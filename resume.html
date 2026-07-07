@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Interactive CV and Resume Builder | TemplateBox</title>
+    <meta name="description" content="Edit your resume live and export an ATS-friendly PDF with selectable text. Everything runs locally in your browser and saves automatically.">
+    <link rel="canonical" href="https://templatebox.win/resume.html">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="TemplateBox">
+    <meta property="og:title" content="Interactive CV and Resume Builder | TemplateBox">
+    <meta property="og:description" content="Edit your resume live and export an ATS-friendly PDF. Free, local, no sign-up.">
+    <meta property="og:url" content="https://templatebox.win/resume.html">
+    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+
+    <!-- ================================================================
+         MICROSOFT CLARITY: paste the Clarity tracking snippet directly
+         below this comment block.
+         ================================================================ -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Compilation engine: jsPDF native text API via clean CDN link.
+         Chosen over html2pdf.js because html2pdf renders through html2canvas,
+         which rasterizes text and breaks ATS machine scanning. See
+         docs/error-fixes/RESUME_PDF_RASTERIZED_TEXT_FIX.md -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+</head>
+<body>
+
+    <header class="site-header">
+        <a class="wordmark" href="index.html">TemplateBox</a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="index.html">Templates</a>
+            <a href="privacy.html">Privacy</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Interactive CV and Resume Builder</h1>
+        <p class="loading-status">Your progress saves automatically on this device. Close the tab and return anytime.</p>
+
+        <!-- Mobile-only tab switcher between form and preview -->
+        <div class="mobile-tabs" role="tablist" aria-label="Editor views">
+            <button type="button" id="tab-edit" class="is-active" aria-selected="true">Edit Form</button>
+            <button type="button" id="tab-preview" aria-selected="false">Live Preview</button>
+        </div>
+
+        <div class="editor-layout show-edit" id="editor-layout">
+
+            <!-- Left pane: input form -->
+            <section class="editor-pane" aria-label="Resume form">
+                <h2>Accent Color</h2>
+                <div class="swatch-row" id="swatch-row" aria-label="Accent color choices">
+                    <button type="button" class="swatch is-active" data-accent="#1A1A1A" style="background-color:#1A1A1A" aria-label="Charcoal accent"></button>
+                    <button type="button" class="swatch" data-accent="#1F4E79" style="background-color:#1F4E79" aria-label="Navy accent"></button>
+                    <button type="button" class="swatch" data-accent="#2E5E4E" style="background-color:#2E5E4E" aria-label="Forest accent"></button>
+                    <button type="button" class="swatch" data-accent="#7A2E2E" style="background-color:#7A2E2E" aria-label="Burgundy accent"></button>
+                    <button type="button" class="swatch" data-accent="#8A6D1D" style="background-color:#8A6D1D" aria-label="Gold accent"></button>
+                </div>
+
+                <form id="resume-form" autocomplete="on">
+                    <fieldset>
+                        <legend>Personal Details</legend>
+                        <div class="field">
+                            <label for="f-name">Full Name</label>
+                            <input type="text" id="f-name" data-bind="name" maxlength="50" required>
+                        </div>
+                        <div class="field">
+                            <label for="f-title">Professional Title</label>
+                            <input type="text" id="f-title" data-bind="title" maxlength="60">
+                        </div>
+                        <div class="field">
+                            <label for="f-email">Email</label>
+                            <input type="email" id="f-email" data-bind="email" maxlength="100">
+                        </div>
+                        <div class="field">
+                            <label for="f-phone">Phone</label>
+                            <input type="tel" id="f-phone" data-bind="phone" maxlength="30">
+                        </div>
+                        <div class="field">
+                            <label for="f-location">Location</label>
+                            <input type="text" id="f-location" data-bind="location" maxlength="60">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Professional Summary</legend>
+                        <div class="field">
+                            <label for="f-summary">Summary</label>
+                            <textarea id="f-summary" data-bind="summary" maxlength="600" rows="4"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Work Experience</legend>
+                        <div id="experience-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-experience">Add Experience Entry</button>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Education</legend>
+                        <div id="education-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-education">Add Education Entry</button>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Skills</legend>
+                        <div class="field">
+                            <label for="f-skills">Skills (comma separated)</label>
+                            <input type="text" id="f-skills" data-bind="skills" maxlength="300">
+                        </div>
+                    </fieldset>
+                </form>
+            </section>
+
+            <!-- Right pane: live document preview and export -->
+            <section class="preview-pane" aria-label="Live resume preview">
+                <h2>Live Preview</h2>
+                <div class="resume-sheet" id="resume-sheet"></div>
+                <button type="button" class="btn btn-block" id="download-pdf">Download PDF</button>
+                <p class="upload-hint">Exports locally as selectable vector text via jsPDF. No file ever leaves your device.</p>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Repeating-entry row templates (cloned by resume.js; static markup
+         only, user data is always injected through textContent bindings) -->
+    <template id="tpl-experience">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Job Title</label>
+                <input type="text" data-entry-field="role" maxlength="60">
+            </div>
+            <div class="field">
+                <label>Company</label>
+                <input type="text" data-entry-field="company" maxlength="60">
+            </div>
+            <div class="field">
+                <label>Dates</label>
+                <input type="text" data-entry-field="dates" maxlength="40" placeholder="2022 - Present">
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <textarea data-entry-field="description" maxlength="400" rows="3"></textarea>
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <template id="tpl-education">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Degree or Certificate</label>
+                <input type="text" data-entry-field="degree" maxlength="80">
+            </div>
+            <div class="field">
+                <label>Institution</label>
+                <input type="text" data-entry-field="school" maxlength="80">
+            </div>
+            <div class="field">
+                <label>Dates</label>
+                <input type="text" data-entry-field="dates" maxlength="40" placeholder="2018 - 2022">
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <footer class="site-footer">
+        <div class="footer-links">
+            <a href="index.html">Templates</a>
+            <a href="privacy.html">Privacy Policy</a>
+        </div>
+        <p>TemplateBox. All editing happens locally in your browser.</p>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/resume.js"></script>
+</body>
+</html>

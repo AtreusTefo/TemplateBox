@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Custom Poster and Canvas Maker | TemplateBox</title>
+    <meta name="description" content="Upload a photo, add a caption, choose a frame, and download a high-resolution PNG poster. Free canvas maker running entirely in your browser.">
+    <link rel="canonical" href="https://templatebox.win/poster.html">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="TemplateBox">
+    <meta property="og:title" content="Custom Poster and Canvas Maker | TemplateBox">
+    <meta property="og:description" content="Create framed photo posters with captions and download high-resolution PNG files free.">
+    <meta property="og:url" content="https://templatebox.win/poster.html">
+    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+
+    <!-- ================================================================
+         MICROSOFT CLARITY: paste the Clarity tracking snippet directly
+         below this comment block.
+         ================================================================ -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <header class="site-header">
+        <a class="wordmark" href="index.html">TemplateBox</a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="index.html">Templates</a>
+            <a href="privacy.html">Privacy</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Custom Poster and Canvas Maker</h1>
+        <p class="loading-status">Your caption and frame choice save automatically on this device. Photos never leave your browser.</p>
+
+        <!-- Mobile-only tab switcher between controls and canvas -->
+        <div class="mobile-tabs" role="tablist" aria-label="Editor views">
+            <button type="button" id="tab-edit" class="is-active" aria-selected="true">Edit Form</button>
+            <button type="button" id="tab-preview" aria-selected="false">Live Preview</button>
+        </div>
+
+        <div class="editor-layout show-edit" id="editor-layout">
+
+            <!-- Left pane: poster controls -->
+            <section class="editor-pane" aria-label="Poster controls">
+                <h2>Poster Controls</h2>
+                <form id="poster-form">
+                    <div class="field">
+                        <label for="p-image">Photo Upload</label>
+                        <input type="file" id="p-image" accept="image/*">
+                        <p class="upload-hint">JPG, PNG, or WebP. Validated client-side before drawing.</p>
+                        <p class="form-error" id="p-image-error" role="alert"></p>
+                    </div>
+                    <div class="field">
+                        <label for="p-caption">Caption</label>
+                        <input type="text" id="p-caption" maxlength="80" placeholder="Til death do us part">
+                    </div>
+                    <div class="field">
+                        <label for="p-frame">Frame Style</label>
+                        <select id="p-frame">
+                            <option value="black">Solid Black</option>
+                            <option value="wood">Matte Wood</option>
+                            <option value="gold">Polished Gold</option>
+                        </select>
+                    </div>
+                </form>
+                <button type="button" class="btn btn-block" id="download-png">Download PNG</button>
+                <p class="upload-hint">Exports a high-resolution 1200 x 1500 pixel PNG directly to your device.</p>
+            </section>
+
+            <!-- Right pane: live canvas preview -->
+            <section class="preview-pane" aria-label="Poster preview">
+                <h2>Live Preview</h2>
+                <div class="poster-stage">
+                    <!-- Fixed internal resolution keeps exports high-quality;
+                         CSS scales the visible element responsively -->
+                    <canvas id="poster-canvas" width="1200" height="1500"></canvas>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-links">
+            <a href="index.html">Templates</a>
+            <a href="privacy.html">Privacy Policy</a>
+        </div>
+        <p>TemplateBox. All editing happens locally in your browser.</p>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/poster.js"></script>
+</body>
+</html>

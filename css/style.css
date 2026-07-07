@@ -1,0 +1,772 @@
+/* ==========================================================================
+   TemplateBox - Unified Global Stylesheet
+   Theme: Fabric Film Studio inspired minimalist e-commerce system
+   Palette: Cream #F4F3EF | Charcoal #1A1A1A | Card White #FFFFFF | Border #EAE8E3
+   Geometry: Flat, sharp, rectangular. No gradients, no drop shadows.
+   ========================================================================== */
+
+:root {
+    --color-bg: #F4F3EF;
+    --color-text: #1A1A1A;
+    --color-card: #FFFFFF;
+    --color-border: #EAE8E3;
+    --color-muted: #6B6B66;
+    --accent: #1A1A1A;
+    --font-serif: "Playfair Display", Georgia, serif;
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   Reset and base
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+img,
+canvas {
+    max-width: 100%;
+    display: block;
+}
+
+h1,
+h2,
+h3 {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+a {
+    color: var(--color-text);
+}
+
+button {
+    font-family: var(--font-sans);
+    cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   Layout shell
+   -------------------------------------------------------------------------- */
+
+.site-header {
+    background-color: var(--color-card);
+    border-bottom: 1px solid var(--color-border);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.wordmark {
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.site-nav {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.site-nav a {
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.site-nav a:hover {
+    text-decoration: underline;
+}
+
+main {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+}
+
+.site-footer {
+    background-color: var(--color-card);
+    border-top: 1px solid var(--color-border);
+    padding: 2rem 1.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+}
+
+.site-footer a {
+    color: var(--color-muted);
+}
+
+.footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.footer-links a {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* --------------------------------------------------------------------------
+   Hero and section headings
+   -------------------------------------------------------------------------- */
+
+.hero {
+    text-align: center;
+    padding: 2rem 0 3rem;
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    max-width: 46rem;
+    margin: 0 auto 1rem;
+}
+
+.hero p {
+    color: var(--color-muted);
+    max-width: 38rem;
+    margin: 0 auto;
+    font-size: 1.0625rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Category filter pills
+   -------------------------------------------------------------------------- */
+
+.filter-pills {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 2.5rem;
+    flex-wrap: wrap;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0 1.5rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.pill:hover {
+    border-color: var(--color-text);
+}
+
+.pill.is-active {
+    background-color: var(--color-text);
+    color: var(--color-card);
+    border-color: var(--color-text);
+}
+
+/* --------------------------------------------------------------------------
+   Template catalog grid
+   -------------------------------------------------------------------------- */
+
+.catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 1.5rem;
+}
+
+.template-card {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+}
+
+.template-card.is-hidden {
+    display: none;
+}
+
+.card-preview {
+    aspect-ratio: 4 / 5;
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+/* Pure CSS document mockups inside catalog cards: zero image payload, zero CLS */
+
+.mock-doc {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    width: 100%;
+    height: 100%;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.mock-doc .bar {
+    background-color: var(--color-border);
+    height: 0.5rem;
+    width: 100%;
+}
+
+.mock-doc .bar.head {
+    background-color: var(--color-text);
+    height: 0.875rem;
+    width: 60%;
+    margin-bottom: 0.25rem;
+}
+
+.mock-doc .bar.half {
+    width: 50%;
+}
+
+.mock-doc .bar.short {
+    width: 35%;
+}
+
+.mock-doc .block {
+    background-color: var(--color-border);
+    flex-grow: 1;
+    margin-top: 0.25rem;
+}
+
+.mock-doc.poster {
+    border: 0.625rem solid var(--color-text);
+    padding: 0.75rem;
+    justify-content: flex-end;
+}
+
+.mock-doc.poster.wood {
+    border-color: #7B5B3A;
+}
+
+.mock-doc.poster.gold {
+    border-color: #C9A227;
+}
+
+.card-body {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex-grow: 1;
+}
+
+.card-category {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+}
+
+.card-title {
+    font-size: 1.25rem;
+}
+
+.card-desc {
+    font-size: 0.875rem;
+    color: var(--color-muted);
+    flex-grow: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons (44px / 2.75rem minimum touch targets throughout)
+   -------------------------------------------------------------------------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0 1.5rem;
+    border: 1px solid var(--color-text);
+    background-color: var(--color-text);
+    color: var(--color-card);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+}
+
+.btn:hover {
+    background-color: var(--color-card);
+    color: var(--color-text);
+}
+
+.btn-secondary {
+    background-color: var(--color-card);
+    color: var(--color-text);
+}
+
+.btn-secondary:hover {
+    background-color: var(--color-text);
+    color: var(--color-card);
+}
+
+.btn-block {
+    width: 100%;
+    margin-top: 0.75rem;
+}
+
+/* --------------------------------------------------------------------------
+   Loading page (loading.html)
+   -------------------------------------------------------------------------- */
+
+.loading-wrap {
+    max-width: 44rem;
+    margin: 0 auto;
+    text-align: center;
+    padding: 2rem 0;
+}
+
+.loading-card {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    padding: 3rem 2rem;
+}
+
+.loading-card h1 {
+    font-size: 1.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.loading-status {
+    color: var(--color-muted);
+    font-size: 0.9375rem;
+    margin-bottom: 2rem;
+}
+
+.countdown {
+    font-family: var(--font-serif);
+    font-size: 5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.countdown-label {
+    font-size: 0.8125rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+}
+
+.ad-row {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+.ad-slot {
+    width: 300px;
+    height: 250px;
+    max-width: 100%;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+}
+
+/* In-Page Push placeholder: hidden until second 7, then slides into view */
+
+.push-slot {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    width: 20rem;
+    max-width: calc(100vw - 2rem);
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    padding: 1rem;
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    text-align: left;
+    transform: translateY(150%);
+    transition: transform 0.4s ease-out;
+}
+
+.push-slot.is-visible {
+    transform: translateY(0);
+}
+
+/* --------------------------------------------------------------------------
+   Editor shell (shared by the resume and poster editors)
+   -------------------------------------------------------------------------- */
+
+.editor-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.editor-pane,
+.preview-pane {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    padding: 1.5rem;
+}
+
+.editor-pane h2,
+.preview-pane h2 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+}
+
+.mobile-tabs {
+    display: none;
+    gap: 0;
+    margin-bottom: 1.5rem;
+}
+
+.mobile-tabs button {
+    flex: 1;
+    min-height: 2.75rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.mobile-tabs button.is-active {
+    background-color: var(--color-text);
+    color: var(--color-card);
+    border-color: var(--color-text);
+}
+
+/* --------------------------------------------------------------------------
+   Form controls
+   -------------------------------------------------------------------------- */
+
+.field {
+    margin-bottom: 1rem;
+}
+
+.field label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.375rem;
+}
+
+.field input,
+.field textarea,
+.field select {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-card);
+    font-family: var(--font-sans);
+    /* 16px minimum prevents un-styled mobile browser auto-zoom on input focus */
+    font-size: 1rem;
+    color: var(--color-text);
+}
+
+.field textarea {
+    resize: vertical;
+    min-height: 6rem;
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+    outline: 2px solid var(--color-text);
+    outline-offset: -1px;
+}
+
+fieldset {
+    border: 1px solid var(--color-border);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+legend {
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 0 0.5rem;
+}
+
+.entry-row {
+    border: 1px solid var(--color-border);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.entry-remove {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-muted);
+}
+
+.entry-remove:hover {
+    border-color: var(--color-text);
+    color: var(--color-text);
+}
+
+/* --------------------------------------------------------------------------
+   Accent color swatches (resume builder)
+   -------------------------------------------------------------------------- */
+
+.swatch-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.swatch {
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid var(--color-border);
+    padding: 0;
+}
+
+.swatch.is-active {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Resume document preview (the html2pdf.js capture target)
+   -------------------------------------------------------------------------- */
+
+.resume-sheet {
+    background-color: #FFFFFF;
+    border: 1px solid var(--color-border);
+    padding: 2rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #1A1A1A;
+    min-height: 28rem;
+}
+
+.resume-sheet .rs-name {
+    font-family: var(--font-serif);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.resume-sheet .rs-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.resume-sheet .rs-contact {
+    font-size: 0.75rem;
+    color: #6B6B66;
+    margin-bottom: 1rem;
+}
+
+.resume-sheet .rs-section {
+    margin-top: 1.25rem;
+}
+
+.resume-sheet .rs-heading {
+    font-family: var(--font-serif);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0.25rem;
+    margin-bottom: 0.625rem;
+}
+
+.resume-sheet .rs-entry {
+    margin-bottom: 0.75rem;
+}
+
+.resume-sheet .rs-entry-head {
+    font-weight: 600;
+}
+
+.resume-sheet .rs-entry-meta {
+    font-size: 0.75rem;
+    color: #6B6B66;
+    margin-bottom: 0.25rem;
+}
+
+.resume-sheet ul {
+    padding-left: 1.125rem;
+}
+
+/* --------------------------------------------------------------------------
+   Poster creator
+   -------------------------------------------------------------------------- */
+
+.poster-stage {
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    padding: 1.5rem;
+    display: flex;
+    justify-content: center;
+}
+
+.poster-stage canvas {
+    width: 100%;
+    max-width: 26rem;
+    height: auto;
+}
+
+.upload-hint {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    margin-top: 0.375rem;
+}
+
+.form-error {
+    color: #8A1F1F;
+    font-size: 0.8125rem;
+    margin-top: 0.375rem;
+    min-height: 1.25rem;
+}
+
+/* --------------------------------------------------------------------------
+   Static content pages (privacy.html)
+   -------------------------------------------------------------------------- */
+
+.prose {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    padding: 2.5rem;
+    max-width: 48rem;
+    margin: 0 auto;
+}
+
+.prose h1 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.prose h2 {
+    font-size: 1.25rem;
+    margin: 2rem 0 0.75rem;
+}
+
+.prose p,
+.prose li {
+    color: var(--color-text);
+    margin-bottom: 0.75rem;
+    font-size: 0.9375rem;
+}
+
+.prose ul {
+    padding-left: 1.25rem;
+}
+
+.prose .updated {
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    margin-bottom: 2rem;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive rules (layouts verified down to a 320px viewport)
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 48rem) {
+    .hero h1 {
+        font-size: 1.875rem;
+    }
+
+    /* Dual 300x250 ad containers collapse into a balanced vertical stack */
+    .ad-row {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* Editor split view collapses into a tabbed single-column layout */
+    .editor-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-tabs {
+        display: flex;
+    }
+
+    .editor-layout.show-edit .preview-pane {
+        display: none;
+    }
+
+    .editor-layout.show-preview .editor-pane {
+        display: none;
+    }
+
+    .countdown {
+        font-size: 3.75rem;
+    }
+
+    .prose {
+        padding: 1.5rem;
+    }
+}
