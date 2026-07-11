@@ -22,7 +22,6 @@ const TB = (() => {
 
     const DEFAULT_TARGET = "resume";
     const COUNTDOWN_SECONDS = 10;
-    const PUSH_REVEAL_AT_SECOND = 7; /* In-Page Push animates into view here */
 
     /* ----------------------------------------------------------------------
        Security: input sanitization firewall.
@@ -123,8 +122,9 @@ const TB = (() => {
 
     /* ----------------------------------------------------------------------
        Intermediary countdown (loading.html).
-       Ticks 10 -> 0, reveals the In-Page Push block around second 7, then
-       hands the foreground tab to the whitelisted editor route.
+       Ticks 10 -> 0, then hands the foreground tab to the whitelisted
+       editor route. The Social Bar ad manages its own appearance timing
+       independently, so no reveal logic is needed here.
        ---------------------------------------------------------------------- */
     function initLoadingPage() {
         const counterEl = document.getElementById("countdown");
@@ -135,17 +135,12 @@ const TB = (() => {
         const params = new URLSearchParams(window.location.search);
         const requested = params.get("target") || DEFAULT_TARGET;
         const destination = EDITOR_ROUTES[requested] || EDITOR_ROUTES[DEFAULT_TARGET];
-        const pushSlot = document.getElementById("push-slot");
 
         let remaining = COUNTDOWN_SECONDS;
         counterEl.textContent = String(remaining);
 
         const clock = window.setInterval(() => {
             remaining -= 1;
-
-            if (remaining <= COUNTDOWN_SECONDS - PUSH_REVEAL_AT_SECOND && pushSlot) {
-                pushSlot.classList.add("is-visible");
-            }
 
             if (remaining <= 0) {
                 window.clearInterval(clock);
