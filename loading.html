@@ -44,29 +44,21 @@
                 <!-- Dual 300x250 banner block: collapses to a vertical stack
                      on mobile viewports via the .ad-row media query -->
                 <div class="ad-row">
+                    <!-- Each banner tag runs inside its own srcdoc iframe so
+                         the two instances get isolated window scopes: the
+                         Adsterra tag configures itself through a global
+                         atOptions variable, and two copies sharing one page
+                         context can clobber or dedupe each other. Both slots
+                         currently share one zone key; when Adsterra support
+                         provisions the second distinct 300x250 zone, swap the
+                         key inside SLOT 2 only. -->
                     <div class="ad-slot" id="ad-banner-1">
-                        <script>
-                          atOptions = {
-                            'key' : '4a408738c2170da16b47c5ac05b3780a',
-                            'format' : 'iframe',
-                            'height' : 250,
-                            'width' : 300,
-                            'params' : {}
-                          };
-                        </script>
-                        <script src="https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js"></script>
+                        <iframe title="Advertisement" width="300" height="250" scrolling="no" style="border:0;display:block"
+                            srcdoc="<body style='margin:0'><script>atOptions={'key':'4a408738c2170da16b47c5ac05b3780a','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js'></script></body>"></iframe>
                     </div>
                     <div class="ad-slot" id="ad-banner-2">
-                        <script>
-                          atOptions = {
-                            'key' : '4a408738c2170da16b47c5ac05b3780a',
-                            'format' : 'iframe',
-                            'height' : 250,
-                            'width' : 300,
-                            'params' : {}
-                          };
-                        </script>
-                        <script src="https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js"></script>
+                        <iframe title="Advertisement" width="300" height="250" scrolling="no" style="border:0;display:block"
+                            srcdoc="<body style='margin:0'><script>atOptions={'key':'4a408738c2170da16b47c5ac05b3780a','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js'></script></body>"></iframe>
                     </div>
                 </div>
             </div>

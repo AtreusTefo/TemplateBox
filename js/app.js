@@ -80,12 +80,25 @@ const TB = (() => {
        The Adsterra Pop-Under snippet installed in the <head> of index.html
        self-attaches to this same click and spawns its background tab; this
        handler only routes the foreground tab to the intermediary page.
+
+       The navigation is deferred one beat rather than assigned inline:
+       when a popup blocker suppresses the Pop-Under's background tab, the
+       ad script falls back to redirecting the current tab, and its
+       document-level handler runs after this one. Whichever location
+       assignment happens last supersedes any still-uncommitted navigation,
+       and the ad redirect needs a cross-origin network round-trip to
+       commit, so assigning ours after a short delay keeps the foreground
+       tab on loading.html.
        ---------------------------------------------------------------------- */
+    const LAUNCH_DELAY_MS = 150;
+
     function launchTemplate(targetKey) {
         const safeKey = Object.prototype.hasOwnProperty.call(EDITOR_ROUTES, targetKey)
             ? targetKey
             : DEFAULT_TARGET;
-        window.location.href = "loading.html?target=" + encodeURIComponent(safeKey);
+        window.setTimeout(() => {
+            window.location.href = "loading.html?target=" + encodeURIComponent(safeKey);
+        }, LAUNCH_DELAY_MS);
     }
 
     function initCatalog() {
