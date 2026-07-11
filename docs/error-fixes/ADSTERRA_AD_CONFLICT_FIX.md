@@ -38,6 +38,10 @@ Two independent defects plus one environmental factor:
 - Foreground still occasionally lands on an ad page: the ad's fallback redirect can win only if it commits within the 150 ms window, which requires an unusually fast ad response. If observed repeatedly, raise `LAUNCH_DELAY_MS` in js/app.js (for example to 250) at the cost of a slightly longer perceived pause after the click.
 - Pop-under never appears: frequency capping is expected behavior (roughly one per visitor per time window). Test in a fresh private window.
 
+## Related Issues
+
+- `docs/error-fixes/LOADING_REDIRECT_STALL_FIX.md`: the same navigation-race defect class later surfaced on loading.html itself, where ad-initiated navigations cancelled or out-raced the countdown's one-shot redirect to the editor, stalling the page at zero. Fixed with a persistent navigation watchdog rather than a fixed delay.
+
 ## Related Files
 
 - `js/app.js`

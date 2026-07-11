@@ -158,7 +158,19 @@ const TB = (() => {
             if (remaining <= 0) {
                 window.clearInterval(clock);
                 counterEl.textContent = "0";
-                window.location.href = destination;
+
+                /* Navigation watchdog. A single location assignment can be
+                   cancelled or out-raced by navigations the ad scripts on
+                   this page start themselves (whichever assignment lands
+                   last wins), leaving the countdown stuck at zero. The URL
+                   is resolved against the document location so an injected
+                   base element cannot repoint the relative editor path, and
+                   the assignment is re-issued on a short interval until the
+                   page actually unloads, which kills the timer. */
+                const editorUrl = new URL(destination, window.location.href).href;
+                const go = () => window.location.replace(editorUrl);
+                go();
+                window.setInterval(go, 700);
                 return;
             }
 
