@@ -48,17 +48,16 @@
                          the two instances get isolated window scopes: the
                          Adsterra tag configures itself through a global
                          atOptions variable, and two copies sharing one page
-                         context can clobber or dedupe each other. Both slots
-                         currently share one zone key; when Adsterra support
-                         provisions the second distinct 300x250 zone, swap the
-                         key inside SLOT 2 only. -->
+                         context can clobber or dedupe each other. Each slot
+                         has its own distinct zone key so Adsterra reports
+                         their impressions separately. -->
                     <div class="ad-slot" id="ad-banner-1">
                         <iframe title="Advertisement" width="300" height="250" scrolling="no" style="border:0;display:block"
                             srcdoc="<body style='margin:0'><script>atOptions={'key':'4a408738c2170da16b47c5ac05b3780a','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js'></script></body>"></iframe>
                     </div>
                     <div class="ad-slot" id="ad-banner-2">
                         <iframe title="Advertisement" width="300" height="250" scrolling="no" style="border:0;display:block"
-                            srcdoc="<body style='margin:0'><script>atOptions={'key':'4a408738c2170da16b47c5ac05b3780a','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js'></script></body>"></iframe>
+                            srcdoc="<body style='margin:0'><script>atOptions={'key':'70d844a3963c8415efa49af391c897a0','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/70d844a3963c8415efa49af391c897a0/invoke.js'></script></body>"></iframe>
                     </div>
                 </div>
             </div>
