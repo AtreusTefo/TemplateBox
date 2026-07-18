@@ -13,6 +13,14 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://templatebox.win/blog.html</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://templatebox.win/post.html?slug=free-cv-resume-templates-build-professional-resume-fast</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://templatebox.win/privacy.html</loc>
     <priority>0.3</priority>
   </url>

@@ -713,6 +713,469 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
+   Blog: shared ad placements
+   Hosts ([data-ad-leaderboard], .ad-break, .post-rail) stay empty and
+   collapsed until js/blog.js mounts a slot into them, so placements whose
+   Adsterra zone keys are not provisioned yet cause zero layout shift.
+   -------------------------------------------------------------------------- */
+
+.ad-lead {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.ad-lead.is-filled {
+    margin-bottom: 2rem;
+}
+
+.ad-break {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 2rem 0;
+}
+
+.ad-label {
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    margin-bottom: 0.375rem;
+}
+
+.ad-lead .ad-slot,
+.ad-break .ad-slot,
+.post-rail .ad-slot,
+.blog-sidebar .ad-slot {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Blog index (blog.html)
+   Layout: a featured hero card for the newest post plus a list of the
+   remaining posts in the main column, and a sticky ad rail alongside on
+   wide viewports (mirrors the classic hero + article-list + sidebar
+   editorial layout).
+   -------------------------------------------------------------------------- */
+
+.blog-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+}
+
+.blog-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.blog-sidebar {
+    flex: 0 0 auto;
+    position: sticky;
+    top: 1.5rem;
+}
+
+.blog-empty {
+    color: var(--color-muted);
+    text-align: center;
+    padding: 3rem 0;
+}
+
+/* Cover image/mock, shared by the featured card and list rows */
+
+.blog-card-cover {
+    display: block;
+    background-color: var(--color-bg);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.blog-card-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.blog-card-mock {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-muted);
+}
+
+.card-title a,
+.blog-featured-title a {
+    text-decoration: none;
+}
+
+.card-title a:hover,
+.blog-featured-title a:hover {
+    text-decoration: underline;
+}
+
+/* Featured hero card: the most recent post, shown large at the top */
+
+.blog-featured-card {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 2.5rem;
+}
+
+.blog-featured-card .blog-card-cover {
+    aspect-ratio: 16 / 7;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.blog-featured-card .card-body {
+    padding: 1.75rem;
+}
+
+.blog-featured-title {
+    font-size: 1.75rem;
+    margin: 0.5rem 0 0.75rem;
+}
+
+.blog-featured-card .card-desc {
+    font-size: 1rem;
+    max-width: 42rem;
+    margin-bottom: 1.25rem;
+}
+
+.blog-featured-card .btn {
+    align-self: flex-start;
+}
+
+/* Latest-articles list: remaining posts, newest first */
+
+.blog-list-heading {
+    margin-bottom: 1.25rem;
+}
+
+.blog-list-row {
+    display: flex;
+    gap: 1.25rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    margin-bottom: 1.25rem;
+}
+
+.blog-list-row .blog-card-cover {
+    width: 9rem;
+    aspect-ratio: 4 / 3;
+    border-right: 1px solid var(--color-border);
+}
+
+.blog-list-row .card-body {
+    padding: 1.25rem 1.25rem 1.25rem 0;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.blog-list-row .card-title {
+    font-size: 1.125rem;
+    margin-bottom: 0.375rem;
+}
+
+.blog-list-link {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+}
+
+.blog-list-link:hover {
+    text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   Single post page (post.html)
+   -------------------------------------------------------------------------- */
+
+.post-layout {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2rem;
+}
+
+.post-article {
+    max-width: 48rem;
+    width: 100%;
+    margin: 0;
+}
+
+.post-rail {
+    flex: 0 0 auto;
+    position: sticky;
+    top: 1.5rem;
+}
+
+.post-header {
+    margin-bottom: 1.5rem;
+}
+
+.post-meta {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    margin-bottom: 0.75rem;
+}
+
+.post-standfirst {
+    color: var(--color-muted);
+    font-size: 1.0625rem;
+    margin-top: 0.75rem;
+}
+
+.post-cover {
+    width: 100%;
+    margin-top: 1.5rem;
+    border: 1px solid var(--color-border);
+}
+
+.post-body h2 {
+    font-size: 1.375rem;
+    margin: 2rem 0 0.75rem;
+}
+
+.post-body h3 {
+    font-size: 1.125rem;
+    margin: 1.5rem 0 0.5rem;
+}
+
+.post-body p {
+    margin-bottom: 1rem;
+}
+
+.post-body ul,
+.post-body ol {
+    padding-left: 1.375rem;
+    margin-bottom: 1rem;
+}
+
+.post-body li {
+    margin-bottom: 0.375rem;
+}
+
+.post-body blockquote {
+    border-left: 3px solid var(--color-text);
+    padding: 0.25rem 0 0.25rem 1.25rem;
+    margin: 1.5rem 0;
+    font-family: var(--font-serif);
+    font-size: 1.0625rem;
+}
+
+.post-figure {
+    margin: 1.5rem 0;
+}
+
+.post-figure img {
+    border: 1px solid var(--color-border);
+}
+
+.post-figure figcaption {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    margin-top: 0.5rem;
+}
+
+.post-footer {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.post-missing {
+    text-align: center;
+}
+
+.post-missing .btn {
+    margin-top: 1rem;
+}
+
+.preview-banner {
+    background-color: var(--color-text);
+    color: var(--color-card);
+    font-size: 0.8125rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Blog admin panel (admin.html)
+   -------------------------------------------------------------------------- */
+
+.admin-main {
+    max-width: 56rem;
+}
+
+.admin-intro {
+    margin-bottom: 2rem;
+}
+
+.admin-intro h1 {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+}
+
+.admin-intro p {
+    color: var(--color-muted);
+    max-width: 44rem;
+}
+
+.admin-panel {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.admin-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.admin-panel-head h2 {
+    font-size: 1.25rem;
+}
+
+.admin-sync {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+}
+
+.admin-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.admin-status {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    margin-top: 0.75rem;
+    min-height: 1.25rem;
+}
+
+.admin-help {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+}
+
+.admin-help summary {
+    cursor: pointer;
+    font-weight: 600;
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+}
+
+.admin-help ol,
+.admin-help ul {
+    padding-left: 1.375rem;
+    margin: 0.5rem 0;
+}
+
+.admin-help li {
+    margin-bottom: 0.375rem;
+}
+
+.admin-empty {
+    color: var(--color-muted);
+    font-size: 0.9375rem;
+    padding: 1rem 0;
+}
+
+.admin-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border: 1px solid var(--color-border);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.admin-row-title {
+    font-weight: 600;
+}
+
+.admin-row-meta {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+}
+
+.admin-row-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-small {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    font-size: 0.8125rem;
+}
+
+.radio-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    font-size: 0.9375rem;
+    cursor: pointer;
+}
+
+.admin-cover-preview {
+    margin-top: 0.5rem;
+}
+
+.admin-cover-preview img {
+    max-width: 18rem;
+    border: 1px solid var(--color-border);
+    margin-bottom: 0.75rem;
+}
+
+.admin-preview {
+    max-width: none;
+}
+
+.mono {
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 0.875em;
+    background-color: var(--color-bg);
+    padding: 0.125rem 0.375rem;
+    border: 1px solid var(--color-border);
+}
+
+/* --------------------------------------------------------------------------
    Responsive rules (layouts verified down to a 320px viewport)
    -------------------------------------------------------------------------- */
 
@@ -750,5 +1213,36 @@ legend {
 
     .prose {
         padding: 1.5rem;
+    }
+
+    .post-footer .btn {
+        width: 100%;
+    }
+}
+
+/* The skyscraper rail is only mounted on wide viewports at load time; if
+   the window is later resized narrower, hide it rather than overflow. */
+@media (max-width: 70rem) {
+    .post-rail,
+    .blog-sidebar {
+        display: none;
+    }
+}
+
+@media (max-width: 40rem) {
+    /* Latest-articles list rows collapse to a stacked card on narrow phones */
+    .blog-list-row {
+        flex-direction: column;
+    }
+
+    .blog-list-row .blog-card-cover {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-right: 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .blog-list-row .card-body {
+        padding: 1.25rem;
     }
 }

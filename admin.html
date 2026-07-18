@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Blog Admin | TemplateBox</title>
+    <!-- Private authoring tool: never indexed, never linked from public pages.
+         It holds no secrets by design -- it only edits this browser's own
+         localStorage workspace and generates the static js/blog-data.js file. -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <header class="site-header">
+        <a class="wordmark" href="index.html">TemplateBox</a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="blog.html">View Blog</a>
+            <a href="index.html">View Site</a>
+        </nav>
+    </header>
+
+    <main class="admin-main">
+        <section class="admin-intro">
+            <h1>Blog Admin</h1>
+            <p>Write and manage blog posts locally, then export the data file and deploy it. Nothing here touches a server: drafts live in this browser's storage until you publish the exported <span class="mono">js/blog-data.js</span> through Git or Netlify.</p>
+        </section>
+
+        <!-- Publish state + export workflow -->
+        <section class="admin-panel" aria-label="Publishing">
+            <div class="admin-panel-head">
+                <h2>Publish</h2>
+                <p class="admin-sync" data-admin-sync></p>
+            </div>
+            <div class="admin-actions">
+                <button class="btn" type="button" data-export-download>Download js/blog-data.js</button>
+                <button class="btn btn-secondary" type="button" data-export-copy>Copy File Contents</button>
+            </div>
+            <p class="admin-status" data-export-status aria-live="polite"></p>
+            <details class="admin-help">
+                <summary>How publishing works</summary>
+                <ol>
+                    <li>Save your posts below. They are stored only in this browser.</li>
+                    <li>Click Download js/blog-data.js and replace the existing file at <span class="mono">js/blog-data.js</span> in the project.</li>
+                    <li>Commit and push to <span class="mono">main</span> (Netlify auto-deploys), or drag the site folder into Netlify.</li>
+                    <li>Visitors now see the updated posts on the live blog.</li>
+                </ol>
+            </details>
+        </section>
+
+        <!-- Post management list, Payhip Blog Posts tab equivalent -->
+        <section class="admin-panel" aria-label="Your blog posts">
+            <div class="admin-panel-head">
+                <h2>Your Blog Posts</h2>
+                <button class="btn" type="button" data-new-post>Add New Blog Post</button>
+            </div>
+            <div class="admin-list" data-admin-list></div>
+        </section>
+
+        <!-- Add/edit form, Payhip Add New Blog Post equivalent -->
+        <section class="admin-panel" aria-label="Post editor">
+            <div class="admin-panel-head">
+                <h2 data-form-title>Add New Blog Post</h2>
+            </div>
+
+            <form id="post-form" novalidate>
+                <div class="field">
+                    <label for="f-title">Title</label>
+                    <input id="f-title" type="text" required maxlength="120"
+                        placeholder="Your post title" autocomplete="off">
+                </div>
+
+                <div class="field">
+                    <label for="f-slug">Slug (URL identifier)</label>
+                    <input id="f-slug" type="text" required maxlength="80"
+                        pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                        placeholder="auto-generated-from-title" autocomplete="off">
+                    <p class="upload-hint">Lowercase letters, numbers, and hyphens. Becomes post.html?slug=...</p>
+                </div>
+
+                <div class="field">
+                    <label for="f-category">Category</label>
+                    <input id="f-category" type="text" maxlength="40" list="category-options"
+                        placeholder="Resumes" autocomplete="off">
+                    <datalist id="category-options">
+                        <option value="Resumes"></option>
+                        <option value="Posters"></option>
+                        <option value="Guides"></option>
+                        <option value="News"></option>
+                    </datalist>
+                </div>
+
+                <div class="field">
+                    <label for="f-description">Description (excerpt and meta description)</label>
+                    <textarea id="f-description" maxlength="200" rows="2"
+                        placeholder="One or two sentences shown on the blog card and in search results"></textarea>
+                </div>
+
+                <div class="field">
+                    <label for="f-content">Content</label>
+                    <textarea id="f-content" required maxlength="30000" rows="16"
+                        placeholder="Type your blog post content here..."></textarea>
+                    <details class="admin-help">
+                        <summary>Formatting reference</summary>
+                        <ul>
+                            <li><span class="mono">## Heading</span> and <span class="mono">### Subheading</span></li>
+                            <li>Blank line starts a new paragraph</li>
+                            <li><span class="mono">- item</span> for bullet lists, <span class="mono">1. item</span> for numbered lists</li>
+                            <li><span class="mono">&gt; text</span> for a quote</li>
+                            <li><span class="mono">**bold**</span>, <span class="mono">*italic*</span>, <span class="mono">[link text](https://example.com)</span></li>
+                            <li><span class="mono">[image: https://url | alt text]</span> on its own line for an inline image</li>
+                        </ul>
+                    </details>
+                </div>
+
+                <fieldset>
+                    <legend>Blog post image</legend>
+                    <div class="field">
+                        <label for="f-cover-file">Upload image (recommended minimum width: 1260px)</label>
+                        <input id="f-cover-file" type="file" accept="image/*">
+                        <p class="upload-hint">Stored inline in the data file; keep it under 400 KB. Larger or non-image files are rejected.</p>
+                        <p class="form-error" data-cover-error></p>
+                    </div>
+                    <div class="field">
+                        <label for="f-cover-url">Or image URL</label>
+                        <input id="f-cover-url" type="url" maxlength="500"
+                            placeholder="https://..." autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label for="f-cover-alt">Image alt text</label>
+                        <input id="f-cover-alt" type="text" maxlength="150" autocomplete="off">
+                    </div>
+                    <div class="admin-cover-preview" data-cover-preview hidden>
+                        <img alt="Cover preview" data-cover-thumb>
+                        <button class="entry-remove" type="button" data-cover-remove>Remove Image</button>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Visibility</legend>
+                    <div class="radio-row">
+                        <label class="radio-option">
+                            <input type="radio" name="visibility" value="visible" checked>
+                            Visible
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="visibility" value="invisible">
+                            Invisible
+                        </label>
+                    </div>
+                    <p class="upload-hint">Invisible posts stay in the data file but never render on the public blog.</p>
+                </fieldset>
+
+                <p class="form-error" data-form-error aria-live="polite"></p>
+
+                <div class="admin-actions">
+                    <button class="btn" type="submit" data-save-btn>Add Blog Post</button>
+                    <button class="btn btn-secondary" type="button" data-preview-btn>Preview Below</button>
+                    <button class="btn btn-secondary" type="button" data-cancel-btn hidden>Cancel Editing</button>
+                </div>
+                <p class="admin-status" data-form-status aria-live="polite"></p>
+            </form>
+        </section>
+
+        <section class="admin-panel" aria-label="Post preview" data-preview-panel hidden>
+            <div class="admin-panel-head">
+                <h2>Preview</h2>
+            </div>
+            <div class="prose admin-preview" data-preview-target></div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>TemplateBox blog admin. Local authoring tool; not part of the public site.</p>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/blog-data.js"></script>
+    <script src="js/blog.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
