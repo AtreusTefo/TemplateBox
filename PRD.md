@@ -6,8 +6,9 @@
 * Security & CDN: [Cloudflare Registrar](https://www.cloudflare.com/products/registrar/) + Cloudflare DNS Proxy (Orange Cloud)
 * Monetization Engine: Adsterra (Pop-Under, Banners, In-Page Push)
 * Analytics Engine: [Microsoft Clarity](https://clarity.microsoft.com/) (Session Recording & Heatmaps) + Google Search Console
-* Version: 1.3
-* Date: July 7, 2026
+* Version: 1.4
+* Date: July 21, 2026
+* Changelog: v1.4 adds the Mockup Generator (section 5.3, App C) and the Serverless Blog (section 5.4) as shipped features beyond the original two-editor scope. v1.3 ad plan named an In-Page Push placement; the shipped implementation uses an Adsterra Social Bar in that role instead (see `docs/error-fixes/SOCIAL_BAR_NOT_DISPLAYING.md`).
 
 ------------------------------
 ## 1. Executive Summary & Objective## 1.1 What We Are Building
@@ -80,6 +81,7 @@ The app operates on a strict single-direction visual path to isolate monetizatio
 * Technical Logic:
 * Uses a client-side JavaScript setInterval countdown clock.
    * Once the timer strikes 0, the browser must execute an automated redirection (window.location.href) to launch the selected interactive web editor.
+   * Resilience requirement: the countdown and redirect must complete even if the primary shared script fails to load or throws (extension interference, ad-blocker collateral damage, cache corruption). loading.html implements this via a dependency-free inline fallback that runs its own identical countdown only if the primary script does not signal it took over; see `docs/error-fixes/LOADING_REDIRECT_STALL_FIX.md` and `docs/implementation/MOCKUP_GENERATOR_IMPLEMENTATION.md`.
 
 ## 5.3 Page 3: The Interactive Web App Editors
 Once the user clears the loading screen, they enter an isolated, clean workspace. To build user loyalty and word-of-mouth virality, the final file export must be entirely ad-free.
@@ -106,6 +108,27 @@ Once the user clears the loading screen, they enter an isolated, clean workspace
 * Uses native JavaScript HTML5 Canvas drawing protocols to compile the uploaded image, border vectors, and custom typography layers.
    * The canvas container must dynamically scale responsively to fit mobile device aspect ratios without cropping the text controls.
    * Provides an instant local download link via a native client-side canvas.toDataURL() stream, outputting a high-resolution .png file directly to the device's downloads path.
+
+## App C: The Print-on-Demand Mockup Generator
+
+* Description: Lets print-on-demand sellers preview a design on real product templates without a photoshoot — upload a design, pick a product, see it applied instantly.
+* UI Layout: A clean container wrapping a responsive HTML5 <canvas> element surrounded by editing controls, following the same split-pane pattern as the CV/Resume and Poster editors.
+* Customization Engine:
+* A product template picker covering t-shirts, hoodies, mugs, and packaging.
+   * A design upload node validated client-side against an image.* mime-type, matching the Poster app's file validation rule.
+   * Color swatches to change the product base color.
+   * Drag-to-reposition placement of the uploaded design directly on the canvas preview, with edits reflected live.
+* The Compilation Engine:
+* Uses native JavaScript HTML5 Canvas drawing protocols to compile the product template, uploaded design layer, and selected color into a single flattened image.
+   * Provides an instant local download link via canvas.toDataURL(), outputting a high-resolution .png file.
+* Full implementation notes: `docs/implementation/MOCKUP_GENERATOR_IMPLEMENTATION.md`.
+
+## 5.4 Page 4: The Serverless Blog (blog.html, post.html, admin.html)
+
+* Description: A content-marketing and SEO surface, kept separate from the ad-monetized loading flow. Blog pages are indexable and must never carry the Popunder or Social Bar; only passive Banner placements are permitted there.
+* Authoring Model: Since the platform has zero database and zero server, `admin.html` is a private (noindex, robots-disallowed) authoring panel. Drafts are held in that browser's localStorage; "publishing" exports a static `js/blog-data.js` file that is committed and deployed like any other asset.
+* Content Safety: Post bodies use a typed block content model rendered exclusively via `createElement`/`textContent` — never raw HTML strings — to preserve the project's no-`innerHTML`-for-user-data rule.
+* Full implementation notes: `docs/implementation/BLOG_SYSTEM_IMPLEMENTATION.md`.
 
 ------------------------------
 ## 6. Non-Functional Requirements & Performance## 6.1 Databaseless State & Retention Strategy

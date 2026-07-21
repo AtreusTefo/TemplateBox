@@ -1,6 +1,6 @@
 # TemplateBox — Project Status and Session Handoff
 
-Last updated: July 20, 2026
+Last updated: July 21, 2026
 
 ## Purpose of This Document
 
@@ -44,7 +44,7 @@ Adult ads are toggled off for this site in the Adsterra dashboard. `index.html` 
 
 ```
 index.html          Catalog: 9 template cards (3 resume, 3 poster, 3 mockup), category filter pills, Popunder script, JSON-LD WebApplication schema
-loading.html         10s countdown, 2 banner slots (isolated in srcdoc iframes), Social Bar script, navigation watchdog
+loading.html         10s countdown, 2 banner slots (isolated in srcdoc iframes), Social Bar script, navigation watchdog, dependency-free inline countdown/redirect fallback (activates only if js/app.js fails to take over)
 resume.html + js/resume.js    CV builder: split-pane editor, accent swatches, localStorage binding, jsPDF native-text PDF export
 poster.html + js/poster.js    Poster creator: HTML5 Canvas, image upload with mime validation, frame styles, PNG export
 mockup.html + js/mockup.js    Product mockup generator: flat-vector Canvas product illustrations (t-shirt/hoodie/mug/box), mime-validated design upload, pointer drag + scale placement, in-memory "My Mockups" tray, PNG export
@@ -74,7 +74,7 @@ index.html card click
   -> resume.html or poster.html: fully ad-free, localStorage-backed editor
 ```
 
-`EDITOR_ROUTES` in `js/app.js` is the whitelist mapping `target` query values to editor pages — this is what makes the redirect immune to open-redirect tampering.
+`EDITOR_ROUTES` in `js/app.js` is the whitelist mapping `target` query values to editor pages — this is what makes the redirect immune to open-redirect tampering. `loading.html` carries a second, dependency-free copy of this same whitelist inline (see below) — **both must be updated when adding a new editor**, or the fallback path silently sends unrecognized/failed cases to the default editor instead of the new one.
 
 ## Known Issues Already Solved (see docs/error-fixes/ for full write-ups)
 
@@ -103,6 +103,7 @@ These cost real time to work out during setup and aren't captured in any other d
 - **Reused Adsterra banner keys across both slots is fine** functionally; a second zone was obtained purely for separated reporting, not because sharing was broken.
 - **CSP is intentionally not in `netlify.toml` yet** — Adsterra's ad domains rotate/vary enough that a hand-written allowlist would likely break ads; revisit once ad domains are observed to be stable.
 - **jsPDF over html2pdf.js** is now the mandated PDF engine project-wide (CLAUDE.md and PRD.md both updated) — do not reintroduce html2pdf.js.
+- **Loading-page countdown resilience (July 21, 2026).** The countdown text (`10`) is static markup in `loading.html`, so if `js/app.js` ever fails to load or throws before scheduling its timer, the page freezes at 10 forever with no redirect — indistinguishable from "the countdown isn't working," and distinct from the already-solved stall-at-zero defect in LOADING_REDIRECT_STALL_FIX.md (that one starts the timer but loses the redirect race; this one never starts the timer at all). Two changes close the gap: (1) the `DOMContentLoaded` boot handler in `js/app.js` now runs `initCatalog`/`initLoadingPage`/`initEditorTabs` each in its own `try/catch` instead of as unguarded sequential calls, so a throw in one can't block the others; (2) `loading.html` carries a small inline, dependency-free fallback script (after the `js/app.js` include) that waits 1.5s, checks a `window.__tbLoadingActive` flag `initLoadingPage()` sets on success, and if unset runs its own identical countdown/redirect against its own copy of the route whitelist. Verified with Playwright: normal path completes in 10s as before; with `js/app.js` blocked, the fallback completes in ~12s and lands on the correct editor; a 10-case fuzz of the fallback's whitelist (valid/missing/unknown targets plus six hostile payloads: absolute URL, protocol-relative, path traversal, `__proto__`, `constructor`) all resolved to the correct or default editor with nothing escaping to an external host. Full write-up: `docs/implementation/MOCKUP_GENERATOR_IMPLEMENTATION.md`.
 - **Mockup generator (July 20, 2026): flat-vector Canvas products, no image assets.** Rather than photographic mockup templates (which would need licensed/hosted product photos), all four products are drawn as flat vector illustrations directly in `js/mockup.js`, matching the site's "no gradients, no drop shadows" theme and keeping the tool's payload at zero images, consistent with the poster editor's approach. The mug handle's arc deliberately oversweeps past 90 degrees on each side so it tucks behind the body edge instead of floating disconnected — worth knowing before adjusting that shape. The "Add to My Mockups" tray is the closest honest stand-in for "add to products in one click" a database-free tool can offer (there is no real product catalog to attach to); it lives in memory only, not localStorage, for the same image-quota reason `poster.js` never persists the uploaded photo. Full write-up: `docs/implementation/MOCKUP_GENERATOR_IMPLEMENTATION.md`.
 - **Blog (July 18, 2026): serverless admin-panel model.** No database means the blog "publishes" by exporting a static `js/blog-data.js` from `admin.html` (drafts live in that browser's localStorage under `tb_admin_posts`) and deploying it. Post bodies are typed blocks rendered createElement/textContent-only — never HTML strings. Blog pages are a monetized surface (banners only, passive formats); the no-ads rule still holds for index.html and the editors, and Popunder/Social Bar are deliberately kept off blog pages because they are indexable content. Ad placements live in the `AD_ZONES` registry in `js/blog.js`: a placement with an empty key renders nothing (zero layout shift), so 728x90/320x50/160x600 activate by pasting keys once Adsterra provisions the zones. Full write-up: `docs/implementation/BLOG_SYSTEM_IMPLEMENTATION.md`.
 

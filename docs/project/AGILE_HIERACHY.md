@@ -110,3 +110,22 @@ APPLICATION: TemplateBox (templatebox.win)
 │       └── US-14: As a platform owner, I want silent user behavioral telemetry tracked so that I can optimize ad container layouts based on clicks.
 │           ├── TASK-37: Embed universal Microsoft Clarity tracking code snippets across all individual HTML asset headers.
 │           └── TASK-38: Connect Google Search Console validation layers to track organic keyword ranking metrics safely.
+│
+├── EPIC-04: Print-on-Demand Mockup Generator (shipped July 20, 2026)
+│   └── FEAT-09: Canvas Product Mockup Tool
+│       ├── US-15: As a print-on-demand seller, I want to preview a design on real product templates so that I can skip a photoshoot.
+│       │   ├── TASK-39: Build flat-vector Canvas product illustrations (t-shirt, hoodie, mug, packaging box).
+│       │   ├── TASK-40: Write mime-validated design upload matching the poster app's file-type guard.
+│       │   ├── TASK-41: Implement Pointer Events drag-to-reposition and range-input scale placement, clipped to a per-product print area.
+│       │   └── TASK-42: Wire `mockup: "mockup.html"` into `EDITOR_ROUTES` so the tool routes through the existing monetized loading flow with zero ad-side changes.
+│       └── US-16: As a print-on-demand seller, I want to stage several finished renders before downloading so that I can build a store listing in one session.
+│           └── TASK-43: Build an in-memory "My Mockups" tray with per-item download/remove actions, deliberately not persisted to localStorage.
+│
+└── EPIC-05: Serverless Content Marketing Blog (shipped July 18, 2026)
+    └── FEAT-10: Static Admin-Authored Blog
+        ├── US-17: As a platform owner, I want to publish blog content without a database or server so that the $0/month infrastructure constraint holds.
+        │   ├── TASK-44: Build a private, robots-disallowed admin.html authoring panel backed by localStorage drafts.
+        │   ├── TASK-45: Implement a typed block content model rendered exclusively via createElement/textContent, never raw HTML.
+        │   └── TASK-46: Write an export flow that generates a static js/blog-data.js post database for deployment.
+        └── US-18: As a platform owner, I want the blog to carry passive ad formats only so that it stays trustworthy as indexable content.
+            └── TASK-47: Build the size-aware AD_ZONES placement registry in js/blog.js, keeping Popunder and Social Bar off blog pages entirely.

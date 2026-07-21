@@ -1,6 +1,7 @@
 # Product Mockup Generator Implementation
 
 Date: July 20, 2026
+Updated: July 21, 2026 — added the loading-page countdown resilience fix and the local-testing `serve.json` fix below, both surfaced while verifying the mockup launch flow end to end.
 
 ## Overview
 
@@ -19,6 +20,25 @@ A third editor tool, alongside the resume builder and poster maker: a print-on-d
 - `index.html` — added a "Mockups" filter pill, three catalog cards (Apparel, Mug, Packaging, all routing to `data-target="mockup"`, mirroring how the three existing poster cards all route to `poster`), and updated the page title/meta description/OG tags/JSON-LD description and the hero H1/copy to mention the new tool.
 - `css/style.css` — mockup catalog card preview variants (`.mock-doc.mockup` + `.dot-row`/`.dot` color swatches), and the editor's own styles: `.mockup-stage`, `.color-row`, `.range-row`, `.mockup-tray` and its `.tray-*` grid/card/thumbnail rules.
 - `sitemap.xml` — added `mockup.html` at the same priority (0.8) as the other two editor entry points.
+- `js/app.js` (`initLoadingPage`) — sets `window.__tbLoadingActive = true` once it takes over the countdown, so the loading-page inline fallback (below) knows to stay dormant. The `DOMContentLoaded` boot handler also now runs `initCatalog`/`initLoadingPage`/`initEditorTabs` each inside its own `try/catch` instead of as three unguarded sequential calls, so a throw in one can no longer prevent the others — specifically, prevent the countdown — from starting.
+- `loading.html` — added a dependency-free inline `<script>` safety net after the `js/app.js` include (see below).
+
+## Loading-Page Countdown Resilience
+
+Surfaced while testing the new mockup launch flow: the countdown text (`10`) is static markup in `loading.html`, so if `js/app.js` ever fails to load or throws before scheduling its timer (blocked request, cache corruption, an unrelated exception in a sibling initializer under the old unguarded boot sequence), the page was left frozen at `10` forever with no redirect — indistinguishable from "the countdown isn't working."
+
+Two changes close this:
+
+1. Each boot initializer in `js/app.js` is now isolated in its own `try/catch` (see above), so `initLoadingPage()` starting is no longer contingent on `initCatalog()`/`initEditorTabs()` succeeding.
+2. `loading.html` carries a small inline, dependency-free fallback script after the `js/app.js` `<script>` tag. It waits 1.5s (giving the primary script a head start), then checks `window.__tbLoadingActive`. If unset, it runs its own identical 10-second countdown and redirect, resolving the `?target=` query against its own copy of the route whitelist (`resume`/`poster`/`mockup`, defaulting to `resume` for anything else — including hostile inputs like absolute/protocol-relative URLs, path traversal, or prototype-chain keys such as `__proto__`/`constructor`, guarded against via `Object.prototype.hasOwnProperty.call`).
+
+The route table in the fallback duplicates `EDITOR_ROUTES` in `js/app.js` by necessity — the whole point is that it must not depend on `js/app.js` having loaded. **Adding a fifth editor requires updating both places**, or the fallback path silently routes unrecognized/failed cases to `resume.html`.
+
+Verified with Playwright headless runs covering both paths: the normal path (`js/app.js` driving) still completes the countdown and redirect in exactly 10 seconds; the fallback path (`js/app.js` request aborted) completes in ~12 seconds (the 1.5s head start plus the 10-second countdown) and lands on the correct editor. A 10-case whitelist fuzz of the fallback's route resolution (valid targets, missing target, unknown target, and six hostile payloads) all resolved correctly, with none escaping to an external host.
+
+## Local Testing Fix (serve.json)
+
+Also surfaced while testing this flow: `npx serve .` — the local test command this project's own tooling docs recommend — 301-redirects any `*.html` request to a clean, extensionless URL by default, and that redirect drops the query string. `loading.html?target=mockup` was silently becoming `loading` with no `target`, so `initLoadingPage()` fell back to the default editor (`resume`) instead of `mockup`, purely as a local-dev-server artifact — Netlify (production) has no equivalent redirect. Fixed by adding `serve.json` (`{"cleanUrls": false}`) at the repo root. Full write-up: `docs/error-fixes/LOCAL_SERVE_CLEAN_URL_DROPS_TARGET_QUERY.md`.
 
 ## Product Rendering
 
