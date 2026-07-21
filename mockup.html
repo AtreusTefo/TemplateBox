@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Product Mockup Generator for Print-on-Demand | TemplateBox</title>
+    <meta name="description" content="Upload your design and preview it on t-shirts, hoodies, mugs, and packaging in seconds. Free product mockup generator running entirely in your browser.">
+    <link rel="canonical" href="https://templatebox.win/mockup.html">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="TemplateBox">
+    <meta property="og:title" content="Product Mockup Generator for Print-on-Demand | TemplateBox">
+    <meta property="og:description" content="Pick a mockup template, drop in your artwork, and see edits live on t-shirts, hoodies, mugs, and packaging.">
+    <meta property="og:url" content="https://templatebox.win/mockup.html">
+    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+
+    <!-- ================================================================
+         MICROSOFT CLARITY: paste the Clarity tracking snippet directly
+         below this comment block.
+         ================================================================ -->
+    <script type="text/javascript">
+        (function(c,l,a,r,i,t,y){
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+        })(window, document, "clarity", "script", "xix7m2758f");
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <header class="site-header">
+        <a class="wordmark" href="index.html">TemplateBox</a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="index.html">Templates</a>
+            <a href="privacy.html">Privacy</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Product Mockup Generator</h1>
+        <p class="loading-status">Upload your design once, then switch between t-shirt, hoodie, mug, and packaging templates. Your artwork is never uploaded to a server &mdash; everything renders locally in this tab.</p>
+
+        <!-- Mobile-only tab switcher between controls and canvas -->
+        <div class="mobile-tabs" role="tablist" aria-label="Editor views">
+            <button type="button" id="tab-edit" class="is-active" aria-selected="true">Edit Form</button>
+            <button type="button" id="tab-preview" aria-selected="false">Live Preview</button>
+        </div>
+
+        <div class="editor-layout show-edit" id="editor-layout">
+
+            <!-- Left pane: mockup controls -->
+            <section class="editor-pane" aria-label="Mockup controls">
+                <h2>Mockup Controls</h2>
+                <form id="mockup-form">
+                    <div class="field">
+                        <label for="m-product">Product Template</label>
+                        <select id="m-product">
+                            <option value="tshirt">T-Shirt</option>
+                            <option value="hoodie">Hoodie</option>
+                            <option value="mug">Mug</option>
+                            <option value="box">Packaging Box</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label id="m-color-label">Color</label>
+                        <div class="color-row" id="m-color-row" role="radiogroup" aria-labelledby="m-color-label"></div>
+                    </div>
+
+                    <div class="field">
+                        <label for="m-design">Upload Design</label>
+                        <input type="file" id="m-design" accept="image/*">
+                        <p class="upload-hint">PNG, JPG, or WebP with a transparent background works best. Validated client-side before drawing.</p>
+                        <p class="form-error" id="m-design-error" role="alert"></p>
+                    </div>
+
+                    <div class="field">
+                        <label for="m-scale">Design Size</label>
+                        <div class="range-row">
+                            <input type="range" id="m-scale" min="30" max="100" value="75" step="1">
+                            <output id="m-scale-output" for="m-scale">75%</output>
+                        </div>
+                        <p class="upload-hint">Drag your design directly on the preview to reposition it on the product.</p>
+                    </div>
+
+                    <div class="field">
+                        <label for="m-label">Mockup Label</label>
+                        <input type="text" id="m-label" maxlength="40" placeholder="Front chest print, navy tee">
+                    </div>
+                </form>
+
+                <button type="button" class="btn btn-block" id="add-to-tray">Add to My Mockups</button>
+                <button type="button" class="btn btn-secondary btn-block" id="download-mockup-png">Download PNG</button>
+            </section>
+
+            <!-- Right pane: live canvas preview + saved mockups tray -->
+            <section class="preview-pane" aria-label="Mockup preview">
+                <h2>Live Preview</h2>
+                <div class="mockup-stage">
+                    <!-- Fixed internal resolution keeps exports high-quality;
+                         CSS scales the visible element responsively -->
+                    <canvas id="mockup-canvas" width="1000" height="1000"></canvas>
+                </div>
+
+                <div class="mockup-tray">
+                    <h2>My Mockups</h2>
+                    <p class="tray-hint">Added mockups stay in this tab only, ready to download and drop into your product listings.</p>
+                    <p class="tray-empty" id="tray-empty">No mockups added yet. Upload a design and select "Add to My Mockups" above.</p>
+                    <div class="tray-grid" id="tray-grid"></div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-links">
+            <a href="index.html">Templates</a>
+            <a href="privacy.html">Privacy Policy</a>
+        </div>
+        <p>TemplateBox. All editing happens locally in your browser.</p>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/mockup.js"></script>
+</body>
+</html>

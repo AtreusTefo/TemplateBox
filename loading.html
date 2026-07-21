@@ -74,6 +74,64 @@
 
     <script src="js/app.js"></script>
 
+    <!-- ================================================================
+         COUNTDOWN SAFETY NET (dependency-free).
+         The countdown and redirect are normally driven by initLoadingPage()
+         in js/app.js. This self-contained fallback runs its own identical
+         10-second countdown and redirect ONLY if js/app.js did not take over
+         (failed to load, was blocked by an extension/ad blocker, or threw
+         before scheduling its timer) - detected via the window.__tbLoadingActive
+         flag app.js sets. Without this, any failure of js/app.js leaves the
+         visitor stranded on a countdown frozen at its initial value with no
+         redirect. The route table mirrors EDITOR_ROUTES in js/app.js; keep
+         the two in sync when adding a new editor.
+         ================================================================ -->
+    <script>
+        (function () {
+            "use strict";
+            var ROUTES = { resume: "resume.html", poster: "poster.html", mockup: "mockup.html" };
+            var DEFAULT_TARGET = "resume";
+
+            /* Give js/app.js a clear head start; it initializes on
+               DOMContentLoaded, well before this check. If it took over, the
+               flag is set and this net stays completely dormant. */
+            window.setTimeout(function () {
+                if (window.__tbLoadingActive) {
+                    return;
+                }
+
+                var counterEl = document.getElementById("countdown");
+                if (!counterEl) {
+                    return;
+                }
+
+                var match = window.location.search.match(/[?&]target=([^&]*)/);
+                var requested = match ? decodeURIComponent(match[1]) : "";
+                var destination = Object.prototype.hasOwnProperty.call(ROUTES, requested)
+                    ? ROUTES[requested]
+                    : ROUTES[DEFAULT_TARGET];
+                var editorUrl = new URL(destination, window.location.href).href;
+
+                var remaining = parseInt(counterEl.textContent, 10);
+                if (!(remaining > 0)) {
+                    remaining = 10;
+                }
+                counterEl.textContent = String(remaining);
+
+                var clock = window.setInterval(function () {
+                    remaining -= 1;
+                    if (remaining <= 0) {
+                        window.clearInterval(clock);
+                        counterEl.textContent = "0";
+                        window.location.replace(editorUrl);
+                        return;
+                    }
+                    counterEl.textContent = String(remaining);
+                }, 1000);
+            }, 1500);
+        })();
+    </script>
+
     <!-- ADSTERRA SOCIAL BAR: self-injecting widget, positions itself
          independently of surrounding markup per Adsterra's own placement
          instructions (insert directly above the closing body tag). -->

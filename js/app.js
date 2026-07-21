@@ -17,7 +17,8 @@ const TB = (() => {
        ---------------------------------------------------------------------- */
     const EDITOR_ROUTES = {
         resume: "resume.html",
-        poster: "poster.html"
+        poster: "poster.html",
+        mockup: "mockup.html"
     };
 
     const DEFAULT_TARGET = "resume";
@@ -145,6 +146,11 @@ const TB = (() => {
             return;
         }
 
+        /* Signal to the dependency-free inline safety net in loading.html
+           that this script successfully took over the countdown, so the net
+           stays dormant and does not double-drive the redirect. */
+        window.__tbLoadingActive = true;
+
         const params = new URLSearchParams(window.location.search);
         const requested = params.get("target") || DEFAULT_TARGET;
         const destination = EDITOR_ROUTES[requested] || EDITOR_ROUTES[DEFAULT_TARGET];
@@ -207,10 +213,18 @@ const TB = (() => {
     /* ----------------------------------------------------------------------
        Boot
        ---------------------------------------------------------------------- */
+    /* Each initializer is isolated so a failure in one (for example a DOM
+       shape this build did not anticipate) can never prevent the others from
+       running. This specifically guarantees the loading-page countdown always
+       starts, independent of the catalog and editor-tab wiring. */
     document.addEventListener("DOMContentLoaded", () => {
-        initCatalog();
-        initLoadingPage();
-        initEditorTabs();
+        [initCatalog, initLoadingPage, initEditorTabs].forEach((init) => {
+            try {
+                init();
+            } catch (err) {
+                /* Swallow: one broken initializer must not halt the page. */
+            }
+        });
     });
 
     /* Public surface consumed by resume.js and poster.js */
