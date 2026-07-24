@@ -298,6 +298,74 @@ main {
     gap: 0.625rem;
 }
 
+/* Business document card mocks: ruled forms and line-item grids */
+
+.mock-doc.paper {
+    justify-content: flex-start;
+    gap: 0.625rem;
+}
+
+.mock-doc.paper .bar.head {
+    width: 55%;
+    margin: 0 auto 0.5rem;
+}
+
+.mock-doc.paper .bar.head.boxed {
+    background-color: transparent;
+    border: 1px solid var(--color-text);
+    width: 100%;
+    height: 1.125rem;
+}
+
+.mock-doc .rule {
+    background-color: var(--color-border);
+    height: 3px;
+    width: 100%;
+}
+
+/* Pushes the trailing signature rule of a form mock to the bottom edge */
+.mock-doc .grow {
+    flex-grow: 1;
+}
+
+.mock-doc .rule.half {
+    width: 55%;
+}
+
+.mock-doc .rule.short {
+    width: 35%;
+}
+
+.mock-doc .mock-table {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--color-border);
+    flex-grow: 1;
+}
+
+.mock-doc .mock-table span {
+    background-color: var(--color-bg);
+}
+
+.mock-doc .check-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.mock-doc .check-row .rule {
+    flex: 1;
+}
+
+.mock-doc .check {
+    width: 0.625rem;
+    height: 0.625rem;
+    border: 1px solid var(--color-muted);
+    flex-shrink: 0;
+}
+
 .mock-doc.mockup.tee {
     border-color: #1A1A1A;
 }
@@ -473,6 +541,11 @@ main {
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
     padding: 1.5rem;
+    /* Grid children default to min-width:auto, which lets an irreducible
+       child (a wide document table) push the pane past its track and scroll
+       the whole page sideways. Allowing the pane to shrink hands the
+       overflow to the child's own scroll container instead. */
+    min-width: 0;
 }
 
 .editor-pane h2,
@@ -669,6 +742,407 @@ legend {
 
 .resume-sheet ul {
     padding-left: 1.125rem;
+}
+
+/* --------------------------------------------------------------------------
+   Business document preview (docs.html)
+   One sheet component with three layout modifiers: is-receipt (rent and cash
+   receipts), is-itemized (business receipts, sales receipts, invoices) and
+   is-notice (employee warning notice). Ruled value lines are kept visible on
+   empty fields so the sheet doubles as a printable blank form.
+   -------------------------------------------------------------------------- */
+
+.doc-sheet {
+    background-color: #FFFFFF;
+    border: 1px solid var(--color-border);
+    padding: 2rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #1A1A1A;
+    min-height: 28rem;
+}
+
+.doc-masthead {
+    margin-bottom: 1.25rem;
+}
+
+.doc-brand {
+    font-family: var(--font-serif);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-height: 1.5rem;
+}
+
+.doc-brand-line {
+    font-size: 0.75rem;
+    color: #6B6B66;
+}
+
+.doc-title {
+    font-family: var(--font-serif);
+    font-size: 1.625rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: center;
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.doc-title.left {
+    text-align: left;
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.doc-title-box {
+    border: 1px solid #1A1A1A;
+    padding: 0.625rem;
+    margin-bottom: 1.25rem;
+}
+
+.doc-title-box .doc-title {
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    font-size: 1.25rem;
+}
+
+/* Label plus ruled value line, the core row of every printed form */
+
+.dl-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    min-width: 0;
+}
+
+.dl-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6B6B66;
+    flex-shrink: 0;
+}
+
+.dl-value {
+    flex: 1 1 auto;
+    min-width: 2rem;
+    min-height: 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+    overflow-wrap: break-word;
+}
+
+.dl-row.boxed {
+    flex: 0 0 auto;
+}
+
+.dl-row.boxed .dl-value {
+    border: 1px solid #1A1A1A;
+    padding: 0.125rem 0.5rem;
+    font-weight: 600;
+    min-width: 6rem;
+}
+
+.dl-row.grow {
+    flex: 1 1 auto;
+    margin-bottom: 0;
+}
+
+.doc-meta-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.doc-meta-row .dl-row {
+    flex: 0 1 12rem;
+}
+
+.doc-split-row {
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.doc-inline-block {
+    margin-bottom: 0.75rem;
+}
+
+/* Checkbox rows: the box is a bordered span whose X is set via textContent */
+
+.doc-check-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1rem;
+    margin-top: 0.375rem;
+}
+
+.doc-check-row.stacked {
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.doc-check-row.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.375rem 1rem;
+}
+
+.doc-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+}
+
+.doc-check-box {
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 1px solid #1A1A1A;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+/* Itemized header: title left, reference and dates right */
+
+.doc-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.doc-head .doc-title {
+    font-size: 2rem;
+}
+
+.doc-head-meta {
+    flex: 0 1 14rem;
+}
+
+.doc-head-meta .dl-row {
+    margin-bottom: 0.375rem;
+}
+
+.doc-parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.doc-party-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6B6B66;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 0.25rem;
+    margin-bottom: 0.375rem;
+}
+
+.doc-party-name {
+    font-weight: 600;
+}
+
+.doc-party-line {
+    font-size: 0.75rem;
+    color: #6B6B66;
+}
+
+/* Line-item table */
+
+/* The line-item table has an irreducible legible width; it scrolls inside
+   this container so a narrow viewport never scrolls the page sideways */
+.doc-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 1.25rem;
+}
+
+.doc-table {
+    width: 100%;
+    min-width: 17rem;
+    border-collapse: collapse;
+}
+
+.doc-table th {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6B6B66;
+    text-align: left;
+    border-bottom: 2px solid #1A1A1A;
+    padding: 0.375rem 0.25rem;
+}
+
+.doc-table td {
+    border-bottom: 1px solid var(--color-border);
+    padding: 0.5rem 0.25rem;
+    vertical-align: top;
+    overflow-wrap: break-word;
+}
+
+.doc-table th.num,
+.doc-table td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.doc-table-empty {
+    color: #6B6B66;
+    text-align: center;
+    padding: 1.5rem 0.25rem;
+}
+
+.doc-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.doc-summary-left {
+    flex: 1 1 10rem;
+    min-width: 0;
+}
+
+.doc-totals {
+    flex: 0 1 15rem;
+    min-width: 0;
+}
+
+.doc-total-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.1875rem 0;
+}
+
+.doc-total-row .num {
+    white-space: nowrap;
+}
+
+.doc-total-row.grand {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    border-top: 1px solid #1A1A1A;
+    padding-top: 0.375rem;
+    margin-top: 0.25rem;
+}
+
+.doc-terms {
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Warning notice sections */
+
+.doc-field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.doc-section-heading {
+    font-family: var(--font-serif);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 0.25rem;
+    margin: 1.25rem 0 0.5rem;
+}
+
+.doc-paragraph {
+    margin-bottom: 0.375rem;
+}
+
+.doc-rule-line {
+    border-bottom: 1px solid var(--color-border);
+    height: 1.5rem;
+}
+
+/* Signatures and closing note */
+
+.doc-sign-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.doc-sign-rule {
+    border-top: 1px solid #1A1A1A;
+}
+
+.doc-sign-label {
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6B6B66;
+    padding-top: 0.25rem;
+}
+
+.doc-note {
+    text-align: center;
+    font-weight: 600;
+    color: var(--accent);
+    margin-top: 1.25rem;
+}
+
+.doc-note.left {
+    text-align: left;
+}
+
+/* Editor controls specific to the document builder */
+
+.doc-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.doc-actions .btn {
+    flex: 1 1 8rem;
+}
+
+.item-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1rem;
+}
+
+.check-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1rem;
+    margin-bottom: 1rem;
 }
 
 /* --------------------------------------------------------------------------
@@ -1366,6 +1840,37 @@ legend {
     .post-footer .btn {
         width: 100%;
     }
+
+    /* Document sheet: every two-column block collapses to a single column
+       so labels and ruled value lines stay readable on a phone */
+    .doc-sheet {
+        padding: 1.25rem;
+    }
+
+    .doc-parties,
+    .doc-field-grid,
+    .doc-sign-grid,
+    .doc-check-row.grid,
+    .item-grid,
+    .check-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .doc-sign-grid {
+        gap: 2rem;
+    }
+
+    .doc-head .doc-title {
+        font-size: 1.5rem;
+    }
+
+    .doc-split-row {
+        gap: 0.75rem;
+    }
+
+    .doc-table {
+        font-size: 0.75rem;
+    }
 }
 
 /* The skyscraper rail is only mounted on wide viewports at load time; if
@@ -1374,6 +1879,57 @@ legend {
     .post-rail,
     .blog-sidebar {
         display: none;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Print: strip the site shell so the document sheet prints on its own page.
+   Used by the Print action in the business document builder; the PDF export
+   remains the higher-fidelity path.
+   -------------------------------------------------------------------------- */
+
+@media print {
+    body {
+        background-color: #FFFFFF;
+    }
+
+    .site-header,
+    .site-footer,
+    .mobile-tabs,
+    .editor-pane,
+    .doc-actions,
+    .upload-hint,
+    .loading-status,
+    main > h1,
+    .preview-pane h2 {
+        display: none !important;
+    }
+
+    main {
+        max-width: none;
+        padding: 0;
+    }
+
+    .editor-layout {
+        display: block;
+    }
+
+    /* Overrides the narrow-viewport tab rule: paper width can fall under the
+       48rem breakpoint, which would otherwise hide the sheet being printed */
+    .editor-layout .preview-pane {
+        display: block !important;
+    }
+
+    .preview-pane,
+    .doc-sheet {
+        border: 0;
+        padding: 0;
+        background-color: #FFFFFF;
+    }
+
+    /* Paper has no scrollbars: the line-item table must print in full */
+    .doc-table-wrap {
+        overflow-x: visible;
     }
 }
 

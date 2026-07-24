@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Free Receipt, Invoice and Warning Notice Maker | TemplateBox</title>
+    <meta name="description" content="Fill in editable rent receipts, cash and sales receipts, itemized invoices and employee warning notices. Live preview, automatic totals, PDF export. Free and local.">
+    <link rel="canonical" href="https://templatebox.win/docs.html">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="TemplateBox">
+    <meta property="og:title" content="Free Receipt, Invoice and Warning Notice Maker | TemplateBox">
+    <meta property="og:description" content="Editable rent receipts, payment receipts, invoices and employee warning notices with automatic totals and PDF export. Free, local, no sign-up.">
+    <meta property="og:url" content="https://templatebox.win/docs.html">
+    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+
+    <!-- ================================================================
+         MICROSOFT CLARITY: paste the Clarity tracking snippet directly
+         below this comment block.
+         ================================================================ -->
+    <script type="text/javascript">
+        (function(c,l,a,r,i,t,y){
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+        })(window, document, "clarity", "script", "xix7m2758f");
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Compilation engine: jsPDF native text API via clean CDN link.
+         Every value is written with doc.text(), so exported receipts and
+         invoices stay selectable, copyable and machine-readable. See
+         docs/error-fixes/RESUME_PDF_RASTERIZED_TEXT_FIX.md for why
+         html2pdf.js is not used anywhere in this project. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+</head>
+<body>
+
+    <header class="site-header">
+        <a class="wordmark" href="index.html">TemplateBox</a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="index.html">Templates</a>
+            <a href="privacy.html">Privacy</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Receipt, Invoice and Notice Builder</h1>
+        <p class="loading-status">Your progress saves automatically on this device. Close the tab and return anytime.</p>
+
+        <!-- Mobile-only tab switcher between form and preview -->
+        <div class="mobile-tabs" role="tablist" aria-label="Editor views">
+            <button type="button" id="tab-edit" class="is-active" aria-selected="true">Edit Form</button>
+            <button type="button" id="tab-preview" aria-selected="false">Live Preview</button>
+        </div>
+
+        <div class="editor-layout show-edit" id="editor-layout">
+
+            <!-- Left pane: input form. Fieldsets and fields carry data-for
+                 listing the document types they belong to; js/docs.js toggles
+                 them so one form drives all six documents. -->
+            <section class="editor-pane" aria-label="Document form">
+
+                <form id="docs-form" autocomplete="on">
+
+                    <fieldset>
+                        <legend>Document</legend>
+                        <div class="field">
+                            <label for="f-doctype">Document Type</label>
+                            <select id="f-doctype">
+                                <option value="rent-receipt">Rent Receipt</option>
+                                <option value="payment-receipt">Cash Payment Receipt</option>
+                                <option value="business-receipt">Itemized Business Receipt</option>
+                                <option value="sales-receipt">Sales and Cash Receipt Form</option>
+                                <option value="invoice">Professional Invoice</option>
+                                <option value="warning-notice">Employee Warning Notice</option>
+                            </select>
+                        </div>
+                        <label class="radio-option">
+                            <input type="checkbox" id="f-blank">
+                            Blank printable form (keep empty fields as ruled lines to write on)
+                        </label>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Accent Color</legend>
+                        <div class="swatch-row" id="swatch-row" aria-label="Accent color choices">
+                            <button type="button" class="swatch is-active" data-accent="#1A1A1A" style="background-color:#1A1A1A" aria-label="Charcoal accent"></button>
+                            <button type="button" class="swatch" data-accent="#1F4E79" style="background-color:#1F4E79" aria-label="Navy accent"></button>
+                            <button type="button" class="swatch" data-accent="#2E5E4E" style="background-color:#2E5E4E" aria-label="Forest accent"></button>
+                            <button type="button" class="swatch" data-accent="#7A2E2E" style="background-color:#7A2E2E" aria-label="Burgundy accent"></button>
+                            <button type="button" class="swatch" data-accent="#8A6D1D" style="background-color:#8A6D1D" aria-label="Gold accent"></button>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend data-label="issuerLegend">Issued By</legend>
+                        <div class="field">
+                            <label for="f-issuer-name" data-label="issuerName">Business Name</label>
+                            <input type="text" id="f-issuer-name" data-bind="issuerName" maxlength="70">
+                        </div>
+                        <div class="field">
+                            <label for="f-issuer-details">Address and Contact (one item per line)</label>
+                            <textarea id="f-issuer-details" data-bind="issuerDetails" maxlength="240" rows="4"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend data-label="recipientLegend">Issued To</legend>
+                        <div class="field">
+                            <label for="f-recipient-name" data-label="recipientName">Received From</label>
+                            <input type="text" id="f-recipient-name" data-bind="recipientName" maxlength="70">
+                        </div>
+                        <div class="field" data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice">
+                            <label for="f-recipient-details">Address and Contact (one item per line)</label>
+                            <textarea id="f-recipient-details" data-bind="recipientDetails" maxlength="240" rows="4"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Reference and Dates</legend>
+                        <div class="field">
+                            <label for="f-doc-number" data-label="docNumber">Receipt No.</label>
+                            <input type="text" id="f-doc-number" data-bind="docNumber" maxlength="24">
+                        </div>
+                        <div class="field">
+                            <label for="f-doc-date" data-label="docDate">Date</label>
+                            <input type="date" id="f-doc-date" data-bind="docDate">
+                        </div>
+                        <div class="field" data-for="invoice">
+                            <label for="f-due-date">Payment Due Date</label>
+                            <input type="date" id="f-due-date" data-bind="dueDate">
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice">
+                        <legend>Currency</legend>
+                        <div class="field">
+                            <label for="f-currency">Currency</label>
+                            <select id="f-currency" data-bind="currency">
+                                <option value="USD">USD - US Dollar ($)</option>
+                                <option value="BWP">BWP - Botswana Pula (P)</option>
+                                <option value="EUR">EUR - Euro (&#8364;)</option>
+                                <option value="GBP">GBP - British Pound (&#163;)</option>
+                                <option value="CAD">CAD - Canadian Dollar (CA$)</option>
+                                <option value="AUD">AUD - Australian Dollar (A$)</option>
+                                <option value="INR">INR - Indian Rupee (&#8377;)</option>
+                                <option value="NGN">NGN - Nigerian Naira (&#8358;)</option>
+                                <option value="GHS">GHS - Ghanaian Cedi (&#8373;)</option>
+                                <option value="KES">KES - Kenyan Shilling (KSh)</option>
+                                <option value="ZAR">ZAR - South African Rand (R)</option>
+                                <option value="JPY">JPY - Japanese Yen (&#165;)</option>
+                            </select>
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="rent-receipt payment-receipt">
+                        <legend>Payment Received</legend>
+                        <div class="field">
+                            <label for="f-amount">Amount</label>
+                            <input type="number" id="f-amount" data-bind="amount" min="0" max="99999999" step="0.01" placeholder="850.00">
+                            <p class="upload-hint" id="amount-words-hint">The amount in words is written out automatically.</p>
+                        </div>
+                        <div class="field">
+                            <label for="f-purpose" data-label="purpose">Payment For</label>
+                            <input type="text" id="f-purpose" data-bind="purpose" maxlength="90" placeholder="Apartment 305, 456 Main St.">
+                        </div>
+                        <div class="field" data-for="rent-receipt">
+                            <label for="f-period-from">Rental Period From</label>
+                            <input type="date" id="f-period-from" data-bind="periodFrom">
+                        </div>
+                        <div class="field" data-for="rent-receipt">
+                            <label for="f-period-to">Rental Period To</label>
+                            <input type="date" id="f-period-to" data-bind="periodTo">
+                        </div>
+                        <div class="field" data-for="rent-receipt">
+                            <label for="f-balance">Balance Still Due</label>
+                            <input type="number" id="f-balance" data-bind="balance" min="0" max="99999999" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label for="f-received-by">Received By</label>
+                            <input type="text" id="f-received-by" data-bind="receivedBy" maxlength="70">
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="business-receipt sales-receipt invoice">
+                        <legend>Line Items</legend>
+                        <div id="item-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-item">Add Line Item</button>
+                    </fieldset>
+
+                    <fieldset data-for="business-receipt sales-receipt invoice">
+                        <legend>Totals</legend>
+                        <div class="field">
+                            <label for="f-discount">Discount Amount</label>
+                            <input type="number" id="f-discount" data-bind="discount" min="0" max="99999999" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label for="f-tax-label">Tax Label</label>
+                            <input type="text" id="f-tax-label" data-bind="taxLabel" maxlength="24" placeholder="Sales Tax">
+                        </div>
+                        <div class="field">
+                            <label for="f-tax-rate">Tax Rate (percent)</label>
+                            <input type="number" id="f-tax-rate" data-bind="taxRate" min="0" max="100" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label for="f-paid" data-label="paid">Amount Paid</label>
+                            <input type="number" id="f-paid" data-bind="amountPaid" min="0" max="99999999" step="0.01">
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="invoice">
+                        <legend>Payment Instructions</legend>
+                        <div class="field">
+                            <label for="f-terms">Payment Terms</label>
+                            <input type="text" id="f-terms" data-bind="paymentTerms" maxlength="90" placeholder="Net 30 days from invoice date">
+                        </div>
+                        <div class="field">
+                            <label for="f-bank">Bank / Payment Details (one item per line)</label>
+                            <textarea id="f-bank" data-bind="bankDetails" maxlength="240" rows="4" placeholder="Bank Name: Example Bank&#10;Account Number: 0123 4567 89"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="warning-notice">
+                        <legend>Employee Details</legend>
+                        <div class="field">
+                            <label for="f-position">Position / Title</label>
+                            <input type="text" id="f-position" data-bind="position" maxlength="60">
+                        </div>
+                        <div class="field">
+                            <label for="f-department">Department</label>
+                            <input type="text" id="f-department" data-bind="department" maxlength="60">
+                        </div>
+                        <div class="field">
+                            <label for="f-employee-id">Employee ID</label>
+                            <input type="text" id="f-employee-id" data-bind="employeeId" maxlength="24">
+                        </div>
+                        <div class="field">
+                            <label for="f-supervisor">Supervisor / Manager</label>
+                            <input type="text" id="f-supervisor" data-bind="supervisor" maxlength="70">
+                        </div>
+                        <div class="field">
+                            <label for="f-incident-date">Date of Incident</label>
+                            <input type="date" id="f-incident-date" data-bind="incidentDate">
+                        </div>
+                        <div class="field">
+                            <label for="f-warning-level">Warning Level</label>
+                            <select id="f-warning-level" data-bind="warningLevel">
+                                <option value="Verbal Warning">Verbal Warning</option>
+                                <option value="First Written Warning">First Written Warning</option>
+                                <option value="Second Written Warning">Second Written Warning</option>
+                                <option value="Final Written Warning">Final Written Warning</option>
+                            </select>
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="warning-notice">
+                        <legend>Reason for Warning</legend>
+                        <div class="check-grid" id="violation-row">
+                            <label class="radio-option"><input type="checkbox" data-check="attendance"> Attendance or Tardiness</label>
+                            <label class="radio-option"><input type="checkbox" data-check="performance"> Poor Work Performance</label>
+                            <label class="radio-option"><input type="checkbox" data-check="policy"> Violation of Company Policy</label>
+                            <label class="radio-option"><input type="checkbox" data-check="insubordination"> Insubordination</label>
+                            <label class="radio-option"><input type="checkbox" data-check="safety"> Safety Violation</label>
+                            <label class="radio-option"><input type="checkbox" data-check="conduct"> Unacceptable Conduct</label>
+                            <label class="radio-option"><input type="checkbox" data-check="damage"> Damage or Loss of Property</label>
+                            <label class="radio-option"><input type="checkbox" data-check="other"> Other</label>
+                        </div>
+                        <div class="field">
+                            <label for="f-incident">Description of Incident</label>
+                            <textarea id="f-incident" data-bind="incident" maxlength="900" rows="5"></textarea>
+                        </div>
+                        <div class="field">
+                            <label for="f-prior">Prior Warnings Issued</label>
+                            <input type="text" id="f-prior" data-bind="priorWarnings" maxlength="120" placeholder="Verbal warning issued March 2, 2026">
+                        </div>
+                        <div class="field">
+                            <label for="f-corrective">Expected Corrective Action</label>
+                            <textarea id="f-corrective" data-bind="corrective" maxlength="600" rows="4"></textarea>
+                        </div>
+                        <div class="field">
+                            <label for="f-consequence">Consequence of Further Violation</label>
+                            <textarea id="f-consequence" data-bind="consequence" maxlength="400" rows="3"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice">
+                        <legend>Payment Method</legend>
+                        <div class="check-grid" id="method-row">
+                            <label class="radio-option"><input type="checkbox" data-check="cash"> Cash</label>
+                            <label class="radio-option"><input type="checkbox" data-check="check"> Check</label>
+                            <label class="radio-option"><input type="checkbox" data-check="card"> Credit / Debit Card</label>
+                            <label class="radio-option"><input type="checkbox" data-check="transfer"> Bank Transfer</label>
+                            <label class="radio-option"><input type="checkbox" data-check="mobile"> Mobile Money</label>
+                            <label class="radio-option"><input type="checkbox" data-check="other"> Other</label>
+                        </div>
+                        <div class="field">
+                            <label for="f-reference">Payment Reference</label>
+                            <input type="text" id="f-reference" data-bind="reference" maxlength="60" placeholder="Check no. 1042">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Closing Note</legend>
+                        <div class="field">
+                            <label for="f-note" data-label="note">Footer Message</label>
+                            <input type="text" id="f-note" data-bind="note" maxlength="120" placeholder="Thank you for your payment!">
+                        </div>
+                    </fieldset>
+
+                </form>
+            </section>
+
+            <!-- Right pane: live document preview and export -->
+            <section class="preview-pane" aria-label="Live document preview">
+                <h2>Live Preview</h2>
+                <div class="doc-sheet" id="doc-sheet"></div>
+                <div class="doc-actions">
+                    <button type="button" class="btn" id="download-pdf">Download PDF</button>
+                    <button type="button" class="btn btn-secondary" id="print-doc">Print</button>
+                    <button type="button" class="btn btn-secondary" id="clear-doc">Clear Form</button>
+                </div>
+                <p class="upload-hint">Exports locally as selectable vector text via jsPDF. No file ever leaves your device.</p>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Repeating line-item row template (cloned by docs.js; static markup
+         only, user data is always injected through textContent bindings) -->
+    <template id="tpl-item">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Item Description</label>
+                <input type="text" data-entry-field="description" maxlength="90">
+            </div>
+            <div class="item-grid">
+                <div class="field">
+                    <label>Quantity</label>
+                    <input type="number" data-entry-field="qty" min="0" max="999999" step="0.01">
+                </div>
+                <div class="field">
+                    <label>Unit Price</label>
+                    <input type="number" data-entry-field="price" min="0" max="99999999" step="0.01">
+                </div>
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Item</button>
+        </div>
+    </template>
+
+    <footer class="site-footer">
+        <div class="footer-links">
+            <a href="index.html">Templates</a>
+            <a href="privacy.html">Privacy Policy</a>
+        </div>
+        <p>TemplateBox. All editing happens locally in your browser.</p>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/docs.js"></script>
+</body>
+</html>

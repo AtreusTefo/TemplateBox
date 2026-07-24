@@ -14,6 +14,7 @@ Start here: `docs/memory/PROJECT_STATUS.md` for current build/deploy state and o
 ## docs/implementation/
 - `BLOG_SYSTEM_IMPLEMENTATION.md` — serverless blog: admin panel authoring workflow, block content model, size-aware Adsterra placement registry, export/publish flow
 - `MOCKUP_GENERATOR_IMPLEMENTATION.md` — print-on-demand mockup generator: canvas-rendered product templates, color swatches, design upload/reposition, PNG export
+- `BUSINESS_DOCUMENT_BUILDER_IMPLEMENTATION.md` — receipts, invoices and employee warning notices: one form driving six documents, blank printable form mode, automatic totals and amount-in-words, hand-rolled jsPDF table/checkbox primitives, catalog variant hand-off
 
 ## docs/error-fixes/
 - `RESUME_PDF_RASTERIZED_TEXT_FIX.md` — html2pdf.js rasterized PDF text; replaced with jsPDF native text API

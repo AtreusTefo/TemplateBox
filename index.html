@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Title under 60 characters / description under 160 characters -->
-    <title>Free Resume, Poster and Product Mockup Maker | TemplateBox</title>
-    <meta name="description" content="Build ATS-friendly resumes, custom photo posters, and print-on-demand product mockups free in your browser. No sign-up, no database. Personalize a template and download instantly.">
+    <title>Free Invoice, Receipt and Resume Maker | TemplateBox</title>
+    <meta name="description" content="Create rent receipts, invoices, sales receipts, employee warning notices, resumes, posters and product mockups free in your browser. No sign-up, no database.">
     <link rel="canonical" href="https://templatebox.win/">
 
     <!-- Open Graph social sharing tags -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="TemplateBox">
-    <meta property="og:title" content="Free Resume, Poster and Product Mockup Maker | TemplateBox">
-    <meta property="og:description" content="Build ATS-friendly resumes, custom posters, and print-on-demand product mockups free in your browser. No sign-up required.">
+    <meta property="og:title" content="Free Invoice, Receipt and Resume Maker | TemplateBox">
+    <meta property="og:description" content="Editable rent receipts, invoices, business receipts, warning notices, resumes and posters. Free, local, no sign-up required.">
     <meta property="og:url" content="https://templatebox.win/">
     <meta property="og:image" content="https://templatebox.win/assets/logo.png">
 
@@ -27,7 +27,7 @@
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "All",
         "browserRequirements": "Requires JavaScript and HTML5 support",
-        "description": "Free client-side resume builder, custom poster maker, and print-on-demand product mockup generator. Personalize templates and export PDF or PNG files directly in the browser.",
+        "description": "Free client-side business document editor for receipts, invoices and employee warning notices, plus a resume builder, custom poster maker, and print-on-demand product mockup generator. Personalize templates and export PDF or PNG files directly in the browser.",
         "offers": {
             "@type": "Offer",
             "price": "0.00",
@@ -74,8 +74,8 @@
 
     <main>
         <section class="hero">
-            <h1>Free Resume Builder, Poster Maker and Product Mockup Generator</h1>
-            <p>Personalize professional CV templates, graphic canvas posters, and print-on-demand product mockups directly in your browser. No accounts, no uploads to a server, no subscription walls. Your work saves locally and exports instantly.</p>
+            <h1>Free Receipt, Invoice, Resume, Poster and Mockup Maker</h1>
+            <p>Fill in editable rent receipts, invoices, sales receipts and employee warning notices, or personalize professional CV templates, graphic canvas posters, and print-on-demand product mockups. Everything runs in your browser. No accounts, no uploads to a server, no subscription walls. Your work saves locally and exports instantly.</p>
         </section>
 
         <section id="templates" aria-label="Template catalog">
@@ -86,6 +86,7 @@
             <nav class="filter-pills" aria-label="Template categories">
                 <a class="pill is-active" href="#templates" data-filter="all">All</a>
                 <a class="pill" href="#templates" data-filter="resumes">Resumes</a>
+                <a class="pill" href="#templates" data-filter="documents">Business Docs</a>
                 <a class="pill" href="#templates" data-filter="canvas">Graphic Canvas</a>
                 <a class="pill" href="#templates" data-filter="mockups">Mockups</a>
             </nav>
@@ -143,6 +144,130 @@
                         <h3 class="card-title">Minimalist ATS Resume</h3>
                         <p class="card-desc">A distraction-free single-column format tuned for applicant tracking systems.</p>
                         <button class="btn btn-block" type="button" data-target="resume">Personalize Template</button>
+                    </div>
+                </article>
+
+                <!-- Business Docs: every card routes to the same docs.html
+                     editor; data-doc pre-selects which document type opens,
+                     validated against the editor's own whitelist on arrival. -->
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc paper receipt">
+                            <div class="bar head"></div>
+                            <div class="rule"></div>
+                            <div class="rule"></div>
+                            <div class="rule half"></div>
+                            <div class="rule"></div>
+                            <div class="grow"></div>
+                            <div class="rule short"></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Business Docs</p>
+                        <h3 class="card-title">Rent Receipt</h3>
+                        <p class="card-desc">Log a tenant payment with rental period, property address, amount in words, and balance due.</p>
+                        <button class="btn btn-block" type="button" data-target="docs" data-doc="rent-receipt">Fill Out Template</button>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc paper receipt">
+                            <div class="bar head"></div>
+                            <div class="rule"></div>
+                            <div class="rule half"></div>
+                            <div class="rule"></div>
+                            <div class="grow"></div>
+                            <div class="rule short"></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Business Docs</p>
+                        <h3 class="card-title">Cash Payment Receipt</h3>
+                        <p class="card-desc">A simple proof-of-payment slip with payment method checkboxes and a signature line.</p>
+                        <button class="btn btn-block" type="button" data-target="docs" data-doc="payment-receipt">Fill Out Template</button>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc paper invoice">
+                            <div class="bar head"></div>
+                            <div class="mock-table">
+                                <span></span><span></span><span></span>
+                                <span></span><span></span><span></span>
+                                <span></span><span></span><span></span>
+                            </div>
+                            <div class="rule half"></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Business Docs</p>
+                        <h3 class="card-title">Itemized Business Receipt</h3>
+                        <p class="card-desc">Billed-to and sent-by blocks, a line-item table, and automatic subtotal, tax and grand total.</p>
+                        <button class="btn btn-block" type="button" data-target="docs" data-doc="business-receipt">Fill Out Template</button>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc paper invoice">
+                            <div class="bar head"></div>
+                            <div class="mock-table">
+                                <span></span><span></span><span></span>
+                                <span></span><span></span><span></span>
+                            </div>
+                            <div class="rule"></div>
+                            <div class="rule short"></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Business Docs</p>
+                        <h3 class="card-title">Sales and Cash Receipt Form</h3>
+                        <p class="card-desc">A printable counter-sale form. Leave the fields empty for ruled blank lines to write on.</p>
+                        <button class="btn btn-block" type="button" data-target="docs" data-doc="sales-receipt">Fill Out Template</button>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc paper invoice">
+                            <div class="bar head"></div>
+                            <div class="mock-table">
+                                <span></span><span></span><span></span>
+                                <span></span><span></span><span></span>
+                                <span></span><span></span><span></span>
+                                <span></span><span></span><span></span>
+                            </div>
+                            <div class="rule half"></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Business Docs</p>
+                        <h3 class="card-title">Professional Invoice</h3>
+                        <p class="card-desc">Invoice number, due date, payment terms and bank details, with balance due calculated for you.</p>
+                        <button class="btn btn-block" type="button" data-target="docs" data-doc="invoice">Fill Out Template</button>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc paper notice">
+                            <div class="bar head boxed"></div>
+                            <div class="check-row"><span class="check"></span><span class="rule"></span></div>
+                            <div class="check-row"><span class="check"></span><span class="rule"></span></div>
+                            <div class="check-row"><span class="check"></span><span class="rule"></span></div>
+                            <div class="rule"></div>
+                            <div class="grow"></div>
+                            <div class="rule half"></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Business Docs</p>
+                        <h3 class="card-title">Employee Warning Notice</h3>
+                        <p class="card-desc">Document a disciplinary incident with warning level, violation checkboxes and signature blocks.</p>
+                        <button class="btn btn-block" type="button" data-target="docs" data-doc="warning-notice">Fill Out Template</button>
                     </div>
                 </article>
 

@@ -18,11 +18,18 @@ const TB = (() => {
     const EDITOR_ROUTES = {
         resume: "resume.html",
         poster: "poster.html",
-        mockup: "mockup.html"
+        mockup: "mockup.html",
+        docs: "docs.html"
     };
 
     const DEFAULT_TARGET = "resume";
     const COUNTDOWN_SECONDS = 10;
+
+    /* Hand-off slot for editors that open more than one template variant
+       (docs.html). The catalog writes the clicked card's variant here and the
+       editor reads it once on arrival; the value is never trusted as a route,
+       only matched against the editor's own whitelist of variants. */
+    const PRESET_KEY = "tb_editor_preset";
 
     /* ----------------------------------------------------------------------
        Security: input sanitization firewall.
@@ -108,9 +115,14 @@ const TB = (() => {
             return;
         }
 
-        /* CTA buttons: route the foreground tab into the loading page. */
+        /* CTA buttons: route the foreground tab into the loading page,
+           carrying the card's template variant across when it has one. */
         grid.querySelectorAll("[data-target]").forEach((btn) => {
             btn.addEventListener("click", () => {
+                const preset = btn.getAttribute("data-doc");
+                if (preset) {
+                    storageSet(PRESET_KEY, preset);
+                }
                 launchTemplate(btn.getAttribute("data-target"));
             });
         });
@@ -184,8 +196,21 @@ const TB = (() => {
         }, 1000);
     }
 
+    /* Reads the one-shot template-variant hand-off written by initCatalog and
+       clears it, so a later direct visit to the editor opens the visitor's
+       own saved document rather than re-applying a stale card choice. */
+    function takePreset() {
+        const value = storageGet(PRESET_KEY);
+        try {
+            window.localStorage.removeItem(PRESET_KEY);
+        } catch (err) {
+            /* Persistence unavailable: nothing to clear. */
+        }
+        return typeof value === "string" ? value : "";
+    }
+
     /* ----------------------------------------------------------------------
-       Mobile editor tabs (shared by resume.html and poster.html).
+       Mobile editor tabs (shared by every editor page).
        Below the 48rem breakpoint the split view collapses and these tabs
        switch between the form pane and the live preview pane.
        ---------------------------------------------------------------------- */
@@ -227,12 +252,13 @@ const TB = (() => {
         });
     });
 
-    /* Public surface consumed by resume.js and poster.js */
+    /* Public surface consumed by the editor scripts */
     return {
         sanitize,
         desanitize,
         storageSet,
         storageGet,
+        takePreset,
         launchTemplate
     };
 })();
