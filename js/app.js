@@ -25,6 +25,33 @@ const TB = (() => {
     const DEFAULT_TARGET = "resume";
     const COUNTDOWN_SECONDS = 10;
 
+    /* ----------------------------------------------------------------------
+       Editor registry.
+       One place describing every editor: its route, its display name, and
+       the localStorage key its own script writes. Consumed by the loading
+       page (to name and preview the chosen template during the wait) and by
+       the catalog (to offer returning visitors their saved work). Keeping
+       this beside EDITOR_ROUTES means adding an editor touches one region.
+       ---------------------------------------------------------------------- */
+    const EDITORS = {
+        resume: { label: "Resume", storageKey: "tb_resume_v1" },
+        docs: { label: "Business Document", storageKey: "tb_docs_v1" },
+        poster: { label: "Poster", storageKey: "tb_poster_v1" },
+        mockup: { label: "Product Mockup", storageKey: "tb_mockup_v1" }
+    };
+
+    /* Display names for the docs.html variants, so a returning visitor is
+       told "Rent Receipt" rather than the generic "Business Document".
+       Mirrors the variant whitelist docs.js validates against. */
+    const DOC_LABELS = {
+        "rent-receipt": "Rent Receipt",
+        "payment-receipt": "Cash Payment Receipt",
+        "business-receipt": "Itemized Business Receipt",
+        "sales-receipt": "Sales Receipt Form",
+        "invoice": "Invoice",
+        "warning-notice": "Employee Warning Notice"
+    };
+
     /* Hand-off slot for editors that open more than one template variant
        (docs.html). The catalog writes the clicked card's variant here and the
        editor reads it once on arrival; the value is never trusted as a route,
@@ -109,23 +136,40 @@ const TB = (() => {
         }, LAUNCH_DELAY_MS);
     }
 
+    /* Binds any element carrying data-target to the monetized launch flow.
+       Every launch control on the site is a real anchor whose href points at
+       the editor page itself; this handler intercepts the click and routes
+       through loading.html instead. Crawlers, which never run the handler,
+       follow the href and so see genuine internal links to the editors,
+       which previously had none anywhere on the site.
+
+       Modified clicks (new tab, new window, middle click) are deliberately
+       left alone so the browser's own behaviour still works. */
+    function bindLaunchControls(root) {
+        root.querySelectorAll("[data-target]").forEach((el) => {
+            el.addEventListener("click", (event) => {
+                if (event.defaultPrevented || event.button > 0 ||
+                    event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                    return;
+                }
+                event.preventDefault();
+
+                const preset = el.getAttribute("data-doc");
+                if (preset) {
+                    storageSet(PRESET_KEY, preset);
+                }
+                launchTemplate(el.getAttribute("data-target"));
+            });
+        });
+    }
+
     function initCatalog() {
+        bindLaunchControls(document);
+
         const grid = document.querySelector("[data-catalog-grid]");
         if (!grid) {
             return;
         }
-
-        /* CTA buttons: route the foreground tab into the loading page,
-           carrying the card's template variant across when it has one. */
-        grid.querySelectorAll("[data-target]").forEach((btn) => {
-            btn.addEventListener("click", () => {
-                const preset = btn.getAttribute("data-doc");
-                if (preset) {
-                    storageSet(PRESET_KEY, preset);
-                }
-                launchTemplate(btn.getAttribute("data-target"));
-            });
-        });
 
         /* Category filter pills: plain anchors for crawlers, enhanced with
            lightweight data-attribute visibility toggling for users. */
@@ -143,6 +187,242 @@ const TB = (() => {
                     card.classList.toggle("is-hidden", !match);
                 });
             });
+        });
+    }
+
+    /* ----------------------------------------------------------------------
+       Returning-visitor continuation strip.
+       Every editor already persists to localStorage, but the catalog had no
+       awareness of it, so a visitor coming back to finish a document had to
+       re-navigate the catalog and sit through the interstitial with no
+       confirmation their work still existed. Rendered only when saved state
+       is actually found, so the strip never appears empty.
+       ---------------------------------------------------------------------- */
+    function describeSavedWork() {
+        const found = [];
+
+        Object.keys(EDITORS).forEach((key) => {
+            const saved = storageGet(EDITORS[key].storageKey);
+            if (!saved || typeof saved !== "object") {
+                return;
+            }
+
+            /* A record with no meaningful content is not worth offering. */
+            const summary = summarizeSaved(key, saved);
+            if (!summary) {
+                return;
+            }
+
+            found.push({ target: key, label: EDITORS[key].label, summary: summary });
+        });
+
+        return found;
+    }
+
+    /* Produces a short human description of a saved record, or an empty
+       string when the record holds nothing the visitor would recognise.
+
+       The shapes differ per editor and are read directly from what each
+       editor's own collectState()/persist() writes: resume.js and docs.js
+       nest their text under a `fields` object, while poster.js and
+       mockup.js persist a flat record. */
+    function summarizeSaved(target, saved) {
+        if (target === "resume") {
+            const fields = saved.fields || {};
+            const name = desanitize(String(fields.name || "")).trim();
+            const title = desanitize(String(fields.title || "")).trim();
+            if (!name && !title) {
+                return "";
+            }
+            return [name, title].filter(Boolean).join(" - ");
+        }
+
+        if (target === "docs") {
+            const fields = saved.fields || {};
+            const type = String(saved.docType || "");
+            const label = Object.prototype.hasOwnProperty.call(DOC_LABELS, type)
+                ? DOC_LABELS[type]
+                : "";
+            /* The recipient is the party a visitor recognises the document
+               by ("the receipt for Daniel Osei"), so it is preferred over
+               the issuer, which is usually their own business name. */
+            const party = desanitize(
+                String(fields.recipientName || fields.issuerName || "")
+            ).trim();
+            /* docType is always populated, even on a document the visitor
+               has just cleared, so the party name is what distinguishes
+               real work from an empty form. Requiring it stops the strip
+               offering "Continue: Rent Receipt" on a blank document. */
+            if (!party) {
+                return "";
+            }
+            return [label, party].filter(Boolean).join(" - ");
+        }
+
+        if (target === "poster") {
+            const caption = desanitize(String(saved.caption || "")).trim();
+            return caption || "";
+        }
+
+        if (target === "mockup") {
+            const label = desanitize(String(saved.label || "")).trim();
+            const product = String(saved.product || "").trim();
+            if (label) {
+                return label;
+            }
+            return product ? "Product: " + product : "";
+        }
+
+        return "";
+    }
+
+    function initContinueStrip() {
+        const mount = document.querySelector("[data-continue-mount]");
+        if (!mount) {
+            return;
+        }
+
+        const saved = describeSavedWork();
+        if (!saved.length) {
+            return;
+        }
+
+        /* Most recently useful first is not knowable without timestamps the
+           editors do not write, so the registry order is used and only the
+           single most specific record is offered, to keep the strip to one
+           clear action rather than a second competing catalog. */
+        const item = saved[0];
+
+        const strip = document.createElement("div");
+        strip.className = "continue-strip";
+
+        const copy = document.createElement("div");
+        copy.className = "continue-copy";
+
+        const label = document.createElement("p");
+        label.className = "continue-label";
+        label.textContent = "Continue where you left off";
+
+        const title = document.createElement("p");
+        title.className = "continue-title";
+        title.textContent = item.summary;
+
+        const meta = document.createElement("p");
+        meta.className = "continue-meta";
+        meta.textContent = item.label + " - saved on this device";
+
+        copy.appendChild(label);
+        copy.appendChild(title);
+        copy.appendChild(meta);
+
+        const actions = document.createElement("div");
+        actions.className = "continue-actions";
+
+        /* Resumes straight into the editor, deliberately bypassing the
+           interstitial: this visitor already paid that cost on the first
+           visit, and charging it again to reopen their own saved work is
+           the fastest way to lose a returning user. */
+        const open = document.createElement("a");
+        open.className = "btn";
+        open.href = EDITOR_ROUTES[item.target];
+        open.textContent = "Continue editing";
+
+        const discard = document.createElement("button");
+        discard.className = "btn btn-secondary";
+        discard.type = "button";
+        discard.textContent = "Start fresh";
+        discard.addEventListener("click", () => {
+            try {
+                window.localStorage.removeItem(EDITORS[item.target].storageKey);
+            } catch (err) {
+                /* Persistence unavailable: nothing to clear. */
+            }
+            strip.remove();
+        });
+
+        actions.appendChild(open);
+        actions.appendChild(discard);
+
+        strip.appendChild(copy);
+        strip.appendChild(actions);
+        mount.appendChild(strip);
+    }
+
+    /* ----------------------------------------------------------------------
+       Homepage guides strip.
+       Surfaces the newest posts from js/blog-data.js on the homepage, which
+       previously linked to no blog content at all. Rendered with
+       createElement/textContent only, never HTML strings, matching the
+       rendering rule the blog library follows.
+       ---------------------------------------------------------------------- */
+    const GUIDES_ON_HOME = 3;
+
+    function initGuidesStrip() {
+        const section = document.querySelector("[data-guides-section]");
+        const grid = document.querySelector("[data-guides-grid]");
+        if (!section || !grid) {
+            return;
+        }
+
+        const posts = Array.isArray(window.TB_BLOG_POSTS) ? window.TB_BLOG_POSTS : [];
+        if (!posts.length) {
+            return;
+        }
+
+        const newest = posts
+            .slice()
+            .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+            .slice(0, GUIDES_ON_HOME);
+
+        newest.forEach((post) => {
+            const slug = String(post.slug || "");
+            if (!slug) {
+                return;
+            }
+
+            const card = document.createElement("article");
+            card.className = "guide-card";
+
+            if (post.date) {
+                const meta = document.createElement("p");
+                meta.className = "card-category";
+                meta.textContent = formatPostDate(post.date);
+                card.appendChild(meta);
+            }
+
+            const heading = document.createElement("h3");
+            heading.className = "card-title";
+
+            const link = document.createElement("a");
+            /* Static post page, not the post.html fallback route: see the
+               postUrlFor comment in js/blog.js for why. */
+            link.href = "blog/" + encodeURIComponent(slug) + ".html";
+            link.textContent = desanitize(String(post.title || "Untitled"));
+            heading.appendChild(link);
+            card.appendChild(heading);
+
+            if (post.standfirst) {
+                const desc = document.createElement("p");
+                desc.className = "card-desc";
+                desc.textContent = desanitize(String(post.standfirst));
+                card.appendChild(desc);
+            }
+
+            grid.appendChild(card);
+        });
+
+        if (grid.childElementCount) {
+            section.hidden = false;
+        }
+    }
+
+    function formatPostDate(value) {
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+            return String(value);
+        }
+        return parsed.toLocaleDateString("en-GB", {
+            day: "numeric", month: "short", year: "numeric"
         });
     }
 
@@ -167,11 +447,46 @@ const TB = (() => {
         const requested = params.get("target") || DEFAULT_TARGET;
         const destination = EDITOR_ROUTES[requested] || EDITOR_ROUTES[DEFAULT_TARGET];
 
+        /* Name the template the visitor actually chose. Previously the wait
+           showed a bare numeral with no confirmation of what was coming, so
+           it read as an obstacle rather than as preparation. The label is
+           resolved from the same whitelists used for routing, so a tampered
+           query value can only ever produce a name that already ships. */
+        const nameEl = document.getElementById("loading-template-name");
+        if (nameEl) {
+            const preset = storageGet(PRESET_KEY);
+            const presetLabel = typeof preset === "string" &&
+                Object.prototype.hasOwnProperty.call(DOC_LABELS, preset)
+                ? DOC_LABELS[preset]
+                : "";
+            const editorLabel = Object.prototype.hasOwnProperty.call(EDITORS, requested)
+                ? EDITORS[requested].label
+                : EDITORS[DEFAULT_TARGET].label;
+            nameEl.textContent = presetLabel || editorLabel;
+        }
+
+        /* Progress bar: a filling indicator is perceived as faster than a
+           descending numeral. The numeral is retained beside it as a precise
+           readout rather than removed. */
+        const progressEl = document.getElementById("progress-fill");
+        const progressHost = progressEl ? progressEl.parentElement : null;
+        const setProgress = (elapsed) => {
+            const pct = Math.min(100, Math.round((elapsed / COUNTDOWN_SECONDS) * 100));
+            if (progressEl) {
+                progressEl.style.width = pct + "%";
+            }
+            if (progressHost) {
+                progressHost.setAttribute("aria-valuenow", String(pct));
+            }
+        };
+
         let remaining = COUNTDOWN_SECONDS;
         counterEl.textContent = String(remaining);
+        setProgress(0);
 
         const clock = window.setInterval(() => {
             remaining -= 1;
+            setProgress(COUNTDOWN_SECONDS - remaining);
 
             if (remaining <= 0) {
                 window.clearInterval(clock);
@@ -236,6 +551,65 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Autosave indicator (shared by every editor).
+       Persistence was previously silent, which wastes the trust payoff of a
+       product whose whole proposition is "no account, and your work is held
+       on your own device". Editors call markSaved() after each write.
+       ---------------------------------------------------------------------- */
+    const SAVED_LABEL_MS = 1600;
+    let saveResetTimer = 0;
+
+    function markSaved(ok) {
+        const el = document.getElementById("save-state");
+        if (!el) {
+            return;
+        }
+
+        if (ok === false) {
+            el.classList.remove("is-saved");
+            el.classList.add("is-unavailable");
+            el.textContent = "Not saved on this device";
+            return;
+        }
+
+        el.classList.remove("is-unavailable");
+        el.classList.add("is-saved");
+        el.textContent = "Saved on this device";
+
+        window.clearTimeout(saveResetTimer);
+        saveResetTimer = window.setTimeout(() => {
+            el.classList.remove("is-saved");
+            el.textContent = "Saves automatically";
+        }, SAVED_LABEL_MS);
+    }
+
+    /* True when localStorage is actually writable. Private browsing modes
+       and exhausted quotas throw, and an editor that silently discards work
+       is worse than one that says so up front. */
+    function storageAvailable() {
+        try {
+            const probe = "tb_probe";
+            window.localStorage.setItem(probe, "1");
+            window.localStorage.removeItem(probe);
+            return true;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function initSaveState() {
+        const el = document.getElementById("save-state");
+        if (!el) {
+            return;
+        }
+        if (!storageAvailable()) {
+            markSaved(false);
+            return;
+        }
+        el.textContent = "Saves automatically";
+    }
+
+    /* ----------------------------------------------------------------------
        Boot
        ---------------------------------------------------------------------- */
     /* Each initializer is isolated so a failure in one (for example a DOM
@@ -243,7 +617,14 @@ const TB = (() => {
        running. This specifically guarantees the loading-page countdown always
        starts, independent of the catalog and editor-tab wiring. */
     document.addEventListener("DOMContentLoaded", () => {
-        [initCatalog, initLoadingPage, initEditorTabs].forEach((init) => {
+        [
+            initCatalog,
+            initLoadingPage,
+            initEditorTabs,
+            initContinueStrip,
+            initGuidesStrip,
+            initSaveState
+        ].forEach((init) => {
             try {
                 init();
             } catch (err) {
@@ -259,6 +640,7 @@ const TB = (() => {
         storageSet,
         storageGet,
         takePreset,
-        launchTemplate
+        launchTemplate,
+        markSaved
     };
 })();

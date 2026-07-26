@@ -2,6 +2,22 @@
   publish = "."
   command = ""
 
+# Blog posts moved from the JavaScript-rendered ?slug= route to static files
+# under blog/, which carry real metadata in the served markup. A 301 (rather
+# than a noindex on post.html) consolidates any ranking signal the old URLs
+# already accumulated onto the new ones instead of discarding it.
+#
+# The rule keys on the slug query parameter, so the admin panel's draft
+# preview at post.html?draft=<slug>&preview=1 is not matched and still
+# renders through post.html, which is what a not-yet-exported draft needs.
+[[redirects]]
+  from = "/post.html"
+  to = "/blog/:slug.html"
+  status = 301
+  force = true
+  [redirects.query]
+    slug = ":slug"
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -9,3 +25,27 @@
     X-Frame-Options = "SAMEORIGIN"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Private authoring tool. Enforced with a response header rather than a
+# robots.txt Disallow: a Disallow prevents the crawler from fetching the page
+# at all, which prevents it from ever reading the page's own noindex meta tag,
+# leaving the URL indexable on the strength of an external link. A header is
+# delivered with the response itself and cannot be missed.
+[[headers]]
+  for = "/admin.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+# The interstitial already carries a noindex meta tag; the header makes the
+# exclusion authoritative for crawlers that skip meta parsing.
+[[headers]]
+  for = "/loading.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+# Internal maintenance tools (Open Graph card generator). Deployed with the
+# site because there is no build step to strip them, so excluded by header.
+[[headers]]
+  for = "/tools/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"

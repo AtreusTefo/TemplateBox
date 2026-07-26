@@ -1,35 +1,94 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- <priority> is deliberately omitted: Google has stated publicly that it
+     ignores the element. <lastmod> is included because Google does use it as
+     an input to recrawl scheduling, provided the values stay accurate.
+     loading.html is excluded (noindex, nofollow); admin.html is excluded and
+     additionally carries an X-Robots-Tag: noindex header from netlify.toml. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
   <url>
     <loc>https://templatebox.win/</loc>
-    <priority>1.0</priority>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+
+  <!-- Document landing pages: one search intent each -->
+  <url>
+    <loc>https://templatebox.win/rent-receipt-template.html</loc>
+    <lastmod>2026-07-26</lastmod>
   </url>
   <url>
+    <loc>https://templatebox.win/cash-payment-receipt-template.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+  <url>
+    <loc>https://templatebox.win/itemized-receipt-template.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+  <url>
+    <loc>https://templatebox.win/sales-receipt-template.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+  <url>
+    <loc>https://templatebox.win/free-invoice-template.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+  <url>
+    <loc>https://templatebox.win/employee-warning-notice-template.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+  <url>
+    <loc>https://templatebox.win/ats-resume-template.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+  <url>
+    <loc>https://templatebox.win/tshirt-mockup-generator.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+  <url>
+    <loc>https://templatebox.win/poster-maker.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+
+  <!-- Editors -->
+  <url>
     <loc>https://templatebox.win/resume.html</loc>
-    <priority>0.8</priority>
+    <lastmod>2026-07-26</lastmod>
   </url>
   <url>
     <loc>https://templatebox.win/docs.html</loc>
-    <priority>0.8</priority>
+    <lastmod>2026-07-26</lastmod>
   </url>
   <url>
     <loc>https://templatebox.win/poster.html</loc>
-    <priority>0.8</priority>
+    <lastmod>2026-07-26</lastmod>
   </url>
   <url>
     <loc>https://templatebox.win/mockup.html</loc>
-    <priority>0.8</priority>
+    <lastmod>2026-07-26</lastmod>
   </url>
+
+  <!-- Guides -->
   <url>
     <loc>https://templatebox.win/blog.html</loc>
-    <priority>0.7</priority>
+    <lastmod>2026-07-26</lastmod>
   </url>
   <url>
-    <loc>https://templatebox.win/post.html?slug=free-cv-resume-templates-build-professional-resume-fast</loc>
-    <priority>0.6</priority>
+    <loc>https://templatebox.win/blog/free-cv-resume-templates-build-professional-resume-fast.html</loc>
+    <lastmod>2026-07-18</lastmod>
+  </url>
+
+  <!-- Company -->
+  <url>
+    <loc>https://templatebox.win/about.html</loc>
+    <lastmod>2026-07-26</lastmod>
   </url>
   <url>
     <loc>https://templatebox.win/privacy.html</loc>
-    <priority>0.3</priority>
+    <lastmod>2026-07-26</lastmod>
   </url>
+  <url>
+    <loc>https://templatebox.win/terms.html</loc>
+    <lastmod>2026-07-26</lastmod>
+  </url>
+
 </urlset>

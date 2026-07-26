@@ -335,6 +335,7 @@
     function persistAndRender() {
         const state = collectState();
         TB.storageSet(STORAGE_KEY, state);
+        TB.markSaved();
         applyDocType(state);
         renderPreview(state);
     }
@@ -1303,6 +1304,101 @@
        Initialization: sweep localStorage, hydrate the form, first render.
        ---------------------------------------------------------------------- */
 
+    /* First-run sample content.
+       The builder previously opened onto an empty form beside an empty sheet,
+       so a first-time visitor saw a blank rectangle and could not tell what
+       the tool produces or that the preview is live. These values are shared
+       across all six document types (the per-type fields that do not apply
+       are simply hidden), and are applied ONLY when no saved state exists so
+       genuine work is never overwritten. */
+    const SAMPLE_FIELDS = {
+        issuerName: "Harbour Supply Co.",
+        issuerDetails: "42 Dock Road, Portside\n+1 (555) 018-2244\nbilling@example.com",
+        recipientName: "Nova Interiors Ltd",
+        recipientDetails: "8 Coleman Street\nRiverton",
+        docNumber: "0148",
+        docDate: "2026-08-01",
+        purpose: "Oak shelving and fittings order",
+        amount: "389.00",
+        periodFrom: "2026-08-01",
+        periodTo: "2026-08-31",
+        receivedBy: "R. Achterberg",
+        reference: "Check no. 1042",
+        note: "Thank you for your business.",
+        taxLabel: "Sales Tax",
+        taxRate: "8.5",
+        paymentTerms: "Net 30",
+        dueDate: "2026-08-31",
+        employeeId: "EMP-2291",
+        department: "Warehouse",
+        position: "Shift Lead",
+        incidentDate: "2026-07-19",
+        incident: "Late arrival on three scheduled shifts during July, following a verbal discussion on 2 July.",
+        corrective: "Arrive at or before the scheduled shift start for the next 60 days.",
+        consequence: "Further lateness within this period may lead to a final written warning."
+    };
+
+    const SAMPLE_ITEMS = [
+        { description: "Oak shelving board", qty: "6", price: "45.00" },
+        { description: "Brass fittings set", qty: "2", price: "42.00" },
+        { description: "Delivery", qty: "1", price: "35.00" }
+    ];
+
+    /* Renders the sample-content notice above the form, with a one-click
+       route to a genuinely empty document. */
+    function showSampleNotice() {
+        const pane = form.parentElement;
+        if (!pane || document.getElementById("sample-notice")) {
+            return;
+        }
+
+        const notice = document.createElement("div");
+        notice.className = "sample-notice";
+        notice.id = "sample-notice";
+
+        const text = document.createElement("p");
+        text.textContent = "This is sample content so you can see how the live preview works. Type over it, or start from an empty document.";
+
+        const clear = document.createElement("button");
+        clear.type = "button";
+        clear.className = "btn btn-secondary btn-small";
+        clear.textContent = "Start blank";
+        clear.addEventListener("click", () => {
+            form.querySelectorAll("[data-bind]").forEach((input) => {
+                if (input.tagName === "SELECT") {
+                    return;
+                }
+                input.value = "";
+            });
+            itemList.replaceChildren();
+            addItemRow();
+            notice.remove();
+            persistAndRender();
+            const first = form.querySelector("[data-bind]:not(select)");
+            if (first) {
+                first.focus();
+            }
+        });
+
+        notice.appendChild(text);
+        notice.appendChild(clear);
+        pane.insertBefore(notice, pane.firstChild);
+    }
+
+    function applySampleContent() {
+        form.querySelectorAll("[data-bind]").forEach((input) => {
+            const key = input.getAttribute("data-bind");
+            if (input.tagName === "SELECT") {
+                return;
+            }
+            if (Object.prototype.hasOwnProperty.call(SAMPLE_FIELDS, key)) {
+                input.value = SAMPLE_FIELDS[key];
+            }
+        });
+        itemList.replaceChildren();
+        SAMPLE_ITEMS.forEach(addItemRow);
+    }
+
     function init() {
         const saved = TB.storageGet(STORAGE_KEY);
         const state = saved && saved.fields ? saved : null;
@@ -1330,7 +1426,8 @@
             (state.items && state.items.length ? state.items : [null]).forEach(addItemRow);
         } else {
             applyAccent(DEFAULT_ACCENT);
-            addItemRow();
+            applySampleContent();
+            showSampleNotice();
         }
 
         /* A catalog card can pre-select which document opens. The value is

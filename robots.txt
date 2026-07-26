@@ -1,5 +1,11 @@
 User-agent: *
 Allow: /
-Disallow: /admin.html
+
+# admin.html is NOT disallowed here on purpose. A robots.txt Disallow stops a
+# crawler fetching the page, which stops it ever reading the page's own
+# noindex meta tag, so a disallowed URL can still be indexed on the strength
+# of an external link. Exclusion is enforced instead by an
+# X-Robots-Tag: noindex response header set in netlify.toml, which a crawler
+# that fetches the URL cannot miss.
 
 Sitemap: https://templatebox.win/sitemap.xml

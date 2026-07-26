@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Graph Card Generator | TemplateBox</title>
+    <!-- Internal maintenance tool, not part of the public site -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+    <header class="site-header">
+        <a class="wordmark" href="../index.html">TemplateBox</a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="../index.html">Templates</a>
+        </nav>
+    </header>
+
+    <main class="admin-main">
+        <div class="admin-intro">
+            <h1>Open Graph Card Generator</h1>
+            <p>Renders the 1200 x 630 social preview card used by <span class="mono">og:image</span> and <span class="mono">twitter:image</span>. The site points those tags at <span class="mono">assets/logo.png</span> by default, which is a square logo at 489KB: social platforms crop or letterbox it to their 1.91:1 frame, and it is heavier than it needs to be for an asset every crawler fetches.</p>
+            <p>Documents are drawn with the native Canvas API, the same approach as the poster and mockup editors, so this tool needs no image assets, no dependency and no server.</p>
+        </div>
+
+        <section class="admin-panel" aria-label="Card settings">
+            <div class="admin-panel-head">
+                <h2>Card content</h2>
+                <p class="admin-sync">Pick a preset, or write your own</p>
+            </div>
+            <form id="og-form">
+                <div class="field">
+                    <label for="og-preset">Page this card is for</label>
+                    <select id="og-preset"></select>
+                </div>
+                <div class="field">
+                    <label for="og-title">Headline</label>
+                    <input type="text" id="og-title" maxlength="60">
+                </div>
+                <div class="field">
+                    <label for="og-sub">Supporting line</label>
+                    <input type="text" id="og-sub" maxlength="90">
+                </div>
+                <div class="item-grid">
+                    <div class="field">
+                        <label for="og-doc">Document shown</label>
+                        <select id="og-doc">
+                            <option value="none">None (text only)</option>
+                            <option value="invoice">Invoice</option>
+                            <option value="receipt">Receipt</option>
+                            <option value="notice">Warning notice</option>
+                            <option value="resume">Resume</option>
+                            <option value="poster">Framed poster</option>
+                            <option value="tee">T-shirt mockup</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="og-theme">Theme</label>
+                        <select id="og-theme">
+                            <option value="cream">Cream background (default)</option>
+                            <option value="dark">Charcoal background</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="og-filename">Save as</label>
+                    <input type="text" id="og-filename" maxlength="60" value="og-cover.png">
+                </div>
+            </form>
+            <div class="admin-actions">
+                <button type="button" class="btn" id="og-download">Download PNG</button>
+            </div>
+            <p class="admin-status" id="og-status" aria-live="polite"></p>
+            <details class="admin-help">
+                <summary>What to do with the file</summary>
+                <ol>
+                    <li>Save the downloaded file into the project's <span class="mono">assets/</span> folder, keeping the filename the tool suggests.</li>
+                    <li>On the matching page, change the <span class="mono">og:image</span> and <span class="mono">twitter:image</span> values from <span class="mono">assets/logo.png</span> to the new file.</li>
+                    <li>Deploy, then re-scrape the URL in the Facebook Sharing Debugger, the X Card Validator and the LinkedIn Post Inspector so the platforms drop their cached version.</li>
+                </ol>
+            </details>
+            <details class="admin-help">
+                <summary>Why one card per page is worth the extra few minutes</summary>
+                <p>A single generic card works, but a shared link to the rent receipt page that actually shows a rent receipt tells the reader what they are getting before they tap. The presets above cover every landing page, and each one sets its own filename, so producing the full set is a matter of stepping through the dropdown and clicking Download each time.</p>
+            </details>
+        </section>
+
+        <section class="admin-panel" aria-label="Preview">
+            <div class="admin-panel-head">
+                <h2>Preview</h2>
+                <p class="admin-sync">1200 x 630, the 1.91:1 frame social platforms expect</p>
+            </div>
+            <div class="poster-stage">
+                <canvas id="og-canvas" width="1200" height="630"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        "use strict";
+
+        (function () {
+            const canvas = document.getElementById("og-canvas");
+            const ctx = canvas.getContext("2d");
+            const presetSelect = document.getElementById("og-preset");
+            const titleInput = document.getElementById("og-title");
+            const subInput = document.getElementById("og-sub");
+            const docSelect = document.getElementById("og-doc");
+            const themeSelect = document.getElementById("og-theme");
+            const filenameInput = document.getElementById("og-filename");
+            const status = document.getElementById("og-status");
+
+            const THEMES = {
+                cream: {
+                    bg: "#F4F3EF", ink: "#1A1A1A", muted: "#6B6B66",
+                    rule: "#8A5A2B", paper: "#FFFFFF", line: "#DAD6CE"
+                },
+                dark: {
+                    bg: "#1A1A1A", ink: "#F4F3EF", muted: "#A8A49B",
+                    rule: "#C08B4E", paper: "#F4F3EF", line: "#C9C5BC"
+                }
+            };
+
+            /* One preset per public page. Each carries its own filename so
+               the whole set can be produced by stepping through the list. */
+            const PRESETS = [
+                { id: "home", label: "Homepage", file: "og-cover.png", doc: "invoice",
+                  title: "Free invoice, receipt and resume maker",
+                  sub: "No sign-up. Nothing leaves your device." },
+                { id: "rent", label: "Rent receipt template", file: "og-rent-receipt.png", doc: "receipt",
+                  title: "Free rent receipt template",
+                  sub: "Tenant, property, period and amount. Print or export a PDF." },
+                { id: "payment", label: "Cash payment receipt", file: "og-payment-receipt.png", doc: "receipt",
+                  title: "Free cash payment receipt",
+                  sub: "Proof of payment with method, amount and signature." },
+                { id: "itemized", label: "Itemized business receipt", file: "og-itemized-receipt.png", doc: "invoice",
+                  title: "Free itemized receipt template",
+                  sub: "Line items with automatic subtotal, tax and total." },
+                { id: "sales", label: "Sales receipt form", file: "og-sales-receipt.png", doc: "receipt",
+                  title: "Free sales receipt form",
+                  sub: "Print a blank ruled pad, or fill it in and export a PDF." },
+                { id: "invoice", label: "Invoice template", file: "og-invoice.png", doc: "invoice",
+                  title: "Free invoice template",
+                  sub: "Automatic totals and balance due. No watermark." },
+                { id: "notice", label: "Employee warning notice", file: "og-warning-notice.png", doc: "notice",
+                  title: "Free employee warning notice",
+                  sub: "Warning level, violation, corrective action, signatures." },
+                { id: "resume", label: "ATS resume template", file: "og-resume.png", doc: "resume",
+                  title: "Free ATS resume template",
+                  sub: "Exports a PDF with real selectable text parsers can read." },
+                { id: "mockup", label: "T-shirt mockup generator", file: "og-mockup.png", doc: "tee",
+                  title: "Free t-shirt mockup generator",
+                  sub: "Drop your design on a shirt, mug or box. No photoshoot." },
+                { id: "poster", label: "Poster maker", file: "og-poster.png", doc: "poster",
+                  title: "Free poster and canvas maker",
+                  sub: "Upload a photo, pick a frame, export a print-ready PNG." }
+            ];
+
+            PRESETS.forEach((p) => {
+                const opt = document.createElement("option");
+                opt.value = p.id;
+                opt.textContent = p.label;
+                presetSelect.appendChild(opt);
+            });
+
+            /* ----------------------------------------------------------------
+               Canvas helpers
+               ---------------------------------------------------------------- */
+
+            /* Greedy word wrap against a pixel budget; the Canvas text API has
+               no wrapping of its own. */
+            function wrap(text, maxWidth) {
+                const words = String(text).split(/\s+/).filter(Boolean);
+                const lines = [];
+                let line = "";
+                words.forEach((word) => {
+                    const attempt = line ? line + " " + word : word;
+                    if (ctx.measureText(attempt).width > maxWidth && line) {
+                        lines.push(line);
+                        line = word;
+                    } else {
+                        line = attempt;
+                    }
+                });
+                if (line) {
+                    lines.push(line);
+                }
+                return lines;
+            }
+
+            function rule(t, x, y, w, weight, color) {
+                ctx.fillStyle = color || t.line;
+                ctx.fillRect(x, y, w, weight || 1);
+            }
+
+            function label(t, text, x, y, size, color, weight) {
+                ctx.fillStyle = color || t.muted;
+                ctx.font = (weight || 600) + " " + size + "px Inter, sans-serif";
+                ctx.fillText(text, x, y);
+            }
+
+            function serif(t, text, x, y, size, color) {
+                ctx.fillStyle = color || t.ink;
+                ctx.font = "700 " + size + "px 'Playfair Display', Georgia, serif";
+                ctx.fillText(text, x, y);
+            }
+
+            /* A label with a ruled value line beside it, the core row of every
+               printed form the site produces. */
+            function fieldRow(t, text, x, y, w, value) {
+                label(t, text, x, y, 10, t.muted);
+                const labelW = ctx.measureText(text).width + 10;
+                if (value) {
+                    label(t, value, x + labelW, y, 11, t.ink, 500);
+                }
+                rule(t, x + labelW, y + 6, w - labelW, 1);
+            }
+
+            function sheet(t, x, y, w, h) {
+                ctx.fillStyle = t.paper;
+                ctx.fillRect(x, y, w, h);
+                ctx.strokeStyle = t.line;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, w, h);
+            }
+
+            /* ----------------------------------------------------------------
+               Document illustrations.
+               Flat geometry only, no gradients or shadows, matching the theme
+               the rest of the site is built on.
+               ---------------------------------------------------------------- */
+
+            function drawReceipt(t, x, y, w, h) {
+                sheet(t, x, y, w, h);
+                const px = x + 26;
+                const iw = w - 52;
+
+                ctx.textAlign = "center";
+                serif(t, "RECEIPT", x + w / 2, y + 52, 22, t.rule);
+                ctx.textAlign = "left";
+                rule(t, px, y + 66, iw, 2, t.rule);
+
+                fieldRow(t, "NO.", px, y + 100, iw * 0.45, "0148");
+                fieldRow(t, "DATE", px + iw * 0.55, y + 100, iw * 0.45, "01 Aug 2026");
+                fieldRow(t, "RECEIVED FROM", px, y + 138, iw, "Daniel Osei");
+                fieldRow(t, "FOR", px, y + 176, iw, "August rent, Unit 2B");
+                fieldRow(t, "PERIOD", px, y + 214, iw, "1 Aug - 31 Aug 2026");
+
+                ctx.strokeStyle = t.ink;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px, y + 240, iw, 44);
+                label(t, "AMOUNT", px + 12, y + 262, 10, t.muted);
+                ctx.font = "700 20px Inter, sans-serif";
+                ctx.fillStyle = t.ink;
+                ctx.fillText("$1,250.00", px + 90, y + 270);
+
+                label(t, "One thousand two hundred fifty dollars", px, y + 308, 10, t.muted, 400);
+
+                rule(t, px, y + h - 58, iw * 0.45, 1, t.ink);
+                label(t, "RECEIVED BY", px, y + h - 42, 9, t.muted);
+                rule(t, px + iw * 0.55, y + h - 58, iw * 0.45, 1, t.ink);
+                label(t, "BALANCE DUE", px + iw * 0.55, y + h - 42, 9, t.muted);
+            }
+
+            function drawInvoice(t, x, y, w, h) {
+                sheet(t, x, y, w, h);
+                const px = x + 26;
+                const iw = w - 52;
+
+                serif(t, "Meridian Studio", px, y + 40, 15, t.ink);
+                label(t, "hello@meridian.studio", px, y + 56, 9, t.muted, 400);
+
+                serif(t, "INVOICE", px, y + 96, 26, t.rule);
+                rule(t, px, y + 110, iw, 2, t.rule);
+
+                fieldRow(t, "NO.", px, y + 142, iw * 0.45, "INV-1043");
+                fieldRow(t, "DUE", px + iw * 0.55, y + 142, iw * 0.45, "30 Aug");
+                fieldRow(t, "BILL TO", px, y + 178, iw, "Larkfield Group");
+
+                const cols = [px, px + iw * 0.62, px + iw * 0.80];
+                let ry = y + 214;
+                label(t, "DESCRIPTION", cols[0], ry, 9, t.muted);
+                label(t, "QTY", cols[1], ry, 9, t.muted);
+                label(t, "AMOUNT", cols[2], ry, 9, t.muted);
+                rule(t, px, ry + 8, iw, 2, t.ink);
+
+                const rows = [
+                    ["Brand identity", "1", "2,400.00"],
+                    ["Web design", "1", "1,850.00"],
+                    ["Print assets", "3", "420.00"]
+                ];
+                ry += 32;
+                rows.forEach((r) => {
+                    label(t, r[0], cols[0], ry, 11, t.ink, 400);
+                    label(t, r[1], cols[1], ry, 11, t.ink, 400);
+                    label(t, r[2], cols[2], ry, 11, t.ink, 400);
+                    rule(t, px, ry + 9, iw, 1);
+                    ry += 30;
+                });
+
+                rule(t, px + iw * 0.45, y + h - 76, iw * 0.55, 2, t.ink);
+                label(t, "BALANCE DUE", px + iw * 0.45, y + h - 52, 10, t.muted);
+                ctx.font = "700 18px Inter, sans-serif";
+                ctx.fillStyle = t.ink;
+                ctx.textAlign = "right";
+                ctx.fillText("$4,670.00", px + iw, y + h - 50);
+                ctx.textAlign = "left";
+            }
+
+            function drawNotice(t, x, y, w, h) {
+                sheet(t, x, y, w, h);
+                const px = x + 26;
+                const iw = w - 52;
+
+                ctx.strokeStyle = t.ink;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px, y + 26, iw, 40);
+                ctx.textAlign = "center";
+                serif(t, "EMPLOYEE WARNING NOTICE", x + w / 2, y + 53, 15, t.ink);
+                ctx.textAlign = "left";
+
+                fieldRow(t, "EMPLOYEE", px, y + 102, iw, "J. Whitmore");
+                fieldRow(t, "DATE", px, y + 140, iw * 0.45, "19 Jul 2026");
+                fieldRow(t, "DEPT", px + iw * 0.55, y + 140, iw * 0.45, "Warehouse");
+
+                const checks = [
+                    [["Verbal", false], ["Written", true], ["Final", false]],
+                    [["Attendance", true], ["Conduct", false]],
+                    [["Safety", false], ["Performance", false]]
+                ];
+                let cy = y + 176;
+                checks.forEach((rowSet) => {
+                    let cx = px;
+                    rowSet.forEach((item) => {
+                        ctx.strokeStyle = t.ink;
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeRect(cx, cy - 9, 11, 11);
+                        if (item[1]) {
+                            ctx.font = "700 10px Inter, sans-serif";
+                            ctx.fillStyle = t.ink;
+                            ctx.fillText("X", cx + 2.5, cy - 0.5);
+                        }
+                        label(t, item[0], cx + 18, cy, 10, t.ink, 400);
+                        cx += 18 + ctx.measureText(item[0]).width + 22;
+                    });
+                    cy += 26;
+                });
+
+                label(t, "Late arrival on three shifts in July,", px, cy + 12, 10, t.muted, 400);
+                label(t, "previously discussed 2 July.", px, cy + 28, 10, t.muted, 400);
+
+                rule(t, px, y + h - 58, iw * 0.45, 1, t.ink);
+                label(t, "EMPLOYEE", px, y + h - 42, 9, t.muted);
+                rule(t, px + iw * 0.55, y + h - 58, iw * 0.45, 1, t.ink);
+                label(t, "SUPERVISOR", px + iw * 0.55, y + h - 42, 9, t.muted);
+            }
+
+            function drawResume(t, x, y, w, h) {
+                sheet(t, x, y, w, h);
+                const px = x + 26;
+                const iw = w - 52;
+
+                serif(t, "Priya Raman", px, y + 48, 24, t.rule);
+                label(t, "Financial Analyst", px, y + 68, 12, t.ink);
+                label(t, "priya.raman@example.com  |  London", px, y + 86, 9, t.muted, 400);
+
+                function section(heading, yy, lines) {
+                    label(t, heading, px, yy, 10, t.rule, 700);
+                    rule(t, px, yy + 7, iw, 1.5, t.rule);
+                    let ly = yy + 28;
+                    lines.forEach((ln) => {
+                        label(t, ln[0], px, ly, ln[1] ? 11 : 10, ln[1] ? t.ink : t.muted, ln[1] ? 600 : 400);
+                        ly += ln[1] ? 17 : 16;
+                    });
+                    return ly;
+                }
+
+                let cy = section("EXPERIENCE", y + 124, [
+                    ["Financial Analyst, Ashcroft Partners", true],
+                    ["2022 - Present", false],
+                    ["Built the quarterly forecasting model", false],
+                    ["used across four business units.", false]
+                ]);
+
+                cy = section("EDUCATION", cy + 14, [
+                    ["BSc Economics", true],
+                    ["University of Manchester, 2020", false]
+                ]);
+
+                section("SKILLS", cy + 14, [
+                    ["Forecasting, reconciliation, Excel,", false],
+                    ["Power BI, IFRS reporting", false]
+                ]);
+            }
+
+            function drawPoster(t, x, y, w, h) {
+                /* Thick frame, flat photographic plate, caption below */
+                ctx.fillStyle = t.ink;
+                ctx.fillRect(x, y, w, h);
+
+                const b = 22;
+                const px = x + b, py = y + b;
+                const pw = w - b * 2, ph = h - b * 2;
+                ctx.fillStyle = t.paper;
+                ctx.fillRect(px, py, pw, ph);
+
+                const ix = px + 16, iy = py + 16;
+                const iwid = pw - 32, ihei = ph - 74;
+                ctx.fillStyle = "#DAD6CE";
+                ctx.fillRect(ix, iy, iwid, ihei);
+                ctx.fillStyle = "#9AA396";
+                ctx.fillRect(ix, iy + ihei * 0.62, iwid, ihei * 0.38);
+                ctx.fillStyle = "#EDE7DA";
+                ctx.beginPath();
+                ctx.arc(ix + iwid * 0.7, iy + ihei * 0.3, iwid * 0.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#1A1A1A";
+                ctx.font = "700 17px 'Playfair Display', Georgia, serif";
+                ctx.fillText("COASTLINE, 2026", px + pw / 2, py + ph - 26);
+                ctx.textAlign = "left";
+            }
+
+            function drawTee(t, x, y, w, h) {
+                /* Same polygon the catalog card miniature uses, scaled */
+                const pts = [
+                    [30, 8], [40, 4], [60, 4], [70, 8], [100, 22], [90, 42],
+                    [78, 36], [78, 96], [22, 96], [22, 36], [10, 42], [0, 22]
+                ];
+                const size = Math.min(w, h);
+                const ox = x + (w - size) / 2;
+                const oy = y + (h - size) / 2;
+
+                ctx.beginPath();
+                pts.forEach((p, i) => {
+                    const cx = ox + (p[0] / 100) * size;
+                    const cy = oy + (p[1] / 100) * size;
+                    if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+                });
+                ctx.closePath();
+                ctx.fillStyle = t.bg === "#1A1A1A" ? "#F4F3EF" : "#1A1A1A";
+                ctx.fill();
+
+                /* The uploaded design sitting on the chest */
+                const aw = size * 0.34;
+                const ax = ox + size / 2 - aw / 2;
+                const ay = oy + size * 0.36;
+                ctx.fillStyle = t.bg === "#1A1A1A" ? "#1A1A1A" : "#F4F3EF";
+                ctx.fillRect(ax, ay, aw, aw);
+                ctx.textAlign = "center";
+                ctx.fillStyle = t.bg === "#1A1A1A" ? "#F4F3EF" : "#1A1A1A";
+                ctx.font = "700 20px 'Playfair Display', Georgia, serif";
+                ctx.fillText("LOGO", ax + aw / 2, ay + aw / 2 + 7);
+                ctx.textAlign = "left";
+
+                /* Colourway dots, as on the catalog card */
+                const colors = ["#1A1A1A", "#FFFFFF", "#1F2A44"];
+                colors.forEach((c, i) => {
+                    ctx.beginPath();
+                    ctx.arc(ox + size / 2 - 34 + i * 34, oy + size + 18, 11, 0, Math.PI * 2);
+                    ctx.fillStyle = c;
+                    ctx.fill();
+                    ctx.strokeStyle = t.line;
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                });
+            }
+
+            const DOCS = {
+                receipt: drawReceipt,
+                invoice: drawInvoice,
+                notice: drawNotice,
+                resume: drawResume,
+                poster: drawPoster,
+                tee: drawTee
+            };
+
+            /* ----------------------------------------------------------------
+               Card composition
+               ---------------------------------------------------------------- */
+
+            function draw() {
+                const t = THEMES[themeSelect.value] || THEMES.cream;
+                const docKey = docSelect.value;
+                const hasDoc = Object.prototype.hasOwnProperty.call(DOCS, docKey);
+                const pad = 80;
+
+                ctx.fillStyle = t.bg;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = t.rule;
+                ctx.lineWidth = 10;
+                ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+
+                ctx.textBaseline = "alphabetic";
+                ctx.textAlign = "left";
+
+                /* The document occupies the right third; without one the text
+                   column runs the full width, as before.
+
+                   Every illustration is authored against a fixed 300x400
+                   reference sheet and then scaled as a whole, so its internal
+                   type, rules and spacing keep their proportions rather than
+                   shrinking relative to a larger sheet. DOC_W is therefore the
+                   only value to change to resize the artwork. */
+                const DOC_REF_W = 300;
+                const DOC_REF_H = 400;
+                const DOC_W = 372;
+                const docW = DOC_W;
+                const docH = DOC_W * (DOC_REF_H / DOC_REF_W);
+                const docX = canvas.width - pad - docW;
+                const docY = (canvas.height - docH) / 2;
+
+                if (hasDoc) {
+                    const k = docW / DOC_REF_W;
+                    ctx.save();
+                    ctx.translate(docX, docY);
+                    ctx.scale(k, k);
+                    DOCS[docKey](t, 0, 0, DOC_REF_W, DOC_REF_H);
+                    ctx.restore();
+                }
+
+                const textW = hasDoc ? (docX - pad - 48) : (canvas.width - pad * 2);
+
+                const wordmarkBaseline = pad + 38;
+                ctx.fillStyle = t.ink;
+                ctx.font = "700 38px 'Playfair Display', Georgia, serif";
+                ctx.fillText("TemplateBox", pad, wordmarkBaseline);
+
+                const titleSize = hasDoc ? 64 : 76;
+                const subSize = 32;
+                ctx.font = "700 " + titleSize + "px 'Playfair Display', Georgia, serif";
+                const titleLines = wrap(titleInput.value, textW).slice(0, 3);
+
+                const lineH = titleSize * 1.16;
+                const subLead = 62;
+                const subLineH = 42;
+                ctx.font = "400 " + subSize + "px Inter, sans-serif";
+                const subLines = wrap(subInput.value, textW).slice(0, 2);
+                const blockH = titleLines.length * lineH +
+                    (subLines.length ? subLead + (subLines.length - 1) * subLineH : 0);
+
+                /* Centre the text block in the band between the wordmark and
+                   the footer rule, not in the whole canvas. Centring against
+                   the canvas ignored the two fixed elements above and below
+                   it, which left a conspicuous void in the lower left. */
+                const bandTop = wordmarkBaseline + 46;
+                const bandBottom = canvas.height - pad - 40;
+                const blockTop = bandTop + Math.max(0, (bandBottom - bandTop - blockH) / 2);
+                let y = blockTop + titleSize * 0.78;
+
+                ctx.fillStyle = t.ink;
+                ctx.font = "700 " + titleSize + "px 'Playfair Display', Georgia, serif";
+                titleLines.forEach((line) => {
+                    ctx.fillText(line, pad, y);
+                    y += lineH;
+                });
+
+                ctx.fillStyle = t.muted;
+                ctx.font = "400 " + subSize + "px Inter, sans-serif";
+                y += subLead - lineH;
+                subLines.forEach((line) => {
+                    ctx.fillText(line, pad, y);
+                    y += subLineH;
+                });
+
+                ctx.fillStyle = t.rule;
+                ctx.fillRect(pad, canvas.height - pad - 6, 120, 6);
+
+                ctx.fillStyle = t.muted;
+                ctx.font = "600 28px Inter, sans-serif";
+                ctx.fillText("templatebox.win", pad + 148, canvas.height - pad + 4);
+            }
+
+            function applyPreset() {
+                const preset = PRESETS.find((p) => p.id === presetSelect.value) || PRESETS[0];
+                titleInput.value = preset.title;
+                subInput.value = preset.sub;
+                docSelect.value = preset.doc;
+                filenameInput.value = preset.file;
+                draw();
+            }
+
+            document.getElementById("og-download").addEventListener("click", () => {
+                draw();
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        status.textContent = "Export failed in this browser.";
+                        return;
+                    }
+                    const name = (filenameInput.value || "og-cover.png").replace(/[^\w.-]/g, "");
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = /\.png$/.test(name) ? name : name + ".png";
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+                    status.textContent = "Downloaded " + a.download +
+                        " (" + Math.round(blob.size / 1024) + "KB). Save it into assets/, then point that page's og:image and twitter:image at it.";
+                }, "image/png");
+            });
+
+            presetSelect.addEventListener("change", applyPreset);
+            document.getElementById("og-form").addEventListener("input", draw);
+            docSelect.addEventListener("change", draw);
+            themeSelect.addEventListener("change", draw);
+
+            /* Wait for the webfonts before the first paint, or the canvas
+               renders in a fallback face and the exported card does not
+               match the site's typography. */
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(draw);
+            }
+            applyPreset();
+        })();
+    </script>
+</body>
+</html>

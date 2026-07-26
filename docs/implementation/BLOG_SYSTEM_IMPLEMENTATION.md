@@ -86,6 +86,28 @@ Notes:
 - Node vm harness, blog index layout (DOM stub with attribute/class `querySelector`, capturing and firing the real `DOMContentLoaded` handler): featured card selects the newest post, list renders remaining posts under a heading, list heading/rows omitted with only one post, sidebar mounts only at wide viewports, leaderboard mounts, empty-post state renders the placeholder message in the featured slot with an empty list. 13/13 pass.
 - Browser pass still recommended: load `blog.html`, `post.html?slug=free-cv-resume-templates-build-professional-resume-fast`, and `admin.html` via a local static server; confirm all five banner sizes fill, the sidebar/rail appear only above 70rem, and layouts stack correctly under 48rem/40rem on mobile.
 
+## Static Per-Post Pages (added July 26, 2026)
+
+Posts are now published as static files under `blog/<slug>.html` rather than being served from the JavaScript-rendered `post.html?slug=` route. The reasoning and the full change set are in `docs/project/SEO_AUDIT.md` finding 2.3; the operational summary:
+
+- `post.html` acquired its real title, description, canonical URL and `BlogPosting` schema only after `js/blog.js` ran. Google renders JavaScript but on a deferred second pass, and **social crawlers do not execute JavaScript at all**, so every post shared to Facebook, X, LinkedIn or WhatsApp previewed as "Article | TemplateBox Blog" with no description and no image. `post.html` also carried no Open Graph tags whatsoever.
+- `admin.html` gained a **Download Post Pages** button (`downloadPostPages()` in `js/admin.js`). It emits one complete HTML file per visible post with all metadata baked into the served markup. The body is produced by running the post through the existing `TBBlog.renderBlocks` into a detached container and serializing the result, so the project keeps exactly one block-rendering implementation and the static files cannot drift from what the site renders. Because that renderer only ever uses `createElement` and `textContent`, the serialized output is correctly escaped by construction rather than by a separate escaping pass.
+- Downloads are spaced 350ms apart because browsers throttle rapid sequential downloads. A zip library was rejected: it would add a CDN dependency for a problem that does not exist at this post count.
+- All generated links now use `postUrlFor()` in `js/blog.js`, a single helper returning `blog/<slug>.html`. This covers the blog index featured card, the list rows, and the homepage guides strip in `js/app.js`.
+- `netlify.toml` 301-redirects `post.html?slug=<slug>` to the static file. A 301 rather than a `noindex` was chosen so the already-indexed query URLs pass their accumulated ranking signal to the new URLs instead of losing it.
+- The admin draft preview moved from `post.html?slug=` to `post.html?draft=<slug>&preview=1`. The redirect rule keys on `slug`, so a draft that has no exported static file yet would otherwise be bounced to a 404. `initPostPage()` reads `draft` first and falls back to `slug`.
+- `post.html` itself now carries `noindex, follow` and survives as the draft-preview and local-testing route.
+
+### Publishing checklist (updated)
+
+1. Author and save posts in `admin.html`.
+2. Download `js/blog-data.js` and replace the file in the project. This drives the blog index and all card lists.
+3. Download the post pages and place every file in `blog/`.
+4. Add each new post URL to `sitemap.xml` as `/blog/<slug>.html` with a `lastmod`.
+5. Commit and push to `main`, or drag the folder into Netlify.
+
+Skipping step 3 leaves the blog index linking to a file that does not exist.
+
 ## Related Files
 
-`blog.html`, `post.html`, `admin.html`, `js/blog.js`, `js/blog-data.js`, `js/admin.js`, `css/style.css`, `index.html`, `sitemap.xml`, `robots.txt`
+`blog.html`, `post.html`, `admin.html`, `blog/`, `js/blog.js`, `js/blog-data.js`, `js/admin.js`, `js/app.js`, `css/style.css`, `index.html`, `sitemap.xml`, `robots.txt`, `netlify.toml`

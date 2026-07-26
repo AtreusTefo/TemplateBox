@@ -149,6 +149,7 @@
             caption: TB.sanitize(captionInput.value),
             frame: FRAME_STYLES[frameSelect.value] ? frameSelect.value : "black"
         });
+        TB.markSaved();
     }
 
     captionInput.addEventListener("input", () => {

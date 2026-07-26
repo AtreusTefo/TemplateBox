@@ -528,6 +528,7 @@
             offsetY,
             label: TB.sanitize(labelInput.value)
         });
+        TB.markSaved();
     }
 
     labelInput.addEventListener("input", persist);

@@ -4,20 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Privacy Policy | TemplateBox</title>
-    <meta name="description" content="TemplateBox privacy policy. Your documents are processed entirely inside your browser. No servers, no databases, no accounts, no uploads.">
-    <link rel="canonical" href="https://templatebox.win/privacy.html">
+    <title>About TemplateBox | Free Serverless Document Tools</title>
+    <meta name="description" content="What TemplateBox is, how the browser-only architecture works, why the tools are free, and how to get in touch. No accounts, no servers, no uploaded data.">
+    <link rel="canonical" href="https://templatebox.win/about.html">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="TemplateBox">
-    <meta property="og:title" content="Privacy Policy | TemplateBox">
-    <meta property="og:description" content="Your documents are processed entirely inside your browser. No servers, no databases, no uploads.">
-    <meta property="og:url" content="https://templatebox.win/privacy.html">
+    <meta property="og:title" content="About TemplateBox | Free Serverless Document Tools">
+    <meta property="og:description" content="How TemplateBox works, why it is free, and why nothing you type ever leaves your device.">
+    <meta property="og:url" content="https://templatebox.win/about.html">
+    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+
     <!-- Twitter Card: without these every share renders as a bare link -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Privacy Policy | TemplateBox">
-    <meta name="twitter:description" content="Your documents are processed entirely inside your browser. No servers, no databases, no uploads.">
+    <meta name="twitter:title" content="About TemplateBox | Free Serverless Document Tools">
+    <meta name="twitter:description" content="How TemplateBox works, why it is free, and why nothing you type ever leaves your device.">
     <meta name="twitter:image" content="https://templatebox.win/assets/logo.png">
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "TemplateBox",
+        "url": "https://templatebox.win/",
+        "logo": "https://templatebox.win/assets/logo.png",
+        "description": "Free, serverless document and template tools that run entirely in the browser.",
+        "sameAs": [
+            "https://x.com/Templatebox26",
+            "https://www.facebook.com/profile.php?id=61592027191178",
+            "https://www.tiktok.com/@templatebox26",
+            "https://www.instagram.com/templatebox26/"
+        ]
+    }
+    </script>
 
     <!-- ================================================================
          MICROSOFT CLARITY: paste the Clarity tracking snippet directly
@@ -42,48 +61,55 @@
 </head>
 <body>
 
+    <a class="skip-link" href="#main">Skip to main content</a>
+
     <header class="site-header">
         <a class="wordmark" href="index.html">TemplateBox</a>
         <nav class="site-nav" aria-label="Primary">
             <a href="index.html">Templates</a>
             <a href="blog.html">Guides</a>
-            <a href="about.html">About</a>
+            <a href="about.html" aria-current="page">About</a>
         </nav>
     </header>
 
-    <main>
+    <main id="main">
         <article class="prose">
-            <h1>Privacy Policy and Data Processing Notice</h1>
-            <p class="updated">Last updated: July 7, 2026</p>
+            <h1>About TemplateBox</h1>
+            <p class="updated">Operating since 2026</p>
 
-            <p>TemplateBox (templatebox.win) is a fully client-side web application. This notice explains exactly where your information lives, what stays on your device, and which third-party infrastructure services are involved in delivering the site.</p>
+            <p>TemplateBox is a set of free document tools that run entirely inside your web browser. There is no account to create, no trial to start, no export limit, and no watermark on anything you produce. There is also no server holding your data, because there is no server at all.</p>
 
-            <h2>1. Your Documents Never Leave Your Device</h2>
-            <p>Every form field you type, every photo you upload, and every file you export is processed entirely inside your own web browser using local JavaScript. TemplateBox operates with zero backend servers and zero databases.</p>
+            <h2>What you can make here</h2>
             <ul>
-                <li>Resume text is compiled into a PDF locally on your device.</li>
-                <li>Receipt, invoice and employee notice details, including names, addresses, payment amounts and disciplinary records, are compiled into a PDF locally on your device and are never transmitted anywhere.</li>
-                <li>Poster photos are drawn onto a local canvas element and exported as a PNG file directly to your downloads folder.</li>
-                <li>No document content, image, or personal detail is ever transmitted to us, because there is no server to receive it.</li>
+                <li><a href="free-invoice-template.html">Invoices</a> with line items, automatic tax and a calculated balance due</li>
+                <li><a href="rent-receipt-template.html">Rent receipts</a>, <a href="cash-payment-receipt-template.html">cash payment receipts</a>, <a href="itemized-receipt-template.html">itemized business receipts</a> and <a href="sales-receipt-template.html">printable sales receipt forms</a></li>
+                <li><a href="employee-warning-notice-template.html">Employee warning notices</a> with warning levels, violation categories and signature blocks</li>
+                <li><a href="ats-resume-template.html">Resumes and CVs</a> that export as machine-readable PDFs</li>
+                <li><a href="poster-maker.html">Framed photo posters</a> and <a href="tshirt-mockup-generator.html">print-on-demand product mockups</a></li>
             </ul>
 
-            <h2>2. State Preservation via Browser localStorage</h2>
-            <p>To let you close a tab and resume later, editor inputs are saved in real time to your browser's built-in localStorage memory. This data is stored only on your device, is never synchronized to any external system, and can be erased at any time by clearing your browser's site data for templatebox.win.</p>
+            <h2>How the browser-only architecture works</h2>
+            <p>Conventional document tools send what you type to a server, process it there, and send a file back. That architecture requires an account so the server knows whose data is whose, and it means your invoice, your tenant's address or your employee's disciplinary record sits in somebody else's database.</p>
+            <p>TemplateBox does the work on your machine instead. The editors are ordinary web pages; the document preview is rendered by JavaScript in your browser as you type; the PDF is compiled locally by a library running in the same page; and the finished file is written straight to your downloads folder. Nothing is transmitted because there is nowhere to transmit it to.</p>
+            <p>Your in-progress work is held in your browser's own local storage on your device, which is why you can close the tab and come back to an unfinished document. Clearing your browser's site data for this domain erases it permanently, and we cannot recover it, because we never had a copy.</p>
 
-            <h2>3. No Accounts, No Sign-Ups, No First-Party Cookies</h2>
-            <p>TemplateBox does not offer or require user accounts, does not collect email addresses, and does not set first-party tracking cookies.</p>
+            <h2>Why it is free</h2>
+            <p>The tools are funded by advertising shown on a short interstitial page between choosing a template and opening the editor. That interval is the entire business model. It is why there is no subscription, no export cap, and no watermark.</p>
+            <p>The editors themselves carry no advertising at all, and neither does the homepage. That is a deliberate decision rather than an oversight: an editor cluttered with ads while someone is drafting a disciplinary notice or a resume is a bad tool, and the trade of one short interstitial for a clean workspace is the one we would want as users.</p>
 
-            <h2>4. Third-Party Services</h2>
-            <p>While your document data stays local, standard connection telemetry (such as IP address, browser type, and page visits) is processed by the third-party services that deliver and fund this free platform:</p>
-            <ul>
-                <li><strong>Advertising (Adsterra):</strong> Ad units shown on the loading screen are served by the Adsterra network, which may use its own cookies or identifiers under its own privacy policy.</li>
-                <li><strong>Infrastructure (Cloudflare and Netlify):</strong> Static site files are delivered through Cloudflare DNS routing and Netlify hosting, which log standard network requests for security and performance.</li>
-                <li><strong>Analytics (Microsoft Clarity):</strong> Anonymous session interaction data (clicks, scrolls, viewport sizes) helps us find and fix usability problems. Clarity does not receive the text you type into editor fields.</li>
-            </ul>
-            <p>Each provider processes connection data under its own published privacy policy. We do not sell, enrich, or re-share any information with additional parties.</p>
+            <h2>What we can and cannot see</h2>
+            <p>We cannot see any document you create. We do not receive names, addresses, amounts, employee records, resume contents, or uploaded images, and this is an architectural fact rather than a policy promise.</p>
+            <p>What we do receive is ordinary web traffic information through third-party services: hosting and DNS logs, anonymous interaction analytics used to find usability problems, and the advertising network's own measurement. The <a href="privacy.html">privacy policy</a> sets out each of these in detail.</p>
 
-            <h2>5. Contact</h2>
-            <p>Questions about this notice can be sent to the site operator through the contact details published on the domain registration record for templatebox.win.</p>
+            <h2>Accuracy and limitations</h2>
+            <p>The guidance published on this site and in the <a href="blog.html">guides section</a> is general information. Requirements for receipts, invoices and employment records vary considerably between countries and between states or provinces, and they change. Nothing here is legal, tax or employment advice, and a consequential decision warrants professional advice specific to your jurisdiction.</p>
+            <p>The tools produce documents; they do not verify that a document meets a particular legal requirement where you are.</p>
+
+            <h2>Contact</h2>
+            <p>Corrections, bug reports and suggestions are welcome. You can reach the site operator through any of the social accounts linked at the foot of every page, or through the contact details published on the domain registration record for templatebox.win.</p>
+
+            <h2>Follow along</h2>
+            <p>New templates and guides are announced on <a href="https://x.com/Templatebox26" target="_blank" rel="noopener noreferrer">X</a>, <a href="https://www.instagram.com/templatebox26/" target="_blank" rel="noopener noreferrer">Instagram</a>, <a href="https://www.facebook.com/profile.php?id=61592027191178" target="_blank" rel="noopener noreferrer">Facebook</a> and <a href="https://www.tiktok.com/@templatebox26" target="_blank" rel="noopener noreferrer">TikTok</a>.</p>
         </article>
     </main>
 
@@ -146,5 +172,6 @@
         </div>
     </footer>
 
+    <script src="js/app.js"></script>
 </body>
 </html>

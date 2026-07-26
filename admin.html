@@ -39,6 +39,7 @@
             </div>
             <div class="admin-actions">
                 <button class="btn" type="button" data-export-download>Download js/blog-data.js</button>
+                <button class="btn" type="button" data-export-pages>Download Post Pages</button>
                 <button class="btn btn-secondary" type="button" data-export-copy>Copy File Contents</button>
             </div>
             <p class="admin-status" data-export-status aria-live="polite"></p>
@@ -46,10 +47,17 @@
                 <summary>How publishing works</summary>
                 <ol>
                     <li>Save your posts below. They are stored only in this browser.</li>
-                    <li>Click Download js/blog-data.js and replace the existing file at <span class="mono">js/blog-data.js</span> in the project.</li>
+                    <li>Click Download js/blog-data.js and replace the existing file at <span class="mono">js/blog-data.js</span> in the project. This drives the blog index and the card lists.</li>
+                    <li>Click Download Post Pages and put every downloaded file into the project's <span class="mono">blog/</span> folder. One static page per post.</li>
+                    <li>Add any new post URL to <span class="mono">sitemap.xml</span> as <span class="mono">/blog/&lt;slug&gt;.html</span>.</li>
                     <li>Commit and push to <span class="mono">main</span> (Netlify auto-deploys), or drag the site folder into Netlify.</li>
                     <li>Visitors now see the updated posts on the live blog.</li>
                 </ol>
+            </details>
+            <details class="admin-help">
+                <summary>Why post pages are exported as separate files</summary>
+                <p><span class="mono">post.html</span> resolves a post's title, description and structured data at runtime with JavaScript. Google renders JavaScript but only on a deferred second pass, and social crawlers (Facebook, X, LinkedIn, WhatsApp) never run it at all, so a shared link previewed as a generic "Article" with no description.</p>
+                <p>The exported files carry the real metadata in the served markup, so search engines and social previews get it immediately. <span class="mono">post.html</span> still works as a fallback route for any existing link.</p>
             </details>
         </section>
 

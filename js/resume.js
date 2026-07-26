@@ -27,6 +27,84 @@
         education: [{ degree: "", school: "", dates: "" }]
     };
 
+    /* First-run sample content.
+       The editor previously opened onto an empty form beside an empty white
+       sheet, so a first-time visitor could not see what the tool produces or
+       that the preview updates live until they had typed several fields.
+       Loaded ONLY when no saved state exists, so it can never overwrite real
+       work, and announced by a dismissible notice offering a blank start. */
+    const SAMPLE_STATE = {
+        accent: "#1F4E79",
+        fields: {
+            name: "Adaeze Nwosu",
+            title: "Operations Director",
+            email: "adaeze.nwosu@example.com",
+            phone: "+1 (555) 014-8820",
+            location: "Chicago, IL",
+            summary: "Operations leader with fifteen years running supply chain and fulfilment teams across three continents. Known for turning underperforming depots into reliable, measurable operations without expanding headcount.",
+            skills: "Supply chain strategy, Vendor negotiation, Lean process design, Demand forecasting, Team leadership, SAP, Power BI"
+        },
+        experience: [
+            {
+                role: "Director of Operations",
+                company: "Northwind Logistics",
+                dates: "2019 - Present",
+                description: "Cut average fulfilment lead time 34% across nine regional depots. Rebuilt the carrier mix, saving $1.8M annually against the prior contract structure."
+            },
+            {
+                role: "Head of Fulfilment",
+                company: "Cardinal Freight",
+                dates: "2014 - 2019",
+                description: "Scaled a single warehouse operation into four sites during a period of 3x order growth, holding on-time dispatch above 97%."
+            }
+        ],
+        education: [
+            { degree: "MBA, Operations Management", school: "Kellogg School of Management", dates: "2012 - 2014" },
+            { degree: "BSc Industrial Engineering", school: "University of Lagos", dates: "2005 - 2009" }
+        ]
+    };
+
+    /* Renders the sample-content notice above the form. Clearing swaps the
+       whole editor back to a blank document in one action. */
+    function showSampleNotice() {
+        const pane = form.parentElement;
+        if (!pane || document.getElementById("sample-notice")) {
+            return;
+        }
+
+        const notice = document.createElement("div");
+        notice.className = "sample-notice";
+        notice.id = "sample-notice";
+
+        const text = document.createElement("p");
+        text.textContent = "This is sample content so you can see how the live preview works. Type over it, or start from an empty resume.";
+
+        const clear = document.createElement("button");
+        clear.type = "button";
+        clear.className = "btn btn-secondary btn-small";
+        clear.textContent = "Start blank";
+        clear.addEventListener("click", () => {
+            form.querySelectorAll("[data-bind]").forEach((input) => {
+                input.value = "";
+            });
+            experienceList.textContent = "";
+            educationList.textContent = "";
+            addEntryRow(experienceList, tplExperience);
+            addEntryRow(educationList, tplEducation);
+            applyAccent(DEFAULT_STATE.accent);
+            notice.remove();
+            persistAndRender();
+            const first = form.querySelector("[data-bind]");
+            if (first) {
+                first.focus();
+            }
+        });
+
+        notice.appendChild(text);
+        notice.appendChild(clear);
+        pane.insertBefore(notice, pane.firstChild);
+    }
+
     const form = document.getElementById("resume-form");
     const sheet = document.getElementById("resume-sheet");
     if (!form || !sheet) {
@@ -71,6 +149,7 @@
     function persistAndRender() {
         const state = collectState();
         TB.storageSet(STORAGE_KEY, state);
+        TB.markSaved();
         renderPreview(state);
     }
 
@@ -347,7 +426,10 @@
 
     function init() {
         const saved = TB.storageGet(STORAGE_KEY);
-        const state = saved && saved.fields ? saved : DEFAULT_STATE;
+        const hasSaved = Boolean(saved && saved.fields);
+        /* Sample content only on a genuinely first visit; saved work always
+           wins, so returning visitors never see their document replaced. */
+        const state = hasSaved ? saved : SAMPLE_STATE;
 
         applyAccent(state.accent);
 
@@ -377,6 +459,10 @@
             addEntryRow(educationList, tplEducation);
             persistAndRender();
         });
+
+        if (!hasSaved) {
+            showSampleNotice();
+        }
 
         renderPreview(collectState());
     }

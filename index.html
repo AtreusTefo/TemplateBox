@@ -17,6 +17,12 @@
     <meta property="og:url" content="https://templatebox.win/">
     <meta property="og:image" content="https://templatebox.win/assets/logo.png">
 
+    <!-- Twitter Card: without these every share renders as a bare link -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Free Invoice, Receipt and Resume Maker | TemplateBox">
+    <meta name="twitter:description" content="Editable rent receipts, invoices, resumes, posters and mockups. Free, local, no sign-up required.">
+    <meta name="twitter:image" content="https://templatebox.win/assets/logo.png">
+
     <!-- Structured data: WebApplication schema per Google Search Central -->
     <script type="application/ld+json">
     {
@@ -33,6 +39,26 @@
             "price": "0.00",
             "priceCurrency": "USD"
         }
+    }
+    </script>
+
+    <!-- Organization schema: binds the brand entity to its social profiles
+         via sameAs, which is how those accounts are associated with the site
+         in search. Kept identical across every public page. -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "TemplateBox",
+        "url": "https://templatebox.win/",
+        "logo": "https://templatebox.win/assets/logo.png",
+        "description": "Free, serverless document and template tools that run entirely in the browser.",
+        "sameAs": [
+            "https://x.com/Templatebox26",
+            "https://www.facebook.com/profile.php?id=61592027191178",
+            "https://www.tiktok.com/@templatebox26",
+            "https://www.instagram.com/templatebox26/"
+        ]
     }
     </script>
 
@@ -53,273 +79,375 @@
          this comment block. The snippet self-attaches to user clicks and
          spawns its background tab; js/app.js independently routes the
          foreground tab to loading.html on the same click.
+
+         Loaded async: as a synchronous tag it blocked HTML parsing on a
+         cross-origin round trip, on the one page Google actually indexes,
+         which directly degraded Largest Contentful Paint. The tag attaches
+         its own document-level click handler when it executes, so async
+         delivery does not change its behaviour.
          ================================================================ -->
-    <script src="https://pl30250761.effectivecpmnetwork.com/3d/61/ac/3d61ac6bb9c3a6962855f7bc2c2ed358.js"></script>
+    <script async src="https://pl30250761.effectivecpmnetwork.com/3d/61/ac/3d61ac6bb9c3a6962855f7bc2c2ed358.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Fonts loaded without blocking render: the print-media swap defers
+         application until the sheet has arrived, and font-display:swap in
+         the served CSS paints text immediately in the fallback face. -->
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
+    <a class="skip-link" href="#templates">Skip to templates</a>
+
     <header class="site-header">
         <a class="wordmark" href="index.html">TemplateBox</a>
         <nav class="site-nav" aria-label="Primary">
-            <a href="#templates">Templates</a>
-            <a href="blog.html">Blog</a>
-            <a href="privacy.html">Privacy</a>
+            <a href="index.html" aria-current="page">Templates</a>
+            <a href="blog.html">Guides</a>
+            <a href="about.html">About</a>
         </nav>
     </header>
 
     <main>
         <section class="hero">
-            <h1>Free Receipt, Invoice, Resume, Poster and Mockup Maker</h1>
-            <p>Fill in editable rent receipts, invoices, sales receipts and employee warning notices, or personalize professional CV templates, graphic canvas posters, and print-on-demand product mockups. Everything runs in your browser. No accounts, no uploads to a server, no subscription walls. Your work saves locally and exports instantly.</p>
+            <h1>Professional documents, made in your browser.</h1>
+            <p>Receipts, invoices, resumes, posters and product mockups. Free, no sign-up, and nothing you type ever leaves your device.</p>
+            <div class="hero-actions">
+                <a class="btn" href="#templates">Browse templates</a>
+                <a class="btn btn-secondary" href="rent-receipt-template.html">Make a rent receipt</a>
+            </div>
         </section>
+
+        <div class="trust-band">
+            <div class="trust-item">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l5 5L19 7"/></svg>
+                <span><strong>No sign-up</strong>No account, no email, no paywall.</span>
+            </div>
+            <div class="trust-item">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 11V8a7 7 0 0114 0v3"/><rect x="4" y="11" width="16" height="10"/></svg>
+                <span><strong>Runs in your browser</strong>Nothing is uploaded to any server.</span>
+            </div>
+            <div class="trust-item">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg>
+                <span><strong>Real selectable text</strong>PDF exports parse cleanly in ATS software.</span>
+            </div>
+            <div class="trust-item">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>
+                <span><strong>No watermark</strong>Your finished file is yours, unmarked.</span>
+            </div>
+        </div>
 
         <section id="templates" aria-label="Template catalog">
             <h2 class="section-title">Browse Templates</h2>
+            <p class="section-intro">Fifteen editable templates across four builders. Popular starting points:
+                <a href="rent-receipt-template.html">rent receipt</a>,
+                <a href="free-invoice-template.html">invoice</a>,
+                <a href="cash-payment-receipt-template.html">cash payment receipt</a>,
+                <a href="employee-warning-notice-template.html">employee warning notice</a>,
+                <a href="ats-resume-template.html">ATS resume</a> and
+                <a href="tshirt-mockup-generator.html">t-shirt mockup</a>.</p>
+
+            <!-- Mount point for the returning-visitor continuation strip,
+                 populated by js/app.js only when saved editor state exists -->
+            <div data-continue-mount></div>
 
             <!-- Category filters: real anchors for crawler indexability,
-                 enhanced client-side via data-filter attributes -->
+                 enhanced client-side via data-filter attributes. Labels are
+                 written in visitor intent language, not internal taxonomy. -->
             <nav class="filter-pills" aria-label="Template categories">
                 <a class="pill is-active" href="#templates" data-filter="all">All</a>
+                <a class="pill" href="#templates" data-filter="documents">Receipts and Invoices</a>
                 <a class="pill" href="#templates" data-filter="resumes">Resumes</a>
-                <a class="pill" href="#templates" data-filter="documents">Business Docs</a>
-                <a class="pill" href="#templates" data-filter="canvas">Graphic Canvas</a>
-                <a class="pill" href="#templates" data-filter="mockups">Mockups</a>
+                <a class="pill" href="#templates" data-filter="canvas">Posters and Prints</a>
+                <a class="pill" href="#templates" data-filter="mockups">Product Mockups</a>
             </nav>
 
             <div class="catalog-grid" data-catalog-grid>
 
+                <!-- Business Docs: every card routes to the same docs.html
+                     editor; data-doc pre-selects which document type opens,
+                     validated against the editor's own whitelist on arrival.
+
+                     Each CTA is a real anchor pointing at its editor page.
+                     js/app.js intercepts the click and routes through the
+                     loading page exactly as before; crawlers, which do not
+                     run the handler, follow the href, which is what gives
+                     the editor pages inbound internal links at all. -->
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc">
+                            <p class="mk-title">Rent Receipt</p>
+                            <div class="mk-row"><span class="mk-lbl">No.</span><span class="mk-val">0148</span><span class="mk-lbl">Date</span><span class="mk-val">01 Aug 2026</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Received from</span><span class="mk-val">Daniel Osei</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Property</span><span class="mk-val">14 Rosewood Ave, Unit 2B</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Period</span><span class="mk-val">1 Aug - 31 Aug 2026</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Amount</span><span class="mk-val strong">$1,250.00</span></div>
+                            <p class="mk-p">One thousand two hundred fifty dollars only</p>
+                            <div class="mk-fill"></div>
+                            <div class="mk-sign"><span>Received by</span><span>Balance due</span></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Receipts and Invoices</p>
+                        <h3 class="card-title">Rent Receipt</h3>
+                        <p class="card-desc">Log a tenant payment with rental period, property address, amount in words, and balance due.</p>
+                        <a class="btn btn-block card-link" href="docs.html" data-target="docs" data-doc="rent-receipt">Open editor</a>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc">
+                            <p class="mk-title">Payment Receipt</p>
+                            <div class="mk-row"><span class="mk-lbl">No.</span><span class="mk-val">2291</span><span class="mk-lbl">Date</span><span class="mk-val">12 Jul 2026</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Received from</span><span class="mk-val">Maria Alvarez</span></div>
+                            <div class="mk-row"><span class="mk-lbl">For</span><span class="mk-val">Deposit on catering order</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Amount</span><span class="mk-val strong">$340.00</span></div>
+                            <div class="mk-check"><span class="mk-box">X</span><span>Cash</span><span class="mk-box"></span><span>Card</span><span class="mk-box"></span><span>Transfer</span></div>
+                            <div class="mk-fill"></div>
+                            <div class="mk-sign"><span>Signature</span><span>Balance</span></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Receipts and Invoices</p>
+                        <h3 class="card-title">Cash Payment Receipt</h3>
+                        <p class="card-desc">A simple proof-of-payment slip with payment method checkboxes and a signature line.</p>
+                        <a class="btn btn-block card-link" href="docs.html" data-target="docs" data-doc="payment-receipt">Open editor</a>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc">
+                            <p class="mk-name">Harbour Supply Co.</p>
+                            <p class="mk-contact">42 Dock Road, Portside</p>
+                            <p class="mk-title">Receipt</p>
+                            <div class="mk-row"><span class="mk-lbl">Billed to</span><span class="mk-val">Nova Interiors Ltd</span></div>
+                            <div class="mk-tbl">
+                                <span class="mk-th">Description</span><span class="mk-th">Qty</span><span class="mk-th">Amount</span>
+                                <span>Oak shelving board</span><span>6</span><span>270.00</span>
+                                <span>Brass fittings set</span><span>2</span><span>84.00</span>
+                                <span>Delivery</span><span>1</span><span>35.00</span>
+                            </div>
+                            <div class="mk-fill"></div>
+                            <div class="mk-total"><span>Total</span><span>$389.00</span></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Receipts and Invoices</p>
+                        <h3 class="card-title">Itemized Business Receipt</h3>
+                        <p class="card-desc">Billed-to and sent-by blocks, a line-item table, and automatic subtotal, tax and grand total.</p>
+                        <a class="btn btn-block card-link" href="docs.html" data-target="docs" data-doc="business-receipt">Open editor</a>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc">
+                            <p class="mk-title">Sales Receipt</p>
+                            <div class="mk-row"><span class="mk-lbl">Date</span><span class="mk-val">04 Jun 2026</span><span class="mk-lbl">No.</span><span class="mk-val">771</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Sold to</span><span class="mk-val">&nbsp;</span></div>
+                            <div class="mk-tbl">
+                                <span class="mk-th">Item</span><span class="mk-th">Qty</span><span class="mk-th">Price</span>
+                                <span>&nbsp;</span><span>&nbsp;</span><span>&nbsp;</span>
+                                <span>&nbsp;</span><span>&nbsp;</span><span>&nbsp;</span>
+                                <span>&nbsp;</span><span>&nbsp;</span><span>&nbsp;</span>
+                            </div>
+                            <div class="mk-fill"></div>
+                            <div class="mk-total"><span>Total</span><span>&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+                            <div class="mk-sign"><span>Received by</span><span>Date</span></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Receipts and Invoices</p>
+                        <h3 class="card-title">Sales and Cash Receipt Form</h3>
+                        <p class="card-desc">A printable counter-sale form. Leave the fields empty for ruled blank lines to write on.</p>
+                        <a class="btn btn-block card-link" href="docs.html" data-target="docs" data-doc="sales-receipt">Open editor</a>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc accent-navy">
+                            <p class="mk-name">Meridian Studio</p>
+                            <p class="mk-contact">hello@meridian.studio</p>
+                            <p class="mk-title">Invoice</p>
+                            <div class="mk-row"><span class="mk-lbl">No.</span><span class="mk-val">INV-1043</span><span class="mk-lbl">Due</span><span class="mk-val">30 Aug</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Bill to</span><span class="mk-val">Larkfield Group</span></div>
+                            <div class="mk-tbl">
+                                <span class="mk-th">Description</span><span class="mk-th">Qty</span><span class="mk-th">Amount</span>
+                                <span>Brand identity</span><span>1</span><span>2,400.00</span>
+                                <span>Web design</span><span>1</span><span>1,850.00</span>
+                                <span>Print assets</span><span>3</span><span>420.00</span>
+                            </div>
+                            <div class="mk-fill"></div>
+                            <div class="mk-total"><span>Balance due</span><span>$4,670.00</span></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Receipts and Invoices</p>
+                        <h3 class="card-title">Professional Invoice</h3>
+                        <p class="card-desc">Invoice number, due date, payment terms and bank details, with balance due calculated for you.</p>
+                        <a class="btn btn-block card-link" href="docs.html" data-target="docs" data-doc="invoice">Open editor</a>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="mock-doc">
+                            <p class="mk-title boxed">Employee Warning Notice</p>
+                            <div class="mk-row"><span class="mk-lbl">Employee</span><span class="mk-val">J. Whitmore</span></div>
+                            <div class="mk-row"><span class="mk-lbl">Date</span><span class="mk-val">19 Jul 2026</span><span class="mk-lbl">Dept</span><span class="mk-val">Warehouse</span></div>
+                            <div class="mk-check"><span class="mk-box"></span><span>Verbal</span><span class="mk-box">X</span><span>Written</span><span class="mk-box"></span><span>Final</span></div>
+                            <div class="mk-check"><span class="mk-box">X</span><span>Attendance</span><span class="mk-box"></span><span>Conduct</span></div>
+                            <div class="mk-check"><span class="mk-box"></span><span>Safety</span><span class="mk-box"></span><span>Performance</span></div>
+                            <p class="mk-p">Repeated late arrival on 3 shifts in July, previously discussed 02 Jul.</p>
+                            <div class="mk-fill"></div>
+                            <div class="mk-sign"><span>Employee</span><span>Supervisor</span></div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Receipts and Invoices</p>
+                        <h3 class="card-title">Employee Warning Notice</h3>
+                        <p class="card-desc">Document a disciplinary incident with warning level, violation checkboxes and signature blocks.</p>
+                        <a class="btn btn-block card-link" href="docs.html" data-target="docs" data-doc="warning-notice">Open editor</a>
+                    </div>
+                </article>
+
                 <article class="template-card" data-category="resumes">
                     <div class="card-preview" aria-hidden="true">
                         <div class="mock-doc">
-                            <div class="bar head"></div>
-                            <div class="bar short"></div>
-                            <div class="bar"></div>
-                            <div class="bar half"></div>
-                            <div class="block"></div>
+                            <p class="mk-name">Adaeze Nwosu</p>
+                            <p class="mk-role">Operations Director</p>
+                            <p class="mk-contact">adaeze.nwosu@mail.com | +1 555 0148 | Chicago, IL</p>
+                            <p class="mk-h">Summary</p>
+                            <p class="mk-p">Fifteen years leading supply chain and fulfilment teams across three continents.</p>
+                            <p class="mk-h">Experience</p>
+                            <p class="mk-t">Director of Operations, Northwind Logistics</p>
+                            <p class="mk-s">2019 - Present</p>
+                            <p class="mk-p">Cut fulfilment lead time 34% across nine regional depots.</p>
+                            <p class="mk-t">Head of Fulfilment, Cardinal Freight</p>
+                            <p class="mk-s">2014 - 2019</p>
+                            <div class="mk-fill"></div>
+                            <p class="mk-h">Education</p>
+                            <p class="mk-s">MBA, Kellogg School of Management</p>
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
                         <h3 class="card-title">Executive Resume</h3>
                         <p class="card-desc">A commanding serif-led layout for senior roles. ATS-safe vector text export.</p>
-                        <button class="btn btn-block" type="button" data-target="resume">Personalize Template</button>
+                        <a class="btn btn-block card-link" href="resume.html" data-target="resume">Open editor</a>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="resumes">
                     <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc">
-                            <div class="bar head"></div>
-                            <div class="bar half"></div>
-                            <div class="block"></div>
-                            <div class="bar"></div>
-                            <div class="bar short"></div>
+                        <div class="mock-doc accent-navy">
+                            <p class="mk-name">Tomas Lindqvist</p>
+                            <p class="mk-role">Product Designer</p>
+                            <p class="mk-contact">tomas.l@mail.com | +46 70 555 0192 | Stockholm</p>
+                            <p class="mk-h">Profile</p>
+                            <p class="mk-p">Designer focused on design systems and accessible interface patterns.</p>
+                            <p class="mk-h">Experience</p>
+                            <p class="mk-t">Senior Product Designer, Fjord Labs</p>
+                            <p class="mk-s">2021 - Present</p>
+                            <p class="mk-p">Owned the component library used by four product teams.</p>
+                            <p class="mk-t">Product Designer, Almen Studio</p>
+                            <p class="mk-s">2018 - 2021</p>
+                            <div class="mk-fill"></div>
+                            <p class="mk-h">Skills</p>
+                            <p class="mk-s">Design systems, prototyping, user research, WCAG</p>
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
                         <h3 class="card-title">Modern Professional CV</h3>
                         <p class="card-desc">Clean accent-colored sections with a live preview and one-click PDF download.</p>
-                        <button class="btn btn-block" type="button" data-target="resume">Personalize Template</button>
+                        <a class="btn btn-block card-link" href="resume.html" data-target="resume">Open editor</a>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="resumes">
                     <div class="card-preview" aria-hidden="true">
                         <div class="mock-doc">
-                            <div class="bar head"></div>
-                            <div class="bar"></div>
-                            <div class="bar"></div>
-                            <div class="bar half"></div>
-                            <div class="block"></div>
+                            <p class="mk-name">Priya Raman</p>
+                            <p class="mk-role">Financial Analyst</p>
+                            <p class="mk-contact">priya.raman@mail.com | +44 20 7946 0231 | London</p>
+                            <p class="mk-h">Experience</p>
+                            <p class="mk-t">Financial Analyst, Ashcroft Partners</p>
+                            <p class="mk-s">2022 - Present</p>
+                            <p class="mk-p">Built the quarterly forecasting model used across four business units.</p>
+                            <p class="mk-t">Junior Analyst, Meridian Bank</p>
+                            <p class="mk-s">2020 - 2022</p>
+                            <p class="mk-p">Reconciled monthly ledgers for a 40-branch retail portfolio.</p>
+                            <div class="mk-fill"></div>
+                            <p class="mk-h">Education</p>
+                            <p class="mk-s">BSc Economics, University of Manchester</p>
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
                         <h3 class="card-title">Minimalist ATS Resume</h3>
                         <p class="card-desc">A distraction-free single-column format tuned for applicant tracking systems.</p>
-                        <button class="btn btn-block" type="button" data-target="resume">Personalize Template</button>
-                    </div>
-                </article>
-
-                <!-- Business Docs: every card routes to the same docs.html
-                     editor; data-doc pre-selects which document type opens,
-                     validated against the editor's own whitelist on arrival. -->
-
-                <article class="template-card" data-category="documents">
-                    <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc paper receipt">
-                            <div class="bar head"></div>
-                            <div class="rule"></div>
-                            <div class="rule"></div>
-                            <div class="rule half"></div>
-                            <div class="rule"></div>
-                            <div class="grow"></div>
-                            <div class="rule short"></div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-category">Business Docs</p>
-                        <h3 class="card-title">Rent Receipt</h3>
-                        <p class="card-desc">Log a tenant payment with rental period, property address, amount in words, and balance due.</p>
-                        <button class="btn btn-block" type="button" data-target="docs" data-doc="rent-receipt">Fill Out Template</button>
-                    </div>
-                </article>
-
-                <article class="template-card" data-category="documents">
-                    <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc paper receipt">
-                            <div class="bar head"></div>
-                            <div class="rule"></div>
-                            <div class="rule half"></div>
-                            <div class="rule"></div>
-                            <div class="grow"></div>
-                            <div class="rule short"></div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-category">Business Docs</p>
-                        <h3 class="card-title">Cash Payment Receipt</h3>
-                        <p class="card-desc">A simple proof-of-payment slip with payment method checkboxes and a signature line.</p>
-                        <button class="btn btn-block" type="button" data-target="docs" data-doc="payment-receipt">Fill Out Template</button>
-                    </div>
-                </article>
-
-                <article class="template-card" data-category="documents">
-                    <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc paper invoice">
-                            <div class="bar head"></div>
-                            <div class="mock-table">
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                            </div>
-                            <div class="rule half"></div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-category">Business Docs</p>
-                        <h3 class="card-title">Itemized Business Receipt</h3>
-                        <p class="card-desc">Billed-to and sent-by blocks, a line-item table, and automatic subtotal, tax and grand total.</p>
-                        <button class="btn btn-block" type="button" data-target="docs" data-doc="business-receipt">Fill Out Template</button>
-                    </div>
-                </article>
-
-                <article class="template-card" data-category="documents">
-                    <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc paper invoice">
-                            <div class="bar head"></div>
-                            <div class="mock-table">
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                            </div>
-                            <div class="rule"></div>
-                            <div class="rule short"></div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-category">Business Docs</p>
-                        <h3 class="card-title">Sales and Cash Receipt Form</h3>
-                        <p class="card-desc">A printable counter-sale form. Leave the fields empty for ruled blank lines to write on.</p>
-                        <button class="btn btn-block" type="button" data-target="docs" data-doc="sales-receipt">Fill Out Template</button>
-                    </div>
-                </article>
-
-                <article class="template-card" data-category="documents">
-                    <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc paper invoice">
-                            <div class="bar head"></div>
-                            <div class="mock-table">
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                                <span></span><span></span><span></span>
-                            </div>
-                            <div class="rule half"></div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-category">Business Docs</p>
-                        <h3 class="card-title">Professional Invoice</h3>
-                        <p class="card-desc">Invoice number, due date, payment terms and bank details, with balance due calculated for you.</p>
-                        <button class="btn btn-block" type="button" data-target="docs" data-doc="invoice">Fill Out Template</button>
-                    </div>
-                </article>
-
-                <article class="template-card" data-category="documents">
-                    <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc paper notice">
-                            <div class="bar head boxed"></div>
-                            <div class="check-row"><span class="check"></span><span class="rule"></span></div>
-                            <div class="check-row"><span class="check"></span><span class="rule"></span></div>
-                            <div class="check-row"><span class="check"></span><span class="rule"></span></div>
-                            <div class="rule"></div>
-                            <div class="grow"></div>
-                            <div class="rule half"></div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-category">Business Docs</p>
-                        <h3 class="card-title">Employee Warning Notice</h3>
-                        <p class="card-desc">Document a disciplinary incident with warning level, violation checkboxes and signature blocks.</p>
-                        <button class="btn btn-block" type="button" data-target="docs" data-doc="warning-notice">Fill Out Template</button>
+                        <a class="btn btn-block card-link" href="resume.html" data-target="resume">Open editor</a>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="canvas">
                     <div class="card-preview" aria-hidden="true">
                         <div class="mock-doc poster">
-                            <div class="block"></div>
-                            <div class="bar half"></div>
+                            <div class="mk-plate"></div>
+                            <p class="mk-caption">Coastline, 2026</p>
                         </div>
                     </div>
                     <div class="card-body">
-                        <p class="card-category">Graphic Canvas</p>
+                        <p class="card-category">Posters and Prints</p>
                         <h3 class="card-title">Framed Photo Poster</h3>
                         <p class="card-desc">Upload a photo, add a caption, and pick a solid black gallery frame.</p>
-                        <button class="btn btn-block" type="button" data-target="poster">Remix Template</button>
+                        <a class="btn btn-block card-link" href="poster.html" data-target="poster">Open editor</a>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="canvas">
                     <div class="card-preview" aria-hidden="true">
                         <div class="mock-doc poster wood">
-                            <div class="block"></div>
-                            <div class="bar half"></div>
+                            <div class="mk-plate"></div>
+                            <p class="mk-caption">Harvest Field</p>
                         </div>
                     </div>
                     <div class="card-body">
-                        <p class="card-category">Graphic Canvas</p>
+                        <p class="card-category">Posters and Prints</p>
                         <h3 class="card-title">Matte Wood Canvas</h3>
                         <p class="card-desc">A warm wood-tone border for rustic prints, exported as high-resolution PNG.</p>
-                        <button class="btn btn-block" type="button" data-target="poster">Remix Template</button>
+                        <a class="btn btn-block card-link" href="poster.html" data-target="poster">Open editor</a>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="canvas">
                     <div class="card-preview" aria-hidden="true">
                         <div class="mock-doc poster gold">
-                            <div class="block"></div>
-                            <div class="bar half"></div>
+                            <div class="mk-plate"></div>
+                            <p class="mk-caption">Ten Years</p>
                         </div>
                     </div>
                     <div class="card-body">
-                        <p class="card-category">Graphic Canvas</p>
+                        <p class="card-category">Posters and Prints</p>
                         <h3 class="card-title">Polished Gold Frame</h3>
                         <p class="card-desc">An elegant gold-trim frame for anniversary and keepsake photo posters.</p>
-                        <button class="btn btn-block" type="button" data-target="poster">Remix Template</button>
+                        <a class="btn btn-block card-link" href="poster.html" data-target="poster">Open editor</a>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc mockup tee">
-                            <div class="block"></div>
+                        <div class="mock-doc mockup">
+                            <div class="mk-product">
+                                <div class="mk-shape tee"><span class="mk-art">LOGO</span></div>
+                            </div>
                             <div class="dot-row">
                                 <span class="dot" style="background-color:#1A1A1A"></span>
                                 <span class="dot" style="background-color:#FFFFFF"></span>
@@ -328,17 +456,19 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <p class="card-category">Mockups</p>
+                        <p class="card-category">Product Mockups</p>
                         <h3 class="card-title">Apparel Mockup: T-Shirt and Hoodie</h3>
                         <p class="card-desc">Upload your design and drop it onto a t-shirt or hoodie in seconds. No photoshoot needed.</p>
-                        <button class="btn btn-block" type="button" data-target="mockup">Generate Mockup</button>
+                        <a class="btn btn-block card-link" href="mockup.html" data-target="mockup">Open editor</a>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc mockup mug">
-                            <div class="block"></div>
+                        <div class="mock-doc mockup">
+                            <div class="mk-product">
+                                <div class="mk-shape mug"><span class="mk-art">ART</span></div>
+                            </div>
                             <div class="dot-row">
                                 <span class="dot" style="background-color:#FFFFFF"></span>
                                 <span class="dot" style="background-color:#1A1A1A"></span>
@@ -347,17 +477,19 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <p class="card-category">Mockups</p>
+                        <p class="card-category">Product Mockups</p>
                         <h3 class="card-title">Mug Mockup</h3>
                         <p class="card-desc">Place your artwork on a ceramic mug and see the edit live before you export.</p>
-                        <button class="btn btn-block" type="button" data-target="mockup">Generate Mockup</button>
+                        <a class="btn btn-block card-link" href="mockup.html" data-target="mockup">Open editor</a>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview" aria-hidden="true">
-                        <div class="mock-doc mockup box">
-                            <div class="block"></div>
+                        <div class="mock-doc mockup">
+                            <div class="mk-product">
+                                <div class="mk-shape box"><span class="mk-art">MARK</span></div>
+                            </div>
                             <div class="dot-row">
                                 <span class="dot" style="background-color:#C48A4A"></span>
                                 <span class="dot" style="background-color:#FFFFFF"></span>
@@ -366,40 +498,87 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <p class="card-category">Mockups</p>
+                        <p class="card-category">Product Mockups</p>
                         <h3 class="card-title">Packaging Mockup</h3>
                         <p class="card-desc">Preview a logo or label on a shipping box across kraft, white, and black finishes.</p>
-                        <button class="btn btn-block" type="button" data-target="mockup">Generate Mockup</button>
+                        <a class="btn btn-block card-link" href="mockup.html" data-target="mockup">Open editor</a>
                     </div>
                 </article>
 
             </div>
         </section>
+
+        <!-- Guides strip: rendered by js/app.js from js/blog-data.js. Hidden
+             entirely when no posts exist, so it never leaves an empty shell. -->
+        <section class="guides-section" id="guides" aria-label="Latest guides" data-guides-section hidden>
+            <div class="section-head">
+                <h2 class="section-title">Latest Guides</h2>
+                <a class="section-more" href="blog.html">All guides</a>
+            </div>
+            <div class="guides-grid" data-guides-grid></div>
+        </section>
     </main>
 
     <footer class="site-footer">
-        <div class="footer-links">
-            <a href="index.html">Templates</a>
-            <a href="blog.html">Blog</a>
-            <a href="privacy.html">Privacy Policy</a>
+        <div class="footer-cols">
+            <div class="footer-col">
+                <h2>Receipts and Invoices</h2>
+                <ul>
+                    <li><a href="rent-receipt-template.html">Rent Receipt Template</a></li>
+                    <li><a href="cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
+                    <li><a href="itemized-receipt-template.html">Itemized Business Receipt</a></li>
+                    <li><a href="sales-receipt-template.html">Sales Receipt Form</a></li>
+                    <li><a href="free-invoice-template.html">Free Invoice Template</a></li>
+                    <li><a href="employee-warning-notice-template.html">Employee Warning Notice</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h2>Creative Tools</h2>
+                <ul>
+                    <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
+                    <li><a href="resume.html">Resume Builder</a></li>
+                    <li><a href="poster-maker.html">Poster Maker</a></li>
+                    <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
+                    <li><a href="mockup.html">Product Mockup Tool</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h2>Learn</h2>
+                <ul>
+                    <li><a href="blog.html">Guides and Articles</a></li>
+                    <li><a href="index.html#templates">All Templates</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h2>Company</h2>
+                <ul>
+                    <li><a href="about.html">About TemplateBox</a></li>
+                    <li><a href="privacy.html">Privacy Policy</a></li>
+                    <li><a href="terms.html">Terms of Use</a></li>
+                </ul>
+            </div>
         </div>
-        <div class="footer-social">
-            <a href="https://x.com/Templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on X">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-            </a>
-            <a href="https://www.facebook.com/profile.php?id=61592027191178" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Facebook">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-            </a>
-            <a href="https://www.tiktok.com/@templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on TikTok">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
-            </a>
-            <a href="https://www.instagram.com/templatebox26/" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Instagram">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
-            </a>
+
+        <div class="footer-base">
+            <div class="footer-social">
+                <a href="https://x.com/Templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on X">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </a>
+                <a href="https://www.facebook.com/profile.php?id=61592027191178" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Facebook">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                </a>
+                <a href="https://www.tiktok.com/@templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on TikTok">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+                </a>
+                <a href="https://www.instagram.com/templatebox26/" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Instagram">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+                </a>
+            </div>
+            <p>TemplateBox. All editing happens locally in your browser. No data leaves your device.</p>
         </div>
-        <p>TemplateBox. All editing happens locally in your browser. No data leaves your device.</p>
     </footer>
 
+    <script src="js/blog-data.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
