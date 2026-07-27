@@ -124,15 +124,37 @@ const TB = (() => {
        and the ad redirect needs a cross-origin network round-trip to
        commit, so assigning ours after a short delay keeps the foreground
        tab on loading.html.
+
+       A one-shot assignment is not enough on its own: a fast ad response
+       can commit inside the deferral window, or the ad script can defer
+       its own fallback past ours. So after the first assignment the
+       navigation is re-issued on a short interval until the page actually
+       unloads, which kills the timers. Same watchdog pattern, and the same
+       700ms cadence, as the countdown redirect on loading.html (see
+       docs/error-fixes/LOADING_REDIRECT_STALL_FIX.md).
        ---------------------------------------------------------------------- */
     const LAUNCH_DELAY_MS = 150;
+    const LAUNCH_REASSERT_MS = 700;
+
+    let launchDelayTimer = 0;
+    let launchWatchdog = 0;
 
     function launchTemplate(targetKey) {
         const safeKey = Object.prototype.hasOwnProperty.call(EDITOR_ROUTES, targetKey)
             ? targetKey
             : DEFAULT_TARGET;
-        window.setTimeout(() => {
-            window.location.href = "loading.html?target=" + encodeURIComponent(safeKey);
+        const destination = "loading.html?target=" + encodeURIComponent(safeKey);
+        const go = () => {
+            window.location.href = destination;
+        };
+
+        /* A second launch click before the first commits supersedes it. */
+        window.clearTimeout(launchDelayTimer);
+        window.clearInterval(launchWatchdog);
+
+        launchDelayTimer = window.setTimeout(() => {
+            go();
+            launchWatchdog = window.setInterval(go, LAUNCH_REASSERT_MS);
         }, LAUNCH_DELAY_MS);
     }
 
@@ -172,22 +194,37 @@ const TB = (() => {
         }
 
         /* Category filter pills: plain anchors for crawlers, enhanced with
-           lightweight data-attribute visibility toggling for users. */
+           lightweight data-attribute visibility toggling for users.
+
+           Delegated from the window capture phase rather than bound to the
+           pill elements: the ad click shield in the head of index.html
+           stops non-launch clicks from propagating below window (so the
+           Pop-Under script's document-level handler cannot hijack them),
+           which would also silence an element-level listener here.
+           stopPropagation does not silence other listeners on the same
+           node, and the shield registers first, so this handler always
+           runs after the shield has already starved the ad script. */
         const pills = document.querySelectorAll(".filter-pills [data-filter]");
         const cards = grid.querySelectorAll("[data-category]");
 
-        pills.forEach((pill) => {
-            pill.addEventListener("click", () => {
-                const filter = pill.getAttribute("data-filter");
+        const applyFilter = (pill) => {
+            const filter = pill.getAttribute("data-filter");
 
-                pills.forEach((p) => p.classList.toggle("is-active", p === pill));
-                cards.forEach((card) => {
-                    const match = filter === "all" ||
-                        card.getAttribute("data-category") === filter;
-                    card.classList.toggle("is-hidden", !match);
-                });
+            pills.forEach((p) => p.classList.toggle("is-active", p === pill));
+            cards.forEach((card) => {
+                const match = filter === "all" ||
+                    card.getAttribute("data-category") === filter;
+                card.classList.toggle("is-hidden", !match);
             });
-        });
+        };
+
+        window.addEventListener("click", (event) => {
+            const origin = event.target instanceof Element ? event.target : null;
+            const pill = origin ? origin.closest(".filter-pills [data-filter]") : null;
+            if (pill) {
+                applyFilter(pill);
+            }
+        }, true);
     }
 
     /* ----------------------------------------------------------------------
@@ -331,14 +368,24 @@ const TB = (() => {
         discard.className = "btn btn-secondary";
         discard.type = "button";
         discard.textContent = "Start fresh";
-        discard.addEventListener("click", () => {
+
+        /* Delegated from window capture for the same reason as the filter
+           pills: the ad click shield on index.html stops this click from
+           ever reaching an element-level listener. */
+        const onDiscard = (event) => {
+            const origin = event.target instanceof Element ? event.target : null;
+            if (!origin || (origin !== discard && !discard.contains(origin))) {
+                return;
+            }
             try {
                 window.localStorage.removeItem(EDITORS[item.target].storageKey);
             } catch (err) {
                 /* Persistence unavailable: nothing to clear. */
             }
             strip.remove();
-        });
+            window.removeEventListener("click", onDiscard, true);
+        };
+        window.addEventListener("click", onDiscard, true);
 
         actions.appendChild(open);
         actions.appendChild(discard);

@@ -1,7 +1,22 @@
 # Adsterra Integration: Foreground Redirect Hijack and Intermittent Blank Banners
 
 Date: July 11, 2026
-Status: Fixed (code-level causes); residual client-side blocking documented below
+Updated: July 27, 2026
+Status: Superseded in part — the click-race fix below proved insufficient; see `POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md` for the current defense. The banner isolation fix (srcdoc iframes) remains current.
+
+## Why Previous Solution Failed
+
+The 150 ms deferred navigation in `launchTemplate()` defended only the launch-control click, and only as a single one-shot location assignment. On July 27, 2026 the same hijack was reported on surfaces that fix never covered: filter pills (which perform no navigation, so the ad's popup-blocked fallback redirect wins unopposed), header navigation links (which race the ad redirect with browser-default navigation), and the launch controls themselves (where a fast-committing ad response, or an ad fallback deferred past 150 ms, defeats a one-shot assignment). The root cause was scoped too narrowly in this document: the Pop-Under's document-level handler observes every click on the page, so every click was hijackable, not just the launch click.
+
+## Revised Solution
+
+Implemented July 27, 2026, full write-up in `docs/error-fixes/POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md`:
+
+1. An inline ad click shield in the head of index.html (above the Pop-Under tag) stops every interaction that is not on a `[data-target]` launch control from ever reaching document-level listeners, via window-capture `stopPropagation`, and refuses clicks on injected anchors pointing at origins the page does not ship.
+2. The pill filter and continue-strip discard handlers in `js/app.js` moved to window-capture delegation so they keep working under the shield.
+3. `launchTemplate()` keeps the 150 ms deferral but now re-issues the navigation every 700 ms until the page unloads (the loading.html watchdog pattern), so no single ad assignment can out-order it.
+
+The original analysis and the banner `srcdoc` isolation fix below remain valid history; the deferral-only defense should not be reintroduced.
 
 ## Issue Title
 

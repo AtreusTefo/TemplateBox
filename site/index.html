@@ -75,10 +75,104 @@
     </script>
 
     <!-- ================================================================
+         AD CLICK SHIELD: must stay ABOVE the Pop-Under tag below.
+         The Pop-Under script listens for clicks at document level across
+         the whole page; when the browser blocks its background window it
+         falls back to redirecting THIS tab to the ad URL. That trade is
+         acceptable only on monetized launch clicks. This shield runs in
+         the capture phase on window, which fires ahead of any
+         document-level listener regardless of registration order, and
+         stops every interaction that is not on a launch control
+         ([data-target]) from ever reaching the ad script. Filter pills,
+         navigation links and plain page clicks can therefore no longer
+         be hijacked off-site. It never prevents the default action of
+         the page's own links, so normal navigation is unaffected.
+
+         It also refuses clicks on any anchor resolving to an origin this
+         page does not ship (ad scripts can inject overlay links); the
+         only external links on index.html are the four footer social
+         profiles, allowlisted below. URLs are resolved against the
+         document location so an injected base element cannot repoint
+         relative hrefs.
+
+         js/app.js registers its own pill and continue-strip handlers on
+         the same window capture phase, which stopPropagation does not
+         silence, so page behaviour survives the shield. Known cost:
+         document-level analytics click capture (Clarity) is also starved
+         on this page; session replays keep scroll and movement.
+         See docs/error-fixes/POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md.
+         ================================================================ -->
+    <script>
+    (function () {
+        "use strict";
+
+        var EXTERNAL_ALLOW = {
+            "x.com": true,
+            "www.facebook.com": true,
+            "www.tiktok.com": true,
+            "www.instagram.com": true
+        };
+
+        /* click plus the press events pop scripts commonly hook. mouseup,
+           touchend and pointerup are deliberately left unguarded: pop
+           scripts rarely use them and analytics replay quality depends
+           on them. */
+        var GUARDED_EVENTS = [
+            "pointerdown", "mousedown", "touchstart", "click", "auxclick"
+        ];
+
+        function shield(event) {
+            var node = event.target;
+            var el = (node && node.nodeType === 1)
+                ? node
+                : (node ? node.parentElement : null);
+
+            /* Monetized launch controls are the one surface the ad script
+               is allowed to observe; js/app.js routes the foreground tab
+               to loading.html on the same click. */
+            if (el && el.closest("[data-target]")) {
+                return;
+            }
+
+            /* Everything else never reaches document-level listeners,
+               which is where the ad script hooks the page. */
+            event.stopPropagation();
+
+            if (event.type !== "click" && event.type !== "auxclick") {
+                return;
+            }
+
+            /* Injected-anchor defence: refuse navigation to any origin
+               this page does not link to itself. */
+            var link = el ? el.closest("a[href]") : null;
+            if (!link) {
+                return;
+            }
+            var dest = null;
+            try {
+                dest = new URL(link.getAttribute("href"), window.location.href);
+            } catch (err) {
+                dest = null;
+            }
+            if (!dest || (dest.origin !== window.location.origin &&
+                    EXTERNAL_ALLOW[dest.host] !== true)) {
+                event.preventDefault();
+            }
+        }
+
+        GUARDED_EVENTS.forEach(function (type) {
+            window.addEventListener(type, shield, true);
+        });
+    })();
+    </script>
+
+    <!-- ================================================================
          ADSTERRA POP-UNDER: paste the Pop-Under script tag directly below
          this comment block. The snippet self-attaches to user clicks and
          spawns its background tab; js/app.js independently routes the
-         foreground tab to loading.html on the same click.
+         foreground tab to loading.html on the same click. The ad click
+         shield above confines the clicks this snippet can observe to the
+         [data-target] launch controls.
 
          Loaded async: as a synchronous tag it blocked HTML parsing on a
          cross-origin round trip, on the one page Google actually indexes,
@@ -543,10 +637,10 @@
             <div class="footer-col">
                 <h2>Editors</h2>
                 <ul>
-                    <li><a href="resume.html">Resume Builder</a></li>
-                    <li><a href="docs.html">Business Document Builder</a></li>
-                    <li><a href="poster.html">Poster Creator</a></li>
-                    <li><a href="mockup.html">Product Mockup Generator</a></li>
+                    <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
+                    <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
+                    <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
+                    <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
                 </ul>
             </div>
             <div class="footer-col">

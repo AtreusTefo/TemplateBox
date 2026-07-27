@@ -1,6 +1,6 @@
 # TemplateBox — Project Status and Session Handoff
 
-Last updated: July 27, 2026 (deployables moved into `site/`, 404 page added, footer restructured to five columns, static guides archive for crawlability)
+Last updated: July 27, 2026 (ad click shield on index.html stops the Pop-Under hijacking non-launch clicks; launch navigation watchdog; earlier same day: deployables moved into `site/`, 404 page added, footer restructured to five columns, static guides archive for crawlability)
 
 **Path convention:** the deployable site now lives in `site/`, which is the Netlify publish directory and therefore the web root. Paths in this document below this line are mostly unprefixed for historical reasons — read `js/app.js` as `site/js/app.js`. Public URLs did not change.
 
@@ -84,13 +84,19 @@ robots.txt / sitemap.xml    SEO; sitemap uses lastmod and omits priority (Google
 
 ```
 index.html card click
+  -> ad click shield (inline in index.html <head>, above the Popunder tag):
+     only [data-target] launch clicks are allowed to reach the ad script's
+     document-level handler; pills, nav and page clicks never do
   -> js/app.js launchTemplate(): navigation to loading.html?target=resume|poster
-     deferred 150ms so it wins any race against the Popunder's same-click fallback redirect
+     deferred 150ms, then re-issued every 700ms until the page unloads, so the
+     Popunder's same-click fallback redirect cannot out-race or out-order it
   -> loading.html: 10s countdown, 2 banners + Social Bar render
   -> at 0: navigation watchdog re-issues location.replace(editorUrl) every 700ms
      until the page actually unloads, so ad-initiated navigations can't strand the user
   -> resume.html or poster.html: fully ad-free, localStorage-backed editor
 ```
+
+Because of the shield, index.html's own click behaviours (filter pills, the continue-strip discard button) are bound as window-capture delegated listeners in `js/app.js`, not element-level listeners — element listeners below window never fire for shielded clicks. Keep that pattern for anything new added to index.html that is not a launch control. See `docs/error-fixes/POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md`.
 
 `EDITOR_ROUTES` in `js/app.js` is the whitelist mapping `target` query values to editor pages — this is what makes the redirect immune to open-redirect tampering. `loading.html` carries a second, dependency-free copy of this same whitelist inline (see below) — **both must be updated when adding a new editor**, or the fallback path silently sends unrecognized/failed cases to the default editor instead of the new one.
 
@@ -99,7 +105,8 @@ An editor that serves several catalog cards (docs.html serves six) also needs a 
 ## Known Issues Already Solved (see docs/error-fixes/ for full write-ups)
 
 - **RESUME_PDF_RASTERIZED_TEXT_FIX.md** — html2pdf.js rasterizes text (fails ATS parsing); replaced with jsPDF native `doc.text()` API. Verified with an automated PDF-stream inspection (real `Tj` text operators, no embedded images) plus a manual browser highlight-copy-paste test.
-- **ADSTERRA_AD_CONFLICT_FIX.md** — Popunder's fallback redirect could hijack the foreground tab when popups were blocked (last navigation assignment wins); fixed with the 150ms deferred nav in `launchTemplate()`. Also: two banner tags sharing one page context clobbered each other's global `atOptions`; fixed by isolating each in its own `srcdoc` iframe.
+- **ADSTERRA_AD_CONFLICT_FIX.md** — Popunder's fallback redirect could hijack the foreground tab when popups were blocked (last navigation assignment wins); fixed with the 150ms deferred nav in `launchTemplate()`. Also: two banner tags sharing one page context clobbered each other's global `atOptions`; fixed by isolating each in its own `srcdoc` iframe. The deferral half of this fix was superseded July 27 (next entry); the srcdoc isolation stands.
+- **POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md** (July 27, 2026) — the hijack above was never launch-click-specific: the Popunder's document-level handler observes every click on index.html, so popup-blocked visitors were redirected off-site from filter pills (no competing navigation at all), nav links (coin-flip race) and even launch clicks (one-shot 150ms deferral loses to a fast-committing ad). Fixed with an inline window-capture click shield in index.html that starves the ad script of every non-`[data-target]` interaction and refuses injected foreign-origin anchors; pills and the continue-strip discard moved to window-capture delegation to survive the shield; `launchTemplate()` now re-issues its navigation every 700ms until unload (loading.html's watchdog pattern). Verified with a 16-check Playwright run against a simulated hijacking ad handler (attached earlier than the real one can be) with the ad redirect delayed 600ms to mirror a cross-origin round trip. Known cost: Clarity's document-level click capture on index.html is starved too; scroll/movement replay unaffected.
 - **LOADING_REDIRECT_STALL_FIX.md** — same "last navigation wins" defect class, but spanning the whole loading.html page lifetime instead of one click; fixed with the persistent navigation watchdog described above.
 - **SOCIAL_BAR_NOT_DISPLAYING.md** — not a defect. Full delivery chain verified (script serves, runtime domains resolve and respond). Non-display was per-visitor frequency capping plus the widget's animated entrance losing the race against the page's 10-second lifetime. Confirmed serving via Adsterra dashboard impression counts.
 - **INTERNAL_FILES_PUBLICLY_SERVED.md** — `publish = "."` plus no build step meant the whole workspace was the web root: `docs/**` (including this file, with the Adsterra zone keys and Clarity ID), `PRD.md`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `README.md` and `.github/` all answered 200 and were crawlable. First fixed with `force = true` 404 redirect rules, then superseded the same day by moving the deployable site into `site/` and setting `publish = "site"`, so internal files are not in the deploy at all. Treat the previously-served contents as having been public.

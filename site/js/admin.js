@@ -206,10 +206,10 @@
 '            <div class="footer-col">\n' +
 '                <h2>Editors</h2>\n' +
 '                <ul>\n' +
-'                    <li><a href="../resume.html">Resume Builder</a></li>\n' +
-'                    <li><a href="../docs.html">Business Document Builder</a></li>\n' +
-'                    <li><a href="../poster.html">Poster Creator</a></li>\n' +
-'                    <li><a href="../mockup.html">Product Mockup Generator</a></li>\n' +
+'                    <li><a href="../resume.html" data-target="resume">Resume Builder</a></li>\n' +
+'                    <li><a href="../docs.html" data-target="docs">Business Document Builder</a></li>\n' +
+'                    <li><a href="../poster.html" data-target="poster">Poster Creator</a></li>\n' +
+'                    <li><a href="../mockup.html" data-target="mockup">Product Mockup Generator</a></li>\n' +
 '                </ul>\n' +
 '            </div>\n' +
 '            <div class="footer-col">\n' +
