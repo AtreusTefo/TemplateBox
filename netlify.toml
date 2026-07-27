@@ -1,5 +1,12 @@
+# The deployable site lives in site/, which is the web root: /index.html is
+# site/index.html. Documentation, specifications and instruction files sit
+# outside it and are therefore never uploaded, which is a structural guarantee
+# rather than a rule that has to be maintained (see
+# docs/error-fixes/INTERNAL_FILES_PUBLICLY_SERVED.md for the earlier
+# 404-rule approach this replaced). Still no build step: drag the site folder
+# into Netlify, or let the Git integration publish it.
 [build]
-  publish = "."
+  publish = "site"
   command = ""
 
 # Blog posts moved from the JavaScript-rendered ?slug= route to static files
@@ -17,6 +24,13 @@
   force = true
   [redirects.query]
     slug = ":slug"
+
+# No 404 rules are needed for internal files any more. Documentation,
+# specifications, instruction files and the local-server config all sit outside
+# site/, so they are not in the deploy at all -- a structural guarantee rather
+# than a list of paths to keep extending. serve.json lives at the repository
+# root and points `serve` at site/ through its own "public" field, which is why
+# it no longer needs to ship inside the publish directory.
 
 [[headers]]
   for = "/*"
