@@ -79,11 +79,15 @@ When creating new error fix documentation:
 - **Compilation Engines:** Use the `jsPDF` native text API (`doc.text()`) via clean CDN links for selectable vector text PDF exports. Do not use `html2pdf.js`: it rasterizes text through html2canvas and breaks ATS parsing (see `docs/error-fixes/RESUME_PDF_RASTERIZED_TEXT_FIX.md`). Use the native HTML5 Canvas API for graphic/poster compilation and `.png` exports via local data streams.
 
 ## Project Structure Reference
+The repository has exactly two top levels: what ships, and what does not.
+- **`site/`** is the deployable site and the Netlify publish directory, so it is also the web root: `site/index.html` is served at `/index.html`. Pages sit flat at `site/`, with `css/`, `js/`, `assets/`, `blog/` and `tools/` beneath it, plus `robots.txt`, `sitemap.xml` and `404.html`. Anything a visitor must be able to fetch belongs here, and nothing else does.
+- **Everything outside `site/`** is never uploaded: `docs/`, `PRD.md`, this file and its copies, `README.md`, `netlify.toml`, `serve.json`, `.vscode/`. Never put project notes, specifications or working files inside `site/` — the publish directory is served verbatim, so a file placed there is a public URL (see `docs/error-fixes/INTERNAL_FILES_PUBLICLY_SERVED.md`).
 - **Documentation:** `docs/` (Refer to `DOCUMENTATION_INDEX.md`).
+- Paths in documentation written before July 27, 2026 omit the `site/` prefix: read `js/app.js` as `site/js/app.js`.
 
 ## Environment Commands
-- **Local Testing:** Run a lightweight static server locally (e.g., VS Code Live Server or `npx serve .`).
-- **Production Build:** None. The workspace files must remain flat, static text assets optimized for direct drag-and-drop ingestion into Netlify.
+- **Local Testing:** Run `npx serve` from the repository root. `serve.json` there points the server at `site/` via its `public` field, restores `/` to `index.html` with a rewrite, and disables clean-URL rewriting so query strings survive; local URLs then match production exactly. Do NOT run it from inside `site/` (the config is invisible there and `loading.html?target=` breaks), and do not remove `cleanUrls: false` to fix a root URL problem -- see `docs/error-fixes/LOCAL_INDEX_PAGE_BLANK_DIRECTORY_LISTING_INSTEAD_OF_HOMEPAGE.md`. VS Code Live Server is configured through `.vscode/settings.json`, which roots it at `/site`.
+- **Production Build:** None. `netlify.toml` sets `publish = "site"` with an empty build command: static text assets, no compilation step. Drag-and-drop deploys use the `site` folder rather than the repository root.
 
 ## Data Integrity, Referential Integrity & Consistency Standards
 - **Form Limits:** Enforce strict HTML5 validation attributes (`maxlength`, `required`, type constraints) on all input parameters to prevent UI layout breaks or local device browser crashes.

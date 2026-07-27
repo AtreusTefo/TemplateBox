@@ -55,13 +55,15 @@ The admin form edits a plain-text markup form of this model (`## heading`, `- it
 
 ## Ad Placements (size-aware registry)
 
-All blog placements are declared in `AD_ZONES` at the top of `js/blog.js`. A placement renders only when its zone key is non-empty; empty-key placements produce zero markup and zero layout shift. Activating a new size means pasting its key into the registry — no page edits.
+All placements are declared in `AD_ZONES` in `js/ads.js` (moved out of `js/blog.js` on July 27, 2026 when the document landing pages became a third page family needing banners; see `docs/implementation/LANDING_PAGE_AD_PLACEMENT.md`). A placement renders only when its zone key is non-empty; empty-key placements produce zero markup and zero layout shift. Activating a new size means pasting its key into the registry — no page edits.
+
+Two mounting paths share that registry. `post.html` renders an article at runtime and `initPostPage()` creates the hosts as it builds the DOM. The static pages under `blog/` carry their body as real markup, so `buildPostPage()` in `js/admin.js` emits empty hosts (`data-ad-leaderboard`, `data-ad-incontent`, `data-ad-endofarticle`, `data-ad-rail`) and `TBAds` fills them at load because their `<main>` carries `data-ads-static`; a renderer-driven page must never carry that attribute, or impressions double-count. Those generated pages consequently load only `js/app.js` and `js/ads.js` — not `js/blog.js`, and not `js/blog-data.js`, since nothing on them reads the post database. Since the static pages are the ones readers reach, **any change to `buildPostPage()` requires re-exporting the post pages** — the deployed files otherwise keep the old shell, which is exactly how the pages came to serve no ads at all (see `docs/error-fixes/STATIC_POST_PAGES_SERVED_NO_ADS.md`). Unfilled hosts are collapsed by `:empty` rules in `css/style.css`, so a dormant zone and a visitor without JavaScript both cost zero layout.
 
 | Placement | Size | Location | Zone key |
 |---|---|---|---|
-| `leaderboard` | 728x90 | Top of blog.html and post.html, desktop | `7577a9abda8083816fafd71754b18205` |
+| `leaderboard` | 728x90 | Top of blog.html and blog/<slug>.html, desktop | `7577a9abda8083816fafd71754b18205` |
 | `leaderboardMobile` | 320x50 | Same host, chosen instead of 728x90 under 48rem | `101fe70128e51351589ecd23ab2d0e21` |
-| `inContent` | 300x250 | Inside post body after the second block (skipped on very short posts) | Reuses `4a408738c2170da16b47c5ac05b3780a` |
+| `inContent` | 300x250 | Inside post body, positioned by `TBBlog.adBreakIndex()`: after the second block, slid forward so it never splits a heading from its own paragraph; skipped below four blocks | Reuses `4a408738c2170da16b47c5ac05b3780a` |
 | `endOfArticle` | 300x250 | After the post body | Reuses `70d844a3963c8415efa49af391c897a0` |
 | `skyscraper` | 160x600 | Sticky rail beside the article, viewports over 70rem | `aaa51e997d5bd5badf6557a7773f78a6` |
 

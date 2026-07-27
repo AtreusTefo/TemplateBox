@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Interactive CV and Resume Builder | TemplateBox</title>
+    <meta name="description" content="Edit your resume live and export an ATS-friendly PDF with selectable text. Everything runs locally in your browser and saves automatically.">
+    <link rel="canonical" href="https://templatebox.win/resume.html">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="TemplateBox">
+    <meta property="og:title" content="Interactive CV and Resume Builder | TemplateBox">
+    <meta property="og:description" content="Edit your resume live and export an ATS-friendly PDF. Free, local, no sign-up.">
+    <meta property="og:url" content="https://templatebox.win/resume.html">
+    <meta property="og:image" content="https://templatebox.win/assets/og-resume.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <!-- Twitter Card: without these every share renders as a bare link -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Interactive CV and Resume Builder | TemplateBox">
+    <meta name="twitter:description" content="Edit your resume live and export an ATS-friendly PDF. Free, local, no sign-up.">
+    <meta name="twitter:image" content="https://templatebox.win/assets/og-resume.png">
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "TemplateBox Resume Builder",
+        "url": "https://templatebox.win/resume.html",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "All",
+        "browserRequirements": "Requires JavaScript and HTML5 support",
+        "description": "Free browser-based CV and resume builder with a live preview and ATS-safe PDF export containing real selectable text. No account required and no data leaves the device.",
+        "featureList": "Live preview, accent colour themes, automatic local save, selectable-text PDF export",
+        "offers": { "@type": "Offer", "price": "0.00", "priceCurrency": "USD" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Templates", "item": "https://templatebox.win/" },
+            { "@type": "ListItem", "position": 2, "name": "ATS Resume Template", "item": "https://templatebox.win/ats-resume-template.html" },
+            { "@type": "ListItem", "position": 3, "name": "Resume Builder", "item": "https://templatebox.win/resume.html" }
+        ]
+    }
+    </script>
+
+    <!-- ================================================================
+         MICROSOFT CLARITY: paste the Clarity tracking snippet directly
+         below this comment block.
+         ================================================================ -->
+    <script type="text/javascript">
+        (function(c,l,a,r,i,t,y){
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+        })(window, document, "clarity", "script", "xix7m2758f");
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Fonts loaded without blocking render: the print-media swap defers
+         application until the sheet has arrived, and font-display:swap in
+         the served CSS paints text immediately in the fallback face. -->
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Compilation engine: jsPDF native text API via clean CDN link.
+         Chosen over html2pdf.js because html2pdf renders through html2canvas,
+         which rasterizes text and breaks ATS machine scanning. See
+         docs/error-fixes/RESUME_PDF_RASTERIZED_TEXT_FIX.md -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+</head>
+<body>
+
+    <header class="site-header">
+        <a class="wordmark" href="index.html">TemplateBox</a>
+        <nav class="site-nav" aria-label="Primary">
+            <a href="index.html" aria-current="page">Templates</a>
+            <a href="blog.html">Guides</a>
+            <a href="about.html">About</a>
+        </nav>
+    </header>
+
+    <main>
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            <ol>
+                <li><a href="index.html">Templates</a></li>
+                <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
+                <li aria-current="page">Resume Builder</li>
+            </ol>
+        </nav>
+
+        <div class="editor-head">
+            <h1>Interactive CV and Resume Builder</h1>
+            <!-- Autosave state: persistence was previously silent, which
+                 wasted the trust payoff of a no-account product -->
+            <p class="save-state" id="save-state" role="status" aria-live="polite">Saves automatically</p>
+        </div>
+        <p class="editor-intro">Your progress saves on this device only. Close the tab and return anytime. Nothing is uploaded to a server.</p>
+
+        <!-- Mobile-only tab switcher between form and preview -->
+        <div class="mobile-tabs" role="tablist" aria-label="Editor views">
+            <button type="button" id="tab-edit" class="is-active" aria-selected="true">Edit Form</button>
+            <button type="button" id="tab-preview" aria-selected="false">Live Preview</button>
+        </div>
+
+        <div class="editor-layout show-edit" id="editor-layout">
+
+            <!-- Left pane: input form -->
+            <section class="editor-pane" aria-label="Resume form">
+                <h2>Accent Color</h2>
+                <div class="swatch-row" id="swatch-row" aria-label="Accent color choices">
+                    <button type="button" class="swatch is-active" data-accent="#1A1A1A" style="background-color:#1A1A1A" aria-label="Charcoal accent"></button>
+                    <button type="button" class="swatch" data-accent="#1F4E79" style="background-color:#1F4E79" aria-label="Navy accent"></button>
+                    <button type="button" class="swatch" data-accent="#2E5E4E" style="background-color:#2E5E4E" aria-label="Forest accent"></button>
+                    <button type="button" class="swatch" data-accent="#7A2E2E" style="background-color:#7A2E2E" aria-label="Burgundy accent"></button>
+                    <button type="button" class="swatch" data-accent="#8A6D1D" style="background-color:#8A6D1D" aria-label="Gold accent"></button>
+                </div>
+
+                <form id="resume-form" autocomplete="on">
+                    <fieldset>
+                        <legend>Personal Details</legend>
+                        <div class="field">
+                            <label for="f-name">Full Name</label>
+                            <input type="text" id="f-name" data-bind="name" maxlength="50" required>
+                        </div>
+                        <div class="field">
+                            <label for="f-title">Professional Title</label>
+                            <input type="text" id="f-title" data-bind="title" maxlength="60">
+                        </div>
+                        <div class="field">
+                            <label for="f-email">Email</label>
+                            <input type="email" id="f-email" data-bind="email" maxlength="100">
+                        </div>
+                        <div class="field">
+                            <label for="f-phone">Phone</label>
+                            <input type="tel" id="f-phone" data-bind="phone" maxlength="30">
+                        </div>
+                        <div class="field">
+                            <label for="f-location">Location</label>
+                            <input type="text" id="f-location" data-bind="location" maxlength="60">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Professional Summary</legend>
+                        <div class="field">
+                            <label for="f-summary">Summary</label>
+                            <textarea id="f-summary" data-bind="summary" maxlength="600" rows="4"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Work Experience</legend>
+                        <div id="experience-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-experience">Add Experience Entry</button>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Education</legend>
+                        <div id="education-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-education">Add Education Entry</button>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Skills</legend>
+                        <div class="field">
+                            <label for="f-skills">Skills (comma separated)</label>
+                            <input type="text" id="f-skills" data-bind="skills" maxlength="300">
+                        </div>
+                    </fieldset>
+                </form>
+            </section>
+
+            <!-- Right pane: live document preview and export -->
+            <section class="preview-pane" aria-label="Live resume preview">
+                <h2>Live Preview</h2>
+                <div class="resume-sheet" id="resume-sheet"></div>
+                <!-- Sticky: the action that completes the task previously sat
+                     below a full rendered page and required scrolling past it -->
+                <div class="preview-actions">
+                    <button type="button" class="btn btn-block" id="download-pdf">Download PDF</button>
+                    <p class="upload-hint">Exports locally as selectable vector text via jsPDF. No file ever leaves your device.</p>
+                </div>
+            </section>
+
+        </div>
+
+        <section class="related-tools" aria-label="Related tools">
+            <h2>Other TemplateBox tools</h2>
+            <ul class="related-list">
+                <li><a href="docs.html" data-target="docs">Receipts and invoices</a></li>
+                <li><a href="poster.html" data-target="poster">Poster maker</a></li>
+                <li><a href="mockup.html" data-target="mockup">Product mockups</a></li>
+                <li><a href="ats-resume-template.html">What makes a resume ATS-safe</a></li>
+            </ul>
+        </section>
+    </main>
+
+    <!-- Repeating-entry row templates (cloned by resume.js; static markup
+         only, user data is always injected through textContent bindings) -->
+    <template id="tpl-experience">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Job Title</label>
+                <input type="text" data-entry-field="role" maxlength="60">
+            </div>
+            <div class="field">
+                <label>Company</label>
+                <input type="text" data-entry-field="company" maxlength="60">
+            </div>
+            <div class="field">
+                <label>Dates</label>
+                <input type="text" data-entry-field="dates" maxlength="40" placeholder="2022 - Present">
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <textarea data-entry-field="description" maxlength="400" rows="3"></textarea>
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <template id="tpl-education">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Degree or Certificate</label>
+                <input type="text" data-entry-field="degree" maxlength="80">
+            </div>
+            <div class="field">
+                <label>Institution</label>
+                <input type="text" data-entry-field="school" maxlength="80">
+            </div>
+            <div class="field">
+                <label>Dates</label>
+                <input type="text" data-entry-field="dates" maxlength="40" placeholder="2018 - 2022">
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <footer class="site-footer">
+        <div class="footer-cols">
+            <div class="footer-col">
+                <h2>Receipts and Invoices</h2>
+                <ul>
+                    <li><a href="rent-receipt-template.html">Rent Receipt Template</a></li>
+                    <li><a href="cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
+                    <li><a href="itemized-receipt-template.html">Itemized Business Receipt</a></li>
+                    <li><a href="sales-receipt-template.html">Sales Receipt Form</a></li>
+                    <li><a href="free-invoice-template.html">Free Invoice Template</a></li>
+                    <li><a href="employee-warning-notice-template.html">Employee Warning Notice</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h2>Resumes and Creative</h2>
+                <ul>
+                    <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
+                    <li><a href="poster-maker.html">Poster Maker</a></li>
+                    <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h2>Editors</h2>
+                <ul>
+                    <li><a href="resume.html">Resume Builder</a></li>
+                    <li><a href="docs.html">Business Document Builder</a></li>
+                    <li><a href="poster.html">Poster Creator</a></li>
+                    <li><a href="mockup.html">Product Mockup Generator</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h2>Learn</h2>
+                <ul>
+                    <li><a href="blog.html">Guides and Articles</a></li>
+                    <li><a href="index.html#templates">All Templates</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h2>Company</h2>
+                <ul>
+                    <li><a href="about.html">About TemplateBox</a></li>
+                    <li><a href="privacy.html">Privacy Policy</a></li>
+                    <li><a href="terms.html">Terms of Use</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-base">
+            <div class="footer-social">
+                <a href="https://x.com/Templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on X">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </a>
+                <a href="https://www.facebook.com/profile.php?id=61592027191178" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Facebook">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                </a>
+                <a href="https://www.tiktok.com/@templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on TikTok">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+                </a>
+                <a href="https://www.instagram.com/templatebox26/" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Instagram">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+                </a>
+            </div>
+            <p>TemplateBox. All editing happens locally in your browser. No data leaves your device.</p>
+        </div>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/resume.js"></script>
+</body>
+</html>

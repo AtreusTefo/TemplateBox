@@ -1,0 +1,5 @@
+{
+  "//": "Live Server serves the workspace root by default, which since the site/ move is a folder with no index.html: it shows a file listing, and navigating into /site serves index.html at a URL with no trailing slash, so every relative asset path resolves one level too high and 404s. Pointing the root at /site makes the extension serve the publish directory, matching production URLs exactly.",
+  "liveServer.settings.root": "/site",
+  "liveServer.settings.file": "index.html"
+}
