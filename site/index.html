@@ -100,6 +100,21 @@
          silence, so page behaviour survives the shield. Known cost:
          document-level analytics click capture (Clarity) is also starved
          on this page; session replays keep scroll and movement.
+
+         SECOND HALF, THE OVERLAY NEUTRALIZER: the Pop-Under does not rely
+         on document listeners alone. It captures the page's first click
+         by inserting a transparent link or layer over the whole viewport
+         (random id, position:fixed, z-index 2147483650), and the code
+         that removes that layer runs inside the ad's own document-level
+         click listener -- exactly the listener the shield starves. Left
+         alone, the layer would never be removed and every click and
+         hover on the page would die against it (this happened; see the
+         error doc). So any oversized fixed/absolute element this page
+         did not ship is forced to pointer-events:none, immediately and
+         whenever the ad script re-styles it. The page beneath stays
+         fully interactive, and launch clicks still reach the ad's
+         document-level listener, so the Pop-Under still monetizes the
+         clicks it is meant to monetize.
          See docs/error-fixes/POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md.
          ================================================================ -->
     <script>
@@ -163,6 +178,95 @@
         GUARDED_EVENTS.forEach(function (type) {
             window.addEventListener(type, shield, true);
         });
+
+        /* --------------------------------------------------------------
+           Transparent-overlay neutralizer. See the comment block above.
+           Geometry, not identity: the ad layer carries a random id, so
+           it is recognized by what it does (a fixed or absolute element
+           covering most of the viewport) rather than by what it is
+           called. index.html ships no such element, so anything matching
+           is foreign.
+           -------------------------------------------------------------- */
+        var OWN_SURFACES = ".skip-link, .site-header, .site-footer, main";
+
+        function coversViewport(el) {
+            var cs;
+            try {
+                cs = window.getComputedStyle(el);
+            } catch (err) {
+                return false;
+            }
+            if (!cs || (cs.position !== "fixed" && cs.position !== "absolute")) {
+                return false;
+            }
+            var box = el.getBoundingClientRect();
+            return box.width >= window.innerWidth * 0.5 &&
+                box.height >= window.innerHeight * 0.5;
+        }
+
+        function inspectNode(el) {
+            if (!el || el.nodeType !== 1) {
+                return;
+            }
+            if (el.matches && el.matches(OWN_SURFACES)) {
+                return;
+            }
+            if (!coversViewport(el)) {
+                return;
+            }
+            /* Already inert (including by our own earlier pass): skip,
+               which also terminates the observer's style-change cycle. */
+            if (window.getComputedStyle(el).pointerEvents === "none") {
+                return;
+            }
+            try {
+                el.style.setProperty("pointer-events", "none", "important");
+            } catch (err) {
+                /* Non-styleable node: nothing to do. */
+            }
+        }
+
+        function sweep() {
+            var nodes = document.querySelectorAll("html > *, body > *, body > * > *");
+            for (var i = 0; i < nodes.length; i++) {
+                inspectNode(nodes[i]);
+            }
+        }
+
+        var watcher = new MutationObserver(function (records) {
+            for (var i = 0; i < records.length; i++) {
+                var rec = records[i];
+                if (rec.type === "attributes") {
+                    inspectNode(rec.target);
+                    continue;
+                }
+                for (var j = 0; j < rec.addedNodes.length; j++) {
+                    var added = rec.addedNodes[j];
+                    inspectNode(added);
+                    if (added.nodeType === 1 && added.children) {
+                        for (var k = 0; k < added.children.length; k++) {
+                            inspectNode(added.children[k]);
+                        }
+                    }
+                }
+            }
+        });
+        watcher.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["style"]
+        });
+
+        /* The observer catches insertions and re-styles the moment they
+           happen; the sweep is the belt to that suspender, catching
+           anything mutated in a way the filter above does not see. */
+        window.setInterval(sweep, 700);
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", sweep);
+        } else {
+            sweep();
+        }
     })();
     </script>
 

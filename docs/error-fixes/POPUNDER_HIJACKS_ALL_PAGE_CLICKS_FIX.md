@@ -1,7 +1,36 @@
 # Pop-Under Hijacks Every Homepage Click: Pills, Navigation, Catalog and Launch Buttons Redirect Off-Site
 
 Date: July 27, 2026
-Status: Fixed and browser-verified
+Updated: July 28, 2026 (the July 27 shield alone made the page completely inert against the real ad script; overlay neutralizer added, see "Why Previous Solution Failed")
+Status: Fixed and browser-verified, including against a faithful simulation of the production ad script's transparent-layer mechanism
+
+## Why Previous Solution Failed
+
+The July 27 shield assumed the Pop-Under observed clicks through document-level listeners only. The production script (fetched and deobfuscated on July 28) has a second mechanism: it captures the page's first click by inserting a **transparent link or layer covering the whole viewport** (internal names `transpLinkId`/`transpLayerId`; random element ids; `position:fixed`; z-index 2147483650), and the code that removes that layer (`removeTransparentLayer`) runs **inside the ad's own document-level click listener**:
+
+```
+document.addEventListener(isMobile ? "touchstart" : "click", (e) => {
+    this.storage.resetClickedUrl();
+    if (this.isLayer) this.storage.removeTransparentLayer();
+    /* ... pop / fallback flow ... */
+});
+```
+
+With the overlay on top, the target of every click is the overlay — never a `[data-target]` launch control — so the shield stopped propagation of every click, the ad's document listener never fired, the layer was never removed, and the page beneath became permanently unreachable: no clicks and no hover anywhere (CSS `:hover` cannot trigger on elements underneath a hit-testing overlay). Reported as "nothing on the homepage is clickable and hover is dead."
+
+The failure did not show up in the July 27 verification because the simulated ad handler replicated only the document-listener mechanism, and the real ad script stays passive under browser automation, so no live overlay ever appeared in the test runs.
+
+## Revised Solution
+
+The shield stands unchanged; a **transparent-overlay neutralizer** was added to the same inline script block in index.html. It recognizes the ad layer by geometry rather than identity (the id is random): any `fixed` or `absolute` positioned element covering at least half the viewport in both dimensions, other than the page's own landmark surfaces, is forced to `pointer-events: none !important`. A MutationObserver (childList + subtree + style-attribute changes) neutralizes insertions and re-styles the moment they happen, and a 700 ms interval sweep of the top two DOM levels backstops anything the observer misses. A computed `pointer-events: none` check terminates the observer's own style-change cycle.
+
+Consequences:
+
+- The page beneath the layer stays fully interactive from load — clicks and hover work immediately.
+- Non-launch clicks now hit real page elements, where the shield's stopPropagation continues to starve the ad's document-level listener, so the hijack protection is unchanged.
+- Launch clicks also hit the real `[data-target]` anchors (not the overlay), propagate to the ad's document listener as designed, and the launch watchdog still routes the foreground to loading.html. The Pop-Under can still monetize exactly the clicks it is meant to monetize.
+
+One residual behavior no client code can prevent: the deobfuscated script also contains an `extraAutoRedirectPlacementKey` path, suggesting some zone configurations can redirect on a timer without any click. If a no-click redirect is ever observed, that is an Adsterra zone setting to change in the dashboard, not a site defect.
 
 ## Issue Title
 
@@ -46,7 +75,18 @@ The single deferred `location.href` assignment is now followed by a re-issuing i
 
 ## Testing Steps
 
-Verified July 27, 2026 with Playwright (Chromium) against `npx serve` from the repository root. The test simulates the ad script faithfully: a document-level capture listener attached before any page script runs (a stricter ordering than production, where the async tag runs after the inline shield), which on click issues a `location.href` redirect to an ad URL served with a 600 ms delay to mirror a cross-origin round trip. All 16 checks passed:
+Re-verified July 28, 2026 with two Playwright (Chromium) suites against `npx serve` from the repository root.
+
+Suite 1 simulates the transparent-layer mechanism decoded from the production script: a transparent full-viewport anchor at z-index 2147483650 injected at DOMContentLoaded, plus a document-level capture listener that removes the layer and redirects the tab as its popup-blocked fallback (ad URL served with a 600 ms delay to mirror a cross-origin round trip). Before the neutralizer this suite reproduces the reported dead page exactly (hit-testing never reaches the pills, clicks time out, nav links cannot navigate). After it, all 9 checks pass:
+
+1. Hit-testing reaches the filter pill through the neutralized overlay (hover works).
+2. Pill click succeeds, stays on index.html, filter applies, ad listener sees nothing.
+3. When the ad script re-styles its overlay, it is re-neutralized within the observer/sweep window.
+4. Nav click lands on blog.html, never the ad URL.
+5. Launch click reaches loading.html with the ad's document listener able to see the click.
+6. Zero page errors.
+
+Suite 2 is the original July 27 suite (document-listener-only ad handler), updated in one place: a full-viewport injected foreign anchor is now expected to be neutralized outright (`pointer-events: none`), and the URL-allowlist defence is exercised with a small injected anchor instead. All 17 checks pass:
 
 1. Pill click: no navigation occurs, the simulated ad handler observes zero events, the filter is applied and the active pill moves.
 2. Header navigation click lands on blog.html, never the ad URL.
@@ -67,6 +107,9 @@ Manual re-test in production: with the popup blocker in its default state, click
 
 ## Troubleshooting
 
+- **Page appears dead again (no clicks, no hover):** an overlay is being missed. In DevTools run `document.elementFromPoint(innerWidth/2, innerHeight/2)` — if it returns an element the page does not ship, check why the neutralizer skipped it (positioned differently than fixed/absolute? smaller than half the viewport per dimension? inserted below the top two DOM levels between sweeps?). Loosen the geometry in `coversViewport()`/`sweep()` accordingly.
+- **A legitimate full-viewport element is being neutralized:** add it to `OWN_SURFACES` in the shield block. index.html currently ships none.
+- **Redirect to an ad with no click at all:** see the `extraAutoRedirectPlacementKey` note above — that is an Adsterra zone setting, not something client code can stop.
 - **Hijack still observed on a non-launch click:** confirm the shield script is still the first script ahead of the Pop-Under tag in index.html and was not moved below it; confirm the click target is not inside an element carrying `data-target` (the shield exempts the whole subtree).
 - **Pills or the discard button stop responding:** something re-bound them as element-level listeners. They must stay window-capture delegated; see the comments at both sites in `js/app.js`.
 - **A legitimate new external link on index.html does not work:** add its host to `EXTERNAL_ALLOW` in the shield.
