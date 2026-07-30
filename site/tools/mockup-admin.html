@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Mockup Coordinate Picker | TemplateBox Internal</title>
+    <style>
+        :root {
+            --ink: #1A1A1A;
+            --muted: #6B6B66;
+            --border: #D8D6D0;
+            --bg: #F4F3EF;
+            --accent: #B5352E;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", system-ui, sans-serif;
+            color: var(--ink);
+            background: var(--bg);
+        }
+        header {
+            padding: 1rem 1.5rem;
+            background: #FFFFFF;
+            border-bottom: 1px solid var(--border);
+        }
+        header h1 { margin: 0 0 0.25rem; font-size: 1.25rem; }
+        header p { margin: 0; color: var(--muted); font-size: 0.875rem; }
+        main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 24rem;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            align-items: start;
+        }
+        @media (max-width: 60rem) {
+            main { grid-template-columns: 1fr; }
+        }
+        .panel {
+            background: #FFFFFF;
+            border: 1px solid var(--border);
+            padding: 1rem;
+        }
+        .stage-hint { color: var(--muted); font-size: 0.875rem; margin: 0 0 0.75rem; }
+        canvas {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            border: 1px solid var(--border);
+            cursor: crosshair;
+            background: repeating-conic-gradient(#EDECE7 0% 25%, #FFFFFF 0% 50%) 0 0 / 24px 24px;
+        }
+        label {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin: 0.75rem 0 0.25rem;
+        }
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            font: inherit;
+            font-size: 0.875rem;
+        }
+        textarea {
+            font-family: Consolas, monospace;
+            font-size: 0.8125rem;
+            min-height: 18rem;
+            white-space: pre;
+        }
+        button {
+            font: inherit;
+            font-size: 0.875rem;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--ink);
+            background: var(--ink);
+            color: #FFFFFF;
+            cursor: pointer;
+            margin: 0.75rem 0.5rem 0 0;
+        }
+        button.secondary {
+            background: #FFFFFF;
+            color: var(--ink);
+        }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .status { font-size: 0.8125rem; color: var(--muted); margin-top: 0.5rem; min-height: 1.2em; }
+        ol { padding-left: 1.25rem; font-size: 0.875rem; color: var(--muted); margin: 0.5rem 0 0; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Mockup Coordinate Picker</h1>
+        <p>Internal tool. Loads a base image locally (nothing is uploaded), records the four print-area corners, and emits a ready-to-paste entry for js/mockup-templates.js.</p>
+    </header>
+
+    <main>
+        <section class="panel">
+            <p class="stage-hint" id="stage-hint">Load a base image, then click the print area's corners in order: top-left, top-right, bottom-right, bottom-left. For a "window" base, the corners are the edges of the transparent opening (shown as checkerboard).</p>
+            <input type="file" id="base-file" accept="image/*">
+            <div style="margin-top:0.75rem;">
+                <canvas id="stage" width="800" height="800"></canvas>
+            </div>
+            <button type="button" class="secondary" id="undo-point" disabled>Undo Last Corner</button>
+            <button type="button" class="secondary" id="clear-points" disabled>Clear Corners</button>
+            <p class="status" id="click-status">No image loaded.</p>
+        </section>
+
+        <section class="panel">
+            <label for="tpl-id">Template ID (lowercase, hyphenated)</label>
+            <input type="text" id="tpl-id" value="" placeholder="black-frame-desk">
+
+            <label for="tpl-title">Title</label>
+            <input type="text" id="tpl-title" value="" placeholder="Black Frame on Desk">
+
+            <label for="tpl-category">Thumbnail category folder</label>
+            <input type="text" id="tpl-category" value="posters-frames-canvas-billboards">
+
+            <label for="tpl-mode">Mode</label>
+            <select id="tpl-mode">
+                <option value="window">window (print opening is transparent in the base)</option>
+                <option value="surface">surface (base is opaque; design draws on top)</option>
+            </select>
+
+            <!-- Choose by how the overlay looks on its own. Getting this
+                 wrong silently washes the artwork out; see
+                 docs/error-fixes/PHOTO_MOCKUP_OVERLAY_WASHES_OUT_DESIGN.md -->
+            <label for="tpl-blend">Overlay blend</label>
+            <select id="tpl-blend">
+                <option value="multiply">multiply (overlay is white with grey shading)</option>
+                <option value="screen">screen (overlay is black with bright streaks)</option>
+                <option value="source-over">source-over (dark shapes on transparency)</option>
+            </select>
+
+            <label for="output">Registry entry (paste into window.TB_PHOTO_MOCKUPS)</label>
+            <textarea id="output" readonly spellcheck="false"></textarea>
+            <button type="button" id="copy-output" disabled>Copy Entry</button>
+            <p class="status" id="copy-status"></p>
+
+            <ol>
+                <li>Save assets as site/assets/mockups/&lt;id&gt;-base.png and &lt;id&gt;-overlay.png.</li>
+                <li>Generate a thumbnail under 100KB at site/assets/thumbnails/product-mockups/&lt;category&gt;/&lt;id&gt;-thumb.jpg.</li>
+                <li>Paste the entry into js/mockup-templates.js.</li>
+                <li>Add a catalog card in index.html with data-target="mockup" data-doc="&lt;id&gt;".</li>
+            </ol>
+        </section>
+    </main>
+
+    <script>
+    "use strict";
+    (() => {
+        const stage = document.getElementById("stage");
+        const ctx = stage.getContext("2d");
+        const fileInput = document.getElementById("base-file");
+        const undoBtn = document.getElementById("undo-point");
+        const clearBtn = document.getElementById("clear-points");
+        const clickStatus = document.getElementById("click-status");
+        const output = document.getElementById("output");
+        const copyBtn = document.getElementById("copy-output");
+        const copyStatus = document.getElementById("copy-status");
+        const idInput = document.getElementById("tpl-id");
+        const titleInput = document.getElementById("tpl-title");
+        const categoryInput = document.getElementById("tpl-category");
+        const modeSelect = document.getElementById("tpl-mode");
+        const blendSelect = document.getElementById("tpl-blend");
+
+        const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
+
+        let baseImage = null;
+        /* Corners recorded in the image's own pixel space. */
+        let points = [];
+
+        function redraw() {
+            ctx.clearRect(0, 0, stage.width, stage.height);
+            if (baseImage) {
+                ctx.drawImage(baseImage, 0, 0, stage.width, stage.height);
+            }
+            if (!points.length) {
+                return;
+            }
+            const kx = stage.width / baseImage.naturalWidth;
+            const ky = stage.height / baseImage.naturalHeight;
+
+            ctx.save();
+            ctx.strokeStyle = "#B5352E";
+            ctx.fillStyle = "#B5352E";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            points.forEach((p, i) => {
+                const sx = p.x * kx;
+                const sy = p.y * ky;
+                if (i === 0) {
+                    ctx.moveTo(sx, sy);
+                } else {
+                    ctx.lineTo(sx, sy);
+                }
+            });
+            if (points.length === 4) {
+                ctx.closePath();
+            }
+            ctx.stroke();
+            points.forEach((p) => {
+                ctx.beginPath();
+                ctx.arc(p.x * kx, p.y * ky, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.restore();
+        }
+
+        function updateStatus() {
+            if (!baseImage) {
+                clickStatus.textContent = "No image loaded.";
+            } else if (points.length < 4) {
+                clickStatus.textContent = "Image " + baseImage.naturalWidth + "x" + baseImage.naturalHeight +
+                    ". Click corner " + (points.length + 1) + " of 4: " + CORNER_NAMES[points.length] + ".";
+            } else {
+                clickStatus.textContent = "All four corners recorded. Adjust the fields on the right, then copy the entry.";
+            }
+            undoBtn.disabled = points.length === 0;
+            clearBtn.disabled = points.length === 0;
+        }
+
+        function slug(value, fallback) {
+            const cleaned = value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+            return cleaned || fallback;
+        }
+
+        function buildEntry() {
+            if (points.length !== 4) {
+                output.value = "";
+                copyBtn.disabled = true;
+                return;
+            }
+            const id = slug(idInput.value, "my-mockup");
+            const category = slug(categoryInput.value, "posters-frames-canvas-billboards");
+            const title = titleInput.value.trim() || id;
+            const corners = points.map((p) =>
+                "            { x: " + Math.round(p.x) + ", y: " + Math.round(p.y) + " }"
+            ).join(",\n");
+
+            output.value =
+                "    {\n" +
+                "        id: \"" + id + "\",\n" +
+                "        title: \"" + title.replace(/\\/g, "").replace(/"/g, "'") + "\",\n" +
+                "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "-thumb.jpg\",\n" +
+                "        base: \"assets/mockups/" + id + "-base.png\",\n" +
+                "        overlay: \"assets/mockups/" + id + "-overlay.png\",\n" +
+                "        overlayBlend: \"" + blendSelect.value + "\",\n" +
+                "        mode: \"" + modeSelect.value + "\",\n" +
+                "        warpZone: [\n" + corners + "\n" +
+                "        ]\n" +
+                "    }";
+            copyBtn.disabled = false;
+        }
+
+        fileInput.addEventListener("change", () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) {
+                return;
+            }
+            if (!/^image\//.test(file.type)) {
+                clickStatus.textContent = "That file is not an image.";
+                fileInput.value = "";
+                return;
+            }
+            const reader = new FileReader();
+            reader.addEventListener("load", () => {
+                const img = new Image();
+                img.addEventListener("load", () => {
+                    baseImage = img;
+                    points = [];
+                    /* Stage keeps the image's aspect ratio at a workable
+                       display width; clicks are mapped back to natural
+                       pixels, so display size never affects accuracy. */
+                    const displayW = 800;
+                    stage.width = displayW;
+                    stage.height = Math.round(displayW * img.naturalHeight / img.naturalWidth);
+                    redraw();
+                    updateStatus();
+                    buildEntry();
+                });
+                img.src = reader.result;
+            });
+            reader.readAsDataURL(file);
+        });
+
+        stage.addEventListener("click", (evt) => {
+            if (!baseImage || points.length >= 4) {
+                return;
+            }
+            const rect = stage.getBoundingClientRect();
+            const x = (evt.clientX - rect.left) * (stage.width / rect.width) * (baseImage.naturalWidth / stage.width);
+            const y = (evt.clientY - rect.top) * (stage.height / rect.height) * (baseImage.naturalHeight / stage.height);
+            points.push({ x: x, y: y });
+            redraw();
+            updateStatus();
+            buildEntry();
+        });
+
+        undoBtn.addEventListener("click", () => {
+            points.pop();
+            redraw();
+            updateStatus();
+            buildEntry();
+        });
+
+        clearBtn.addEventListener("click", () => {
+            points = [];
+            redraw();
+            updateStatus();
+            buildEntry();
+        });
+
+        [idInput, titleInput, categoryInput].forEach((el) => el.addEventListener("input", buildEntry));
+        [modeSelect, blendSelect].forEach((el) => el.addEventListener("change", buildEntry));
+
+        copyBtn.addEventListener("click", () => {
+            output.select();
+            let copied = false;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(output.value).then(() => {
+                    copyStatus.textContent = "Copied to clipboard.";
+                });
+                copied = true;
+            } else {
+                copied = document.execCommand("copy");
+                copyStatus.textContent = copied ? "Copied to clipboard." : "Copy failed; select and copy manually.";
+            }
+        });
+
+        updateStatus();
+    })();
+    </script>
+</body>
+</html>
