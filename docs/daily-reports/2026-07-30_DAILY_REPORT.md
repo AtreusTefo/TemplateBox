@@ -4,7 +4,7 @@ Session scope: one feature built to a supplied specification, plus one productio
 
 Two findings outrank the feature work itself:
 
-1. **Production `templatebox.win` is serving 404 on every path**, from Cloudflare rather than Netlify. Discovered by accident while trying to compare a layout against the live site. The whole site, including all ad revenue, is down. Nothing in the repository causes it and nothing in the repository can fix it.
+1. **Production `templatebox.win` was serving 404 on every path**, from Cloudflare rather than Netlify. Discovered by accident while trying to compare a layout against the live site. The whole site, including all ad revenue, was down. Cause: an R2 bucket had the apex domain bound as its Custom Domain. **Diagnosed and fixed within the session; the site is live again and today's feature is deployed and verified on it.**
 2. **The specification's compositing instructions were incomplete in a way that silently ruins output.** Implementing them literally produced washed-out artwork. The missing element was the overlay's blend mode, and the failure mode is invisible: the browser reports no error.
 
 ## Summary
@@ -18,8 +18,9 @@ Two findings outrank the feature work itself:
 | Coordinate tooling | Internal picker built, so future templates need no manual pixel hunting |
 | Defect found and fixed | Overlay blend mode washing out all artwork; found during verification, never deployed |
 | Verification capability gained | File uploads can now be driven headlessly, closing a gap open since July 20 |
-| Production status | **Down.** Domain not reaching Netlify; diagnosis and remediation steps recorded |
-| Documentation | 2 new documents, 3 updated, 1 daily report, 2 memory entries |
+| Production outage | Found, diagnosed and **fixed**. R2 bucket had claimed the apex domain |
+| Production status | **Live**, with today's feature deployed and verified through the Cloudflare proxy |
+| Documentation | 3 new documents, 3 updated, 1 daily report, 2 memory entries |
 
 ## 1. What I did today
 
@@ -112,25 +113,36 @@ Built but **not** verified: the perspective-warp path for angled frames. It is s
 | **Playwright is not installed in this environment**, and the project's verification precedent depends on it | Used headless Microsoft Edge with `--screenshot` and `--dump-dom`, reading results back through `document.title`. Sufficient for rendering, pixel sampling and DOM assertions |
 | **Headless browsers cannot type into a file picker**, so the upload path looked unverifiable, and it is the single most important path in the tool | Populated the input programmatically: built a PNG `File` with `canvas.toBlob`, assigned it through a `DataTransfer`, and dispatched `change`, so the production handler ran unmodified. This closed a verification gap that has been open on this project since July 20 and applies equally to the poster and resume editors |
 | **A 320px capture appeared to show layout overflow**, which would be a PRD violation | Did not act on it. Reproduced the identical cutoff on the pre-change page and on `docs.html`, which was Playwright-verified overflow-free on July 21. It is headless-Edge window clamping, not overflow. Recorded as such so it is not chased again |
-| **Production could not be used as a comparison baseline** because it returns 404 | Compared against the previous committed revision instead, extracted with `git show` and served locally. The outage was then investigated separately and recorded as the session's top open item |
+| **Production could not be used as a comparison baseline** because it returned 404 | Compared against the previous committed revision instead, extracted with `git show` and served locally. The outage was then investigated separately and fixed |
+| **Fixing the outage appeared to make it worse**, going from a 404 page to the domain not resolving at all | Recognised the change as progress rather than regression: removing the R2 binding deletes the DNS record it created, so the apex had no record at all. Recreated the `CNAME`, which Cloudflare's own "Visitors cannot reach templatebox.win" banner was already asking for |
+| **A DNS fix that was verifiably correct still failed every local test.** The record resolved at Cloudflare's authoritative nameservers and at three public resolvers, yet `Invoke-WebRequest` and `curl` both reported the host as unresolvable | Negative caching: the earlier NXDOMAIN was cached upstream, and `Clear-DnsClientCache` does not reach the upstream resolver. Bypassed DNS entirely with `curl --resolve` against the edge IP, which proved the site was serving with correct SNI while the resolver was still stale. Without this the fix would have looked like a failure |
+| **The push was rejected with 403 despite valid stored credentials** | Two GitHub accounts are stored on the machine. The remote URL carries no username, so Git selected `atreusramokate`, which has no write access to `AtreusTefo/TemplateBox`. Pushed once via `https://AtreusTefo@github.com/...` to select the owner's credential; the remote config was deliberately left unchanged and the mismatch reported rather than silently rewritten |
 | **`git mv` failed on the asset folders** | The files were untracked, so there was nothing for git to move. Used filesystem moves. A subsequent directory rename was refused by a file lock and was resolved by creating the target structure and moving contents |
 | **The first thumbnail was composited with the wrong blend**, so the card preview no longer matched what the tool produces | Regenerated it, implementing alpha-aware multiply arithmetic directly since GDI+ has no such blend mode, then regenerated again with sample art inside the frame to meet the project's filled-preview standard |
 
-## 4. Production outage discovered
+## 4. Production outage: found, diagnosed and fixed
 
-Found while attempting to fetch `https://templatebox.win/mockup.html` as a layout baseline.
+Found while attempting to fetch `https://templatebox.win/mockup.html` as a layout baseline — the outage was not reported, and nothing in the repository could have revealed it.
 
-**Observed.** Every path on the apex domain returns HTTP 404 with `Server: cloudflare` and `cf-cache-status: DYNAMIC`, and no Netlify headers at all. The body is a cloud object storage error page reading "Object not found" and "Is this your bucket?". At the same moment `https://templatebox.netlify.app/mockup.html` returned 200 with normal Netlify headers.
+**Observed.** Every path on the apex returned HTTP 404 with `Server: cloudflare` and no Netlify headers at all, rendering a storage error page reading "Object not found" and "Is this your bucket?". At the same moment `https://templatebox.netlify.app/` returned 200 with normal Netlify headers. `www` was affected too.
 
-**Interpretation.** The site itself is healthy; the hostname is not reaching Netlify. The bucket-flavoured error page is characteristic of a Cloudflare R2 bucket having claimed the hostname as a custom domain, which overrides proxied DNS for that name. That is a plausible sequence given R2 was under active consideration for these very assets.
+**Cause, confirmed from the dashboard rather than inferred.** An R2 bucket named `product-mockups` had `templatebox.win` — the apex, the website itself — bound as its Custom Domain, Active and Enabled. An R2 custom domain binds the *entire hostname* to the bucket, so every request was answered by R2 instead of reaching Netlify, and the bucket was empty. Uploading assets would not have fixed it: a bucket has no page routing, no `netlify.toml` headers or redirects, and Cloudflare does not serve bucket listings at a domain root, so `/` 404s by design. The site was never broken; it had simply stopped being asked.
 
-**Remediation to perform in the Cloudflare dashboard**, in order:
+**The remedy has a destructive second step, and this is the part worth remembering.** Removing the binding also deletes the DNS record it created, and because that binding had superseded the original `CNAME` to Netlify, nothing remained underneath. The symptom changed from a 404 to `DNS_PROBE_FINISHED_NXDOMAIN`, which reads as a worse failure than the one being fixed:
 
-1. R2, then each bucket, then Settings, then Custom Domains. Disconnect any binding to `templatebox.win` or `www`.
-2. Workers and Pages. Remove any route bound to `templatebox.win/*`.
-3. DNS. Confirm `templatebox.win` and `www` are both proxied `CNAME` records to `templatebox.netlify.app`, per the Live Infrastructure table in `PROJECT_STATUS.md`.
+| Stage | Symptom | Meaning |
+|---|---|---|
+| R2 bound to apex | 404 from Cloudflare, storage error page | Resolves, but to an empty bucket |
+| Binding removed | NXDOMAIN, "This site can't be reached" | Does not resolve at all |
+| Apex `CNAME` recreated | 200 with `x-nf-request-id` | Fixed |
 
-**Carry forward:** if assets do move to R2 later, give the bucket its own subdomain such as `cdn.templatebox.win`. Never the apex.
+`www` appeared broken throughout despite having an intact, proxied record of its own, because Netlify 301s it to the primary domain and the apex was what was failing — so the browser reported the error against the apex name even when the request started at `www`.
+
+**Sequence that resolved it:** removed the binding; recreated the apex `CNAME` to `templatebox.netlify.app`; left it DNS-only until Netlify's Domain management moved off "Pending DNS verification" and the Let's Encrypt certificate listed both hostnames; then switched to Proxied. Proxying earlier would have kept Netlify's verification failing, because Netlify resolves the name and sees Cloudflare's IPs rather than its own load balancer — the same sequencing lesson already recorded from the original July setup.
+
+**Two dashboard suggestions were deliberately refused.** Netlify recommends making `www` the primary domain, because an apex primary bypasses some of its own CDN; that barely applies behind Cloudflare, and accepting it would have changed the primary domain while every canonical URL, `og:url` and sitemap entry is `https://templatebox.win/...` — rewriting the site's search identity mid-outage to solve a problem it does not have. Netlify also offers "Set up Netlify DNS", which cannot work here: Cloudflare Registrar locks nameservers to Cloudflare, which is why the Netlify DNS zone was deleted during the original setup.
+
+Full write-up, including troubleshooting and the CORS prerequisite for any future R2 migration: `docs/error-fixes/R2_CUSTOM_DOMAIN_ON_APEX_TAKES_DOWN_SITE.md`.
 
 ## Verification performed
 
@@ -153,29 +165,51 @@ Headless Microsoft Edge against `npx serve` from the repository root, plus `node
 | Asset paths free of spaces and commas | Pass |
 | No temporary or internal files left inside `site/` | Pass |
 
-**Not verified.** The perspective-warp path, which no current template exercises. Real-touchscreen dragging. Narrow-viewport layout on a real device. Anything requiring `netlify.toml`, which only Netlify reads. Production behaviour of any kind, since production is down.
+### Post-deploy verification in production
+
+Run after the outage was fixed and the commit had deployed, through the Cloudflare proxy. This also closes the post-deploy checklist carried since the July 27 `site/` migration.
+
+| Check | Result |
+|---|---|
+| Apex resolution | `172.67.205.174`, `104.21.90.225` — Cloudflare, correct for proxied |
+| Homepage | 200, `Server: cloudflare` **and** `x-nf-request-id` present |
+| Redirect loop | None: 0 redirects, final 200, so SSL/TLS is not on Flexible |
+| `www` | 301 to `https://templatebox.win/` |
+| Certificate | Let's Encrypt covering `templatebox.win, www.templatebox.win` |
+| `/mockup.html` | 200 |
+| `/assets/mockups/wood-a4-base.png` | 200, 2,174,533 bytes — byte-identical to the committed file |
+| `/assets/mockups/wood-a4-overlay.png`, thumbnail, registry, vendored glfx.js | 200 |
+| `/tools/mockup-admin.html` | 200 with `X-Robots-Tag: noindex, nofollow` |
+| `/docs/memory/PROJECT_STATUS.md`, `/docs/project/MOCKUP_CONTEXT.md`, `/CLAUDE.md`, `/PRD.md` | 404 — internal files correctly unserved |
+| Mistyped path | 404 |
+
+**Not verified.** The perspective-warp path, which no current template exercises. Real-touchscreen dragging. Narrow-viewport layout on a real device. Whether the Adsterra zones resume filling now that the site is reachable again — the outage will have zeroed impressions for its duration, so treat today's ad figures as unusable rather than as a signal about placement.
 
 All temporary harness files created inside `site/` during verification were removed, and their absence was asserted rather than assumed.
 
 ## Files
 
-**Created (7):** `site/js/mockup-templates.js` (73 lines), `site/tools/mockup-admin.html` (312 lines), `site/js/vendor/glfx.js` (vendored, MIT), `site/assets/mockups/wood-a4-base.png` and `-overlay.png` (moved from `site/assets/`), `site/assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.jpg` (generated, 69KB), plus `docs/implementation/PHOTO_MOCKUP_TEMPLATES_IMPLEMENTATION.md`, `docs/error-fixes/PHOTO_MOCKUP_OVERLAY_WASHES_OUT_DESIGN.md` and this report.
+**Created (8):** `site/js/mockup-templates.js` (73 lines), `site/tools/mockup-admin.html` (312 lines), `site/js/vendor/glfx.js` (vendored, MIT), `site/assets/mockups/wood-a4-base.png` and `-overlay.png` (moved from `site/assets/`), `site/assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.jpg` (generated, 69KB), plus `docs/implementation/PHOTO_MOCKUP_TEMPLATES_IMPLEMENTATION.md`, `docs/error-fixes/PHOTO_MOCKUP_OVERLAY_WASHES_OUT_DESIGN.md`, `docs/error-fixes/R2_CUSTOM_DOMAIN_ON_APEX_TAKES_DOWN_SITE.md` and this report.
 
 **Modified (6):** `site/js/mockup.js` (+371 net), `site/index.html`, `site/mockup.html`, `site/css/style.css`, `docs/memory/PROJECT_STATUS.md`, `docs/DOCUMENTATION_INDEX.md`.
+
+**Moved:** `MOCKUP_CONTEXT.MD` from the repository root to `docs/project/MOCKUP_CONTEXT.md`, per the documentation-organization rule in CLAUDE.md. It was outside `site/` before and after, so it was never publicly served.
 
 **Renamed:** the two supplied thumbnail folders, to remove spaces and commas from public URLs.
 
 **Unused but retained:** the two supplied 1.4MB `.webp` renders, kept in the repository in case a larger preview surface wants them later.
 
-**Commits.** None. All work is uncommitted and staged for review, on `main`.
+**Commits.** `e47d7f5` on `main`, pushed to `origin` (18 files, 3,099 insertions). Netlify deployed it, and the assets were verified live afterwards. The documentation updates recording the outage resolution follow in a second commit.
 
 ## Open items carried forward
 
-1. **Restore production.** Everything else on this list is secondary while the domain returns 404. Steps in section 4.
-2. **Verify the perspective-warp path** when the first genuinely angled frame asset arrives. It has never rendered a real image.
-3. **Real-touchscreen pass** on the drag interaction, and a narrow-viewport check on a real device. Open since July 20. Do not treat the headless 320px cutoff as evidence of overflow.
-4. **Consider committing the unused `.webp` files out of the repository** if the collection grows and they stay unused.
-5. Pre-existing items are unchanged: post-deploy verification of the `site/` move, confirmation that the article-page ad zones are filling, sitemap resubmission, the remaining Open Graph cards with `og-cover.png` as the priority, and the Adsterra escalation from July 28.
+1. **Confirm SSL/TLS is Full (strict)** in Cloudflare. The absence of a redirect loop rules out Flexible, so it is almost certainly already correct, but the difference between Full and Full (strict) is whether Cloudflare validates Netlify's certificate on the back half of the connection.
+2. **Fix the GitHub push identity.** Either `git remote set-url origin https://AtreusTefo@github.com/AtreusTefo/TemplateBox.git`, or add `atreusramokate` as a collaborator. As it stands a plain `git push` will 403 again, while commits are authored as the account that cannot push.
+3. **Verify the perspective-warp path** when the first genuinely angled frame asset arrives. It has never rendered a real image.
+4. **Real-touchscreen pass** on the drag interaction, and a narrow-viewport check on a real device. Open since July 20. Do not treat the headless 320px cutoff as evidence of overflow.
+5. **Ignore today's Adsterra figures.** The site was unreachable for an unknown period, so impressions are not a signal about placement. This also delays the clean before/after read on the four article-page zones from July 28.
+6. **Consider removing the unused 1.4MB `.webp` files** if the collection grows and they stay unused.
+7. Pre-existing items still open: sitemap resubmission, the remaining Open Graph cards with `og-cover.png` as the priority, and the Adsterra escalation from July 28. The July 27 post-deploy checklist for the `site/` migration is now closed by the verification table above.
 
 ## Notes for the next session
 
@@ -186,3 +220,7 @@ All temporary harness files created inside `site/` during verification were remo
 - **File inputs can be verified headlessly** via `canvas.toBlob`, `DataTransfer` and a dispatched `change` event. Worth applying to the poster and resume editors, whose upload paths have never been verified either.
 - **Asset filenames are public URLs here.** Reject spaces, commas and capitals at the point assets arrive, not later.
 - **Verify third-party CDN URLs before pasting them**, including ones supplied in a specification. One in today's brief was a 404.
+- **Never bind an R2 bucket, Worker route or any other Cloudflare product to `templatebox.win` or `www`.** A custom domain binding takes the whole hostname, and the website disappears. Asset hosting goes on its own subdomain, e.g. `cdn.templatebox.win`.
+- **Judge domain routing by the header pair, not the status code.** `Server: cloudflare` plus `x-nf-request-id` on the same response is the only real proof. A bare 200 is not proof, and a 404 carrying `x-nf-request-id` is a healthy site serving its own 404 page.
+- **When a DNS fix looks like it failed, suspect negative caching before suspecting the fix.** Query the authoritative nameservers directly, then bypass DNS with `curl --resolve <host>:443:<ip>`. A local cache flush does not reach upstream resolvers, and a browser still erroring is not evidence.
+- **Restore or add DNS records grey-cloud first, then proxy.** Netlify cannot verify a hostname that resolves to Cloudflare's IPs, so proxying too early deadlocks it on "Pending DNS verification".
