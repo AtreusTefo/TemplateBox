@@ -98,7 +98,9 @@ index.html card click
   -> loading.html: 10s countdown, 2 banners + Social Bar render
   -> at 0: navigation watchdog re-issues location.replace(editorUrl) every 700ms
      until the page actually unloads, so ad-initiated navigations can't strand the user
-  -> resume.html or poster.html: fully ad-free, localStorage-backed editor
+  -> resume.html or poster.html: localStorage-backed editor carrying one
+     passive banner (160x600 rail above 75rem, 320x50 anchor below 48rem)
+     and no active format
 ```
 
 Because of the shield, index.html's own click behaviours (filter pills, the continue-strip discard button) are bound as window-capture delegated listeners in `js/app.js`, not element-level listeners — element listeners below window never fire for shielded clicks. Keep that pattern for anything new added to index.html that is not a launch control. See `docs/error-fixes/POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md`.
@@ -145,7 +147,8 @@ These cost real time to work out during setup and aren't captured in any other d
 ## Design/Architecture Decisions Made During Build (with reasoning, in case revisited)
 
 - **jsPDF primitives over jspdf-autotable.** The invoice/receipt line-item table, checkbox rows and side-by-side party columns in `js/docs.js` are hand-rolled on `doc.text()`, `doc.rect()` and `doc.line()` rather than adding the autotable plugin. Rationale: it keeps the CDN surface identical to the resume builder's single jsPDF include, and CLAUDE.md mandates the native text API specifically. Do not add autotable to "simplify" the table code without weighing that.
-- **No ads on index.html or the editor pages, ever.** Argued out explicitly: index.html is the page Google actually indexes (loading.html is noindex,nofollow), so ad clutter there carries real SEO/trust risk that the isolated loading-page model doesn't. Editors stay ad-free per PRD to build return-usage trust.
+- **No ads on index.html, ever.** Argued out explicitly: index.html is the page Google actually indexes (loading.html is noindex,nofollow), so ad clutter there carries real SEO/trust risk that the isolated loading-page model doesn't. This half of the rule stands.
+- **Editors carry one passive banner (revised July 27, 2026).** The original rule was "no ads on the editors either, ever". It was reversed on a dwell-time argument: an editing session lasts minutes where a catalog visit lasts seconds, so one passive unit on an editor plausibly out-earns the interstitial per session at a far lower interruption cost. The shape is deliberately narrow — a 160x600 rail above 75rem, a 320x50 anchor below 48rem, never both, no active format, iframe-isolated only. The isolation is what keeps "nothing leaves your device" honest, so **Native Banner and any other page-context format is prohibited on editors**. Full reasoning and rejected alternatives: `docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md`. Four documents were updated to match (`PRD.md`, `CLAUDE.md`, `site/privacy.html`, `site/terms.html`, `site/about.html`) — if this is ever reversed again, all of them need revisiting.
 - **Reused Adsterra banner keys across both slots is fine** functionally; a second zone was obtained purely for separated reporting, not because sharing was broken.
 - **CSP is intentionally not in `netlify.toml` yet** — Adsterra's ad domains rotate/vary enough that a hand-written allowlist would likely break ads; revisit once ad domains are observed to be stable.
 - **jsPDF over html2pdf.js** is now the mandated PDF engine project-wide (CLAUDE.md and PRD.md both updated) — do not reintroduce html2pdf.js.

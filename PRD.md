@@ -84,7 +84,17 @@ The app operates on a strict single-direction visual path to isolate monetizatio
    * Resilience requirement: the countdown and redirect must complete even if the primary shared script fails to load or throws (extension interference, ad-blocker collateral damage, cache corruption). loading.html implements this via a dependency-free inline fallback that runs its own identical countdown only if the primary script does not signal it took over; see `docs/error-fixes/LOADING_REDIRECT_STALL_FIX.md` and `docs/implementation/MOCKUP_GENERATOR_IMPLEMENTATION.md`.
 
 ## 5.3 Page 3: The Interactive Web App Editors
-Once the user clears the loading screen, they enter an isolated, clean workspace. To build user loyalty and word-of-mouth virality, the final file export must be entirely ad-free.
+Once the user clears the loading screen, they enter a clean workspace. To build user loyalty and word-of-mouth virality, the exported file must be entirely ad-free and unwatermarked.
+
+**Editor advertising policy (revised July 27, 2026).** The editors were originally specified as carrying no advertising at all. That was revised once dwell-time data made the trade obvious: an editing session lasts minutes where a catalog visit lasts seconds, so a single passive banner on an editor earns more per session than the interstitial, at a far lower interruption cost than any active format. The revised rule:
+
+* Exactly one passive banner per editor. A 160x600 rail beside the workspace above 75rem, or a 320x50 anchor fixed to the foot of the viewport below 48rem. Never both, and never a second unit.
+* Passive formats only. No Pop-Under, no Social Bar, no interstitial, and nothing that moves, expands, covers or delays the workspace.
+* Iframe-isolated delivery is mandatory. The ad runs cross-origin and cannot read the document being edited. Page-context formats (for example Adsterra's Native Banner) are prohibited on editor pages, because they would place third-party code in the same document as the user's typed content and would falsify the product's central privacy claim.
+* The placement must reserve its own space and collapse to nothing when dormant, blocked, or out of viewport range, so it can never shift the workspace.
+* The homepage remains entirely ad-free. It is the indexed page and the first impression, and that decision is unchanged.
+
+Full reasoning and the rejected alternatives: `docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md`.
 ## App A: The Interactive CV/Resume Builder
 
 * UI Layout:

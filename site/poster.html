@@ -78,7 +78,7 @@
         </nav>
     </header>
 
-    <main>
+    <main data-ads-static>
         <nav class="breadcrumb" aria-label="Breadcrumb">
             <ol>
                 <li><a href="index.html">Templates</a></li>
@@ -101,6 +101,7 @@
             <button type="button" id="tab-preview" aria-selected="false">Live Preview</button>
         </div>
 
+        <div class="editor-shell">
         <div class="editor-layout show-edit" id="editor-layout">
 
             <!-- Left pane: poster controls -->
@@ -143,6 +144,13 @@
             </section>
 
         </div>
+
+            <!-- 160x600 rail, wide desktop only. Filled by js/ads.js from
+                 AD_ZONES.skyscraper; renders nothing under 75rem and nothing
+                 when the zone is dormant, so it can never shift the layout. -->
+            <aside class="editor-rail" data-ad-editor-rail aria-label="Advertisement"></aside>
+        </div>
+
         <section class="related-tools" aria-label="Related tools">
             <h2>Other TemplateBox tools</h2>
             <ul class="related-list">
@@ -220,6 +228,13 @@
         </div>
     </footer>
 
+    <!-- 320x50 anchor, phones only. Fixed to the foot of the viewport for the
+         whole editing session. js/ads.js adds .has-ad-anchor to <body> when it
+         fills, which reserves the space and lifts the sticky export bar clear
+         of it; without that the ad would sit on top of the Download button. -->
+    <div class="editor-anchor" data-ad-editor-anchor aria-label="Advertisement"></div>
+
+    <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
     <script src="js/poster.js"></script>
 </body>

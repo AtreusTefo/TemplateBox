@@ -1251,6 +1251,103 @@ main {
    Editor shell (shared by the resume and poster editors)
    -------------------------------------------------------------------------- */
 
+/* Shell wrapping the split panes plus the desktop ad rail. The panes keep
+   their own grid; the shell only decides how much width they get. */
+.editor-shell {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-lg);
+}
+
+.editor-shell .editor-layout {
+    flex: 1 1 auto;
+    /* Flex children default to min-width:auto and would refuse to shrink
+       below the line-item table's minimum, pushing the rail off-screen.
+       Same containment fix as the grid panes below. */
+    min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Editor advertising
+   Editors are the longest sessions on the site, so they carry a passive
+   banner. Both placements are opt-in from js/ads.js and collapse to nothing
+   when the zone is dormant, blocked, or the viewport is the wrong size, so
+   neither can ever shift the layout.
+   Full reasoning: docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md
+   -------------------------------------------------------------------------- */
+
+/* Give the editor page extra width once a rail is in play, so the rail is
+   added beside the panes rather than taken out of them. Only above the rail
+   gate: narrower than that no rail mounts and the standard width applies. */
+@media (min-width: 75rem) {
+    main:has(.editor-shell) {
+        max-width: 84rem;
+    }
+}
+
+.editor-rail {
+    flex: 0 0 auto;
+    position: sticky;
+    /* Clears the sticky site header rather than sliding under it */
+    top: 5.75rem;
+}
+
+/* Below this the two panes plus a 160px rail start cramping the preview,
+   so the rail is simply not mounted. Wider gate than the blog's 70rem. */
+@media (max-width: 75rem) {
+    .editor-rail {
+        display: none;
+    }
+}
+
+/* Never leave an empty box where a dormant zone would have been */
+.editor-rail:empty {
+    display: none;
+}
+
+/* Mobile anchor: hidden by default at every width, revealed only once
+   js/ads.js has actually filled it on a phone-width viewport. */
+.editor-anchor {
+    display: none;
+}
+
+@media (max-width: 48rem) {
+    .editor-anchor.is-filled {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 30;
+        background-color: var(--color-card);
+        border-top: 1px solid var(--color-border);
+        padding: 0.25rem 0;
+        /* Clears the home-indicator gesture bar on modern phones */
+        padding-bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* The disclosure label is kept, but small: on a 50px unit a full-size
+       label would nearly double the height the anchor costs. */
+    .editor-anchor .ad-label {
+        font-size: 0.5625rem;
+        margin-bottom: 0.125rem;
+    }
+
+    /* Reserve the space the fixed anchor occupies. Without this the last of
+       the page sits underneath it and cannot be scrolled clear. */
+    body.has-ad-anchor {
+        padding-bottom: 4.75rem;
+    }
+
+    /* The export action is itself sticky at bottom:0, so it would otherwise
+       be covered by the anchor. Lift it above. */
+    body.has-ad-anchor .preview-actions {
+        bottom: 4.75rem;
+    }
+}
+
 .editor-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -3150,9 +3247,23 @@ legend {
     .preview-actions,
     .related-tools,
     .save-state,
+    .editor-rail,
+    .editor-anchor,
     main > h1,
     .preview-pane h2 {
         display: none !important;
+    }
+
+    /* The anchor reserves body padding while it is on screen; a printed
+       page must not carry that gap at the foot of the sheet. */
+    body.has-ad-anchor {
+        padding-bottom: 0 !important;
+    }
+
+    /* The shell is a flex row purely to seat the rail, which is hidden
+       above; collapse it so the document sheet prints full width. */
+    .editor-shell {
+        display: block;
     }
 
     main {

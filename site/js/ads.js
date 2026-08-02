@@ -15,13 +15,17 @@
      - blog.html / post.html   js/blog.js mounts as it renders
      - blog/<slug>.html        hosts are in the served markup, auto-mounted
      - *-template.html         same, auto-mounted
+     - the four editors        same, auto-mounted (rail + mobile anchor)
    Auto-mounting is opt-in through [data-ads-static] on the page's <main>, so
    a page whose renderer does its own mounting can never double-count.
 
    Ad policy this file enforces by omission: only passive banner formats live
    here. The Popunder (index.html) and Social Bar (loading.html) are declared
    inline on those two pages and are deliberately absent from every indexable
-   content page.
+   content page and from every editor.
+
+   index.html carries no banner at all. It is the page Google indexes and the
+   first impression for every visitor, and that decision stands.
    ========================================================================== */
 
 "use strict";
@@ -168,6 +172,51 @@ const TBAds = (() => {
             mountPlacement(root.querySelector("[data-ad-rail]"), "skyscraper");
             mountPlacement(root.querySelector("[data-ad-sidebar]"), "skyscraper");
         }
+
+        mountEditorAds(root);
+    }
+
+    /* ----------------------------------------------------------------------
+       Editor placements.
+
+       The editors are the longest sessions on the site -- filling an itemized
+       invoice takes minutes, where a catalog visit takes seconds -- so a
+       persistent passive banner earns more per session than the interstitial
+       does, without interrupting anything. This reverses the earlier
+       "editors stay ad-free" decision; see
+       docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md for the reasoning and
+       what was ruled out.
+
+       Both placements are iframe-isolated like every other banner here, which
+       is what keeps the product's central claim honest: the ad script runs
+       cross-origin and cannot read the document the visitor is typing into.
+       A page-context format (Adsterra's Native Banner) was rejected for
+       exactly that reason and must not be used on these pages.
+       ---------------------------------------------------------------------- */
+
+    /* Wider than the blog's 70rem rail gate: an editor is two panes plus the
+       rail, so it needs more room before the panes start to cramp. */
+    const EDITOR_RAIL_MIN = "(min-width: 75rem)";
+    const EDITOR_ANCHOR_MAX = "(max-width: 48rem)";
+
+    function mountEditorAds(scope) {
+        const root = scope || document;
+
+        if (window.matchMedia(EDITOR_RAIL_MIN).matches) {
+            mountPlacement(root.querySelector("[data-ad-editor-rail]"), "skyscraper");
+        }
+
+        /* The anchor is fixed over the foot of the viewport, so the page has
+           to make room for it: .has-ad-anchor reserves bottom padding and
+           lifts the sticky export bar above it. The class is only added when
+           a banner actually filled, so a dormant or blocked zone leaves the
+           layout exactly as it was. */
+        if (window.matchMedia(EDITOR_ANCHOR_MAX).matches) {
+            const anchor = root.querySelector("[data-ad-editor-anchor]");
+            if (mountPlacement(anchor, "leaderboardMobile")) {
+                document.body.classList.add("has-ad-anchor");
+            }
+        }
     }
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -182,6 +231,7 @@ const TBAds = (() => {
         mountLeaderboard,
         buildAdBreak,
         adBreakIndex,
-        mountHosts
+        mountHosts,
+        mountEditorAds
     };
 })();
