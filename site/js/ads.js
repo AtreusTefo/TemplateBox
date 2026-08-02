@@ -194,9 +194,24 @@ const TBAds = (() => {
        exactly that reason and must not be used on these pages.
        ---------------------------------------------------------------------- */
 
-    /* Wider than the blog's 70rem rail gate: an editor is two panes plus the
-       rail, so it needs more room before the panes start to cramp. */
-    const EDITOR_RAIL_MIN = "(min-width: 75rem)";
+    /* Three mutually exclusive viewport bands, one unit each. The boundaries
+       are deliberately non-overlapping to the pixel, so no viewport can ever
+       mount two placements or none.
+
+       The rail gate is 84rem, not the blog's 70rem, because an editor is two
+       panes plus a rail. Below 84rem the page is capped by the viewport
+       rather than by its own max-width, so a rail stops using spare margin
+       and starts eating the panes: at 1200px it cost each pane 68px. At
+       84rem and above the panes measure 544px, marginally wider than the
+       540px they had before any rail existed.
+
+       Between 48rem and 84rem there is no room beside the panes, so that
+       band gets a leaderboard above the workspace instead. It scrolls away,
+       which is why it is the fallback rather than the primary: the whole
+       argument for advertising on editors is session-long visibility. */
+    const EDITOR_RAIL_MIN = "(min-width: 84rem)";
+    const EDITOR_LEADERBOARD_BAND =
+        "(min-width: 48.0625rem) and (max-width: 83.9375rem)";
     const EDITOR_ANCHOR_MAX = "(max-width: 48rem)";
 
     function mountEditorAds(scope) {
@@ -204,6 +219,13 @@ const TBAds = (() => {
 
         if (window.matchMedia(EDITOR_RAIL_MIN).matches) {
             mountPlacement(root.querySelector("[data-ad-editor-rail]"), "skyscraper");
+        }
+
+        /* mountPlacement directly rather than mountLeaderboard(): the mobile
+           320x50 swap that helper performs is wrong here, because this band
+           starts above the mobile breakpoint. */
+        if (window.matchMedia(EDITOR_LEADERBOARD_BAND).matches) {
+            mountPlacement(root.querySelector("[data-ad-editor-leaderboard]"), "leaderboard");
         }
 
         /* The anchor is fixed over the foot of the viewport, so the page has

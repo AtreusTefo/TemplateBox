@@ -44,7 +44,11 @@ DNS record shape in Cloudflare: `templatebox.win` and `www` are both `CNAME` →
 
 `post.html` still carries the same registry and its own leaderboard host, but it is a 301 source and the admin draft preview only, so it serves no meaningful impressions. The pages readers reach are `blog/<slug>.html`.
 
-Adult ads are toggled off for this site in the Adsterra dashboard. `index.html` and the editor pages carry zero visible ads by design — only `loading.html` shows ad units; this is a deliberate PRD/CLAUDE.md architecture decision, not an oversight, argued out in-session (SEO/trust risk on the indexed homepage vs. limited upside).
+| Banner 160x600 skyscraper (reused zone) | The four editors, sticky rail beside the panes, viewports 84rem and above, via `AD_ZONES.skyscraper` | `aaa51e997d5bd5badf6557a7773f78a6` |
+| Banner 728x90 (reused zone) | The four editors, above the workspace, viewports 48rem to 84rem, via `AD_ZONES.leaderboard` | `7577a9abda8083816fafd71754b18205` |
+| Banner 320x50 (reused zone) | The four editors, fixed anchor at the foot of the viewport, under 48rem, via `AD_ZONES.leaderboardMobile` | `101fe70128e51351589ecd23ab2d0e21` |
+
+Adult ads are toggled off for this site in the Adsterra dashboard. **`index.html` carries zero ads and that is not negotiable** — it is the page Google indexes and the first impression, and the SEO/trust risk there outweighs the upside. The editors carried none either until July 27, 2026, when that half of the rule was reversed on a dwell-time argument; they now carry exactly one passive banner selected by viewport band. See the decision log below and `docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md`.
 
 ## File Map
 
@@ -99,8 +103,8 @@ index.html card click
   -> at 0: navigation watchdog re-issues location.replace(editorUrl) every 700ms
      until the page actually unloads, so ad-initiated navigations can't strand the user
   -> resume.html or poster.html: localStorage-backed editor carrying one
-     passive banner (160x600 rail above 75rem, 320x50 anchor below 48rem)
-     and no active format
+     passive banner, chosen by viewport (160x600 rail at 84rem+, 728x90
+     leaderboard 48-84rem, 320x50 anchor below 48rem) and no active format
 ```
 
 Because of the shield, index.html's own click behaviours (filter pills, the continue-strip discard button) are bound as window-capture delegated listeners in `js/app.js`, not element-level listeners — element listeners below window never fire for shielded clicks. Keep that pattern for anything new added to index.html that is not a launch control. See `docs/error-fixes/POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md`.
@@ -148,7 +152,7 @@ These cost real time to work out during setup and aren't captured in any other d
 
 - **jsPDF primitives over jspdf-autotable.** The invoice/receipt line-item table, checkbox rows and side-by-side party columns in `js/docs.js` are hand-rolled on `doc.text()`, `doc.rect()` and `doc.line()` rather than adding the autotable plugin. Rationale: it keeps the CDN surface identical to the resume builder's single jsPDF include, and CLAUDE.md mandates the native text API specifically. Do not add autotable to "simplify" the table code without weighing that.
 - **No ads on index.html, ever.** Argued out explicitly: index.html is the page Google actually indexes (loading.html is noindex,nofollow), so ad clutter there carries real SEO/trust risk that the isolated loading-page model doesn't. This half of the rule stands.
-- **Editors carry one passive banner (revised July 27, 2026).** The original rule was "no ads on the editors either, ever". It was reversed on a dwell-time argument: an editing session lasts minutes where a catalog visit lasts seconds, so one passive unit on an editor plausibly out-earns the interstitial per session at a far lower interruption cost. The shape is deliberately narrow — a 160x600 rail above 75rem, a 320x50 anchor below 48rem, never both, no active format, iframe-isolated only. The isolation is what keeps "nothing leaves your device" honest, so **Native Banner and any other page-context format is prohibited on editors**. Full reasoning and rejected alternatives: `docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md`. Four documents were updated to match (`PRD.md`, `CLAUDE.md`, `site/privacy.html`, `site/terms.html`, `site/about.html`) — if this is ever reversed again, all of them need revisiting.
+- **Editors carry one passive banner (revised July 27, 2026).** The original rule was "no ads on the editors either, ever". It was reversed on a dwell-time argument: an editing session lasts minutes where a catalog visit lasts seconds, so one passive unit on an editor plausibly out-earns the interstitial per session at a far lower interruption cost. The shape is deliberately narrow: three mutually exclusive viewport bands carrying one unit each (160x600 rail at 84rem and above, 728x90 leaderboard between 48rem and 84rem, 320x50 anchor below 48rem), never two and never none, no active format, iframe-isolated only. The rail gate is 84rem rather than 75rem because below that the page is capped by the viewport instead of its own max-width, so the rail stops using spare margin and starts eating the editing panes — at 1200px it cost each pane 68px against the pre-rail layout. The isolation is what keeps "nothing leaves your device" honest, so **Native Banner and any other page-context format is prohibited on editors**. Full reasoning and rejected alternatives: `docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md`. Four documents were updated to match (`PRD.md`, `CLAUDE.md`, `site/privacy.html`, `site/terms.html`, `site/about.html`) — if this is ever reversed again, all of them need revisiting.
 - **Reused Adsterra banner keys across both slots is fine** functionally; a second zone was obtained purely for separated reporting, not because sharing was broken.
 - **CSP is intentionally not in `netlify.toml` yet** — Adsterra's ad domains rotate/vary enough that a hand-written allowlist would likely break ads; revisit once ad domains are observed to be stable.
 - **jsPDF over html2pdf.js** is now the mandated PDF engine project-wide (CLAUDE.md and PRD.md both updated) — do not reintroduce html2pdf.js.

@@ -5,7 +5,7 @@
 - **Target-Stack:** Vanilla JAMstack (HTML5, CSS3, ES6+ JavaScript)
 - **Primary IDEs:** VS Code 2026, Claude Code.
 - **Main Goal:** A serverless, 100% database-free template engine that monetizes free user customization traffic through a mandatory 10-second intermediary ad loading loop (Adsterra Pop-Under, Banners, and In-Page Push) before rendering client-side editors, plus passive banners on the editors and on indexable content pages.
-- **Ad policy (revised July 27, 2026):** `index.html` carries no banner, ever. Editors carry exactly one passive banner (160x600 rail above 75rem, 320x50 anchor below 48rem) and no active format. Every placement is declared once in `AD_ZONES` in `site/js/ads.js` and rendered iframe-isolated; page-context formats such as Native Banner are prohibited on editors because they would run third-party code in the same document as the user's typed content. See `docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md`.
+- **Ad policy (revised July 27, 2026):** `index.html` carries no banner, ever. Editors carry exactly one passive banner, by viewport band (160x600 rail at 84rem and above, 728x90 leaderboard between 48rem and 84rem, 320x50 anchor below 48rem) and no active format. Every placement is declared once in `AD_ZONES` in `site/js/ads.js` and rendered iframe-isolated; page-context formats such as Native Banner are prohibited on editors because they would run third-party code in the same document as the user's typed content. See `docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md`.
 
 ## AI Behavior Guidelines
 - **No Emojis:** Do NOT use emojis in any documentation, comments, or commit messages. Keep text professional and plain-text based.
@@ -96,7 +96,7 @@ The repository has exactly two top levels: what ships, and what does not.
 
 ### Testing Requirements
 - **Ad Script Separation:** Verify that triggering a download action initiates the background window hook (Adsterra Pop-Under) while successfully routing the primary active foreground view to the 10-second timer page.
-- **Editor Ad Containment:** On every editor, verify that the banner never overlaps the sticky export bar (the anchor reserves body padding and lifts it), that the rail is absent below 75rem and the anchor absent above 48rem, that neither appears in print output, and that a dormant or blocked zone leaves the workspace layout byte-identical to having no placement at all.
+- **Editor Ad Containment:** On every editor, verify that the banner never overlaps the sticky export bar (the anchor reserves body padding and lifts it), that exactly one unit mounts at every width (rail at 84rem and above, leaderboard between 48rem and 84rem, anchor below 48rem, never two and never none), that neither appears in print output, and that a dormant or blocked zone leaves the workspace layout byte-identical to having no placement at all.
 - **Responsive Fluidity:** Test layouts down to a minimum screen width of `320px` to verify that text containers wrap cleanly and that the dual 300x250 ad container collapses into a balanced vertical stack on mobile viewports.
 
 ## Critical Rules

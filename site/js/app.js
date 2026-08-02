@@ -601,6 +601,124 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Form section navigation.
+
+       A long form pushed the live preview off the screen, so the visitor was
+       typing blind into the feature the split view exists for. The preview is
+       now sticky (css/style.css) and this adds a jump list so the form itself
+       is quicker to move around.
+
+       Deliberately anchors rather than tabs: tabs hide fields, and a visitor
+       who never notices a tab exports a document missing that whole section.
+       Anchors keep every field present, findable with the browser's own
+       search, and reviewable in one pass before export.
+
+       The list is built from the form's own fieldsets, so adding a fieldset
+       adds a nav entry with no second place to update. Hidden fieldsets are
+       skipped, which is what makes it usable on docs.html, where the visible
+       set changes with the document type.
+       ---------------------------------------------------------------------- */
+    let navObserver = null;
+
+    function slugifyLegend(text, index) {
+        const base = String(text).toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+        return "sect-" + (base || String(index));
+    }
+
+    /* A fieldset the page has hidden has no layout box. offsetParent is null
+       for display:none, which is how docs.html hides the fieldsets that do
+       not belong to the selected document type. */
+    function isVisible(el) {
+        return Boolean(el.offsetParent !== null || el.getClientRects().length);
+    }
+
+    function initFormNav() {
+        const mount = document.querySelector("[data-form-nav]");
+        if (!mount) {
+            return;
+        }
+
+        const pane = mount.closest(".editor-pane") || document;
+        const sections = Array.prototype.slice
+            .call(pane.querySelectorAll("fieldset"))
+            .filter((fs) => fs.querySelector("legend") && isVisible(fs));
+
+        mount.textContent = "";
+        if (navObserver) {
+            navObserver.disconnect();
+            navObserver = null;
+        }
+
+        /* One section is not worth a navigation row */
+        if (sections.length < 2) {
+            mount.hidden = true;
+            return;
+        }
+        mount.hidden = false;
+
+        const links = [];
+        sections.forEach((fs, index) => {
+            const legend = fs.querySelector("legend");
+            const label = (legend.textContent || "").trim();
+            if (!fs.id) {
+                fs.id = slugifyLegend(label, index);
+            }
+
+            const link = document.createElement("a");
+            link.href = "#" + fs.id;
+            link.textContent = label;
+            link.addEventListener("click", (event) => {
+                /* Handled here so the section lands under the sticky header
+                   rather than behind it, and so the URL is not littered with
+                   fragments the visitor did not choose to bookmark. */
+                event.preventDefault();
+                fs.scrollIntoView({ behavior: "smooth", block: "start" });
+                const firstField = fs.querySelector("input, textarea, select");
+                if (firstField) {
+                    firstField.focus({ preventScroll: true });
+                }
+            });
+            mount.appendChild(link);
+            links.push({ link: link, section: fs });
+        });
+
+        highlightOnScroll(links);
+    }
+
+    /* Marks the section currently in view. IntersectionObserver rather than a
+       scroll handler so this costs nothing while the visitor is typing. */
+    function highlightOnScroll(links) {
+        if (typeof window.IntersectionObserver !== "function") {
+            return;
+        }
+
+        const bySection = new Map();
+        links.forEach((entry) => bySection.set(entry.section, entry.link));
+
+        navObserver = new window.IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) {
+                    return;
+                }
+                links.forEach((item) => item.link.classList.remove("is-current"));
+                const active = bySection.get(entry.target);
+                if (active) {
+                    active.classList.add("is-current");
+                }
+            });
+        }, {
+            /* Fires when a section reaches the band just below the sticky
+               header, rather than when it merely touches the viewport edge */
+            rootMargin: "-10% 0px -70% 0px",
+            threshold: 0
+        });
+
+        links.forEach((entry) => navObserver.observe(entry.section));
+    }
+
+    /* ----------------------------------------------------------------------
        Autosave indicator (shared by every editor).
        Persistence was previously silent, which wastes the trust payoff of a
        product whose whole proposition is "no account, and your work is held
@@ -673,7 +791,8 @@ const TB = (() => {
             initEditorTabs,
             initContinueStrip,
             initGuidesStrip,
-            initSaveState
+            initSaveState,
+            initFormNav
         ].forEach((init) => {
             try {
                 init();
@@ -691,6 +810,9 @@ const TB = (() => {
         storageGet,
         takePreset,
         launchTemplate,
-        markSaved
+        markSaved,
+        /* docs.html changes which fieldsets are visible with the document
+           type, so it rebuilds the nav after a type change */
+        refreshFormNav: initFormNav
     };
 })();

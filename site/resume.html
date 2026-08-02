@@ -109,6 +109,12 @@
             <button type="button" id="tab-preview" aria-selected="false">Live Preview</button>
         </div>
 
+
+        <!-- 728x90 leaderboard for the band too narrow for a rail (48rem to
+             84rem). Exactly one unit per page: this and the rail are mutually
+             exclusive by viewport, never both. -->
+        <div class="editor-leaderboard" data-ad-editor-leaderboard aria-label="Advertisement"></div>
+
         <div class="editor-shell">
         <div class="editor-layout show-edit" id="editor-layout">
 
@@ -123,6 +129,10 @@
                     <button type="button" class="swatch" data-accent="#8A6D1D" style="background-color:#8A6D1D" aria-label="Gold accent"></button>
                 </div>
 
+                <!-- Section jump list, built by initFormNav() in js/app.js
+                     from the fieldsets below. Anchors, not tabs: nothing is
+                     hidden, so no section can be missed before export. -->
+                <nav class="form-nav" data-form-nav aria-label="Form sections" hidden></nav>
                 <form id="resume-form" autocomplete="on">
                     <fieldset>
                         <legend>Personal Details</legend>

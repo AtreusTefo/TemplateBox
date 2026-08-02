@@ -16,15 +16,36 @@ What did not change: the trade only holds while the placement stays genuinely pa
 
 ## What Was Built
 
+Three mutually exclusive viewport bands, exactly one unit each. The boundaries are non-overlapping to the pixel, so no viewport can ever mount two placements or none.
+
 | Viewport | Placement | Zone | Host |
 |---|---|---|---|
-| Above 75rem | Sticky 160x600 rail beside the split panes | `skyscraper` | `[data-ad-editor-rail]` |
-| Below 48rem | Fixed 320x50 anchor at the foot of the viewport | `leaderboardMobile` | `[data-ad-editor-anchor]` |
-| 48rem to 75rem | Nothing | — | — |
+| 84rem and above | Sticky 160x600 rail beside the split panes | `skyscraper` | `[data-ad-editor-rail]` |
+| 48rem to 84rem | 728x90 leaderboard above the workspace | `leaderboard` | `[data-ad-editor-leaderboard]` |
+| 48rem and below | Fixed 320x50 anchor at the foot of the viewport | `leaderboardMobile` | `[data-ad-editor-anchor]` |
 
-Both zones already existed and are live; no new Adsterra provisioning was needed. Both hosts are empty in the served markup and filled by `mountEditorAds()` in `site/js/ads.js`, which runs because each editor's `<main>` now carries `data-ads-static`.
+All three zones already existed and are live; no new Adsterra provisioning was needed. Every host is empty in the served markup and filled by `mountEditorAds()` in `site/js/ads.js`, which runs because each editor's `<main>` carries `data-ads-static`.
 
-The middle band is deliberately empty. A 160px rail below 75rem starts squeezing the preview pane, and a bottom anchor on a tablet-width editor covers more proportionally useful screen than it earns.
+### Why the rail gate is 84rem, not 75rem
+
+The first implementation gated the rail at 75rem, which was wrong, and the arithmetic shows why. Below 84rem the page is capped by the viewport rather than by its own `max-width`, so there is no spare margin for the rail to occupy and it comes straight out of the panes instead:
+
+| Screen | Pane width, no rail | Pane width, rail at 75rem gate |
+|---|---|---|
+| 1200px | 540px | 472px |
+| 1280px | 540px | 512px |
+| 1366px | 540px | 544px |
+| 1440px and up | 540px | 544px |
+
+At 1200px each pane lost 68px against the pre-rail layout — a real regression, on a common laptop width. Above 84rem (1344px) the page is at its full declared width, the rail sits in margin that was previously empty, and the panes measure 544px, marginally *wider* than the 540px they had before any rail existed.
+
+Raising the gate leaves the 48rem-to-84rem band with no room beside the panes, which is what the leaderboard is for.
+
+### Why the leaderboard is the fallback, not the primary
+
+A banner above the workspace scrolls out of view within seconds of the visitor reaching the form, so it earns roughly one impression per session. The rail is visible for the entire session. Since session-long visibility is the whole argument for advertising on editors, the rail is used wherever it fits and the leaderboard only covers the band where it does not.
+
+A sticky top banner was rejected: laptops are wide and short, and a sticky site header plus a sticky 90px banner would permanently occupy roughly a quarter of the vertical space on a 1366x768 screen — the axis where those machines are actually tight. Horizontal space is what they have spare.
 
 ## The Rail
 
@@ -82,7 +103,8 @@ If this decision is ever reversed again, every row above needs revisiting.
 - **A second unit per editor.** One is the whole point. Two makes it a monetized surface rather than a workspace with a banner.
 - **Any placement inside the form or preview panes.** The document must never compete with an advertisement for attention. The placement lives in the page shell only.
 - **Pop-Under or Social Bar on editors.** Same rule the blog already follows for indexable content. A Pop-Under firing while someone drafts a disciplinary notice is precisely the experience that costs a return visit.
-- **Live reflow between rail and anchor on resize.** The choice is made once per page load via `matchMedia`, matching the existing leaderboard behaviour, because re-mounting a tag double-counts impressions.
+- **Live reflow between bands on resize.** The band is chosen once per page load via `matchMedia`, matching the existing leaderboard behaviour, because re-mounting a tag double-counts impressions. Resizing a window across a band boundary mid-session therefore leaves the original unit in place, which is the correct trade.
+- **A top banner as the primary placement.** Raised as an alternative to the rail on the grounds that it costs no pane width. Rejected because it scrolls out of view within seconds of the visitor reaching the form, which forfeits the session-long visibility that is the entire argument for advertising on editors. It survives only as the fallback for the band where a rail does not fit.
 - **A distinct reporting zone.** The rail reuses the blog's `skyscraper` key and the anchor reuses `leaderboardMobile`. Separating editor revenue in Adsterra reporting needs a support ticket for a size already in use (see the Adsterra notes in `PROJECT_STATUS.md`); worth doing if editor placements turn out to carry the revenue, but not a blocker.
 
 ## Verification
@@ -92,6 +114,6 @@ Verified without a browser, consistent with the rest of this work:
 - Structural pass across all 24 pages: internal links resolve, JSON-LD parses, single `<h1>`, canonical and metadata coverage intact
 - All four editors serve locally with every asset returning 200
 - `node --check` clean across `site/js`
-- Mount-logic harness over `mountEditorAds()`: rail mounts only above 75rem, anchor only below 48rem, neither in the middle band, `.has-ad-anchor` added only on a successful fill and never on a dormant zone
+- Mount-logic harness over `mountEditorAds()`, 32 cases: exactly one unit at every one of fourteen widths including both band boundaries and one pixel either side of each, correct zone size per band, every unit labelled and iframe-isolated, dormant zones filling nothing and reserving no space, missing hosts survivable, `.has-ad-anchor` added only on a successful anchor fill
 
 **Not verified, and worth a real-device pass:** that the anchor genuinely clears the Download button on a phone, that the rail does not collide with the sticky header at awkward zoom levels, and that print output from `docs.html` carries neither placement. The print rules are written but were verified as CSS only, not as a rendered print job — the same gap already recorded for the document builder.

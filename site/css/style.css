@@ -1279,7 +1279,7 @@ main {
 /* Give the editor page extra width once a rail is in play, so the rail is
    added beside the panes rather than taken out of them. Only above the rail
    gate: narrower than that no rail mounts and the standard width applies. */
-@media (min-width: 75rem) {
+@media (min-width: 84rem) {
     main:has(.editor-shell) {
         max-width: 84rem;
     }
@@ -1292,11 +1292,32 @@ main {
     top: 5.75rem;
 }
 
-/* Below this the two panes plus a 160px rail start cramping the preview,
-   so the rail is simply not mounted. Wider gate than the blog's 70rem. */
-@media (max-width: 75rem) {
+/* The rail only appears once the page is at its full 84rem width and the
+   margin it occupies is genuinely spare. Below that the page is capped by
+   the viewport instead, so a rail would come straight out of the panes --
+   at 1200px it cost each pane 68px against the pre-rail layout. The band
+   below gets a leaderboard above the workspace instead.
+   83.9375rem = 1343px, one pixel below the 84rem JS gate, so the two can
+   never both apply. */
+@media (max-width: 83.9375rem) {
     .editor-rail {
         display: none;
+    }
+}
+
+/* Leaderboard for the band with no room beside the panes. Hidden at every
+   width by default and revealed only once js/ads.js has actually filled it
+   inside the band, so a dormant zone costs no space. */
+.editor-leaderboard {
+    display: none;
+}
+
+@media (min-width: 48.0625rem) and (max-width: 83.9375rem) {
+    .editor-leaderboard.is-filled {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: var(--space-lg);
     }
 }
 
@@ -1371,6 +1392,100 @@ main {
 .preview-pane h2 {
     font-size: 1.125rem;
     margin-bottom: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Sticky live preview (split view only)
+
+   Both panes used to scroll with the page, so by the time a visitor reached
+   the Education fields the resume sheet had left the screen entirely -- the
+   live preview, which is the whole reason the split view exists, was
+   switched off exactly when the form got long. Keeping the preview in place
+   means every keystroke visibly lands on the document however far down the
+   form the visitor is.
+
+   align-self: start is what makes this work inside the grid. The row track
+   is as tall as the taller pane (the form), so the preview's grid area gives
+   the sticky element room to travel; without it the item would stretch to
+   fill the track and have nowhere to move.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 48.0625rem) {
+    .preview-pane {
+        position: sticky;
+        top: 5.75rem;
+        align-self: start;
+        /* A long document must not run past the viewport: cap the pane and
+           let it scroll internally instead. This also makes the sticky
+           export bar inside it stick to the pane rather than the page. */
+        max-height: calc(100vh - 7rem);
+        overflow-y: auto;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Form section navigation
+
+   Jumps to a section rather than hiding the others. A tabbed form would cut
+   the scrolling further, but it hides fields (a visitor who never notices a
+   tab exports a document missing that section), breaks browser find across
+   the form, and would sit directly under the existing Edit/Preview tab row
+   on mobile. Anchors keep everything discoverable and need no completion
+   -state machinery.
+
+   Built by initFormNav() in js/app.js from the form's own fieldsets, so a
+   new fieldset appears in the nav automatically and the two can never drift.
+   -------------------------------------------------------------------------- */
+
+.form-nav {
+    display: flex;
+    gap: var(--space-3xs);
+    overflow-x: auto;
+    /* Sits above the fields while the form scrolls beneath it */
+    position: sticky;
+    top: 5.5rem;
+    z-index: 4;
+    background-color: var(--color-card);
+    border-bottom: 1px solid var(--color-border);
+    margin: 0 calc(var(--space-lg) * -1) var(--space-lg);
+    padding: 0 var(--space-lg) var(--space-xs);
+    /* Hide the scrollbar on the overflow row without losing the scrolling */
+    scrollbar-width: none;
+}
+
+.form-nav::-webkit-scrollbar {
+    display: none;
+}
+
+.form-nav a {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+    padding: 0 var(--space-sm);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color var(--motion-fast) var(--ease),
+        border-color var(--motion-fast) var(--ease);
+}
+
+.form-nav a:hover {
+    color: var(--color-text);
+}
+
+.form-nav a.is-current {
+    color: var(--color-brand-ink);
+    border-bottom-color: var(--color-brand);
+}
+
+/* Clears the sticky header and the nav row itself when jumping to a
+   section, so the legend is not hidden underneath them on arrival */
+.editor-pane fieldset {
+    scroll-margin-top: 9rem;
 }
 
 .mobile-tabs {
@@ -3249,6 +3364,8 @@ legend {
     .save-state,
     .editor-rail,
     .editor-anchor,
+    .editor-leaderboard,
+    .form-nav,
     main > h1,
     .preview-pane h2 {
         display: none !important;
@@ -3279,6 +3396,15 @@ legend {
        48rem breakpoint, which would otherwise hide the sheet being printed */
     .editor-layout .preview-pane {
         display: block !important;
+    }
+
+    /* On screen the preview is sticky, height-capped and internally
+       scrollable. All three must be undone for print, or the sheet is
+       clipped at one viewport height and the rest never reaches the paper. */
+    .preview-pane {
+        position: static !important;
+        max-height: none !important;
+        overflow: visible !important;
     }
 
     .preview-pane,
