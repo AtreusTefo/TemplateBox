@@ -404,6 +404,11 @@ body + '\n' +
 '    </main>\n\n' +
 FOOTER +
 '\n' +
+/* No site-wide anchor here, deliberately. Article pages already mount the
+   leaderboard zones into the host above, and the anchor draws from those same
+   two zones -- putting one here would serve a single zone key twice in one
+   page view. They also already carry four units. If an anchor is ever wanted
+   on article pages, get a dedicated zone from Adsterra first. */
 /* The 790-line blog library and the whole post database were both dead
    weight on a page whose metadata and body are already baked into the
    markup: nothing here reads window.TB_BLOG_POSTS, and the only runtime

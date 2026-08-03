@@ -1332,6 +1332,53 @@ main {
     display: none;
 }
 
+/* --------------------------------------------------------------------------
+   Site-wide anchor: the editors' fixed foot banner carried to every other
+   page except index.html, loading.html and admin.html. Unlike .editor-anchor
+   this is not confined to phone widths -- js/ads.js mounts a 320x50 into it
+   under 48rem and a 728x90 above, so the placement behaves identically on a
+   phone and on a laptop. Hidden until filled, so a dormant or blocked zone
+   costs nothing and shifts nothing.
+   -------------------------------------------------------------------------- */
+
+.site-anchor {
+    display: none;
+}
+
+.site-anchor.is-filled {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    background-color: var(--color-card);
+    border-top: 1px solid var(--color-border);
+    padding: 0.25rem 0;
+    /* Clears the home-indicator gesture bar on modern phones */
+    padding-bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.site-anchor .ad-label {
+    font-size: 0.5625rem;
+    margin-bottom: 0.125rem;
+}
+
+/* Reserve the space the fixed bar occupies, or the foot of the page sits
+   under it and cannot be scrolled clear. The desktop unit is 728x90, so it
+   needs noticeably more room than the 320x50 phone one. */
+body.has-site-anchor {
+    padding-bottom: 7.25rem;
+}
+
+@media (max-width: 48rem) {
+    body.has-site-anchor {
+        padding-bottom: 4.75rem;
+    }
+}
+
 @media (max-width: 48rem) {
     .editor-anchor.is-filled {
         display: flex;
@@ -3364,6 +3411,7 @@ legend {
     .save-state,
     .editor-rail,
     .editor-anchor,
+    .site-anchor,
     .editor-leaderboard,
     .form-nav,
     main > h1,
@@ -3373,7 +3421,8 @@ legend {
 
     /* The anchor reserves body padding while it is on screen; a printed
        page must not carry that gap at the foot of the sheet. */
-    body.has-ad-anchor {
+    body.has-ad-anchor,
+    body.has-site-anchor {
         padding-bottom: 0 !important;
     }
 

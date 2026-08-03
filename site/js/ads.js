@@ -241,10 +241,66 @@ const TBAds = (() => {
         }
     }
 
+    /* ----------------------------------------------------------------------
+       Site-wide anchor.
+
+       The editors proved the format: a unit fixed to the foot of the viewport
+       is visible for the whole session instead of scrolling away after two
+       seconds. This carries the same placement to every other page except the
+       four listed below, so a visitor reading a landing page or an article
+       sees one persistent unit the way an editing visitor does.
+
+       Deliberately absent from:
+         index.html    the page Google indexes and the first impression every
+                       visitor gets. That decision predates this and stands.
+         loading.html  already the site's ad surface (two 300x250 plus the
+                       Social Bar) over a ten-second life; a fourth unit fixed
+                       across the countdown would cover the thing the visitor
+                       is waiting on.
+         admin.html    private authoring tool, never carries ads.
+         the editors   they mount their own three-band system, which includes
+                       this same anchor below 48rem. Their host attribute is
+                       different so the two can never both fire.
+         blog.html,    these mount `leaderboard` / `leaderboardMobile` into
+         post.html,    their own top host, and the anchor draws from those
+         blog/*.html   same two zones -- an anchor here would serve one zone
+                       key twice in a single page view, which is not the same
+                       thing as reusing a key across different pages. They
+                       also already carry four units including a 160x600
+                       rail. Giving them an anchor needs a dedicated Adsterra
+                       zone first (a duplicate size requires a support
+                       ticket); see docs/memory/PROJECT_STATUS.md.
+
+       Size follows the viewport: 320x50 under 48rem, 728x90 above. That is
+       what makes it "the same thing on desktop" rather than a second design
+       -- one host, one behavior, one padding mechanism.
+       ---------------------------------------------------------------------- */
+    const SITE_ANCHOR_MOBILE = "(max-width: 48rem)";
+
+    function mountSiteAnchor(scope) {
+        const root = scope || document;
+        const anchor = root.querySelector("[data-ad-anchor]");
+        if (!anchor) {
+            return false;
+        }
+
+        const mobile = window.matchMedia(SITE_ANCHOR_MOBILE).matches;
+
+        /* .has-site-anchor reserves the space the fixed bar occupies, and is
+           only added when a banner actually filled -- a dormant or blocked
+           zone leaves the layout untouched. */
+        if (mountPlacement(anchor, mobile ? "leaderboardMobile" : "leaderboard")) {
+            document.body.classList.add("has-site-anchor");
+            return true;
+        }
+        return false;
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
         if (document.querySelector("[data-ads-static]")) {
             mountHosts();
         }
+        mountSiteAnchor();
     });
 
     return {
@@ -254,6 +310,7 @@ const TBAds = (() => {
         buildAdBreak,
         adBreakIndex,
         mountHosts,
-        mountEditorAds
+        mountEditorAds,
+        mountSiteAnchor
     };
 })();
