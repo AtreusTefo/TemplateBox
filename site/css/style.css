@@ -1285,11 +1285,40 @@ main {
     }
 }
 
+/* Very wide screens carry a three-slot 300px rail instead of one 160px
+   unit, which needs 324px including the gap. Widening the page to 93rem
+   keeps the editing panes at the 540px they had before any rail existed,
+   so the extra inventory is added beside the workspace, never taken from
+   it -- the same rule the 84rem gate enforces one band down. */
+@media (min-width: 93rem) {
+    main:has(.editor-shell) {
+        max-width: 93rem;
+    }
+}
+
 .editor-rail {
     flex: 0 0 auto;
     position: sticky;
     /* Clears the sticky site header rather than sliding under it */
     top: 5.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    /* Three stacked units can exceed a short viewport. Capping the rail and
+       letting it scroll internally keeps the workspace unaffected either
+       way; on a tall screen the cap never engages. */
+    max-height: calc(100vh - 7rem);
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.editor-rail::-webkit-scrollbar {
+    display: none;
+}
+
+/* A slot with no filled banner leaves no gap in the stack */
+.editor-rail > div:empty {
+    display: none;
 }
 
 /* The rail only appears once the page is at its full 84rem width and the
@@ -1321,8 +1350,10 @@ main {
     }
 }
 
-/* Never leave an empty box where a dormant zone would have been */
-.editor-rail:empty {
+/* Never leave an empty box where a dormant zone would have been. The rail
+   always contains its three slot elements, so :empty never matches it --
+   the test has to be whether any slot actually received a banner. */
+.editor-rail:not(:has(.ad-slot)) {
     display: none;
 }
 

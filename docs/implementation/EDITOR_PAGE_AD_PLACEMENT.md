@@ -16,13 +16,26 @@ What did not change: the trade only holds while the placement stays genuinely pa
 
 ## What Was Built
 
-Three mutually exclusive viewport bands, exactly one unit each. The boundaries are non-overlapping to the pixel, so no viewport can ever mount two placements or none.
+Four mutually exclusive viewport bands. The boundaries are non-overlapping to the pixel, so no viewport can ever mount two bands or none.
 
-| Viewport | Placement | Zone | Host |
+| Viewport | Placement | Zone(s) | Host |
 |---|---|---|---|
-| 84rem and above | Sticky 160x600 rail beside the split panes | `skyscraper` | `[data-ad-editor-rail]` |
+| 93rem and above | Sticky rail of three stacked 300x250 units | `editorRail1/2/3` | `[data-ad-rail-slot]` |
+| 84rem to 93rem | Sticky single 160x600 rail | `skyscraper` | first `[data-ad-rail-slot]` |
 | 48rem to 84rem | 728x90 leaderboard above the workspace | `leaderboard` | `[data-ad-editor-leaderboard]` |
 | 48rem and below | Fixed 320x50 anchor at the foot of the viewport | `leaderboardMobile` | `[data-ad-editor-anchor]` |
+
+### The rail stack (added August 3, 2026)
+
+Very wide screens have room for more than one unit beside the workspace, and an editor session is long enough that a stack is seen for its whole duration rather than scrolled past. Three 300x250 slots replace the single 160x600 above 93rem.
+
+**Every slot carries its own zone key.** Repeating one key down the stack would have Adsterra treat it as the same placement rendered three times, which is not the same thing as three placements. This is the same reason `loading.html` carries two distinct 300x250 zones rather than one key twice.
+
+Slots 1 and 2 reuse the two live 300x250 zones. Reusing a key across pages is functionally fine per Adsterra; only separated reporting requires a dedicated zone. **Slot 3 is deliberately keyless and renders nothing**, because a third distinct 300x250 needs an Adsterra support ticket — the dashboard blocks a duplicate of a size already in use. Pasting the key into `AD_ZONES.editorRail3` activates it with no other change.
+
+Why 93rem: a three-slot 300px rail needs 324px including its gap. Holding the editing panes at the 540px they had before any rail existed therefore takes 1476px of viewport. Below that the single 160px rail still fits, which is what the 84rem band is for. The principle is unchanged from the 84rem gate — inventory is added beside the workspace, never taken out of it.
+
+The rail is capped at `calc(100vh - 7rem)` with internal scrolling. Three stacked units plus labels run to roughly 830px, which exceeds a short laptop viewport; capping keeps the workspace unaffected either way, and on a tall screen the cap never engages.
 
 All three zones already existed and are live; no new Adsterra provisioning was needed. Every host is empty in the served markup and filled by `mountEditorAds()` in `site/js/ads.js`, which runs because each editor's `<main>` carries `data-ads-static`.
 

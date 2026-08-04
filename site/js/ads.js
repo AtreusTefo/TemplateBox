@@ -53,7 +53,26 @@ const TBAds = (() => {
         /* 300x250 end-of-article (distinct reporting zone) */
         endOfArticle: { key: "70d844a3963c8415efa49af391c897a0", width: 300, height: 250 },
         /* 160x600 wide skyscraper, desktop rail beside an article */
-        skyscraper: { key: "aaa51e997d5bd5badf6557a7773f78a6", width: 160, height: 600 }
+        skyscraper: { key: "aaa51e997d5bd5badf6557a7773f78a6", width: 160, height: 600 },
+
+        /* Editor rail stack, very wide screens only. Three slots, each with
+           its own key so Adsterra treats them as separate placements rather
+           than one unit repeated -- the same reason loading.html carries two
+           distinct 300x250 zones instead of the same key twice.
+
+           Slots 1 and 2 reuse the two live 300x250 zones. Reusing a key
+           across pages is functionally fine per Adsterra; only separated
+           reporting needs a dedicated zone.
+
+           Slot 3 is deliberately keyless and therefore renders nothing. A
+           third distinct 300x250 requires an Adsterra support ticket,
+           because the dashboard blocks a duplicate of a size already in use
+           (see the Adsterra notes in docs/memory/PROJECT_STATUS.md). Paste
+           the key here when it is provisioned and the slot activates with
+           no other change. */
+        editorRail1: { key: "4a408738c2170da16b47c5ac05b3780a", width: 300, height: 250 },
+        editorRail2: { key: "70d844a3963c8415efa49af391c897a0", width: 300, height: 250 },
+        editorRail3: { key: "", width: 300, height: 250 }
     };
 
     /* Each banner is isolated in its own srcdoc iframe: the Adsterra tag
@@ -214,11 +233,29 @@ const TBAds = (() => {
         "(min-width: 48.0625rem) and (max-width: 83.9375rem)";
     const EDITOR_ANCHOR_MAX = "(max-width: 48rem)";
 
+    /* A three-slot 300px rail needs 324px including its gap. Holding the
+       editing panes at the 540px they had before any rail existed therefore
+       takes 1476px of viewport, so the stack only appears at 93rem and up.
+       Between 84rem and 93rem there is room for the 160px skyscraper but not
+       for the stack, and that band keeps the single unit. */
+    const EDITOR_RAIL_STACK_MIN = "(min-width: 93rem)";
+    const EDITOR_RAIL_STACK = ["editorRail1", "editorRail2", "editorRail3"];
+
     function mountEditorAds(scope) {
         const root = scope || document;
 
-        if (window.matchMedia(EDITOR_RAIL_MIN).matches) {
-            mountPlacement(root.querySelector("[data-ad-editor-rail]"), "skyscraper");
+        const rail = root.querySelector("[data-ad-editor-rail]");
+        const slots = rail
+            ? Array.prototype.slice.call(rail.querySelectorAll("[data-ad-rail-slot]"))
+            : [];
+
+        if (slots.length && window.matchMedia(EDITOR_RAIL_STACK_MIN).matches) {
+            rail.classList.add("is-stack");
+            EDITOR_RAIL_STACK.forEach((zoneName, index) => {
+                mountPlacement(slots[index], zoneName);
+            });
+        } else if (slots.length && window.matchMedia(EDITOR_RAIL_MIN).matches) {
+            mountPlacement(slots[0], "skyscraper");
         }
 
         /* mountPlacement directly rather than mountLeaderboard(): the mobile
