@@ -45,9 +45,9 @@ DNS record shape in Cloudflare: `templatebox.win` and `www` are both `CNAME` →
 `post.html` still carries the same registry and its own leaderboard host, but it is a 301 source and the admin draft preview only, so it serves no meaningful impressions. The pages readers reach are `blog/<slug>.html`.
 
 | Banner 160x600 skyscraper (reused zone) | The four editors, sticky rail beside the panes, viewports 84rem to 93rem, via `AD_ZONES.skyscraper` | `aaa51e997d5bd5badf6557a7773f78a6` |
-| Banner 300x250 rail slot 1 (reused zone) | The four editors, top of the three-slot rail, viewports 93rem and above, via `AD_ZONES.editorRail1` | `4a408738c2170da16b47c5ac05b3780a` |
-| Banner 300x250 rail slot 2 (reused zone) | Same rail, middle slot, via `AD_ZONES.editorRail2` | `70d844a3963c8415efa49af391c897a0` |
-| Banner 300x250 rail slot 3 | Same rail, bottom slot. **DORMANT** -- needs a third distinct 300x250 zone, which requires an Adsterra support ticket because the dashboard blocks a duplicate of a size already in use. Paste the key into `AD_ZONES.editorRail3` to activate | (none yet) |
+| Banner 300x250 rail slot 1 (dedicated zone) | The four editors, top of the three-slot rail, viewports 93rem and above, via `AD_ZONES.editorRail1`. Provisioned Aug 3, 2026 specifically for this slot -- reports separately from every other 300x250 on the site | `3d08daa8e24f9416073d41bb566768bb` |
+| Banner 300x250 rail slot 2 (dedicated zone) | Same rail, middle slot, via `AD_ZONES.editorRail2`. Also provisioned Aug 3, 2026, also fully separated | `67fd95399c1261e2f4ffbd1b284dd38d` |
+| Banner 300x250 rail slot 3 (dedicated zone) | Same rail, bottom slot, via `AD_ZONES.editorRail3`. The initial ticket response repeated the existing `endOfArticle` key for this slot rather than issuing a new one; a follow-up delivered the genuinely new zone below, so all three rail slots now report independently of each other and of every other zone on the site | `0f6d3819d6704f2c657da28a4e25ae11` |
 | Banner 728x90 (reused zone) | The four editors, above the workspace, viewports 48rem to 84rem, via `AD_ZONES.leaderboard` | `7577a9abda8083816fafd71754b18205` |
 | Banner 320x50 (reused zone) | The four editors, fixed anchor at the foot of the viewport, under 48rem, via `AD_ZONES.leaderboardMobile` | `101fe70128e51351589ecd23ab2d0e21` |
 

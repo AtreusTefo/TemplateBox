@@ -56,23 +56,20 @@ const TBAds = (() => {
         skyscraper: { key: "aaa51e997d5bd5badf6557a7773f78a6", width: 160, height: 600 },
 
         /* Editor rail stack, very wide screens only. Three slots, each with
-           its own key so Adsterra treats them as separate placements rather
-           than one unit repeated -- the same reason loading.html carries two
-           distinct 300x250 zones instead of the same key twice.
+           its own dedicated key so Adsterra treats them as three separate
+           placements rather than one unit repeated -- the same reason
+           loading.html carries two distinct 300x250 zones instead of the
+           same key twice.
 
-           Slots 1 and 2 reuse the two live 300x250 zones. Reusing a key
-           across pages is functionally fine per Adsterra; only separated
-           reporting needs a dedicated zone.
-
-           Slot 3 is deliberately keyless and therefore renders nothing. A
-           third distinct 300x250 requires an Adsterra support ticket,
-           because the dashboard blocks a duplicate of a size already in use
-           (see the Adsterra notes in docs/memory/PROJECT_STATUS.md). Paste
-           the key here when it is provisioned and the slot activates with
-           no other change. */
-        editorRail1: { key: "4a408738c2170da16b47c5ac05b3780a", width: 300, height: 250 },
-        editorRail2: { key: "70d844a3963c8415efa49af391c897a0", width: 300, height: 250 },
-        editorRail3: { key: "", width: 300, height: 250 }
+           Requested via support ticket (Aug 3, 2026). The first response
+           issued two new zones and, for the third, repeated the existing
+           endOfArticle key rather than a fresh one; a follow-up delivered
+           the genuinely new third zone below, so all three now report
+           independently of each other and of every other 300x250 on the
+           site. */
+        editorRail1: { key: "3d08daa8e24f9416073d41bb566768bb", width: 300, height: 250 },
+        editorRail2: { key: "67fd95399c1261e2f4ffbd1b284dd38d", width: 300, height: 250 },
+        editorRail3: { key: "0f6d3819d6704f2c657da28a4e25ae11", width: 300, height: 250 }
     };
 
     /* Each banner is isolated in its own srcdoc iframe: the Adsterra tag

@@ -31,7 +31,9 @@ Very wide screens have room for more than one unit beside the workspace, and an 
 
 **Every slot carries its own zone key.** Repeating one key down the stack would have Adsterra treat it as the same placement rendered three times, which is not the same thing as three placements. This is the same reason `loading.html` carries two distinct 300x250 zones rather than one key twice.
 
-Slots 1 and 2 reuse the two live 300x250 zones. Reusing a key across pages is functionally fine per Adsterra; only separated reporting requires a dedicated zone. **Slot 3 is deliberately keyless and renders nothing**, because a third distinct 300x250 needs an Adsterra support ticket — the dashboard blocks a duplicate of a size already in use. Pasting the key into `AD_ZONES.editorRail3` activates it with no other change.
+The rail launched with slots 1-2 reusing the site's two existing 300x250 zones and slot 3 keyless (the dashboard blocks creating a duplicate of a size already in use, so a third zone needs a support ticket). A ticket was filed August 3, 2026 asking for three dedicated zones so the rail would stop sharing keys with `inContent` and `endOfArticle` entirely.
+
+Adsterra's first response issued two genuinely new zones and, for the third, repeated the existing `endOfArticle` key rather than a new one — worth noticing rather than assuming three-for-three, since nothing about the response format distinguished a fresh zone from a returned one. A follow-up delivered the actual third zone. All three rail slots now carry keys that appear nowhere else in `AD_ZONES`, so each reports independently in the Adsterra dashboard, and `inContent`/`endOfArticle` are freed from double duty on the editors.
 
 Why 93rem: a three-slot 300px rail needs 324px including its gap. Holding the editing panes at the 540px they had before any rail existed therefore takes 1476px of viewport. Below that the single 160px rail still fits, which is what the 84rem band is for. The principle is unchanged from the 84rem gate — inventory is added beside the workspace, never taken out of it.
 
