@@ -183,6 +183,29 @@ button {
     min-height: 2.75rem;
     display: inline-flex;
     align-items: center;
+    gap: 0.5rem;
+}
+
+/* Logo mark. Inline SVG rather than an <img>: assets/logo.png is 478KB at
+   1219x1509, absurd for a 28px slot, and inlining costs no request at all.
+   Same approach as the footer social icons. stroke="currentColor" on the
+   markup means it takes the wordmark's ink colour automatically. */
+.wordmark svg {
+    width: 1.625rem;
+    height: 1.828rem;
+    flex-shrink: 0;
+    display: block;
+}
+
+@media (max-width: 30rem) {
+    .wordmark {
+        font-size: 1.25rem;
+    }
+
+    .wordmark svg {
+        width: 1.375rem;
+        height: 1.547rem;
+    }
 }
 
 .site-nav {
@@ -1071,6 +1094,40 @@ main {
 /* --------------------------------------------------------------------------
    Loading page (loading.html)
    -------------------------------------------------------------------------- */
+
+/* Loading page: the countdown card, plus a sticky ad rail beside it on
+   desktop.
+
+   The rail replaced a fixed bottom anchor. The anchor sat position:fixed
+   over the foot of the viewport while this page's two 300x250 banners sit
+   mid-page inside the centred card, so on a short viewport the bar covered
+   them -- reserving body padding does not help when the thing being covered
+   is not at the end of the document. A rail in this flex row cannot overlap
+   anything by construction. */
+.loading-layout {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2rem;
+}
+
+.loading-rail {
+    flex: 0 0 auto;
+    position: sticky;
+    top: 1.5rem;
+}
+
+/* Same 70rem gate the guides rails use: below it there is no room beside
+   the card, and js/ads.js does not mount the placement at all. */
+@media (max-width: 70rem) {
+    .loading-rail {
+        display: none;
+    }
+}
+
+.loading-rail:empty {
+    display: none;
+}
 
 .loading-wrap {
     max-width: 44rem;

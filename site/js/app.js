@@ -111,67 +111,85 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
-       Monetized launch flow (fires from catalog card CTA buttons).
-       The Adsterra Pop-Under snippet installed in the <head> of index.html
-       self-attaches to this same click and spawns its background tab; this
-       handler only routes the foreground tab to the intermediary page.
+       Launch flow (fires from catalog card CTAs and every other
+       [data-target] control). Routes the visitor to the intermediary page,
+       which is where the monetization now lives.
 
-       The navigation is deferred one beat rather than assigned inline:
-       when a popup blocker suppresses the Pop-Under's background tab, the
-       ad script falls back to redirecting the current tab, and its
-       document-level handler runs after this one. Whichever location
-       assignment happens last supersedes any still-uncommitted navigation,
-       and the ad redirect needs a cross-origin network round-trip to
-       commit, so assigning ours after a short delay keeps the foreground
-       tab on loading.html.
+       This used to be considerably more complicated. The navigation was
+       deferred 150ms and then re-issued on a 700ms watchdog, because the
+       Adsterra Pop-Under attached to the same click and, when a popup
+       blocker suppressed its background tab, fell back to redirecting the
+       foreground tab out from under us -- last location assignment wins.
+       The Pop-Under was removed on August 6, 2026 (it was redirecting
+       visitors off-site on ordinary clicks), so nothing competes for the
+       navigation any more and the delay was pure latency on every launch.
+       Assign it directly.
 
-       A one-shot assignment is not enough on its own: a fast ad response
-       can commit inside the deferral window, or the ad script can defer
-       its own fallback past ours. So after the first assignment the
-       navigation is re-issued on a short interval until the page actually
-       unloads, which kills the timers. Same watchdog pattern, and the same
-       700ms cadence, as the countdown redirect on loading.html (see
-       docs/error-fixes/LOADING_REDIRECT_STALL_FIX.md).
+       If a competing navigation is ever reintroduced, the watchdog pattern
+       is still documented in docs/error-fixes/LOADING_REDIRECT_STALL_FIX.md
+       and still live on loading.html's countdown, which faces the Social
+       Bar rather than the Pop-Under.
        ---------------------------------------------------------------------- */
-    const LAUNCH_DELAY_MS = 150;
-    const LAUNCH_REASSERT_MS = 700;
-
-    let launchDelayTimer = 0;
-    let launchWatchdog = 0;
-
     function launchTemplate(targetKey) {
+        window.location.href = launchUrl(targetKey);
+    }
+
+    /* Resolves a target key to its interstitial URL through the route
+       whitelist, so a tampered data-target can never become an open
+       redirect. Shared by the same-tab and new-tab paths. */
+    function launchUrl(targetKey) {
         const safeKey = Object.prototype.hasOwnProperty.call(EDITOR_ROUTES, targetKey)
             ? targetKey
             : DEFAULT_TARGET;
-        const destination = "loading.html?target=" + encodeURIComponent(safeKey);
-        const go = () => {
-            window.location.href = destination;
-        };
-
-        /* A second launch click before the first commits supersedes it. */
-        window.clearTimeout(launchDelayTimer);
-        window.clearInterval(launchWatchdog);
-
-        launchDelayTimer = window.setTimeout(() => {
-            go();
-            launchWatchdog = window.setInterval(go, LAUNCH_REASSERT_MS);
-        }, LAUNCH_DELAY_MS);
+        return "loading.html?target=" + encodeURIComponent(safeKey);
     }
 
-    /* Binds any element carrying data-target to the monetized launch flow.
+    /* Binds any element carrying data-target to the launch flow.
        Every launch control on the site is a real anchor whose href points at
        the editor page itself; this handler intercepts the click and routes
        through loading.html instead. Crawlers, which never run the handler,
-       follow the href and so see genuine internal links to the editors,
-       which previously had none anywhere on the site.
-
-       Modified clicks (new tab, new window, middle click) are deliberately
-       left alone so the browser's own behaviour still works. */
+       follow the href and so see genuine internal links to the editors. */
     function bindLaunchControls(root) {
         root.querySelectorAll("[data-target]").forEach((el) => {
+            /* Modified clicks (ctrl/cmd/shift, middle button) would otherwise
+               follow the href straight to the editor and skip the
+               interstitial entirely -- the href points at the editor
+               precisely because that is what makes those pages crawlable.
+               So intercept those too and open the interstitial in the new
+               tab instead. window.open is permitted here because it runs
+               inside a real user gesture; it is not a popup a browser
+               blocks. The editors keep their crawlable links via the
+               footer's Editors column on every page carrying a footer. */
+            const openInNewTab = (event) => {
+                if (event.defaultPrevented) {
+                    return false;
+                }
+                const modified = event.metaKey || event.ctrlKey ||
+                    event.shiftKey || event.altKey || event.button === 1;
+                if (!modified) {
+                    return false;
+                }
+                event.preventDefault();
+
+                const preset = el.getAttribute("data-doc");
+                if (preset) {
+                    storageSet(PRESET_KEY, preset);
+                }
+                /* noopener: the new tab gets no handle back to this window */
+                window.open(launchUrl(el.getAttribute("data-target")), "_blank", "noopener");
+                return true;
+            };
+
+            /* Middle click fires auxclick, not click, in every current
+               browser -- without this the gesture most likely to be used
+               for "open in new tab" would still slip past. */
+            el.addEventListener("auxclick", openInNewTab);
+
             el.addEventListener("click", (event) => {
-                if (event.defaultPrevented || event.button > 0 ||
-                    event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                if (openInNewTab(event)) {
+                    return;
+                }
+                if (event.defaultPrevented || event.button > 0) {
                     return;
                 }
                 event.preventDefault();
@@ -197,13 +215,13 @@ const TB = (() => {
            lightweight data-attribute visibility toggling for users.
 
            Delegated from the window capture phase rather than bound to the
-           pill elements: the ad click shield in the head of index.html
-           stops non-launch clicks from propagating below window (so the
-           Pop-Under script's document-level handler cannot hijack them),
-           which would also silence an element-level listener here.
-           stopPropagation does not silence other listeners on the same
-           node, and the shield registers first, so this handler always
-           runs after the shield has already starved the ad script. */
+           pill elements. This was originally required: the ad click shield
+           in the head of index.html stopped non-launch clicks propagating
+           below window, which would have silenced an element-level listener
+           here too. The shield went with the Pop-Under on August 6, 2026,
+           so capture-phase delegation is no longer necessary -- but it is
+           still correct, and rewriting working event wiring to remove a
+           constraint that no longer applies buys nothing. Left as is. */
         const pills = document.querySelectorAll(".filter-pills [data-filter]");
         const cards = grid.querySelectorAll("[data-category]");
 
@@ -370,8 +388,9 @@ const TB = (() => {
         discard.textContent = "Start fresh";
 
         /* Delegated from window capture for the same reason as the filter
-           pills: the ad click shield on index.html stops this click from
-           ever reaching an element-level listener. */
+           pills, and kept for the same reason: originally required by the
+           ad click shield, no longer required since it was removed, still
+           correct. */
         const onDiscard = (event) => {
             const origin = event.target instanceof Element ? event.target : null;
             if (!origin || (origin !== discard && !discard.contains(origin))) {

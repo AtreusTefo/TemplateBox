@@ -22,7 +22,7 @@ A 100% client-side, serverless template personalization engine at templatebox.wi
 | Source control | GitHub: `AtreusTefo/TemplateBox` | Live, `main` is production |
 | Analytics | Microsoft Clarity, project ID `xix7m2758f` | Installed on all 5 pages, confirmed no console errors |
 | Search | Google Search Console, Domain property `templatebox.win` | Verified via DNS TXT; homepage indexed; sitemap submission pending first crawl (see Known Issues) |
-| Ads | Adsterra | Popunder, 2x Banner 300x250 (distinct zones), Social Bar — all live, see table below |
+| Ads | Adsterra | 2x Banner 300x250 (distinct zones), Social Bar, plus the banner registry in `js/ads.js` — see table below. **Pop-Under removed August 6, 2026** (was redirecting visitors off-site on ordinary clicks) |
 
 DNS record shape in Cloudflare: `templatebox.win` and `www` are both `CNAME` → `templatebox.netlify.app`, proxied (orange cloud). No Netlify DNS zone is used — it was deliberately deleted because Cloudflare Registrar locks nameservers to Cloudflare, so Netlify DNS can never complete verification.
 
@@ -30,7 +30,7 @@ DNS record shape in Cloudflare: `templatebox.win` and `www` are both `CNAME` →
 
 | Placement | Location | Zone key / script ID |
 |---|---|---|
-| Popunder | `index.html` `<head>` | `pl30250761` |
+| ~~Popunder~~ | ~~`index.html` `<head>`~~ | `pl30250761` — **REMOVED August 6, 2026.** Zone still exists in the Adsterra dashboard; the tag no longer ships. It was redirecting visitors to third-party sites on ordinary clicks, which costs more in return usage than the format earned |
 | Banner 300x250, slot 1 | `loading.html` `#ad-banner-1` | `4a408738c2170da16b47c5ac05b3780a` |
 | Banner 300x250, slot 2 | `loading.html` `#ad-banner-2` | `70d844a3963c8415efa49af391c897a0` (distinct zone, provisioned by Adsterra support on request) |
 | Social Bar | `loading.html`, directly before `</body>` | `pl30250765` |
@@ -53,14 +53,16 @@ DNS record shape in Cloudflare: `templatebox.win` and `www` are both `CNAME` →
 
 Adult ads are toggled off for this site in the Adsterra dashboard. **`index.html` carries zero ads and that is not negotiable** — it is the page Google indexes and the first impression, and the SEO/trust risk there outweighs the upside. The editors carried none either until July 27, 2026, when that half of the rule was reversed on a dwell-time argument; they now carry passive banners selected by viewport band, up to three on very wide screens. The editors also carry no site footer — it was removed as unnecessary chrome on a workspace page, which means **the privacy policy and terms are not linked from any editor**; worth revisiting if that ever needs to be reachable from where visitors type personal data. See the decision log below and `docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md`.
 
+**`loading.html` also lost its footer and gained the site-wide anchor (August 2026).** The footer served no purpose on a ten-second, noindex intermediary — there is nowhere the links could send a visitor that outperforms waiting out the countdown. The anchor is a reversal of a documented exclusion in `js/ads.js`: it was originally left off specifically because a unit fixed to the foot of the viewport during a ten-second countdown reads as if it might cover the thing the visitor is waiting on. It was added back on the reasoning that `.has-site-anchor` reserves body padding *only once a banner has actually filled*, which is the same mechanism that already makes this placement safe on every other page carrying it — the anchor takes its place below the loading card, not over it. Verify this specifically on a real short viewport before trusting it; it has not been checked in a browser. The page's existing two 300x250 banners and the Social Bar are untouched; the anchor draws from `leaderboard`/`leaderboardMobile`, distinct zones from the inline banners' `inContent`/`endOfArticle` keys, so nothing on the page repeats a zone. One unverified interaction worth knowing about: the Social Bar is a self-injecting widget that positions itself independently per Adsterra's own instructions (see `SOCIAL_BAR_NOT_DISPLAYING.md`), and if it renders at the same screen edge as the fixed anchor the two could visually collide — low probability, since that document already establishes the Social Bar rarely displays at all on this page's short lifetime, but worth a look if both are ever seen firing together.
+
 ## File Map
 
 Everything below lives under `site/`, the publish directory, except the last two entries.
 
 ```
 404.html             Not-found page (noindex, follow). Netlify serves it for every unmatched path; carries the standard shell, Clarity, and a Popular Pages list of the nine landing pages and four editors
-index.html          Catalog: 15 template cards (3 resume, 6 business docs, 3 poster, 3 mockup) with filled CSS document miniatures, hero + CTA pair, trust band, intent-labelled filter pills, continue-where-you-left-off mount, guides strip, async Popunder script, WebApplication + Organization JSON-LD
-loading.html         10s interstitial: progress bar + numeric readout, chosen-template name, honest status copy, 2 banner slots (isolated in srcdoc iframes), Social Bar script, navigation watchdog, dependency-free inline countdown/redirect fallback (activates only if js/app.js fails to take over)
+index.html          Catalog: 15 template cards (3 resume, 6 business docs, 3 poster, 3 mockup) with filled CSS document miniatures, hero + CTA pair, trust band, intent-labelled filter pills, continue-where-you-left-off mount, guides strip, WebApplication + Organization JSON-LD. Carries ZERO advertising and no site footer (both removed August 6, 2026)
+loading.html         10s interstitial: progress bar + numeric readout, chosen-template name, honest status copy, 2 banner slots (isolated in srcdoc iframes), Social Bar script, site-wide anchor (320x50/728x90, added Aug 2026), navigation watchdog, dependency-free inline countdown/redirect fallback (activates only if js/app.js fails to take over). No site footer -- see decision log
 *-template.html / poster-maker.html / tshirt-mockup-generator.html
                      Nine document landing pages, one per search intent, each with its own title/H1/canonical, body content, FAQPage + BreadcrumbList JSON-LD and a CTA into the correct editor variant. Generated once from a template; now plain static files, hand-edit directly
 about.html / terms.html    Entity and trust pages (Organization schema, operator information, acceptable-use and liability terms)

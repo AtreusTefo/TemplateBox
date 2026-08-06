@@ -75,216 +75,29 @@
     </script>
 
     <!-- ================================================================
-         AD CLICK SHIELD: must stay ABOVE the Pop-Under tag below.
-         The Pop-Under script listens for clicks at document level across
-         the whole page; when the browser blocks its background window it
-         falls back to redirecting THIS tab to the ad URL. That trade is
-         acceptable only on monetized launch clicks. This shield runs in
-         the capture phase on window, which fires ahead of any
-         document-level listener regardless of registration order, and
-         stops every interaction that is not on a launch control
-         ([data-target]) from ever reaching the ad script. Filter pills,
-         navigation links and plain page clicks can therefore no longer
-         be hijacked off-site. It never prevents the default action of
-         the page's own links, so normal navigation is unaffected.
+         NO POP-UNDER, AND NO CLICK SHIELD, DELIBERATELY.
 
-         It also refuses clicks on any anchor resolving to an origin this
-         page does not ship (ad scripts can inject overlay links); the
-         only external links on index.html are the four footer social
-         profiles, allowlisted below. URLs are resolved against the
-         document location so an injected base element cannot repoint
-         relative hrefs.
+         The Adsterra Pop-Under was removed on August 6, 2026: it was
+         redirecting visitors to third-party sites on ordinary clicks.
+         Whatever it earned, a catalog that randomly throws people off
+         the site destroys the return usage the whole model depends on.
 
-         js/app.js registers its own pill and continue-strip handlers on
-         the same window capture phase, which stopPropagation does not
-         silence, so page behaviour survives the shield. Known cost:
-         document-level analytics click capture (Clarity) is also starved
-         on this page; session replays keep scroll and movement.
+         The click shield and overlay neutralizer that used to sit here
+         went with it. Every line of that code existed only to contain
+         the Pop-Under: it starved the ad script of clicks outside the
+         launch controls, and forced pointer-events:none onto the
+         transparent full-viewport layer the script inserted to capture
+         a first click. With no Pop-Under there is nothing to contain,
+         and keeping it would leave a defence against an absent threat
+         for future work to reason around.
 
-         SECOND HALF, THE OVERLAY NEUTRALIZER: the Pop-Under does not rely
-         on document listeners alone. It captures the page's first click
-         by inserting a transparent link or layer over the whole viewport
-         (random id, position:fixed, z-index 2147483650), and the code
-         that removes that layer runs inside the ad's own document-level
-         click listener -- exactly the listener the shield starves. Left
-         alone, the layer would never be removed and every click and
-         hover on the page would die against it (this happened; see the
-         error doc). So any oversized fixed/absolute element this page
-         did not ship is forced to pointer-events:none, immediately and
-         whenever the ad script re-styles it. The page beneath stays
-         fully interactive, and launch clicks still reach the ad's
-         document-level listener, so the Pop-Under still monetizes the
-         clicks it is meant to monetize.
-         See docs/error-fixes/POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md.
+         Retained as history, not as live behaviour:
+           docs/error-fixes/POPUNDER_HIJACKS_ALL_PAGE_CLICKS_FIX.md
+           docs/error-fixes/ADSTERRA_AD_CONFLICT_FIX.md
+
+         index.html now carries zero advertising of any kind.
          ================================================================ -->
-    <script>
-    (function () {
-        "use strict";
 
-        var EXTERNAL_ALLOW = {
-            "x.com": true,
-            "www.facebook.com": true,
-            "www.tiktok.com": true,
-            "www.instagram.com": true
-        };
-
-        /* click plus the press events pop scripts commonly hook. mouseup,
-           touchend and pointerup are deliberately left unguarded: pop
-           scripts rarely use them and analytics replay quality depends
-           on them. */
-        var GUARDED_EVENTS = [
-            "pointerdown", "mousedown", "touchstart", "click", "auxclick"
-        ];
-
-        function shield(event) {
-            var node = event.target;
-            var el = (node && node.nodeType === 1)
-                ? node
-                : (node ? node.parentElement : null);
-
-            /* Monetized launch controls are the one surface the ad script
-               is allowed to observe; js/app.js routes the foreground tab
-               to loading.html on the same click. */
-            if (el && el.closest("[data-target]")) {
-                return;
-            }
-
-            /* Everything else never reaches document-level listeners,
-               which is where the ad script hooks the page. */
-            event.stopPropagation();
-
-            if (event.type !== "click" && event.type !== "auxclick") {
-                return;
-            }
-
-            /* Injected-anchor defence: refuse navigation to any origin
-               this page does not link to itself. */
-            var link = el ? el.closest("a[href]") : null;
-            if (!link) {
-                return;
-            }
-            var dest = null;
-            try {
-                dest = new URL(link.getAttribute("href"), window.location.href);
-            } catch (err) {
-                dest = null;
-            }
-            if (!dest || (dest.origin !== window.location.origin &&
-                    EXTERNAL_ALLOW[dest.host] !== true)) {
-                event.preventDefault();
-            }
-        }
-
-        GUARDED_EVENTS.forEach(function (type) {
-            window.addEventListener(type, shield, true);
-        });
-
-        /* --------------------------------------------------------------
-           Transparent-overlay neutralizer. See the comment block above.
-           Geometry, not identity: the ad layer carries a random id, so
-           it is recognized by what it does (a fixed or absolute element
-           covering most of the viewport) rather than by what it is
-           called. index.html ships no such element, so anything matching
-           is foreign.
-           -------------------------------------------------------------- */
-        var OWN_SURFACES = ".skip-link, .site-header, .site-footer, main";
-
-        function coversViewport(el) {
-            var cs;
-            try {
-                cs = window.getComputedStyle(el);
-            } catch (err) {
-                return false;
-            }
-            if (!cs || (cs.position !== "fixed" && cs.position !== "absolute")) {
-                return false;
-            }
-            var box = el.getBoundingClientRect();
-            return box.width >= window.innerWidth * 0.5 &&
-                box.height >= window.innerHeight * 0.5;
-        }
-
-        function inspectNode(el) {
-            if (!el || el.nodeType !== 1) {
-                return;
-            }
-            if (el.matches && el.matches(OWN_SURFACES)) {
-                return;
-            }
-            if (!coversViewport(el)) {
-                return;
-            }
-            /* Already inert (including by our own earlier pass): skip,
-               which also terminates the observer's style-change cycle. */
-            if (window.getComputedStyle(el).pointerEvents === "none") {
-                return;
-            }
-            try {
-                el.style.setProperty("pointer-events", "none", "important");
-            } catch (err) {
-                /* Non-styleable node: nothing to do. */
-            }
-        }
-
-        function sweep() {
-            var nodes = document.querySelectorAll("html > *, body > *, body > * > *");
-            for (var i = 0; i < nodes.length; i++) {
-                inspectNode(nodes[i]);
-            }
-        }
-
-        var watcher = new MutationObserver(function (records) {
-            for (var i = 0; i < records.length; i++) {
-                var rec = records[i];
-                if (rec.type === "attributes") {
-                    inspectNode(rec.target);
-                    continue;
-                }
-                for (var j = 0; j < rec.addedNodes.length; j++) {
-                    var added = rec.addedNodes[j];
-                    inspectNode(added);
-                    if (added.nodeType === 1 && added.children) {
-                        for (var k = 0; k < added.children.length; k++) {
-                            inspectNode(added.children[k]);
-                        }
-                    }
-                }
-            }
-        });
-        watcher.observe(document.documentElement, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ["style"]
-        });
-
-        /* The observer catches insertions and re-styles the moment they
-           happen; the sweep is the belt to that suspender, catching
-           anything mutated in a way the filter above does not see. */
-        window.setInterval(sweep, 700);
-        if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", sweep);
-        } else {
-            sweep();
-        }
-    })();
-    </script>
-
-    <!-- ================================================================
-         ADSTERRA POP-UNDER: paste the Pop-Under script tag directly below
-         this comment block. The snippet self-attaches to user clicks and
-         spawns its background tab; js/app.js independently routes the
-         foreground tab to loading.html on the same click. The ad click
-         shield above confines the clicks this snippet can observe to the
-         [data-target] launch controls.
-
-         Loaded async: as a synchronous tag it blocked HTML parsing on a
-         cross-origin round trip, on the one page Google actually indexes,
-         which directly degraded Largest Contentful Paint. The tag attaches
-         its own document-level click handler when it executes, so async
-         delivery does not change its behaviour.
-         ================================================================ -->
-    <script async src="https://pl30250761.effectivecpmnetwork.com/3d/61/ac/3d61ac6bb9c3a6962855f7bc2c2ed358.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -293,6 +106,7 @@
          the served CSS paints text immediately in the fallback face. -->
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
+    <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -300,7 +114,7 @@
     <a class="skip-link" href="#templates">Skip to templates</a>
 
     <header class="site-header">
-        <a class="wordmark" href="index.html">TemplateBox</a>
+        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
         <nav class="site-nav" aria-label="Primary">
             <a href="index.html" aria-current="page">Templates</a>
             <a href="blog.html">Guides</a>
@@ -729,71 +543,13 @@
         </section>
     </main>
 
-    <footer class="site-footer">
-        <div class="footer-cols">
-            <div class="footer-col">
-                <h2>Receipts and Invoices</h2>
-                <ul>
-                    <li><a href="rent-receipt-template.html">Rent Receipt Template</a></li>
-                    <li><a href="cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
-                    <li><a href="itemized-receipt-template.html">Itemized Business Receipt</a></li>
-                    <li><a href="sales-receipt-template.html">Sales Receipt Form</a></li>
-                    <li><a href="free-invoice-template.html">Free Invoice Template</a></li>
-                    <li><a href="employee-warning-notice-template.html">Employee Warning Notice</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h2>Resumes and Creative</h2>
-                <ul>
-                    <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
-                    <li><a href="poster-maker.html">Poster Maker</a></li>
-                    <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h2>Editors</h2>
-                <ul>
-                    <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
-                    <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
-                    <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
-                    <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h2>Learn</h2>
-                <ul>
-                    <li><a href="blog.html">Guides and Articles</a></li>
-                    <li><a href="index.html#templates">All Templates</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h2>Company</h2>
-                <ul>
-                    <li><a href="about.html">About TemplateBox</a></li>
-                    <li><a href="privacy.html">Privacy Policy</a></li>
-                    <li><a href="terms.html">Terms of Use</a></li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="footer-base">
-            <div class="footer-social">
-                <a href="https://x.com/Templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on X">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                </a>
-                <a href="https://www.facebook.com/profile.php?id=61592027191178" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Facebook">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                </a>
-                <a href="https://www.tiktok.com/@templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on TikTok">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
-                </a>
-                <a href="https://www.instagram.com/templatebox26/" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Instagram">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
-                </a>
-            </div>
-            <p>TemplateBox. All editing happens locally in your browser. No data leaves your device.</p>
-        </div>
-    </footer>
+    <!-- No site footer on the homepage. It is the catalog: the job of the
+         page is to get a visitor into a template, and a five-column link
+         block below the grid competed with that while adding roughly 300px
+         of scroll. The footer remains on every content page, which is where
+         it does its real work as the internal-linking surface -- see
+         docs/project/SEO_AUDIT.md. Legal pages stay reachable from the
+         primary nav via About. -->
 
     <script src="js/blog-data.js"></script>
     <script src="js/app.js"></script>

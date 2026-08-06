@@ -287,10 +287,6 @@ const TBAds = (() => {
        Deliberately absent from:
          index.html    the page Google indexes and the first impression every
                        visitor gets. That decision predates this and stands.
-         loading.html  already the site's ad surface (two 300x250 plus the
-                       Social Bar) over a ten-second life; a fourth unit fixed
-                       across the countdown would cover the thing the visitor
-                       is waiting on.
          admin.html    private authoring tool, never carries ads.
          the editors   they mount their own three-band system, which includes
                        this same anchor below 48rem. Their host attribute is
@@ -308,6 +304,16 @@ const TBAds = (() => {
        Size follows the viewport: 320x50 under 48rem, 728x90 above. That is
        what makes it "the same thing on desktop" rather than a second design
        -- one host, one behavior, one padding mechanism.
+
+       loading.html does NOT use this anchor, and the reason is instructive.
+       It briefly did (August 2026) on the reasoning that .has-site-anchor
+       reserves body padding, so the fixed bar could not cover anything.
+       That reasoning was wrong: reserving body padding protects the END of
+       a document, and this page's two 300x250 banners sit MID-page inside
+       a centred card. On a short viewport the bar sat straight over them.
+       It now carries a sticky [data-ad-rail] beside the card instead,
+       filled by mountHosts, which cannot overlap by construction. See the
+       .loading-layout rules in css/style.css.
        ---------------------------------------------------------------------- */
     const SITE_ANCHOR_MOBILE = "(max-width: 48rem)";
 
