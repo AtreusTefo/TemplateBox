@@ -221,8 +221,14 @@ const TB = (() => {
            here too. The shield went with the Pop-Under on August 6, 2026,
            so capture-phase delegation is no longer necessary -- but it is
            still correct, and rewriting working event wiring to remove a
-           constraint that no longer applies buys nothing. Left as is. */
-        const pills = document.querySelectorAll(".filter-pills [data-filter]");
+           constraint that no longer applies buys nothing. Left as is.
+
+           Matched on the attribute alone rather than on a wrapper class.
+           The homepage rebuild renamed .filter-pills to .feed-tabs when the
+           catalog became a feed, which silently killed filtering here and in
+           initSearch(); data-filter is what both actually key on, so a
+           future rename of the container cannot repeat that. */
+        const pills = document.querySelectorAll("[data-filter]");
         const cards = grid.querySelectorAll("[data-category]");
 
         const applyFilter = (pill) => {
@@ -238,7 +244,7 @@ const TB = (() => {
 
         window.addEventListener("click", (event) => {
             const origin = event.target instanceof Element ? event.target : null;
-            const pill = origin ? origin.closest(".filter-pills [data-filter]") : null;
+            const pill = origin ? origin.closest("[data-filter]") : null;
             if (pill) {
                 applyFilter(pill);
             }
@@ -738,6 +744,172 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Header mega-menu.
+
+       The homepage carries no footer, so without this the landing pages and
+       legal pages would be unreachable from it except by finding a catalog
+       card. Desktop only -- CSS hides the control below 62rem, where the
+       footer on every other page already covers the same links.
+       ---------------------------------------------------------------------- */
+    function initNavMore() {
+        const root = document.querySelector("[data-nav-more]");
+        if (!root) {
+            return;
+        }
+        const toggle = root.querySelector("[data-nav-more-toggle]");
+        const panel = root.querySelector("[data-nav-more-panel]");
+        if (!toggle || !panel) {
+            return;
+        }
+
+        function setOpen(open) {
+            panel.hidden = !open;
+            toggle.setAttribute("aria-expanded", String(open));
+        }
+
+        toggle.addEventListener("click", (event) => {
+            event.preventDefault();
+            setOpen(panel.hidden);
+        });
+
+        /* Close on outside click. Capture phase for the same reason the
+           filter pills use it -- consistent with the rest of this file. */
+        window.addEventListener("click", (event) => {
+            if (panel.hidden) {
+                return;
+            }
+            const origin = event.target instanceof Element ? event.target : null;
+            if (!origin || !root.contains(origin)) {
+                setOpen(false);
+            }
+        }, true);
+
+        /* Escape closes and returns focus to the trigger, or a keyboard user
+           who opened the panel has no way back out of it. */
+        root.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && !panel.hidden) {
+                setOpen(false);
+                toggle.focus();
+            }
+        });
+
+        /* Tabbing past the last link closes it rather than leaving an open
+           panel floating over the page. */
+        panel.addEventListener("focusout", () => {
+            window.setTimeout(() => {
+                if (!panel.contains(document.activeElement) &&
+                    document.activeElement !== toggle) {
+                    setOpen(false);
+                }
+            }, 0);
+        });
+    }
+
+    /* ----------------------------------------------------------------------
+       Catalog search.
+
+       Filters the cards already on the page rather than navigating to a
+       results page: there is no server to query and every template is
+       already here, so a results page would send the visitor to where they
+       already are.
+
+       Searches the card's own visible text (category, title, description),
+       so it stays correct automatically when a card is added or reworded --
+       there is no keyword list to maintain alongside the markup.
+       ---------------------------------------------------------------------- */
+    function initSearch() {
+        const wrap = document.querySelector("[data-search]");
+        const input = document.querySelector("[data-search-input]");
+        const grid = document.querySelector("[data-catalog-grid]");
+        if (!wrap || !input || !grid) {
+            return;
+        }
+
+        const clear = wrap.querySelector("[data-search-clear]");
+        const empty = document.querySelector("[data-catalog-empty]");
+        const pills = document.querySelectorAll("[data-filter]");
+        const cards = Array.prototype.slice.call(grid.querySelectorAll("[data-category]"));
+
+        /* Indexed once. The preview miniatures are aria-hidden decorative
+           sample text ("Daniel Osei", "$1,250.00") and must not be
+           searchable, or a search for a sample name would match. */
+        const index = cards.map((card) => {
+            const body = card.querySelector(".card-body");
+            return {
+                card: card,
+                text: (body ? body.textContent : "").toLowerCase().replace(/\s+/g, " ")
+            };
+        });
+
+        function apply(rawQuery) {
+            const query = String(rawQuery || "").trim().toLowerCase();
+            wrap.classList.toggle("has-value", query.length > 0);
+
+            if (!query) {
+                index.forEach((entry) => entry.card.classList.remove("is-hidden"));
+                if (empty) {
+                    empty.hidden = true;
+                }
+                return;
+            }
+
+            /* Every whitespace-separated term must appear somewhere in the
+               card, so "rent receipt" narrows rather than widening the way
+               an OR match would. */
+            const terms = query.split(/\s+/);
+            let shown = 0;
+
+            index.forEach((entry) => {
+                const match = terms.every((term) => entry.text.indexOf(term) !== -1);
+                entry.card.classList.toggle("is-hidden", !match);
+                if (match) {
+                    shown += 1;
+                }
+            });
+
+            if (empty) {
+                empty.hidden = shown > 0;
+            }
+
+            /* A live search and a category pill filtering the same cards
+               would fight each other, so searching resets the pills to All. */
+            pills.forEach((p) => p.classList.toggle("is-active",
+                p.getAttribute("data-filter") === "all"));
+        }
+
+        input.addEventListener("input", () => apply(input.value));
+
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                input.value = "";
+                apply("");
+            }
+        });
+
+        if (clear) {
+            clear.addEventListener("click", () => {
+                input.value = "";
+                apply("");
+                input.focus();
+            });
+        }
+
+        /* Clicking a category pill abandons the search, for the same reason
+           the search resets the pills. */
+        pills.forEach((pill) => {
+            pill.addEventListener("click", () => {
+                if (input.value) {
+                    input.value = "";
+                    wrap.classList.remove("has-value");
+                    if (empty) {
+                        empty.hidden = true;
+                    }
+                }
+            });
+        });
+    }
+
+    /* ----------------------------------------------------------------------
        Autosave indicator (shared by every editor).
        Persistence was previously silent, which wastes the trust payoff of a
        product whose whole proposition is "no account, and your work is held
@@ -811,7 +983,9 @@ const TB = (() => {
             initContinueStrip,
             initGuidesStrip,
             initSaveState,
-            initFormNav
+            initFormNav,
+            initNavMore,
+            initSearch
         ].forEach((init) => {
             try {
                 init();

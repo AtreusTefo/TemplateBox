@@ -115,66 +115,119 @@
 
     <header class="site-header">
         <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
+        <!-- Filters the catalog in place. There is no server to query and
+             every template is already on this page, so a results page would
+             be a redirect to where the visitor already is. Hidden under
+             62rem, where the filter pills cover the same ground. -->
+        <div class="site-search" data-search>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/>
+            </svg>
+            <label class="sr-only" for="site-search-input">Search templates</label>
+            <input type="search" id="site-search-input" placeholder="Search templates, receipts, resumes..."
+                   autocomplete="off" spellcheck="false" data-search-input>
+            <button type="button" data-search-clear aria-label="Clear search">&times;</button>
+        </div>
+
         <nav class="site-nav" aria-label="Primary">
             <a href="index.html" aria-current="page">Templates</a>
             <a href="blog.html">Guides</a>
             <a href="about.html">About</a>
+
+            <!-- Mega-menu. The homepage carries no footer, so without this
+                 the landing pages and legal pages would be unreachable from
+                 it except through the catalog cards. -->
+            <div class="nav-more" data-nav-more>
+                <button type="button" aria-expanded="false" aria-controls="nav-more-panel" data-nav-more-toggle>
+                    More
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg>
+                </button>
+                <div class="nav-more-panel" id="nav-more-panel" hidden data-nav-more-panel>
+                    <div>
+                        <h2>Receipts and Invoices</h2>
+                        <ul>
+                            <li><a href="rent-receipt-template.html">Rent Receipt Template</a></li>
+                            <li><a href="cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
+                            <li><a href="itemized-receipt-template.html">Itemized Business Receipt</a></li>
+                            <li><a href="sales-receipt-template.html">Sales Receipt Form</a></li>
+                            <li><a href="free-invoice-template.html">Free Invoice Template</a></li>
+                            <li><a href="employee-warning-notice-template.html">Employee Warning Notice</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Resumes and Creative</h2>
+                        <ul>
+                            <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
+                            <li><a href="poster-maker.html">Poster Maker</a></li>
+                            <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Editors</h2>
+                        <ul>
+                            <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
+                            <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
+                            <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
+                            <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Learn</h2>
+                        <ul>
+                            <li><a href="blog.html">Guides and Articles</a></li>
+                            <li><a href="index.html#templates">All Templates</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Company</h2>
+                        <ul>
+                            <li><a href="about.html">About TemplateBox</a></li>
+                            <li><a href="privacy.html">Privacy Policy</a></li>
+                            <li><a href="terms.html">Terms of Use</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </nav>
     </header>
 
-    <main>
-        <section class="hero">
-            <h1>Professional documents, made in your browser.</h1>
-            <p>Receipts, invoices, resumes, posters and product mockups. Free, no sign-up, and nothing you type ever leaves your device.</p>
-            <div class="hero-actions">
-                <a class="btn" href="#templates">Browse templates</a>
-                <a class="btn btn-secondary" href="rent-receipt-template.html">Make a rent receipt</a>
-            </div>
-        </section>
+    <main data-ads-static>
+        <!-- Two-column shell: the feed, and a sticky ad rail beside it on
+             wide desktop. Contents are left at their original indent level
+             rather than re-indented wholesale, so the wrappers are labelled
+             at their closing tags instead. -->
+        <div class="home-layout">
+        <div class="home-main">
+        <!-- Pure feed: the templates ARE the pitch, so nothing precedes the
+             category tabs. The visible masthead, the trust band and the
+             keyword link strip were all removed on August 9, 2026 at the
+             owner's request.
 
-        <div class="trust-band">
-            <div class="trust-item">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12l5 5L19 7"/></svg>
-                <span><strong>No sign-up</strong>No account, no email, no paywall.</span>
-            </div>
-            <div class="trust-item">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 11V8a7 7 0 0114 0v3"/><rect x="4" y="11" width="16" height="10"/></svg>
-                <span><strong>Runs in your browser</strong>Nothing is uploaded to any server.</span>
-            </div>
-            <div class="trust-item">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg>
-                <span><strong>Real selectable text</strong>PDF exports parse cleanly in ATS software.</span>
-            </div>
-            <div class="trust-item">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>
-                <span><strong>No watermark</strong>Your finished file is yours, unmarked.</span>
-            </div>
-        </div>
+             The H1 stays in the document but not on the screen. Every other
+             page on the site has a visible one; this page has to keep a
+             single H1 for the heading hierarchy Rule 2 in AGENTS.md mandates,
+             and dropping it entirely would leave the most-indexed page on
+             the site with no heading at all. Same words a visible one would
+             carry, so it is a layout choice, not a cloaking one. -->
+        <h1 class="sr-only">Free document templates you edit in your browser</h1>
 
-        <section id="templates" aria-label="Template catalog">
-            <h2 class="section-title">Browse Templates</h2>
-            <p class="section-intro">Sixteen editable templates across four builders. Popular starting points:
-                <a href="rent-receipt-template.html">rent receipt</a>,
-                <a href="free-invoice-template.html">invoice</a>,
-                <a href="cash-payment-receipt-template.html">cash payment receipt</a>,
-                <a href="employee-warning-notice-template.html">employee warning notice</a>,
-                <a href="ats-resume-template.html">ATS resume</a> and
-                <a href="tshirt-mockup-generator.html">t-shirt mockup</a>.</p>
+        <!-- Category tabs. Horizontally scrollable and sticky beneath the
+             header, so filtering stays reachable however far down the feed
+             the visitor is. Still real anchors, so crawlers see them. -->
+        <nav class="feed-tabs" id="templates" aria-label="Template categories">
+            <div class="feed-tabs-scroll">
+                <a class="tab is-active" href="#templates" data-filter="all">All</a>
+                <a class="tab" href="#templates" data-filter="documents">Receipts and Invoices</a>
+                <a class="tab" href="#templates" data-filter="resumes">Resumes</a>
+                <a class="tab" href="#templates" data-filter="canvas">Posters and Prints</a>
+                <a class="tab" href="#templates" data-filter="mockups">Product Mockups</a>
+            </div>
+        </nav>
 
+        <section aria-label="Template catalog">
             <!-- Mount point for the returning-visitor continuation strip,
                  populated by js/app.js only when saved editor state exists -->
             <div data-continue-mount></div>
-
-            <!-- Category filters: real anchors for crawler indexability,
-                 enhanced client-side via data-filter attributes. Labels are
-                 written in visitor intent language, not internal taxonomy. -->
-            <nav class="filter-pills" aria-label="Template categories">
-                <a class="pill is-active" href="#templates" data-filter="all">All</a>
-                <a class="pill" href="#templates" data-filter="documents">Receipts and Invoices</a>
-                <a class="pill" href="#templates" data-filter="resumes">Resumes</a>
-                <a class="pill" href="#templates" data-filter="canvas">Posters and Prints</a>
-                <a class="pill" href="#templates" data-filter="mockups">Product Mockups</a>
-            </nav>
 
             <div class="catalog-grid" data-catalog-grid>
 
@@ -530,7 +583,19 @@
                 </article>
 
             </div>
+
+            <!-- Shown by js/app.js when a search matches nothing -->
+            <p class="catalog-empty" data-catalog-empty hidden>
+                <strong>No templates match that search.</strong>
+                Try a broader term, or clear the search to see all 16.
+            </p>
         </section>
+
+        <!-- The trust band and the "Popular starting points" keyword strip
+             stood here until August 9, 2026. Removed at the owner's request.
+             The six landing pages the strip linked are not orphaned by this:
+             every content page's footer carries all six, and they remain in
+             sitemap.xml. -->
 
         <!-- Guides strip: rendered by js/app.js from js/blog-data.js. Hidden
              entirely when no posts exist, so it never leaves an empty shell. -->
@@ -541,7 +606,30 @@
             </div>
             <div class="guides-grid" data-guides-grid></div>
         </section>
+        </div><!-- /.home-main -->
+
+        <!-- Sticky ad rail, wide desktop only. Reverses the long-standing
+             "index.html carries zero advertising" rule; see the decision log
+             in docs/memory/PROJECT_STATUS.md. Filled by js/ads.js, which
+             mounts a three-slot 300x250 stack at 93rem and above, a single
+             160x600 between 75rem and 93rem, and nothing below that. Same
+             markup, same slots and same zones as the editor rail in
+             resume.html -- deliberately one pattern, not two. Each slot
+             carries its own zone key; repeating one key would be a single
+             placement counted three times, not three placements. -->
+        <aside class="home-rail" data-ad-home-rail aria-label="Advertisements">
+            <div data-ad-rail-slot></div>
+            <div data-ad-rail-slot></div>
+            <div data-ad-rail-slot></div>
+        </aside>
+        </div><!-- /.home-layout -->
     </main>
+
+    <!-- Mobile ad anchor, phones only, matching the placement used on the
+         content pages. Fixed to the foot of the viewport; js/ads.js adds
+         .has-site-anchor to <body> when it fills, which reserves the space
+         so the end of the catalog can still be scrolled clear of it. -->
+    <div class="site-anchor" data-ad-home-anchor aria-label="Advertisement"></div>
 
     <!-- No site footer on the homepage. It is the catalog: the job of the
          page is to get a visitor into a template, and a five-column link
@@ -551,6 +639,13 @@
          docs/project/SEO_AUDIT.md. Legal pages stay reachable from the
          primary nav via About. -->
 
+    <!-- ads.js before app.js, matching every other page that carries a
+         placement. It self-mounts on DOMContentLoaded because <main> above
+         carries data-ads-static; without this tag the rail and anchor hosts
+         are inert markup and the page shows no advertising at all. This file
+         had no ad script at all until August 9, 2026 -- a leftover from the
+         years index.html deliberately carried zero advertising. -->
+    <script src="js/ads.js"></script>
     <script src="js/blog-data.js"></script>
     <script src="js/app.js"></script>
 </body>

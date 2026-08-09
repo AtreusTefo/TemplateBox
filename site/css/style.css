@@ -135,6 +135,22 @@ button {
     outline-offset: 3px;
 }
 
+/* Visually hidden but available to assistive technology. Used for form
+   labels whose purpose is obvious sighted (the search field's magnifier
+   icon and placeholder) but which a screen reader still needs named.
+   Not display:none, which would remove it from the accessibility tree. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* Skip link: present on every page, revealed only on keyboard focus */
 .skip-link {
     position: absolute;
@@ -232,6 +248,216 @@ button {
 
 .site-nav a[aria-current="page"] {
     font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   Header search (desktop only).
+
+   Filters the catalog in place rather than navigating to a results page:
+   there is no server to query, and every template already lives on this
+   one page. Below 62rem it is hidden -- the header has no room, and the
+   filter pills already cover the same ground on a phone.
+   -------------------------------------------------------------------------- */
+
+.site-search {
+    flex: 1 1 22rem;
+    max-width: 30rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.site-search input {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 2.5rem 0 2.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 1.5rem;
+    background-color: var(--color-bg);
+    font-family: var(--font-sans);
+    /* 16px minimum: anything smaller triggers mobile auto-zoom on focus */
+    font-size: 1rem;
+    color: var(--color-text);
+    transition: border-color var(--motion-fast) var(--ease),
+        background-color var(--motion-fast) var(--ease);
+}
+
+.site-search input:focus {
+    outline: 2px solid var(--color-brand);
+    outline-offset: -1px;
+    background-color: var(--color-card);
+}
+
+.site-search svg {
+    position: absolute;
+    left: 0.875rem;
+    width: 1.0625rem;
+    height: 1.0625rem;
+    fill: none;
+    stroke: var(--color-muted);
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+/* Clear button, revealed by js/app.js only while the field has content */
+.site-search button {
+    position: absolute;
+    right: 0.375rem;
+    width: 2rem;
+    height: 2rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--color-muted);
+    font-size: 1.125rem;
+    line-height: 1;
+}
+
+.site-search button:hover {
+    color: var(--color-text);
+    background-color: var(--color-border);
+}
+
+.site-search.has-value button {
+    display: inline-flex;
+}
+
+@media (max-width: 62rem) {
+    .site-search {
+        display: none;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Mega-menu (desktop only).
+
+   Surfaces the footer's five link columns from the header, so the whole
+   site is reachable without scrolling to the bottom of a long catalog.
+   The homepage no longer carries a footer at all, which is what made this
+   necessary rather than merely convenient.
+   -------------------------------------------------------------------------- */
+
+.nav-more {
+    position: relative;
+}
+
+.nav-more > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    min-height: 2.75rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-muted);
+    transition: color var(--motion-fast) var(--ease);
+}
+
+.nav-more > button:hover,
+.nav-more > button[aria-expanded="true"] {
+    color: var(--color-text);
+}
+
+/* Chevron, rotated when open */
+.nav-more > button svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    transition: transform var(--motion-fast) var(--ease);
+}
+
+.nav-more > button[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+
+.nav-more-panel {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    right: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(9rem, 1fr));
+    gap: var(--space-lg) var(--space-xl);
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border-strong);
+    padding: var(--space-lg) var(--space-xl);
+    min-width: 52rem;
+}
+
+.nav-more-panel[hidden] {
+    display: none;
+}
+
+.nav-more-panel h2 {
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text);
+    margin-bottom: var(--space-sm);
+}
+
+.nav-more-panel ul {
+    list-style: none;
+}
+
+.nav-more-panel li {
+    margin-bottom: var(--space-3xs);
+}
+
+.nav-more-panel a {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.875rem;
+    line-height: 1.4;
+    transition: color var(--motion-fast) var(--ease);
+}
+
+.nav-more-panel a:hover,
+.nav-more-panel a:focus-visible {
+    color: var(--color-brand-ink);
+    text-decoration: underline;
+}
+
+/* The panel needs horizontal room it does not have on a narrow screen, and
+   the footer already carries these links on every page that has one. */
+@media (max-width: 62rem) {
+    .nav-more {
+        display: none;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Search empty state
+   -------------------------------------------------------------------------- */
+
+.catalog-empty {
+    text-align: center;
+    padding: var(--space-3xl) 0;
+    color: var(--color-muted);
+}
+
+.catalog-empty[hidden] {
+    display: none;
+}
+
+.catalog-empty strong {
+    display: block;
+    font-size: 1.0625rem;
+    color: var(--color-text);
+    margin-bottom: var(--space-3xs);
 }
 
 main {
@@ -381,52 +607,6 @@ main {
     margin-top: var(--space-lg);
 }
 
-/* --------------------------------------------------------------------------
-   Trust band
-   The "nothing leaves your device" claim is the product's strongest
-   differentiator and previously appeared only in a footer sentence.
-   -------------------------------------------------------------------------- */
-
-.trust-band {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-    gap: 1px;
-    background-color: var(--color-border);
-    border: 1px solid var(--color-border);
-    margin-bottom: var(--space-2xl);
-}
-
-.trust-item {
-    background-color: var(--color-card);
-    padding: var(--space-md) var(--space-lg);
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-sm);
-}
-
-.trust-item svg {
-    width: 1.125rem;
-    height: 1.125rem;
-    flex-shrink: 0;
-    fill: none;
-    stroke: var(--color-brand);
-    stroke-width: 2;
-    stroke-linecap: square;
-    margin-top: 0.1875rem;
-}
-
-.trust-item strong {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-.trust-item span {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    line-height: 1.45;
-}
-
 .section-title {
     font-size: 1.5rem;
     margin-bottom: var(--space-xs);
@@ -514,57 +694,194 @@ main {
 }
 
 /* --------------------------------------------------------------------------
-   Category filter pills
+   Homepage: a feed, not a landing page.
+
+   The catalog is the pitch, so it starts near the top of the viewport
+   rather than below a full-height hero and a trust band. Three structural
+   consequences, all deliberate:
+
+     1. main widens to 96rem here, overriding the 72rem cap every other
+        page uses. A dense masonry feed constrained to 72rem wastes half a
+        wide screen and forces narrower cards than the previews need.
+     2. The masthead is one line of heading and one of copy. The H1 stays
+        for SEO and heading structure; it just no longer occupies a screen.
+     3. The trust band and keyword links moved BELOW the feed. They answer
+        a visitor who is deciding; they were blocking one who is browsing.
    -------------------------------------------------------------------------- */
 
-.filter-pills {
-    display: flex;
-    justify-content: center;
-    gap: 0.75rem;
-    margin-bottom: 2.5rem;
-    flex-wrap: wrap;
+/* Much wider than the 72rem every other page uses, but not unbounded:
+   three columns across a full 1920px viewport would give ~560px cards,
+   which turns a browsable feed into four enormous tiles. 96rem keeps the
+   cards around 430px -- large enough that the document preview reads at a
+   glance, small enough that a screenful shows several rows. */
+main:has(.home-layout) {
+    max-width: 96rem;
+    padding: 0 var(--space-lg) var(--space-3xl);
 }
 
-.pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.75rem;
-    min-width: 2.75rem;
-    padding: 0 1.5rem;
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-decoration: none;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-}
-
-.pill {
-    transition: background-color var(--motion-fast) var(--ease),
-        color var(--motion-fast) var(--ease),
-        border-color var(--motion-fast) var(--ease);
-}
-
-.pill:hover {
-    border-color: var(--color-text);
-}
-
-.pill.is-active {
-    background-color: var(--color-text);
-    color: var(--color-card);
-    border-color: var(--color-text);
+@media (max-width: 48rem) {
+    main:has(.home-layout) {
+        padding: 0 var(--space-md) var(--space-2xl);
+    }
 }
 
 /* --------------------------------------------------------------------------
-   Template catalog grid
+   Category tabs.
+
+   Sticky under the site header so filtering stays reachable however far
+   down the feed the visitor has scrolled, and horizontally scrollable so
+   the labels never wrap into a second row that pushes the feed down.
+   -------------------------------------------------------------------------- */
+
+.feed-tabs {
+    position: sticky;
+    /* Sits directly beneath the sticky site header */
+    top: 5.25rem;
+    z-index: 15;
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    /* Bleed the rule to the padding edges of the full-width main */
+    margin: 0 calc(var(--space-lg) * -1) var(--space-lg);
+    padding: 0 var(--space-lg);
+}
+
+.feed-tabs-scroll {
+    display: flex;
+    gap: var(--space-lg);
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.feed-tabs-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.feed-tabs .tab {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: color var(--motion-fast) var(--ease),
+        border-color var(--motion-fast) var(--ease);
+}
+
+.feed-tabs .tab:hover {
+    color: var(--color-text);
+}
+
+.feed-tabs .tab.is-active {
+    color: var(--color-text);
+    border-bottom-color: var(--color-text);
+}
+
+@media (max-width: 48rem) {
+    .feed-tabs {
+        top: 4.75rem;
+        margin: 0 calc(var(--space-md) * -1) var(--space-md);
+        padding: 0 var(--space-md);
+    }
+
+    .feed-tabs-scroll {
+        gap: var(--space-md);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Homepage shell: feed column plus a sticky ad rail.
+   -------------------------------------------------------------------------- */
+
+.home-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-xl);
+}
+
+.home-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* .home-rail is declared further down, sharing ONE rule with .editor-rail --
+   position, stickiness, stacking, the height cap and the internal scroll all
+   come from there, and so does its 75rem width gate. It has to live there
+   rather than here: a `display: none` gate written in this section would sit
+   ABOVE the shared `display: flex` at identical specificity and lose to it,
+   leaving the rail visible on the viewports it is meant to skip. Media
+   queries add no specificity, so source order is the whole contest. */
+
+/* --------------------------------------------------------------------------
+   Catalog: masonry columns.
+
+   CSS multi-column rather than grid: the cards have a fixed-ratio preview
+   but variable body height, so a grid leaves ragged whitespace under the
+   shorter ones. Columns pack them tight, which is the whole point of the
+   Pinterest-style layout this follows.
+
+   `grid-template-rows: masonry` would be the semantically correct tool and
+   is still not shipped unprefixed across browsers, so it is not usable here.
+
+   Trade-off accepted: multi-column reading order runs DOWN each column
+   rather than across rows. For a browsable catalog with no inherent
+   sequence that is fine; it would not be for ranked or chronological
+   content.
+
+   break-inside on the card is what stops a card being split across a
+   column boundary -- without it the layout shreds cards in half.
    -------------------------------------------------------------------------- */
 
 .catalog-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-    gap: 1.5rem;
+    column-count: 3;
+    column-gap: 1.5rem;
+}
+
+.catalog-grid > * {
+    break-inside: avoid;
+    /* Safari still honours only the legacy property for column breaks */
+    -webkit-column-break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 1.5rem;
+    /* Deliberately no `display` here: .template-card is a flex column and
+       its body relies on flex-grow. Column children may be flex containers
+       without issue. */
+    width: 100%;
+}
+
+/* A hidden card must leave no gap. display:none on a column child is
+   honoured, but the margin-bottom rule above would otherwise still apply
+   through the universal selector, so this has to come after it. */
+.catalog-grid > .is-hidden {
+    display: none;
+}
+
+/* Three columns hold all the way down to 48rem. Losing the rail at 75rem
+   gives the feed that width back rather than taking a column away, so the
+   cards get wider there, not narrower. */
+
+/* Two columns on phones and small tablets, matching the mobile reference */
+@media (max-width: 48rem) {
+    .catalog-grid {
+        column-count: 2;
+        column-gap: 1rem;
+    }
+
+    .catalog-grid > * {
+        margin-bottom: 1rem;
+    }
+}
+
+/* One column only at the very narrow end, where two would make the preview
+   miniatures illegible */
+@media (max-width: 26rem) {
+    .catalog-grid {
+        column-count: 1;
+    }
 }
 
 .template-card {
@@ -1042,6 +1359,79 @@ main {
 }
 
 /* --------------------------------------------------------------------------
+   Feed cards: the preview carries the card.
+
+   In a masonry feed the document miniature is what a visitor scans, and
+   the text block underneath is a caption, not a pitch. Tighter body,
+   smaller type, and the CTA reduced to a link that appears on hover --
+   the whole card is already clickable via .card-link, so a full-width
+   button on every one of sixteen cards is sixteen competing buttons.
+   Scoped to .catalog-grid so the guides cards and blog cards are
+   untouched.
+   -------------------------------------------------------------------------- */
+
+.catalog-grid .card-body {
+    padding: 0.75rem 0.125rem 0;
+    gap: 0.1875rem;
+}
+
+.catalog-grid .card-category {
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+}
+
+.catalog-grid .card-title {
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
+.catalog-grid .card-desc {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+/* The preview is the card. Border and background move here from the
+   card wrapper so the miniature reads as a standalone tile. */
+.catalog-grid .template-card {
+    background: none;
+    border: 0;
+}
+
+.catalog-grid .card-preview {
+    border: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    background-color: var(--color-card);
+    transition: border-color var(--motion-base) var(--ease);
+}
+
+.catalog-grid .template-card:hover .card-preview,
+.catalog-grid .template-card:focus-within .card-preview {
+    border-color: var(--color-border-strong);
+}
+
+/* CTA reduced to a text link. It stays a real anchor with its own href and
+   data-target, so the launch flow and crawlability are unchanged. */
+.catalog-grid .card-link {
+    align-self: flex-start;
+    min-height: 2.25rem;
+    margin-top: 0.125rem;
+    padding: 0;
+    width: auto;
+    border: 0;
+    background: none;
+    color: var(--color-brand-ink);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.catalog-grid .card-link:hover,
+.catalog-grid .card-link:focus-visible {
+    background: none;
+    color: var(--color-brand-ink);
+    text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
    Buttons (44px / 2.75rem minimum touch targets throughout)
    -------------------------------------------------------------------------- */
 
@@ -1289,6 +1679,12 @@ main {
     width: 300px;
     height: 250px;
     max-width: 100%;
+    /* Some creatives lay out taller than the zone they were booked at and
+       raise a scrollbar inside the frame. The iframe carries scrolling="no",
+       which is deprecated and no longer reliably honoured, so clip from the
+       parent side as well: the slot is exactly the booked size and nothing
+       may paint or scroll outside it. */
+    overflow: hidden;
     background-color: var(--color-bg);
     border: 1px solid var(--color-border);
     display: flex;
@@ -1353,7 +1749,18 @@ main {
     }
 }
 
-.editor-rail {
+/* The one rail definition on the site. The homepage rail is not a copy of
+   this, it IS this -- asked for in those words, and sharing the selector is
+   the only reading of "the same rail" that cannot drift apart later. The two
+   pages differ solely in which viewport band mounts it, which is a media
+   query below and a matchMedia call in js/ads.js.
+
+   Both are flex-row children of a parent with align-items: flex-start, which
+   is what lets the rail keep its own height while the column beside it runs
+   thousands of pixels past. Stretch alignment would make the rail as tall as
+   that column and sticky would have nothing left to travel through. */
+.editor-rail,
+.home-rail {
     flex: 0 0 auto;
     position: sticky;
     /* Clears the sticky site header rather than sliding under it */
@@ -1361,20 +1768,25 @@ main {
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
-    /* Three stacked units can exceed a short viewport. Capping the rail and
-       letting it scroll internally keeps the workspace unaffected either
-       way; on a tall screen the cap never engages. */
+    /* Three stacked units come to 782px and can exceed a short viewport.
+       Capping the rail and letting it scroll internally keeps the page beside
+       it unaffected either way; on a tall screen the cap never engages. The
+       trade is that on a short screen the lower slots sit inside a scroller
+       most visitors will not scroll. Accepted on both pages as the price of
+       the layout never moving. */
     max-height: calc(100vh - 7rem);
     overflow-y: auto;
     scrollbar-width: none;
 }
 
-.editor-rail::-webkit-scrollbar {
+.editor-rail::-webkit-scrollbar,
+.home-rail::-webkit-scrollbar {
     display: none;
 }
 
 /* A slot with no filled banner leaves no gap in the stack */
-.editor-rail > div:empty {
+.editor-rail > div:empty,
+.home-rail > div:empty {
     display: none;
 }
 
@@ -1387,6 +1799,25 @@ main {
    never both apply. */
 @media (max-width: 83.9375rem) {
     .editor-rail {
+        display: none;
+    }
+}
+
+/* The homepage rail is the same element, gated one band wider. 75rem, not
+   the editors' 84rem, because an editor is two fixed panes plus a rail and
+   below 93rem the rail stops using spare margin and starts eating the
+   workspace, whereas the feed has no fixed panes -- its masonry columns just
+   reflow narrower. At 1200px a 300px rail still leaves three columns of
+   roughly 257px, wider than the 185px the two-column phone layout ships, so
+   there is no width where the homepage can hold a rail but not the full
+   stack. 74.9375rem = 1199px, one pixel below the 75rem gate in js/ads.js,
+   so the two can never both apply.
+
+   This must stay AFTER the shared rule above: media queries carry no
+   specificity, so a display:none written before the shared display:flex
+   would simply lose to it. */
+@media (max-width: 74.9375rem) {
+    .home-rail {
         display: none;
     }
 }
@@ -1410,7 +1841,8 @@ main {
 /* Never leave an empty box where a dormant zone would have been. The rail
    always contains its three slot elements, so :empty never matches it --
    the test has to be whether any slot actually received a banner. */
-.editor-rail:not(:has(.ad-slot)) {
+.editor-rail:not(:has(.ad-slot)),
+.home-rail:not(:has(.ad-slot)) {
     display: none;
 }
 
@@ -3499,6 +3931,7 @@ legend {
     .save-state,
     .editor-rail,
     .editor-anchor,
+    .home-rail,
     .site-anchor,
     .editor-leaderboard,
     .form-nav,

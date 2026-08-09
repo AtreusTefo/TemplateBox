@@ -24,8 +24,10 @@
    inline on those two pages and are deliberately absent from every indexable
    content page and from every editor.
 
-   index.html carries no banner at all. It is the page Google indexes and the
-   first impression for every visitor, and that decision stands.
+   index.html carried no banner at all until August 6, 2026, on the grounds
+   that it is the page Google indexes and the first impression for every
+   visitor. That was reversed; it now carries a fixed rail on wide viewports
+   and a mobile anchor. Only the ban on active formats there survives.
    ========================================================================== */
 
 "use strict";
@@ -190,6 +192,88 @@ const TBAds = (() => {
         }
 
         mountEditorAds(root);
+        mountHomeAds(root);
+    }
+
+    /* ----------------------------------------------------------------------
+       Homepage placements (August 6, 2026).
+
+       This reverses a rule that had stood since launch and was recorded as
+       non-negotiable: index.html carried zero advertising, on the grounds
+       that it is the page Google indexes and the first impression every
+       visitor gets. The owner reversed it after the catalog moved to a
+       masonry layout that leaves genuine empty margin beside three columns.
+
+       What makes it defensible where the old Pop-Under was not: this is a
+       passive banner in the page's own margin. It cannot navigate the tab,
+       cannot cover content, and renders nothing at all below 75rem where
+       that margin does not exist. The formats that made the homepage
+       hostile -- Pop-Under, In-Page Push -- remain banned everywhere.
+
+       Zone note: the rail reuses `skyscraper` and the three `editorRail`
+       zones, which also serve the blog rails and the editor rails, so
+       homepage impressions blend into those zones' reporting. Dedicated
+       zones would need an Adsterra support ticket for sizes already in use;
+       worth doing if homepage revenue needs measuring separately.
+       ---------------------------------------------------------------------- */
+    const HOME_RAIL_MIN = "(min-width: 75rem)";
+    const HOME_ANCHOR_MAX = "(max-width: 48rem)";
+
+    /* The editor rail, on the homepage. Same markup, same slots, same three
+       zones, and the same .editor-rail CSS rule -- not a copy of it, the same
+       selector, so the two cannot drift apart.
+
+       Both bands are the editors' bands, and the 93rem boundary between them
+       matters more than the arithmetic suggested. It was briefly dropped
+       here, on the reasoning that the feed has no fixed panes to protect and
+       three columns of 257px are still perfectly readable at 1200px. That is
+       true and beside the point: a 300px stack on a 1366px laptop is as wide
+       as a content column, so it stops reading as a rail beside the feed and
+       starts reading as a fourth column of adverts. The 160px skyscraper is
+       what makes the 75-93rem band look like a side rail at all. Width that
+       is merely affordable is not the same as width that looks right.
+
+       The only thing that differs from the editors is the floor: 75rem here
+       rather than 84rem, because below 84rem an editor's rail comes straight
+       out of its fixed panes while the feed's masonry columns simply reflow.
+       ---------------------------------------------------------------------- */
+    const HOME_RAIL_STACK_MIN = "(min-width: 93rem)";
+    const HOME_RAIL_STACK = ["editorRail1", "editorRail2", "editorRail3"];
+
+    function mountHomeAds(scope) {
+        const root = scope || document;
+        const rail = root.querySelector("[data-ad-home-rail]");
+        const slots = rail
+            ? Array.prototype.slice.call(rail.querySelectorAll("[data-ad-rail-slot]"))
+            : [];
+
+        if (slots.length && window.matchMedia(HOME_RAIL_STACK_MIN).matches) {
+            /* Styling hook only, and currently unstyled -- .editor-rail sets
+               it too and no rule reads it on either page. Kept because the
+               two rails are meant to stay interchangeable. */
+            rail.classList.add("is-stack");
+            HOME_RAIL_STACK.forEach((zoneName, index) => {
+                mountPlacement(slots[index], zoneName);
+            });
+            return;
+        }
+
+        /* Narrower than the stack band: one 160x600 in the first slot, the
+           other two left empty and collapsed by .home-rail > div:empty. */
+        if (slots.length && window.matchMedia(HOME_RAIL_MIN).matches) {
+            mountPlacement(slots[0], "skyscraper");
+            return;
+        }
+
+        /* Phones get the same fixed anchor the content pages use. The two
+           are mutually exclusive by viewport, so the homepage never shows
+           both. .has-site-anchor reserves the space only on a real fill. */
+        if (window.matchMedia(HOME_ANCHOR_MAX).matches) {
+            const anchor = root.querySelector("[data-ad-home-anchor]");
+            if (mountPlacement(anchor, "leaderboardMobile")) {
+                document.body.classList.add("has-site-anchor");
+            }
+        }
     }
 
     /* ----------------------------------------------------------------------
@@ -351,6 +435,7 @@ const TBAds = (() => {
         adBreakIndex,
         mountHosts,
         mountEditorAds,
+        mountHomeAds,
         mountSiteAnchor
     };
 })();
