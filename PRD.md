@@ -28,7 +28,7 @@ The entire application must adopt a premium, high-end, minimalist e-commerce des
 
 * Color Palette: Soft off-white/cream background (#F4F3EF), dark charcoal text (#1A1A1A), pure white asset cards (#FFFFFF), and clean light-gray utility borders (#EAE8E3). [4] 
 * Typography: Elegant, bold Serif fonts (e.g., Playfair Display or Lora via Google Fonts) for editorial headlines, paired with modern, hyper-clean Sans-Serif fonts (e.g., Inter) for forms, controls, and UI buttons.
-* Component Geometry: Flat, sharp, rectangular shapes with generous whitespace padding. Avoid bubbly gradients, drop shadows, or cartoonish curves.
+* Component Geometry: Flat, sharp, rectangular shapes with generous whitespace padding. Avoid bubbly gradients, drop shadows, or cartoonish curves. **One deliberate exception, added August 10, 2026 at the owner's instruction:** the homepage catalogue cards (`.catalog-grid`) are rounded with the `--radius-card` token for the Pinterest-style feed. Everything outside that grid keeps square corners, and no gradients or drop shadows were introduced anywhere. If a second rounded surface ever appears, the exception has become drift and this line should be rewritten rather than extended.
 
 ------------------------------
 ## 3. Technical SEO & Google Search Optimization

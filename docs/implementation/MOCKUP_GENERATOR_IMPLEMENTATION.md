@@ -42,7 +42,7 @@ Also surfaced while testing this flow: `npx serve .` — the local test command 
 
 ## Product Rendering
 
-Each product template is a flat, gradient-free vector illustration composed with plain Canvas 2D path/fill/stroke calls, matching the "Flat, sharp, rectangular. No gradients, no drop shadows" theme already documented at the top of `css/style.css` — no external product photography or template image assets are loaded, keeping the tool fully offline-capable and payload-free like the poster frame styles.
+Each product template is a flat, gradient-free vector illustration composed with plain Canvas 2D path/fill/stroke calls, matching the "Flat, sharp, rectangular. No gradients, no drop shadows" theme documented at the top of `css/style.css` (that header now records one exception, added August 10, 2026: the homepage catalogue cards are rounded. The mockup products themselves are unaffected and stay flat and square-cornered) — no external product photography or template image assets are loaded, keeping the tool fully offline-capable and payload-free like the poster frame styles.
 
 | Product | Notable construction detail |
 |---|---|

@@ -2,7 +2,11 @@
    TemplateBox - Unified Global Stylesheet
    Theme: Fabric Film Studio inspired minimalist e-commerce system
    Palette: Cream #F4F3EF | Charcoal #1A1A1A | Card White #FFFFFF | Border #EAE8E3
-   Geometry: Flat, sharp, rectangular. No gradients, no drop shadows.
+   Geometry: Flat, sharp, rectangular -- EXCEPT the homepage catalogue cards,
+   which are rounded (--radius-card) for the Pinterest-style feed, at the
+   owner's instruction on August 10, 2026. That is a deliberate exception to
+   "sharp, rectangular", not drift: everything outside .catalog-grid keeps
+   square corners. No gradients, no drop shadows anywhere.
    ========================================================================== */
 
 :root {
@@ -39,6 +43,12 @@
     --space-xl: 2rem;
     --space-2xl: 2.5rem;
     --space-3xl: 4rem;
+
+    /* Corner radius. One token rather than a magic number, and deliberately
+       only one: the theme is otherwise square, so this exists solely for the
+       homepage catalogue cards. If a second radius ever seems necessary,
+       that is a sign the exception is spreading -- see the header comment. */
+    --radius-card: 0.75rem;
 
     /* Motion. Capped deliberately low, and applied only to color, border,
        opacity and transform so no animated property can affect layout and
@@ -745,6 +755,56 @@ main:has(.home-layout) {
     padding: 0 var(--space-lg);
 }
 
+/* --------------------------------------------------------------------------
+   Hide on scroll-down, show on scroll-up (August 10, 2026).
+
+   js/app.js writes one class, `.is-nav-hidden`, onto <body> and knows nothing
+   about these elements; everything below is the opt-in.
+
+   Scoped to the homepage with `body:has(.home-layout)`. The class is written
+   on every page that loads js/app.js, and the editors deliberately do not opt
+   in: they carry their own sticky export bar and a fixed ad anchor, and a
+   header that moves underneath those has not been tested. Extending this is a
+   deliberate decision, not a one-line CSS addition.
+
+   translateY, never display:none. These are position: sticky, and collapsing
+   them would drop their boxes out of flow -- the ad-rail inset on index.html
+   works precisely because .site-header stays in normal flow and inherits the
+   body padding. A transform moves the paint, not the box, so the inset, the
+   sticky behaviour and the header's right edge all survive untouched.
+
+   The tabs travel their own height PLUS their sticky offset, so they clear
+   the viewport entirely. Travelling only -100% would leave them parked on top
+   of the header on desktop, and visible below a hidden header on mobile. */
+.feed-tabs,
+body:has(.home-layout) .site-header {
+    transition: transform var(--motion-base) var(--ease);
+}
+
+body:has(.home-layout).is-nav-hidden .feed-tabs {
+    transform: translateY(calc(-100% - 5.25rem));
+}
+
+@media (max-width: 48rem) {
+    /* The tabs sit 4.75rem down on phones, and the header goes with them. */
+    body:has(.home-layout).is-nav-hidden .feed-tabs {
+        transform: translateY(calc(-100% - 4.75rem));
+    }
+
+    body:has(.home-layout).is-nav-hidden .site-header {
+        transform: translateY(-100%);
+    }
+}
+
+/* Focus must never be stranded off-screen. Tabbing into a hidden bar brings
+   it straight back, so a keyboard visitor can always see what they have
+   focused even if the page is mid scroll-down. This has to come after the
+   rules above to win on source order at equal specificity. */
+body.is-nav-hidden .feed-tabs:focus-within,
+body.is-nav-hidden .site-header:focus-within {
+    transform: none;
+}
+
 .feed-tabs-scroll {
     display: flex;
     gap: var(--space-lg);
@@ -871,10 +931,26 @@ main:has(.home-layout) {
    existed because two columns made the miniatures illegible; two columns are
    now wanted at every phone width, and the miniatures were rechecked at
    320px to confirm they still read. */
+/* Ladder revised August 10, 2026: the 5-column band is gone and the gaps are
+   tighter, because the cards read too small against the whitespace.
+
+   Which of the two was actually to blame was measured, not guessed. At 1920px
+   the four gaps came to 96px of a 1164px feed -- 8.2%. Deleting the gap
+   ENTIRELY would have taken a card from 213.6px to 232.8px, +9%. Dropping the
+   fifth column takes it to 279px, +31%. **The column count was the culprit and
+   the gap was close to a red herring**, so the fifth column went and the gap
+   came down as a smaller second-order improvement.
+
+   The 100rem tier is therefore deleted rather than lowered: 4 columns is now
+   the ceiling, so 64rem and above all share one rule.
+
+   The next lever, if the cards still read small, is the 48-64rem band (3
+   columns, 230px at 768px). Two columns there gives 353px, which is a large
+   card for a tablet -- worth looking at rather than assuming. */
 .catalog-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
+    gap: 0.75rem;
     /* Rows size to their tallest card and every card stretches to match, which
        is what makes the tops align. Do not set align-items: start -- that
        reintroduces exactly the ragged alignment this replaced. */
@@ -884,19 +960,13 @@ main:has(.home-layout) {
 @media (min-width: 48rem) {
     .catalog-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 1.5rem;
+        gap: 1rem;
     }
 }
 
 @media (min-width: 64rem) {
     .catalog-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-}
-
-@media (min-width: 100rem) {
-    .catalog-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 }
 
@@ -1528,11 +1598,59 @@ main:has(.home-layout) {
     border-bottom: 1px solid var(--color-border);
     background-color: var(--color-card);
     padding: 0;
+    /* Rounded corners, contradicting the "sharp, rectangular" theme on purpose
+       and only here -- see the stylesheet header. The card wrapper carries no
+       background or border of its own in the feed, so rounding this one box
+       rounds the whole card; there is no square frame left behind it.
+
+       `overflow: hidden` (inherited from the base rule) clips to this radius,
+       which is what keeps the zoom and both hover crossfades inside the curve
+       instead of flashing square corners under a rounded mask. */
+    border-radius: var(--radius-card);
     transition: border-color var(--motion-base) var(--ease);
 }
 
 .catalog-grid .card-preview .mock-doc:not(.poster) {
     border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Hover zoom (August 10, 2026).
+
+   .card-media wraps everything inside the preview window so ONE element
+   carries the scale. That matters for the poster cards specifically: the
+   frame photograph and the artwork inside its window have to scale about the
+   same origin, and scaling them separately -- each about its own centre --
+   would slide the artwork out of the frame's opening. One wrapper, one
+   transform-origin, and the composite stays registered.
+
+   The clip lives on .card-preview and the scale on the child, never both on
+   the same element: scaling the clipping box would scale the window itself
+   and the content would spill past the card.
+
+   Transform only, so it costs no layout and cannot repack the grid -- verified
+   by measuring card and grid geometry with and without hover.
+
+   prefers-reduced-motion is handled by the global block near the top of this
+   file, which zeroes transition-duration everywhere. The state change still
+   happens; only the animation does not, which is the required behaviour. */
+.catalog-grid .card-media {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: scale(1);
+    transform-origin: center center;
+    transition: transform var(--motion-base) var(--ease);
+}
+
+@media (hover: hover) {
+    .catalog-grid .template-card:hover .card-media,
+    .catalog-grid .template-card:focus-within .card-media {
+        transform: scale(1.06);
+    }
 }
 
 .catalog-grid .template-card:hover .card-preview,
@@ -1589,8 +1707,8 @@ main:has(.home-layout) {
    source-over it would paint over the artwork and wash it out entirely (see
    docs/error-fixes/PHOTO_MOCKUP_OVERLAY_WASHES_OUT_DESIGN.md). */
 @media (hover: hover) {
-    .card-preview.framed::before,
-    .card-preview.framed::after {
+    .card-preview.framed .card-media::before,
+    .card-preview.framed .card-media::after {
         content: "";
         position: absolute;
         top: 0;
@@ -1606,21 +1724,21 @@ main:has(.home-layout) {
         transition: opacity var(--motion-base) var(--ease);
     }
 
-    .card-preview.framed::before {
+    .card-preview.framed .card-media::before {
         background-image: url("../assets/mockups/wood-a4-base.png");
         z-index: 2;
     }
 
-    .card-preview.framed::after {
+    .card-preview.framed .card-media::after {
         background-image: url("../assets/mockups/wood-a4-overlay.png");
         mix-blend-mode: multiply;
         z-index: 3;
     }
 
-    .template-card:hover .card-preview.framed::before,
-    .template-card:hover .card-preview.framed::after,
-    .template-card:focus-within .card-preview.framed::before,
-    .template-card:focus-within .card-preview.framed::after {
+    .template-card:hover .card-preview.framed .card-media::before,
+    .template-card:hover .card-preview.framed .card-media::after,
+    .template-card:focus-within .card-preview.framed .card-media::before,
+    .template-card:focus-within .card-preview.framed .card-media::after {
         opacity: 1;
     }
 

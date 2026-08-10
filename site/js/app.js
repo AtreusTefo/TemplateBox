@@ -744,6 +744,58 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Scroll direction (August 10, 2026).
+
+       ONE utility for every element that hides on scroll-down, rather than a
+       copy per element: this only decides which way the page is moving and
+       writes a single class onto <body>. Which elements react, and at which
+       widths, is entirely a CSS question -- today that is the homepage
+       category tabs at every width and the homepage header below 48rem.
+
+       Three deliberate details:
+
+         - The listener is passive, so it can never block scrolling, and the
+           work is deferred to one requestAnimationFrame per frame through a
+           flag. Reading scrollY inside the rAF rather than the event also
+           keeps the read out of the scroll handler's critical path.
+         - JITTER ignores sub-pixel and rubber-band noise that would otherwise
+           flip the class back and forth while the page is effectively still.
+         - REVEAL_ABOVE keeps everything visible near the top of the document,
+           so a short scroll on a nearly-unscrolled page does not hide the
+           navigation the visitor is still looking at.
+
+       The hidden state is a transform in CSS, never display:none, so it
+       animates and so the sticky elements keep their boxes -- index.html's
+       ad-rail inset depends on .site-header staying in normal flow.
+       ---------------------------------------------------------------------- */
+    function initScrollDirection() {
+        const JITTER = 6;
+        const REVEAL_ABOVE = 80;
+        let lastY = Math.max(0, window.pageYOffset || 0);
+        let queued = false;
+
+        function update() {
+            queued = false;
+            const y = Math.max(0, window.pageYOffset || 0);
+            if (Math.abs(y - lastY) < JITTER) {
+                return;
+            }
+            document.body.classList.toggle(
+                "is-nav-hidden",
+                y > lastY && y > REVEAL_ABOVE
+            );
+            lastY = y;
+        }
+
+        window.addEventListener("scroll", () => {
+            if (!queued) {
+                queued = true;
+                window.requestAnimationFrame(update);
+            }
+        }, { passive: true });
+    }
+
+    /* ----------------------------------------------------------------------
        Header mega-menu.
 
        The homepage carries no footer, so without this the landing pages and
@@ -985,7 +1037,8 @@ const TB = (() => {
             initSaveState,
             initFormNav,
             initNavMore,
-            initSearch
+            initSearch,
+            initScrollDirection
         ].forEach((init) => {
             try {
                 init();
