@@ -111,45 +111,85 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
-       Monetized launch flow (fires from catalog card CTA buttons).
-       The Adsterra Pop-Under snippet installed in the <head> of index.html
-       self-attaches to this same click and spawns its background tab; this
-       handler only routes the foreground tab to the intermediary page.
+       Launch flow (fires from catalog card CTAs and every other
+       [data-target] control). Routes the visitor to the intermediary page,
+       which is where the monetization now lives.
 
-       The navigation is deferred one beat rather than assigned inline:
-       when a popup blocker suppresses the Pop-Under's background tab, the
-       ad script falls back to redirecting the current tab, and its
-       document-level handler runs after this one. Whichever location
-       assignment happens last supersedes any still-uncommitted navigation,
-       and the ad redirect needs a cross-origin network round-trip to
-       commit, so assigning ours after a short delay keeps the foreground
-       tab on loading.html.
+       This used to be considerably more complicated. The navigation was
+       deferred 150ms and then re-issued on a 700ms watchdog, because the
+       Adsterra Pop-Under attached to the same click and, when a popup
+       blocker suppressed its background tab, fell back to redirecting the
+       foreground tab out from under us -- last location assignment wins.
+       The Pop-Under was removed on August 6, 2026 (it was redirecting
+       visitors off-site on ordinary clicks), so nothing competes for the
+       navigation any more and the delay was pure latency on every launch.
+       Assign it directly.
+
+       If a competing navigation is ever reintroduced, the watchdog pattern
+       is still documented in docs/error-fixes/LOADING_REDIRECT_STALL_FIX.md
+       and still live on loading.html's countdown, which faces the Social
+       Bar rather than the Pop-Under.
        ---------------------------------------------------------------------- */
-    const LAUNCH_DELAY_MS = 150;
-
     function launchTemplate(targetKey) {
+        window.location.href = launchUrl(targetKey);
+    }
+
+    /* Resolves a target key to its interstitial URL through the route
+       whitelist, so a tampered data-target can never become an open
+       redirect. Shared by the same-tab and new-tab paths. */
+    function launchUrl(targetKey) {
         const safeKey = Object.prototype.hasOwnProperty.call(EDITOR_ROUTES, targetKey)
             ? targetKey
             : DEFAULT_TARGET;
-        window.setTimeout(() => {
-            window.location.href = "loading.html?target=" + encodeURIComponent(safeKey);
-        }, LAUNCH_DELAY_MS);
+        return "loading.html?target=" + encodeURIComponent(safeKey);
     }
 
-    /* Binds any element carrying data-target to the monetized launch flow.
+    /* Binds any element carrying data-target to the launch flow.
        Every launch control on the site is a real anchor whose href points at
        the editor page itself; this handler intercepts the click and routes
        through loading.html instead. Crawlers, which never run the handler,
-       follow the href and so see genuine internal links to the editors,
-       which previously had none anywhere on the site.
-
-       Modified clicks (new tab, new window, middle click) are deliberately
-       left alone so the browser's own behaviour still works. */
+       follow the href and so see genuine internal links to the editors. */
     function bindLaunchControls(root) {
         root.querySelectorAll("[data-target]").forEach((el) => {
+            /* Modified clicks (ctrl/cmd/shift, middle button) would otherwise
+               follow the href straight to the editor and skip the
+               interstitial entirely -- the href points at the editor
+               precisely because that is what makes those pages crawlable.
+               So intercept those too and open the interstitial in the new
+               tab instead. window.open is permitted here because it runs
+               inside a real user gesture; it is not a popup a browser
+               blocks. The editors keep their crawlable links via the
+               footer's Editors column on every page carrying a footer. */
+            const openInNewTab = (event) => {
+                if (event.defaultPrevented) {
+                    return false;
+                }
+                const modified = event.metaKey || event.ctrlKey ||
+                    event.shiftKey || event.altKey || event.button === 1;
+                if (!modified) {
+                    return false;
+                }
+                event.preventDefault();
+
+                const preset = el.getAttribute("data-doc");
+                if (preset) {
+                    storageSet(PRESET_KEY, preset);
+                }
+                /* noopener: the new tab gets no handle back to this window */
+                window.open(launchUrl(el.getAttribute("data-target")), "_blank", "noopener");
+                return true;
+            };
+
+            /* Middle click fires auxclick, not click, in every current
+               browser -- without this the gesture most likely to be used
+               for "open in new tab" would still slip past. */
+            el.addEventListener("auxclick", openInNewTab);
+
             el.addEventListener("click", (event) => {
-                if (event.defaultPrevented || event.button > 0 ||
-                    event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                if (openInNewTab(event)) {
+                    return;
+                }
+                if (event.defaultPrevented || event.button > 0) {
                     return;
                 }
                 event.preventDefault();
@@ -172,22 +212,43 @@ const TB = (() => {
         }
 
         /* Category filter pills: plain anchors for crawlers, enhanced with
-           lightweight data-attribute visibility toggling for users. */
-        const pills = document.querySelectorAll(".filter-pills [data-filter]");
+           lightweight data-attribute visibility toggling for users.
+
+           Delegated from the window capture phase rather than bound to the
+           pill elements. This was originally required: the ad click shield
+           in the head of index.html stopped non-launch clicks propagating
+           below window, which would have silenced an element-level listener
+           here too. The shield went with the Pop-Under on August 6, 2026,
+           so capture-phase delegation is no longer necessary -- but it is
+           still correct, and rewriting working event wiring to remove a
+           constraint that no longer applies buys nothing. Left as is.
+
+           Matched on the attribute alone rather than on a wrapper class.
+           The homepage rebuild renamed .filter-pills to .feed-tabs when the
+           catalog became a feed, which silently killed filtering here and in
+           initSearch(); data-filter is what both actually key on, so a
+           future rename of the container cannot repeat that. */
+        const pills = document.querySelectorAll("[data-filter]");
         const cards = grid.querySelectorAll("[data-category]");
 
-        pills.forEach((pill) => {
-            pill.addEventListener("click", () => {
-                const filter = pill.getAttribute("data-filter");
+        const applyFilter = (pill) => {
+            const filter = pill.getAttribute("data-filter");
 
-                pills.forEach((p) => p.classList.toggle("is-active", p === pill));
-                cards.forEach((card) => {
-                    const match = filter === "all" ||
-                        card.getAttribute("data-category") === filter;
-                    card.classList.toggle("is-hidden", !match);
-                });
+            pills.forEach((p) => p.classList.toggle("is-active", p === pill));
+            cards.forEach((card) => {
+                const match = filter === "all" ||
+                    card.getAttribute("data-category") === filter;
+                card.classList.toggle("is-hidden", !match);
             });
-        });
+        };
+
+        window.addEventListener("click", (event) => {
+            const origin = event.target instanceof Element ? event.target : null;
+            const pill = origin ? origin.closest("[data-filter]") : null;
+            if (pill) {
+                applyFilter(pill);
+            }
+        }, true);
     }
 
     /* ----------------------------------------------------------------------
@@ -331,14 +392,25 @@ const TB = (() => {
         discard.className = "btn btn-secondary";
         discard.type = "button";
         discard.textContent = "Start fresh";
-        discard.addEventListener("click", () => {
+
+        /* Delegated from window capture for the same reason as the filter
+           pills, and kept for the same reason: originally required by the
+           ad click shield, no longer required since it was removed, still
+           correct. */
+        const onDiscard = (event) => {
+            const origin = event.target instanceof Element ? event.target : null;
+            if (!origin || (origin !== discard && !discard.contains(origin))) {
+                return;
+            }
             try {
                 window.localStorage.removeItem(EDITORS[item.target].storageKey);
             } catch (err) {
                 /* Persistence unavailable: nothing to clear. */
             }
             strip.remove();
-        });
+            window.removeEventListener("click", onDiscard, true);
+        };
+        window.addEventListener("click", onDiscard, true);
 
         actions.appendChild(open);
         actions.appendChild(discard);
@@ -554,6 +626,290 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Form section navigation.
+
+       A long form pushed the live preview off the screen, so the visitor was
+       typing blind into the feature the split view exists for. The preview is
+       now sticky (css/style.css) and this adds a jump list so the form itself
+       is quicker to move around.
+
+       Deliberately anchors rather than tabs: tabs hide fields, and a visitor
+       who never notices a tab exports a document missing that whole section.
+       Anchors keep every field present, findable with the browser's own
+       search, and reviewable in one pass before export.
+
+       The list is built from the form's own fieldsets, so adding a fieldset
+       adds a nav entry with no second place to update. Hidden fieldsets are
+       skipped, which is what makes it usable on docs.html, where the visible
+       set changes with the document type.
+       ---------------------------------------------------------------------- */
+    let navObserver = null;
+
+    function slugifyLegend(text, index) {
+        const base = String(text).toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+        return "sect-" + (base || String(index));
+    }
+
+    /* A fieldset the page has hidden has no layout box. offsetParent is null
+       for display:none, which is how docs.html hides the fieldsets that do
+       not belong to the selected document type. */
+    function isVisible(el) {
+        return Boolean(el.offsetParent !== null || el.getClientRects().length);
+    }
+
+    function initFormNav() {
+        const mount = document.querySelector("[data-form-nav]");
+        if (!mount) {
+            return;
+        }
+
+        const pane = mount.closest(".editor-pane") || document;
+        const sections = Array.prototype.slice
+            .call(pane.querySelectorAll("fieldset"))
+            .filter((fs) => fs.querySelector("legend") && isVisible(fs));
+
+        mount.textContent = "";
+        if (navObserver) {
+            navObserver.disconnect();
+            navObserver = null;
+        }
+
+        /* One section is not worth a navigation row */
+        if (sections.length < 2) {
+            mount.hidden = true;
+            return;
+        }
+        mount.hidden = false;
+
+        const links = [];
+        sections.forEach((fs, index) => {
+            const legend = fs.querySelector("legend");
+            const label = (legend.textContent || "").trim();
+            if (!fs.id) {
+                fs.id = slugifyLegend(label, index);
+            }
+
+            const link = document.createElement("a");
+            link.href = "#" + fs.id;
+            link.textContent = label;
+            link.addEventListener("click", (event) => {
+                /* Handled here so the section lands under the sticky header
+                   rather than behind it, and so the URL is not littered with
+                   fragments the visitor did not choose to bookmark. */
+                event.preventDefault();
+                fs.scrollIntoView({ behavior: "smooth", block: "start" });
+                const firstField = fs.querySelector("input, textarea, select");
+                if (firstField) {
+                    firstField.focus({ preventScroll: true });
+                }
+            });
+            mount.appendChild(link);
+            links.push({ link: link, section: fs });
+        });
+
+        highlightOnScroll(links);
+    }
+
+    /* Marks the section currently in view. IntersectionObserver rather than a
+       scroll handler so this costs nothing while the visitor is typing. */
+    function highlightOnScroll(links) {
+        if (typeof window.IntersectionObserver !== "function") {
+            return;
+        }
+
+        const bySection = new Map();
+        links.forEach((entry) => bySection.set(entry.section, entry.link));
+
+        navObserver = new window.IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) {
+                    return;
+                }
+                links.forEach((item) => item.link.classList.remove("is-current"));
+                const active = bySection.get(entry.target);
+                if (active) {
+                    active.classList.add("is-current");
+                }
+            });
+        }, {
+            /* Fires when a section reaches the band just below the sticky
+               header, rather than when it merely touches the viewport edge */
+            rootMargin: "-10% 0px -70% 0px",
+            threshold: 0
+        });
+
+        links.forEach((entry) => navObserver.observe(entry.section));
+    }
+
+    /* ----------------------------------------------------------------------
+       Header mega-menu.
+
+       The homepage carries no footer, so without this the landing pages and
+       legal pages would be unreachable from it except by finding a catalog
+       card. Desktop only -- CSS hides the control below 62rem, where the
+       footer on every other page already covers the same links.
+       ---------------------------------------------------------------------- */
+    function initNavMore() {
+        const root = document.querySelector("[data-nav-more]");
+        if (!root) {
+            return;
+        }
+        const toggle = root.querySelector("[data-nav-more-toggle]");
+        const panel = root.querySelector("[data-nav-more-panel]");
+        if (!toggle || !panel) {
+            return;
+        }
+
+        function setOpen(open) {
+            panel.hidden = !open;
+            toggle.setAttribute("aria-expanded", String(open));
+        }
+
+        toggle.addEventListener("click", (event) => {
+            event.preventDefault();
+            setOpen(panel.hidden);
+        });
+
+        /* Close on outside click. Capture phase for the same reason the
+           filter pills use it -- consistent with the rest of this file. */
+        window.addEventListener("click", (event) => {
+            if (panel.hidden) {
+                return;
+            }
+            const origin = event.target instanceof Element ? event.target : null;
+            if (!origin || !root.contains(origin)) {
+                setOpen(false);
+            }
+        }, true);
+
+        /* Escape closes and returns focus to the trigger, or a keyboard user
+           who opened the panel has no way back out of it. */
+        root.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && !panel.hidden) {
+                setOpen(false);
+                toggle.focus();
+            }
+        });
+
+        /* Tabbing past the last link closes it rather than leaving an open
+           panel floating over the page. */
+        panel.addEventListener("focusout", () => {
+            window.setTimeout(() => {
+                if (!panel.contains(document.activeElement) &&
+                    document.activeElement !== toggle) {
+                    setOpen(false);
+                }
+            }, 0);
+        });
+    }
+
+    /* ----------------------------------------------------------------------
+       Catalog search.
+
+       Filters the cards already on the page rather than navigating to a
+       results page: there is no server to query and every template is
+       already here, so a results page would send the visitor to where they
+       already are.
+
+       Searches the card's own visible text (category, title, description),
+       so it stays correct automatically when a card is added or reworded --
+       there is no keyword list to maintain alongside the markup.
+       ---------------------------------------------------------------------- */
+    function initSearch() {
+        const wrap = document.querySelector("[data-search]");
+        const input = document.querySelector("[data-search-input]");
+        const grid = document.querySelector("[data-catalog-grid]");
+        if (!wrap || !input || !grid) {
+            return;
+        }
+
+        const clear = wrap.querySelector("[data-search-clear]");
+        const empty = document.querySelector("[data-catalog-empty]");
+        const pills = document.querySelectorAll("[data-filter]");
+        const cards = Array.prototype.slice.call(grid.querySelectorAll("[data-category]"));
+
+        /* Indexed once. The preview miniatures are aria-hidden decorative
+           sample text ("Daniel Osei", "$1,250.00") and must not be
+           searchable, or a search for a sample name would match. */
+        const index = cards.map((card) => {
+            const body = card.querySelector(".card-body");
+            return {
+                card: card,
+                text: (body ? body.textContent : "").toLowerCase().replace(/\s+/g, " ")
+            };
+        });
+
+        function apply(rawQuery) {
+            const query = String(rawQuery || "").trim().toLowerCase();
+            wrap.classList.toggle("has-value", query.length > 0);
+
+            if (!query) {
+                index.forEach((entry) => entry.card.classList.remove("is-hidden"));
+                if (empty) {
+                    empty.hidden = true;
+                }
+                return;
+            }
+
+            /* Every whitespace-separated term must appear somewhere in the
+               card, so "rent receipt" narrows rather than widening the way
+               an OR match would. */
+            const terms = query.split(/\s+/);
+            let shown = 0;
+
+            index.forEach((entry) => {
+                const match = terms.every((term) => entry.text.indexOf(term) !== -1);
+                entry.card.classList.toggle("is-hidden", !match);
+                if (match) {
+                    shown += 1;
+                }
+            });
+
+            if (empty) {
+                empty.hidden = shown > 0;
+            }
+
+            /* A live search and a category pill filtering the same cards
+               would fight each other, so searching resets the pills to All. */
+            pills.forEach((p) => p.classList.toggle("is-active",
+                p.getAttribute("data-filter") === "all"));
+        }
+
+        input.addEventListener("input", () => apply(input.value));
+
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                input.value = "";
+                apply("");
+            }
+        });
+
+        if (clear) {
+            clear.addEventListener("click", () => {
+                input.value = "";
+                apply("");
+                input.focus();
+            });
+        }
+
+        /* Clicking a category pill abandons the search, for the same reason
+           the search resets the pills. */
+        pills.forEach((pill) => {
+            pill.addEventListener("click", () => {
+                if (input.value) {
+                    input.value = "";
+                    wrap.classList.remove("has-value");
+                    if (empty) {
+                        empty.hidden = true;
+                    }
+                }
+            });
+        });
+    }
+
+    /* ----------------------------------------------------------------------
        Autosave indicator (shared by every editor).
        Persistence was previously silent, which wastes the trust payoff of a
        product whose whole proposition is "no account, and your work is held
@@ -626,7 +982,10 @@ const TB = (() => {
             initEditorTabs,
             initContinueStrip,
             initGuidesStrip,
-            initSaveState
+            initSaveState,
+            initFormNav,
+            initNavMore,
+            initSearch
         ].forEach((init) => {
             try {
                 init();
@@ -644,6 +1003,9 @@ const TB = (() => {
         storageGet,
         takePreset,
         launchTemplate,
-        markSaved
+        markSaved,
+        /* docs.html changes which fieldsets are visible with the document
+           type, so it rebuilds the nav after a type change */
+        refreshFormNav: initFormNav
     };
 })();

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Figma Import | TemplateBox Internal</title>
+    <!-- Internal authoring tool. Not linked from the public site; /tools/*
+         carries X-Robots-Tag noindex in netlify.toml. Styles inline so this
+         page cannot affect any public page. The Figma token is pasted by the
+         operator and kept in this browser only -- never committed, never
+         shipped, because client-side source is readable by anyone. -->
+    <meta name="robots" content="noindex, nofollow">
+    <style>
+        :root { --ink:#1A1A1A; --muted:#6B6B66; --line:#DED9CF; --bg:#FBF8F2; }
+        * { box-sizing:border-box; }
+        body { margin:0; font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+        header { padding:1rem 1.5rem; border-bottom:1px solid var(--line); }
+        h1 { font-size:1rem; margin:0 0 .75rem; font-weight:600; }
+        .row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+        input, button, select { font:inherit; padding:.45rem .7rem; border-radius:6px;
+            border:1px solid var(--line); background:#fff; }
+        input { min-width:16rem; }
+        button { cursor:pointer; }
+        button.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
+        main { display:grid; grid-template-columns:minmax(0,1fr) 26rem; gap:1.5rem; padding:1.5rem; align-items:start; }
+        @media (max-width:70rem){ main { grid-template-columns:1fr; } }
+        .card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+        .card h2 { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em;
+            color:var(--muted); margin:0 0 .6rem; }
+        .rt-sheet { display:block; width:100%; height:auto; box-shadow:0 1px 6px rgba(0,0,0,.14); background:#fff; }
+        table { width:100%; border-collapse:collapse; font-size:.8rem; }
+        td { padding:.2rem .4rem; border-bottom:1px solid #F1EDE5; vertical-align:top; }
+        td:first-child { color:var(--muted); white-space:nowrap; }
+        textarea { width:100%; min-height:9rem; font-family:ui-monospace,monospace;
+            font-size:.7rem; border:1px solid var(--line); border-radius:6px; padding:.5rem; }
+        .swatch { display:inline-block; width:.8rem; height:.8rem; border-radius:2px;
+            border:1px solid rgba(0,0,0,.15); vertical-align:-2px; margin-right:.35rem; }
+        .status { font-size:.85rem; padding:.5rem 0; }
+        .err { color:#9A3412; } .ok { color:#1D6B3F; }
+        .hint { font-size:.75rem; color:var(--muted); margin:.4rem 0 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Figma Import - Resume Templates</h1>
+        <div class="row">
+            <input id="token" type="password" placeholder="Figma personal access token" autocomplete="off">
+            <input id="file" type="text" placeholder="Figma file URL or key">
+            <button id="go" class="primary">Fetch and import</button>
+            <button id="loadJson">Use pasted JSON instead</button>
+        </div>
+        <p class="hint">The token stays in this browser's localStorage. It is never sent anywhere except
+           api.figma.com, and never enters the repository. Create one under Figma Settings, Security,
+           Personal access tokens (file_read scope is enough).</p>
+        <div class="status" id="status"></div>
+    </header>
+
+    <main>
+        <div>
+            <div class="card">
+                <h2>Rendered draft</h2>
+                <div id="stage"></div>
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h2>Analysis</h2>
+                <table id="analysis"></table>
+            </div>
+            <div class="card">
+                <h2>Type roles detected</h2>
+                <table id="roles"></table>
+            </div>
+            <div class="card">
+                <h2>Needs human field mapping</h2>
+                <table id="unmapped"></table>
+            </div>
+            <div class="card">
+                <h2>Draft descriptor</h2>
+                <textarea id="out" spellcheck="false"></textarea>
+                <div class="row" style="margin-top:.5rem">
+                    <button id="copy">Copy</button>
+                    <button id="render">Render edited</button>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Paste Figma file JSON (offline)</h2>
+                <textarea id="json" spellcheck="false" placeholder='{"document":{...}}'></textarea>
+            </div>
+        </div>
+    </main>
+
+    <script src="../js/app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+            integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"
+            crossorigin="anonymous"></script>
+    <script src="../js/resume-engine.js"></script>
+    <script src="../js/resume-import-figma.js"></script>
+    <script>
+    (function () {
+        "use strict";
+        var TOKEN_KEY = "tb_figma_token";
+        var $ = function (id) { return document.getElementById(id); };
+
+        try { $("token").value = localStorage.getItem(TOKEN_KEY) || ""; } catch (e) {}
+        $("token").addEventListener("change", function () {
+            try { localStorage.setItem(TOKEN_KEY, $("token").value.trim()); } catch (e) {}
+        });
+
+        function say(msg, cls) {
+            var s = $("status"); s.textContent = msg; s.className = "status " + (cls || "");
+        }
+        function rows(tbl, pairs) {
+            tbl.replaceChildren();
+            pairs.forEach(function (p) {
+                var tr = document.createElement("tr");
+                var a = document.createElement("td"); a.textContent = p[0];
+                var b = document.createElement("td");
+                if (p[2]) {
+                    var sw = document.createElement("span");
+                    sw.className = "swatch"; sw.style.background = p[2];
+                    b.appendChild(sw);
+                }
+                b.appendChild(document.createTextNode(p[1]));
+                tr.appendChild(a); tr.appendChild(b); tbl.appendChild(tr);
+            });
+        }
+
+        function run(file) {
+            var rep = window.TBFigmaImport.analyze(file);
+            var out = window.TBFigmaImport.toDescriptor(rep, "imported");
+
+            rows($("analysis"), [
+                ["Frame", rep.frameName],
+                ["Page", rep.page.width + " x " + rep.page.height + " pt"],
+                ["Columns", rep.sidebar ? "two (" + rep.sidebar.side + " rail, " +
+                    (rep.sidebar.fraction * 100).toFixed(1) + "%)" : "single"],
+                ["Rail colour", rep.sidebar ? rep.sidebar.background : "-",
+                    rep.sidebar ? rep.sidebar.background : null],
+                ["Text nodes", String(rep.texts.length)],
+                ["Rules", String(rep.rules.length)],
+                ["Icon shapes", String(rep.discs.length)],
+                ["Style clusters", String(rep.styles.all.length)]
+            ]);
+
+            rows($("roles"), Object.keys(rep.styles.roles).map(function (k) {
+                var r = rep.styles.roles[k];
+                return [k, r.family + " " + r.weight + " " + r.size + "pt " + r.color, r.color];
+            }));
+
+            rows($("unmapped"), out.unmapped.slice(0, 14).map(function (t, i) {
+                return [String(i + 1), String(t).slice(0, 60)];
+            }));
+
+            $("out").value = JSON.stringify(out.descriptor, null, 2);
+            draw(out.descriptor);
+            say("Imported. " + out.descriptor.blocks.length + " blocks, " +
+                out.unmapped.length + " lines need field mapping.", "ok");
+        }
+
+        function draw(desc) {
+            try {
+                window.TBResume.renderPreview(desc, { fields: {}, accent: "#1A1A1A" }, $("stage"));
+            } catch (e) {
+                say("Render failed: " + e.message, "err");
+            }
+        }
+
+        $("go").addEventListener("click", function () {
+            var token = $("token").value.trim();
+            var key = window.TBFigmaImport.parseFileKey($("file").value);
+            if (!token) { return say("Paste a Figma personal access token first.", "err"); }
+            if (!key) { return say("Could not read a file key from that URL.", "err"); }
+            say("Fetching from Figma...");
+            window.TBFigmaImport.fetchFile(key, token)
+                .then(run)
+                .catch(function (e) { say(e.message, "err"); });
+        });
+
+        $("loadJson").addEventListener("click", function () {
+            try { run(JSON.parse($("json").value)); }
+            catch (e) { say("Bad JSON: " + e.message, "err"); }
+        });
+        $("render").addEventListener("click", function () {
+            try { draw(JSON.parse($("out").value)); say("Rendered edited descriptor.", "ok"); }
+            catch (e) { say("Bad JSON: " + e.message, "err"); }
+        });
+        $("copy").addEventListener("click", function () {
+            $("out").select(); document.execCommand("copy"); say("Copied.", "ok");
+        });
+
+        say("Paste a token and file URL, or paste file JSON below and use the offline button.");
+    })();
+    </script>
+</body>
+</html>

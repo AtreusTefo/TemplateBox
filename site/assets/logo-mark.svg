@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 72" width="64" height="72" role="img" aria-label="TemplateBox">
+    <!-- Isometric box mark: a hexagon outline with three internal edges
+         meeting at the centre, reading as a cube seen corner-on. Flat,
+         sharp, no gradients and no curves, per the theme's geometry rule.
+
+         Drawn as strokes rather than filled paths so it stays crisp at
+         favicon sizes and inherits colour from the surrounding text when
+         inlined into the header (stroke="currentColor" is set on the
+         inline copy; this standalone file hardcodes the ink colour because
+         a favicon has no text to inherit from). -->
+    <g fill="none" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="miter" stroke-linecap="butt">
+        <!-- Outer hexagon: top vertex, upper-right, lower-right, bottom
+             vertex, lower-left, upper-left -->
+        <path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/>
+        <!-- Three edges to the centre: the visible corner of the cube -->
+        <path d="M32 3 L32 36"/>
+        <path d="M32 36 L4 19"/>
+        <path d="M32 36 L60 53"/>
+    </g>
+</svg>

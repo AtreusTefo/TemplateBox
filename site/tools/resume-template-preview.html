@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Template Preview | TemplateBox Internal</title>
+    <!-- Internal authoring/verification harness for the resume template
+         engine. Not linked from the public site; /tools/* already carries
+         X-Robots-Tag noindex in netlify.toml. Styles are inline rather than
+         in css/style.css so this page cannot affect any public page, and so
+         the engine can be exercised before it is wired into resume.html. -->
+    <meta name="robots" content="noindex, nofollow">
+    <style>
+        :root { --ink:#1A1A1A; --muted:#6B6B66; --line:#DED9CF; --bg:#FBF8F2; }
+        * { box-sizing: border-box; }
+        body { margin:0; font-family: Inter, system-ui, sans-serif;
+               background: var(--bg); color: var(--ink); }
+        header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--line);
+                 display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
+        h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+        .grow { flex: 1 1 auto; }
+        button, select { font: inherit; padding: .45rem .8rem; border-radius: 6px;
+                 border: 1px solid var(--line); background: #fff; cursor: pointer; }
+        button.primary { background: var(--ink); color:#fff; border-color: var(--ink); }
+        main { display: grid; grid-template-columns: minmax(0,1fr) 22rem; gap: 1.5rem;
+               padding: 1.5rem; align-items: start; }
+        @media (max-width: 60rem) { main { grid-template-columns: 1fr; } }
+        .stage { background:#fff; border:1px solid var(--line); border-radius:8px;
+                 padding:1rem; }
+        .rt-sheet { display:block; width:100%; height:auto; margin: 0 auto 1rem;
+                    box-shadow: 0 1px 6px rgba(0,0,0,.14); background:#fff; }
+        .panel { background:#fff; border:1px solid var(--line); border-radius:8px;
+                 padding:1rem; font-size:.85rem; }
+        .panel h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.06em;
+                    color: var(--muted); margin:0 0 .5rem; }
+        .panel dl { display:grid; grid-template-columns:auto 1fr; gap:.25rem .75rem;
+                    margin:0 0 1rem; }
+        .panel dt { color: var(--muted); }
+        .panel dd { margin:0; font-variant-numeric: tabular-nums; }
+        .ok { color:#1D6B3F; font-weight:600; }
+        .warn { color:#9A3412; font-weight:600; }
+        textarea { width:100%; min-height:12rem; font-family: ui-monospace, monospace;
+                   font-size:.75rem; border:1px solid var(--line); border-radius:6px;
+                   padding:.5rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Resume Template Preview</h1>
+        <select id="template-select" aria-label="Template"></select>
+        <span class="grow"></span>
+        <button id="rerender">Re-render</button>
+        <button id="download" class="primary">Download PDF</button>
+    </header>
+
+    <main>
+        <div class="stage" id="stage" aria-live="polite"></div>
+
+        <div class="panel">
+            <h2>Layout report</h2>
+            <dl>
+                <dt>Pages</dt><dd id="r-pages">-</dd>
+                <dt>Draw ops</dt><dd id="r-ops">-</dd>
+                <dt>Text runs</dt><dd id="r-text">-</dd>
+                <dt>Main overflow</dt><dd id="r-main">-</dd>
+                <dt>Rail overflow</dt><dd id="r-side">-</dd>
+                <dt>Layout time</dt><dd id="r-time">-</dd>
+            </dl>
+            <h2>Sample state</h2>
+            <textarea id="state" spellcheck="false"></textarea>
+        </div>
+    </main>
+
+    <script src="../js/app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+            integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"
+            crossorigin="anonymous"></script>
+    <script src="../js/resume-templates.js"></script>
+    <script src="../js/resume-engine.js"></script>
+    <script>
+    (function () {
+        "use strict";
+
+        /* Sample content transcribed from the reference artwork, so the
+           harness exercises wrapped bullets, mixed-weight head lines, a
+           two-line display name and a full skills rail. */
+        var SAMPLE = {
+            accent: "#4A4A4A",
+            fields: {
+                name: "Aiden Leonard",
+                summary: "Hardworking building professional with years of experience in domestic and commercial construction. Completes jobs to brief for secure, quality builds. Maintains excellent physical fitness levels to handle project demands.",
+                address: "11 Guild Street", city: "London", postcode: "N19 NB",
+                phone: "07912345678", phoneAlt: "07912345678",
+                email: "aiden.leonard@example-example.co.uk",
+                skills: "Site safety compliance, Concreting, Worksite management, Construction cost estimates, Tool maintenance, Contractor management, Blueprint interpretation, Site risk assessments, Labour and equipment management, Ground preparation, Building repair and maintenance, Construction progress reports, Construction quality inspections"
+            },
+            experience: [
+                { role: "Builder", dates: "03/2018 - Current", company: "Earth Foods", place: "London",
+                  description: "Delivered demolition and remediation contracts.\nErected scaffolding and navigated working at heights.\nPrepared fencing, posts, and panels.\nSafely operated power tools and forklift with accuracy and precision to produce finished results.\nManoeuvred mobile elevating work platforms." },
+                { role: "General Labourer", dates: "02/2012 - 03/2018", company: "ABC Corporation", place: "London",
+                  description: "Prioritised jobs effectively to meet daily construction deadlines.\nKept building and construction areas clear and tidy, reducing site risks.\nOperated concrete mixers, circular saws and cordless drills.\nPrepared surfaces for painting using hand scrapers and wire brushes.\nPerformed basic electrical work and plumbing repairs such as installing new toilets, removing electrical wires, unclogging drains and maintaining gutters.\nOperated forklift trucks and excavators." },
+                { role: "Apprentice builder", dates: "06/2010 - 02/2012", company: "Billingham & Kite", place: "London",
+                  description: "Shared carpentry and joinery skills across the team.\nOffered multi-trade services for house building projects.\nManoeuvred mobile elevating work platforms.\nMaintained a safe worksite environment through vigilant observation, minimising risks by 10%." }
+            ],
+            education: [
+                { degree: "NVQ Level 3", field: "Construction", dates: "07/2010",
+                  school: "Clayton College", place: "London" }
+            ]
+        };
+
+        var stage = document.getElementById("stage");
+        var stateBox = document.getElementById("state");
+        var select = document.getElementById("template-select");
+
+        (window.TB_RESUME_TEMPLATES || []).forEach(function (t) {
+            var o = document.createElement("option");
+            o.value = t.id; o.textContent = t.title;
+            select.appendChild(o);
+        });
+        stateBox.value = JSON.stringify(SAMPLE, null, 2);
+
+        function currentState() {
+            try { return JSON.parse(stateBox.value); }
+            catch (e) { return SAMPLE; }
+        }
+
+        function render() {
+            var tpl = window.TBResume.byId(select.value);
+            var t0 = performance.now();
+            var ctx = window.TBResume.renderPreview(tpl, currentState(), stage);
+            var ms = performance.now() - t0;
+
+            var texts = ctx.ops.filter(function (o) { return o.op === "text"; }).length;
+            document.getElementById("r-pages").textContent = ctx.pages;
+            document.getElementById("r-ops").textContent = ctx.ops.length;
+            document.getElementById("r-text").textContent = texts;
+            document.getElementById("r-time").textContent = ms.toFixed(1) + " ms";
+            flag("r-main", ctx.overflow.main);
+            flag("r-side", ctx.overflow.sidebar);
+            window.__tbLastCtx = ctx;   /* verification hook */
+        }
+
+        function flag(id, bad) {
+            var el = document.getElementById(id);
+            el.textContent = bad ? "OVERFLOW" : "fits";
+            el.className = bad ? "warn" : "ok";
+        }
+
+        document.getElementById("rerender").addEventListener("click", render);
+        select.addEventListener("change", render);
+        document.getElementById("download").addEventListener("click", function () {
+            var tpl = window.TBResume.byId(select.value);
+            window.TBResume.buildPdf(tpl, currentState()).save(tpl.id + "-preview.pdf");
+        });
+
+        render();
+    })();
+    </script>
+</body>
+</html>

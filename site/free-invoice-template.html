@@ -125,6 +125,7 @@
          the served CSS paints text immediately in the fallback face. -->
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
+    <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -132,7 +133,7 @@
     <a class="skip-link" href="#main">Skip to main content</a>
 
     <header class="site-header">
-        <a class="wordmark" href="index.html">TemplateBox</a>
+        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
         <nav class="site-nav" aria-label="Primary">
             <a href="index.html" aria-current="page">Templates</a>
             <a href="blog.html">Guides</a>
@@ -280,10 +281,10 @@
             <div class="footer-col">
                 <h2>Editors</h2>
                 <ul>
-                    <li><a href="resume.html">Resume Builder</a></li>
-                    <li><a href="docs.html">Business Document Builder</a></li>
-                    <li><a href="poster.html">Poster Creator</a></li>
-                    <li><a href="mockup.html">Product Mockup Generator</a></li>
+                    <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
+                    <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
+                    <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
+                    <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
                 </ul>
             </div>
             <div class="footer-col">
@@ -324,5 +325,12 @@
 
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- Site-wide anchor: 320x50 under 48rem, 728x90 above, fixed to the foot
+         of the viewport for the whole visit. Filled by js/ads.js; suppressed
+         on desktop for pages that already carry a persistent rail, so no page
+         ever shows two. Collapses to nothing when unfilled. -->
+    <div class="site-anchor" data-ad-anchor aria-label="Advertisement"></div>
+
 </body>
 </html>

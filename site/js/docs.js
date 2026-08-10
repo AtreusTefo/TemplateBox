@@ -370,6 +370,22 @@
        fieldsets and fields that belong to the selected document.
        ---------------------------------------------------------------------- */
 
+    /* The section nav lists only the fieldsets the current document type
+       shows, so it has to be rebuilt when that set changes. Guarded on the
+       type actually changing: applyDocType runs on every keystroke through
+       persistAndRender, and rebuilding the nav that often would be waste. */
+    let navDocType = "";
+
+    function syncFormNav(docType) {
+        if (docType === navDocType) {
+            return;
+        }
+        navDocType = docType;
+        if (TB.refreshFormNav) {
+            TB.refreshFormNav();
+        }
+    }
+
     function applyDocType(state) {
         const config = DOC_TYPES[state.docType];
 
@@ -392,6 +408,10 @@
                 ? "In words: " + words
                 : "The amount in words is written out automatically.";
         }
+
+        /* After the [data-for] toggles above, so the nav is rebuilt from the
+           fieldsets this document type actually shows */
+        syncFormNav(state.docType);
     }
 
     /* ----------------------------------------------------------------------

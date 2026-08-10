@@ -38,12 +38,13 @@
          the served CSS paints text immediately in the fallback face. -->
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
+    <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
     <header class="site-header">
-        <a class="wordmark" href="index.html">TemplateBox</a>
+        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
         <nav class="site-nav" aria-label="Primary">
             <a href="index.html">Templates</a>
             <a href="blog.html">Guides</a>
@@ -54,7 +55,7 @@
     <main>
         <article class="prose">
             <h1>Privacy Policy and Data Processing Notice</h1>
-            <p class="updated">Last updated: July 7, 2026</p>
+            <p class="updated">Last updated: July 27, 2026</p>
 
             <p>TemplateBox (templatebox.win) is a fully client-side web application. This notice explains exactly where your information lives, what stays on your device, and which third-party infrastructure services are involved in delivering the site.</p>
 
@@ -76,7 +77,8 @@
             <h2>4. Third-Party Services</h2>
             <p>While your document data stays local, standard connection telemetry (such as IP address, browser type, and page visits) is processed by the third-party services that deliver and fund this free platform:</p>
             <ul>
-                <li><strong>Advertising (Adsterra):</strong> Ad units shown on the loading screen are served by the Adsterra network, which may use its own cookies or identifiers under its own privacy policy.</li>
+                <li><strong>Advertising (Adsterra):</strong> Ad units are served by the Adsterra network, which may use its own cookies or identifiers under its own privacy policy. Advertising appears on the loading screen shown before an editor opens, on the guide and article pages, on the template information pages, alongside each editor, and alongside the template catalogue on the home page. It is always a passive banner placed beside or below the page content, never over it.</li>
+                <li><strong>Advertising and your document content:</strong> Every ad unit on this site is rendered inside an isolated frame served from the advertising network's own domain. Browsers prevent code inside such a frame from reading the page that contains it, so an advertisement placed beside an editor cannot access the document you are working on, the values in any form field, or anything held in your browser's storage for this site. Formats that would run advertising code directly inside the editor page are deliberately not used.</li>
                 <li><strong>Infrastructure (Cloudflare and Netlify):</strong> Static site files are delivered through Cloudflare DNS routing and Netlify hosting, which log standard network requests for security and performance.</li>
                 <li><strong>Analytics (Microsoft Clarity):</strong> Anonymous session interaction data (clicks, scrolls, viewport sizes) helps us find and fix usability problems. Clarity does not receive the text you type into editor fields.</li>
             </ul>
@@ -111,10 +113,10 @@
             <div class="footer-col">
                 <h2>Editors</h2>
                 <ul>
-                    <li><a href="resume.html">Resume Builder</a></li>
-                    <li><a href="docs.html">Business Document Builder</a></li>
-                    <li><a href="poster.html">Poster Creator</a></li>
-                    <li><a href="mockup.html">Product Mockup Generator</a></li>
+                    <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
+                    <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
+                    <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
+                    <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
                 </ul>
             </div>
             <div class="footer-col">
@@ -153,5 +155,14 @@
         </div>
     </footer>
 
+
+    <!-- Site-wide anchor: 320x50 under 48rem, 728x90 above, fixed to the foot
+         of the viewport for the whole visit. Filled by js/ads.js; suppressed
+         on desktop for pages that already carry a persistent rail, so no page
+         ever shows two. Collapses to nothing when unfilled. -->
+    <div class="site-anchor" data-ad-anchor aria-label="Advertisement"></div>
+
+    <script src="js/ads.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

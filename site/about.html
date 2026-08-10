@@ -57,6 +57,7 @@
          the served CSS paints text immediately in the fallback face. -->
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
+    <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -64,7 +65,7 @@
     <a class="skip-link" href="#main">Skip to main content</a>
 
     <header class="site-header">
-        <a class="wordmark" href="index.html">TemplateBox</a>
+        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
         <nav class="site-nav" aria-label="Primary">
             <a href="index.html">Templates</a>
             <a href="blog.html">Guides</a>
@@ -95,7 +96,10 @@
 
             <h2>Why it is free</h2>
             <p>The tools are funded by advertising shown on a short interstitial page between choosing a template and opening the editor. That interval is the entire business model. It is why there is no subscription, no export cap, and no watermark.</p>
-            <p>The editors themselves carry no advertising at all, and neither does the homepage. That is a deliberate decision rather than an oversight: an editor cluttered with ads while someone is drafting a disciplinary notice or a resume is a bad tool, and the trade of one short interstitial for a clean workspace is the one we would want as users.</p>
+            <p>Advertising here is always a passive banner: it sits beside the page on a wide screen, or along the bottom edge on a phone, and nothing else. No pop-ups, nothing that opens a tab you did not ask for, nothing that moves, covers or delays what you are working on. A pop-under ad ran on this site until August 2026 and was removed because it redirected visitors to other sites on ordinary clicks; that category of advertising will not return.
+            <p>An editor cluttered with advertising while someone drafts a disciplinary notice is a bad tool, so the editors carry one quiet banner and no more.</p>
+            <p>That banner is rendered inside an isolated frame served from the advertising network's own domain, which browsers prevent from reading the page around it. It cannot see your document, your form fields, or anything saved in your browser for this site. Ad formats that would run inside the editor page itself are deliberately not used.</p>
+            <p>Whatever you export is untouched: no watermark, no advertising, no branding you did not put there yourself.</p>
 
             <h2>What we can and cannot see</h2>
             <p>We cannot see any document you create. We do not receive names, addresses, amounts, employee records, resume contents, or uploaded images, and this is an architectural fact rather than a policy promise.</p>
@@ -137,10 +141,10 @@
             <div class="footer-col">
                 <h2>Editors</h2>
                 <ul>
-                    <li><a href="resume.html">Resume Builder</a></li>
-                    <li><a href="docs.html">Business Document Builder</a></li>
-                    <li><a href="poster.html">Poster Creator</a></li>
-                    <li><a href="mockup.html">Product Mockup Generator</a></li>
+                    <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
+                    <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
+                    <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
+                    <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
                 </ul>
             </div>
             <div class="footer-col">
@@ -179,6 +183,14 @@
         </div>
     </footer>
 
+    <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- Site-wide anchor: 320x50 under 48rem, 728x90 above, fixed to the foot
+         of the viewport for the whole visit. Filled by js/ads.js; suppressed
+         on desktop for pages that already carry a persistent rail, so no page
+         ever shows two. Collapses to nothing when unfilled. -->
+    <div class="site-anchor" data-ad-anchor aria-label="Advertisement"></div>
+
 </body>
 </html>

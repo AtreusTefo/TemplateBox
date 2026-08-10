@@ -15,13 +15,19 @@
      - blog.html / post.html   js/blog.js mounts as it renders
      - blog/<slug>.html        hosts are in the served markup, auto-mounted
      - *-template.html         same, auto-mounted
+     - the four editors        same, auto-mounted (rail + mobile anchor)
    Auto-mounting is opt-in through [data-ads-static] on the page's <main>, so
    a page whose renderer does its own mounting can never double-count.
 
    Ad policy this file enforces by omission: only passive banner formats live
    here. The Popunder (index.html) and Social Bar (loading.html) are declared
    inline on those two pages and are deliberately absent from every indexable
-   content page.
+   content page and from every editor.
+
+   index.html carried no banner at all until August 6, 2026, on the grounds
+   that it is the page Google indexes and the first impression for every
+   visitor. That was reversed; it now carries a fixed rail on wide viewports
+   and a mobile anchor. Only the ban on active formats there survives.
    ========================================================================== */
 
 "use strict";
@@ -49,7 +55,23 @@ const TBAds = (() => {
         /* 300x250 end-of-article (distinct reporting zone) */
         endOfArticle: { key: "70d844a3963c8415efa49af391c897a0", width: 300, height: 250 },
         /* 160x600 wide skyscraper, desktop rail beside an article */
-        skyscraper: { key: "aaa51e997d5bd5badf6557a7773f78a6", width: 160, height: 600 }
+        skyscraper: { key: "aaa51e997d5bd5badf6557a7773f78a6", width: 160, height: 600 },
+
+        /* Editor rail stack, very wide screens only. Three slots, each with
+           its own dedicated key so Adsterra treats them as three separate
+           placements rather than one unit repeated -- the same reason
+           loading.html carries two distinct 300x250 zones instead of the
+           same key twice.
+
+           Requested via support ticket (Aug 3, 2026). The first response
+           issued two new zones and, for the third, repeated the existing
+           endOfArticle key rather than a fresh one; a follow-up delivered
+           the genuinely new third zone below, so all three now report
+           independently of each other and of every other 300x250 on the
+           site. */
+        editorRail1: { key: "3d08daa8e24f9416073d41bb566768bb", width: 300, height: 250 },
+        editorRail2: { key: "67fd95399c1261e2f4ffbd1b284dd38d", width: 300, height: 250 },
+        editorRail3: { key: "0f6d3819d6704f2c657da28a4e25ae11", width: 300, height: 250 }
     };
 
     /* Each banner is isolated in its own srcdoc iframe: the Adsterra tag
@@ -96,6 +118,22 @@ const TBAds = (() => {
         host.appendChild(slot);
         host.classList.add("is-filled");
         return true;
+    }
+
+    /* The rail is a column fixed to the right edge of the window, running the
+       full height of the viewport, so the page has to make room for it:
+       .has-ad-rail puts one padding-right on <body> and everything in normal
+       flow -- the sticky header included -- is inset to the left of the
+       column. The class is added only when a banner actually filled, the same
+       discipline .has-site-anchor and .has-ad-anchor follow, so a dormant or
+       blocked zone leaves the page byte-identical to having no placement at
+       all. How much width to reserve is a CSS token that tracks the band, so
+       this never has to know which unit mounted. */
+    function reserveRailWidth(filled) {
+        if (filled) {
+            document.body.classList.add("has-ad-rail");
+        }
+        return filled;
     }
 
     /* Leaderboard host: desktop 728x90 zone with a 320x50 mobile swap.
@@ -168,12 +206,249 @@ const TBAds = (() => {
             mountPlacement(root.querySelector("[data-ad-rail]"), "skyscraper");
             mountPlacement(root.querySelector("[data-ad-sidebar]"), "skyscraper");
         }
+
+        mountEditorAds(root);
+        mountHomeAds(root);
+    }
+
+    /* ----------------------------------------------------------------------
+       Homepage placements (August 6, 2026).
+
+       This reverses a rule that had stood since launch and was recorded as
+       non-negotiable: index.html carried zero advertising, on the grounds
+       that it is the page Google indexes and the first impression every
+       visitor gets. The owner reversed it after the catalog moved to a
+       masonry layout that leaves genuine empty margin beside three columns.
+
+       What makes it defensible where the old Pop-Under was not: this is a
+       passive banner in the page's own margin. It cannot navigate the tab,
+       cannot cover content, and renders nothing at all below 75rem where
+       that margin does not exist. The formats that made the homepage
+       hostile -- Pop-Under, In-Page Push -- remain banned everywhere.
+
+       Zone note: the rail reuses `skyscraper` and the three `editorRail`
+       zones, which also serve the blog rails and the editor rails, so
+       homepage impressions blend into those zones' reporting. Dedicated
+       zones would need an Adsterra support ticket for sizes already in use;
+       worth doing if homepage revenue needs measuring separately.
+       ---------------------------------------------------------------------- */
+    const HOME_RAIL_MIN = "(min-width: 75rem)";
+    const HOME_ANCHOR_MAX = "(max-width: 48rem)";
+
+    /* The editor rail, on the homepage. Same markup, same slots, same three
+       zones, and the same .editor-rail CSS rule -- not a copy of it, the same
+       selector, so the two cannot drift apart.
+
+       Both bands are the editors' bands, and the 93rem boundary between them
+       matters more than the arithmetic suggested. It was briefly dropped
+       here, on the reasoning that the feed has no fixed panes to protect and
+       three columns of 257px are still perfectly readable at 1200px. That is
+       true and beside the point: a 300px stack on a 1366px laptop is as wide
+       as a content column, so it stops reading as a rail beside the feed and
+       starts reading as a fourth column of adverts. The 160px skyscraper is
+       what makes the 75-93rem band look like a side rail at all. Width that
+       is merely affordable is not the same as width that looks right.
+
+       The only thing that differs from the editors is the floor: 75rem here
+       rather than 84rem, because below 84rem an editor's rail comes straight
+       out of its fixed panes while the feed's masonry columns simply reflow.
+       ---------------------------------------------------------------------- */
+    const HOME_RAIL_STACK_MIN = "(min-width: 93rem)";
+    const HOME_RAIL_STACK = ["editorRail1", "editorRail2", "editorRail3"];
+
+    function mountHomeAds(scope) {
+        const root = scope || document;
+        const rail = root.querySelector("[data-ad-home-rail]");
+        const slots = rail
+            ? Array.prototype.slice.call(rail.querySelectorAll("[data-ad-rail-slot]"))
+            : [];
+
+        if (slots.length && window.matchMedia(HOME_RAIL_STACK_MIN).matches) {
+            /* Styling hook only, and currently unstyled -- .editor-rail sets
+               it too and no rule reads it on either page. Kept because the
+               two rails are meant to stay interchangeable. */
+            rail.classList.add("is-stack");
+            let filled = false;
+            HOME_RAIL_STACK.forEach((zoneName, index) => {
+                filled = mountPlacement(slots[index], zoneName) || filled;
+            });
+            reserveRailWidth(filled);
+            return;
+        }
+
+        /* Narrower than the stack band: one 160x600 in the first slot, the
+           other two left empty and collapsed by .home-rail > div:empty. */
+        if (slots.length && window.matchMedia(HOME_RAIL_MIN).matches) {
+            reserveRailWidth(mountPlacement(slots[0], "skyscraper"));
+            return;
+        }
+
+        /* Phones get the same fixed anchor the content pages use. The two
+           are mutually exclusive by viewport, so the homepage never shows
+           both. .has-site-anchor reserves the space only on a real fill. */
+        if (window.matchMedia(HOME_ANCHOR_MAX).matches) {
+            const anchor = root.querySelector("[data-ad-home-anchor]");
+            if (mountPlacement(anchor, "leaderboardMobile")) {
+                document.body.classList.add("has-site-anchor");
+            }
+        }
+    }
+
+    /* ----------------------------------------------------------------------
+       Editor placements.
+
+       The editors are the longest sessions on the site -- filling an itemized
+       invoice takes minutes, where a catalog visit takes seconds -- so a
+       persistent passive banner earns more per session than the interstitial
+       does, without interrupting anything. This reverses the earlier
+       "editors stay ad-free" decision; see
+       docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md for the reasoning and
+       what was ruled out.
+
+       Both placements are iframe-isolated like every other banner here, which
+       is what keeps the product's central claim honest: the ad script runs
+       cross-origin and cannot read the document the visitor is typing into.
+       A page-context format (Adsterra's Native Banner) was rejected for
+       exactly that reason and must not be used on these pages.
+       ---------------------------------------------------------------------- */
+
+    /* Three mutually exclusive viewport bands, one unit each. The boundaries
+       are deliberately non-overlapping to the pixel, so no viewport can ever
+       mount two placements or none.
+
+       The rail gate is 84rem, not the blog's 70rem, because an editor is two
+       panes plus a rail. Below 84rem the page is capped by the viewport
+       rather than by its own max-width, so a rail stops using spare margin
+       and starts eating the panes: at 1200px it cost each pane 68px. At
+       84rem and above the panes measure 546px, marginally wider than the
+       540px they had before any rail existed. That held when the rail was a
+       sticky block inside the page and it still holds now the rail is a fixed
+       column and the width is reserved by body padding instead -- the page
+       cap sheds exactly what the padding takes. See the
+       --ad-rail-w / .has-ad-rail rules in css/style.css.
+
+       Between 48rem and 84rem there is no room beside the panes, so that
+       band gets a leaderboard above the workspace instead. It scrolls away,
+       which is why it is the fallback rather than the primary: the whole
+       argument for advertising on editors is session-long visibility. */
+    const EDITOR_RAIL_MIN = "(min-width: 84rem)";
+    const EDITOR_LEADERBOARD_BAND =
+        "(min-width: 48.0625rem) and (max-width: 83.9375rem)";
+    const EDITOR_ANCHOR_MAX = "(max-width: 48rem)";
+
+    /* A three-slot 300px rail needs 324px including its gap. Holding the
+       editing panes at the 540px they had before any rail existed therefore
+       takes 1476px of viewport, so the stack only appears at 93rem and up.
+       Between 84rem and 93rem there is room for the 160px skyscraper but not
+       for the stack, and that band keeps the single unit. */
+    const EDITOR_RAIL_STACK_MIN = "(min-width: 93rem)";
+    const EDITOR_RAIL_STACK = ["editorRail1", "editorRail2", "editorRail3"];
+
+    function mountEditorAds(scope) {
+        const root = scope || document;
+
+        const rail = root.querySelector("[data-ad-editor-rail]");
+        const slots = rail
+            ? Array.prototype.slice.call(rail.querySelectorAll("[data-ad-rail-slot]"))
+            : [];
+
+        if (slots.length && window.matchMedia(EDITOR_RAIL_STACK_MIN).matches) {
+            rail.classList.add("is-stack");
+            let filled = false;
+            EDITOR_RAIL_STACK.forEach((zoneName, index) => {
+                filled = mountPlacement(slots[index], zoneName) || filled;
+            });
+            reserveRailWidth(filled);
+        } else if (slots.length && window.matchMedia(EDITOR_RAIL_MIN).matches) {
+            reserveRailWidth(mountPlacement(slots[0], "skyscraper"));
+        }
+
+        /* mountPlacement directly rather than mountLeaderboard(): the mobile
+           320x50 swap that helper performs is wrong here, because this band
+           starts above the mobile breakpoint. */
+        if (window.matchMedia(EDITOR_LEADERBOARD_BAND).matches) {
+            mountPlacement(root.querySelector("[data-ad-editor-leaderboard]"), "leaderboard");
+        }
+
+        /* The anchor is fixed over the foot of the viewport, so the page has
+           to make room for it: .has-ad-anchor reserves bottom padding and
+           lifts the sticky export bar above it. The class is only added when
+           a banner actually filled, so a dormant or blocked zone leaves the
+           layout exactly as it was. */
+        if (window.matchMedia(EDITOR_ANCHOR_MAX).matches) {
+            const anchor = root.querySelector("[data-ad-editor-anchor]");
+            if (mountPlacement(anchor, "leaderboardMobile")) {
+                document.body.classList.add("has-ad-anchor");
+            }
+        }
+    }
+
+    /* ----------------------------------------------------------------------
+       Site-wide anchor.
+
+       The editors proved the format: a unit fixed to the foot of the viewport
+       is visible for the whole session instead of scrolling away after two
+       seconds. This carries the same placement to every other page except the
+       four listed below, so a visitor reading a landing page or an article
+       sees one persistent unit the way an editing visitor does.
+
+       Deliberately absent from:
+         index.html    the page Google indexes and the first impression every
+                       visitor gets. That decision predates this and stands.
+         admin.html    private authoring tool, never carries ads.
+         the editors   they mount their own three-band system, which includes
+                       this same anchor below 48rem. Their host attribute is
+                       different so the two can never both fire.
+         blog.html,    these mount `leaderboard` / `leaderboardMobile` into
+         post.html,    their own top host, and the anchor draws from those
+         blog/*.html   same two zones -- an anchor here would serve one zone
+                       key twice in a single page view, which is not the same
+                       thing as reusing a key across different pages. They
+                       also already carry four units including a 160x600
+                       rail. Giving them an anchor needs a dedicated Adsterra
+                       zone first (a duplicate size requires a support
+                       ticket); see docs/memory/PROJECT_STATUS.md.
+
+       Size follows the viewport: 320x50 under 48rem, 728x90 above. That is
+       what makes it "the same thing on desktop" rather than a second design
+       -- one host, one behavior, one padding mechanism.
+
+       loading.html does NOT use this anchor, and the reason is instructive.
+       It briefly did (August 2026) on the reasoning that .has-site-anchor
+       reserves body padding, so the fixed bar could not cover anything.
+       That reasoning was wrong: reserving body padding protects the END of
+       a document, and this page's two 300x250 banners sit MID-page inside
+       a centred card. On a short viewport the bar sat straight over them.
+       It now carries a sticky [data-ad-rail] beside the card instead,
+       filled by mountHosts, which cannot overlap by construction. See the
+       .loading-layout rules in css/style.css.
+       ---------------------------------------------------------------------- */
+    const SITE_ANCHOR_MOBILE = "(max-width: 48rem)";
+
+    function mountSiteAnchor(scope) {
+        const root = scope || document;
+        const anchor = root.querySelector("[data-ad-anchor]");
+        if (!anchor) {
+            return false;
+        }
+
+        const mobile = window.matchMedia(SITE_ANCHOR_MOBILE).matches;
+
+        /* .has-site-anchor reserves the space the fixed bar occupies, and is
+           only added when a banner actually filled -- a dormant or blocked
+           zone leaves the layout untouched. */
+        if (mountPlacement(anchor, mobile ? "leaderboardMobile" : "leaderboard")) {
+            document.body.classList.add("has-site-anchor");
+            return true;
+        }
+        return false;
     }
 
     document.addEventListener("DOMContentLoaded", () => {
         if (document.querySelector("[data-ads-static]")) {
             mountHosts();
         }
+        mountSiteAnchor();
     });
 
     return {
@@ -182,6 +457,9 @@ const TBAds = (() => {
         mountLeaderboard,
         buildAdBreak,
         adBreakIndex,
-        mountHosts
+        mountHosts,
+        mountEditorAds,
+        mountHomeAds,
+        mountSiteAnchor
     };
 })();

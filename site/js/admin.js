@@ -206,10 +206,10 @@
 '            <div class="footer-col">\n' +
 '                <h2>Editors</h2>\n' +
 '                <ul>\n' +
-'                    <li><a href="../resume.html">Resume Builder</a></li>\n' +
-'                    <li><a href="../docs.html">Business Document Builder</a></li>\n' +
-'                    <li><a href="../poster.html">Poster Creator</a></li>\n' +
-'                    <li><a href="../mockup.html">Product Mockup Generator</a></li>\n' +
+'                    <li><a href="../resume.html" data-target="resume">Resume Builder</a></li>\n' +
+'                    <li><a href="../docs.html" data-target="docs">Business Document Builder</a></li>\n' +
+'                    <li><a href="../poster.html" data-target="poster">Poster Creator</a></li>\n' +
+'                    <li><a href="../mockup.html" data-target="mockup">Product Mockup Generator</a></li>\n' +
 '                </ul>\n' +
 '            </div>\n' +
 '            <div class="footer-col">\n' +
@@ -404,6 +404,11 @@ body + '\n' +
 '    </main>\n\n' +
 FOOTER +
 '\n' +
+/* No site-wide anchor here, deliberately. Article pages already mount the
+   leaderboard zones into the host above, and the anchor draws from those same
+   two zones -- putting one here would serve a single zone key twice in one
+   page view. They also already carry four units. If an anchor is ever wanted
+   on article pages, get a dedicated zone from Adsterra first. */
 /* The 790-line blog library and the whole post database were both dead
    weight on a page whose metadata and body are already baked into the
    markup: nothing here reads window.TB_BLOG_POSTS, and the only runtime

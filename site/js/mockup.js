@@ -2,10 +2,13 @@
    TemplateBox - Product Mockup Generator Core Logic
    Responsibilities: strict client-side image mime-type validation, flat
    vector product illustrations composed on HTML5 Canvas (t-shirt, hoodie,
-   mug, packaging box), pointer-driven design placement, real-time
+   mug, packaging box), photographic mockup templates composited with the
+   three-layer "Sandwich Method" (scene photograph, warped/placed design,
+   shadow-and-glare overlay), pointer-driven design placement, real-time
    localStorage retention of non-image settings, an in-memory "My Mockups"
    tray, and PNG export through a local canvas.toDataURL() stream.
-   Depends on: js/app.js (TB.sanitize, TB.desanitize, TB.storageGet/Set)
+   Depends on: js/app.js (TB.sanitize, TB.desanitize, TB.storageGet/Set,
+   TB.takePreset) and js/mockup-templates.js (window.TB_PHOTO_MOCKUPS).
    ========================================================================== */
 
 "use strict";
@@ -14,8 +17,10 @@
 
     const STORAGE_KEY = "tb_mockup_v1";
 
-    /* Fixed internal resolution: the visible element scales via CSS while
-       exports always render at full 1000 x 1000 quality. */
+    /* Internal resolution for the vector products: the visible element
+       scales via CSS while exports render at full 1000 x 1000 quality.
+       Photographic templates instead resize the canvas to the base
+       photograph's native dimensions so exports keep the photo's quality. */
     const CANVAS_W = 1000;
     const CANVAS_H = 1000;
 
@@ -259,10 +264,190 @@
     };
 
     /* ----------------------------------------------------------------------
+       Photographic mockup templates ("Sandwich Method").
+       js/mockup-templates.js publishes window.TB_PHOTO_MOCKUPS; each valid
+       entry becomes a product whose base is a photographed scene instead of
+       a vector illustration. Rendering order for mode "window" is design
+       first, then the base photograph (whose fully transparent print
+       opening masks the art with its own antialiased edge), then the
+       shadow/glare overlay. Mode "surface" draws the base first, for
+       templates whose print area is opaque in the base file. Malformed
+       registry entries are skipped rather than allowed to break the editor.
+       ---------------------------------------------------------------------- */
+
+    const PHOTO_REGISTRY = Array.isArray(window.TB_PHOTO_MOCKUPS) ? window.TB_PHOTO_MOCKUPS : [];
+
+    /* Composite operations a template may request for its overlay layer.
+       "multiply" for baked shadow/light maps, "screen" for glass glare,
+       "source-over" for a conventional pre-masked transparent PNG. */
+    const OVERLAY_BLENDS = ["multiply", "screen", "source-over"];
+
+    PHOTO_REGISTRY.forEach((tpl) => {
+        const valid = tpl &&
+            typeof tpl.id === "string" && tpl.id &&
+            !Object.prototype.hasOwnProperty.call(PRODUCTS, tpl.id) &&
+            typeof tpl.base === "string" &&
+            Array.isArray(tpl.warpZone) && tpl.warpZone.length === 4 &&
+            tpl.warpZone.every((p) => p && typeof p.x === "number" && typeof p.y === "number");
+        if (!valid) {
+            return;
+        }
+        PRODUCTS[tpl.id] = {
+            type: "photo",
+            label: typeof tpl.title === "string" && tpl.title ? tpl.title : tpl.id,
+            template: tpl,
+            colors: null
+        };
+    });
+
+    function isPhotoProduct(key) {
+        return PRODUCTS[key].type === "photo";
+    }
+
+    /* Axis-aligned bounding box of a four-corner warp zone. */
+    function zoneBounds(zone) {
+        const xs = zone.map((p) => p.x);
+        const ys = zone.map((p) => p.y);
+        const minX = Math.min.apply(null, xs);
+        const minY = Math.min.apply(null, ys);
+        return {
+            x: minX,
+            y: minY,
+            w: Math.max.apply(null, xs) - minX,
+            h: Math.max.apply(null, ys) - minY
+        };
+    }
+
+    /* True when the quad is an upright rectangle, which composites with the
+       plain 2D path and keeps drag/scale placement. Non-rectangular quads
+       (angled or leaning frames) take the perspective-warp path instead. */
+    function zoneIsRect(zone) {
+        return zone[0].y === zone[1].y && zone[3].y === zone[2].y &&
+            zone[0].x === zone[3].x && zone[1].x === zone[2].x;
+    }
+
+    /* ----------------------------------------------------------------------
+       Photo template asset loading. Base and overlay images load once per
+       template and stay cached for the session. Absolute URLs (future
+       object-storage hosting) get crossOrigin="anonymous" so
+       canvas.toDataURL() exports are not blocked by a tainted canvas.
+       ---------------------------------------------------------------------- */
+
+    const photoAssets = {};
+
+    function loadTemplateImage(src, onDone) {
+        const img = new Image();
+        if (/^https?:/i.test(src)) {
+            img.crossOrigin = "anonymous";
+        }
+        img.addEventListener("load", () => onDone(img));
+        img.addEventListener("error", () => onDone(null));
+        img.src = src;
+    }
+
+    function ensurePhotoAssets(key) {
+        if (photoAssets[key]) {
+            return photoAssets[key];
+        }
+        const tpl = PRODUCTS[key].template;
+        const entry = {
+            status: "loading",
+            base: null,
+            overlay: null,
+            pending: tpl.overlay ? 2 : 1
+        };
+        photoAssets[key] = entry;
+
+        const settle = () => {
+            entry.pending -= 1;
+            if (entry.pending > 0) {
+                return;
+            }
+            /* A missing overlay only costs realism; a missing base is fatal
+               for the template. */
+            entry.status = entry.base ? "ready" : "error";
+            if (currentProduct === key) {
+                draw();
+            }
+        };
+
+        loadTemplateImage(tpl.base, (img) => {
+            entry.base = img;
+            settle();
+        });
+        if (tpl.overlay) {
+            loadTemplateImage(tpl.overlay, (img) => {
+                entry.overlay = img;
+                settle();
+            });
+        }
+        return entry;
+    }
+
+    /* ----------------------------------------------------------------------
+       Perspective warp (non-rectangular warp zones only). The WebGL helper
+       is vendored at js/vendor/glfx.js and loaded lazily the first time an
+       angled template actually needs it, so rectangular templates cost no
+       extra payload. If the library or a WebGL context is unavailable the
+       design falls back to an unwarped draw across the zone's bounding box.
+       ---------------------------------------------------------------------- */
+
+    let warpLibState = "idle"; /* idle | loading | ready | failed */
+    let fxCanvas = null;
+
+    function ensureWarpLib() {
+        if (warpLibState !== "idle") {
+            return;
+        }
+        warpLibState = "loading";
+        const script = document.createElement("script");
+        script.src = "js/vendor/glfx.js";
+        script.addEventListener("load", () => {
+            warpLibState = window.fx ? "ready" : "failed";
+            draw();
+        });
+        script.addEventListener("error", () => {
+            warpLibState = "failed";
+            draw();
+        });
+        document.head.appendChild(script);
+    }
+
+    function drawWarpedDesign(zone) {
+        if (warpLibState === "ready") {
+            try {
+                fxCanvas = fxCanvas || window.fx.canvas();
+                const texture = fxCanvas.texture(design);
+                fxCanvas.draw(texture, canvas.width, canvas.height).perspective(
+                    [0, 0, canvas.width, 0, canvas.width, canvas.height, 0, canvas.height],
+                    [
+                        zone[0].x, zone[0].y,
+                        zone[1].x, zone[1].y,
+                        zone[2].x, zone[2].y,
+                        zone[3].x, zone[3].y
+                    ]
+                ).update();
+                ctx.drawImage(fxCanvas, 0, 0);
+                texture.destroy();
+                /* Dragging is not offered on warped quads: the design maps
+                   corner-to-corner onto the zone. */
+                lastDesignRect = null;
+                return;
+            } catch (err) {
+                warpLibState = "failed";
+            }
+        } else {
+            ensureWarpLib();
+        }
+        drawDesignInArea(zoneBounds(zone), 0);
+    }
+
+    /* ----------------------------------------------------------------------
        DOM references
        ---------------------------------------------------------------------- */
 
     const productSelect = document.getElementById("m-product");
+    const colorField = document.getElementById("m-color-field");
     const colorRow = document.getElementById("m-color-row");
     const fileInput = document.getElementById("m-design");
     const fileError = document.getElementById("m-design-error");
@@ -301,22 +486,27 @@
        Canvas composition
        ---------------------------------------------------------------------- */
 
-    function drawDesignInArea(area) {
+    function drawDesignInArea(area, cornerRadius) {
+        const r = typeof cornerRadius === "number" ? cornerRadius : 16;
+        /* Placeholder styling scales with the canvas, which runs at 1000px
+           for vector products but at the base photograph's native size for
+           photographic templates. */
+        const k = canvas.width / CANVAS_W;
         if (!design) {
             ctx.save();
-            roundRectPath(ctx, area.x, area.y, area.w, area.h, 16);
+            roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
             ctx.fillStyle = "#F4F3EF";
             ctx.fill();
-            ctx.setLineDash([12, 8]);
+            ctx.setLineDash([12 * k, 8 * k]);
             ctx.strokeStyle = "#B9B7B2";
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 3 * k;
             ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = "#6B6B66";
-            ctx.font = '400 32px "Inter", sans-serif';
+            ctx.font = "400 " + Math.round(32 * k) + 'px "Inter", sans-serif';
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("Upload your design", area.x + area.w / 2, area.y + area.h / 2, area.w - 40);
+            ctx.fillText("Upload your design", area.x + area.w / 2, area.y + area.h / 2, area.w - 40 * k);
             ctx.restore();
             lastDesignRect = null;
             return;
@@ -337,7 +527,7 @@
         const drawY = centerY - drawH / 2;
 
         ctx.save();
-        roundRectPath(ctx, area.x, area.y, area.w, area.h, 16);
+        roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
         ctx.clip();
         ctx.drawImage(design, drawX, drawY, drawW, drawH);
         ctx.restore();
@@ -350,14 +540,111 @@
         currentProduct = product;
         const config = PRODUCTS[currentProduct];
 
+        if (config.type === "photo") {
+            drawPhoto(config);
+            return;
+        }
+
+        if (canvas.width !== CANVAS_W || canvas.height !== CANVAS_H) {
+            canvas.width = CANVAS_W;
+            canvas.height = CANVAS_H;
+        }
+
         if (!config.colors[currentColor]) {
             currentColor = Object.keys(config.colors)[0];
         }
         const color = config.colors[currentColor];
 
-        ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         config.drawBase(ctx, color.hex, color.outline);
-        drawDesignInArea(config.printArea);
+        drawDesignInArea(config.printArea, 16);
+    }
+
+    /* The Sandwich Method compositor for photographic templates. Layer
+       order depends on the template's mode: "window" bases carry a fully
+       transparent print opening, so the design (over a white paper backing)
+       is painted first and the base then masks it; "surface" bases are
+       opaque, so the design is painted over them. The shadow/glare overlay
+       is always the final layer. */
+    function drawPhoto(config) {
+        const assets = ensurePhotoAssets(currentProduct);
+
+        if (assets.status !== "ready") {
+            if (canvas.width !== CANVAS_W || canvas.height !== CANVAS_H) {
+                canvas.width = CANVAS_W;
+                canvas.height = CANVAS_H;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.fillStyle = "#F4F3EF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#6B6B66";
+            ctx.font = '400 32px "Inter", sans-serif';
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(
+                assets.status === "error"
+                    ? "This mockup template could not be loaded."
+                    : "Loading mockup template...",
+                canvas.width / 2,
+                canvas.height / 2,
+                canvas.width - 80
+            );
+            ctx.restore();
+            lastDesignRect = null;
+            return;
+        }
+
+        /* Export quality tracks the photograph: the canvas runs at the base
+           image's native resolution while CSS scales the visible element. */
+        const w = assets.base.naturalWidth;
+        const h = assets.base.naturalHeight;
+        if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+        }
+        ctx.clearRect(0, 0, w, h);
+
+        const tpl = config.template;
+        const rectZone = zoneIsRect(tpl.warpZone);
+        const area = zoneBounds(tpl.warpZone);
+
+        const paintDesign = () => {
+            if (design && !rectZone) {
+                drawWarpedDesign(tpl.warpZone);
+                return;
+            }
+            /* The white backing reads as the paper sheet behind a design
+               that does not cover the full print area, and keeps exports
+               opaque behind a transparent "window" base. */
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(area.x, area.y, area.w, area.h);
+            drawDesignInArea(area, 0);
+        };
+
+        if (tpl.mode === "surface") {
+            ctx.drawImage(assets.base, 0, 0, w, h);
+            paintDesign();
+        } else {
+            paintDesign();
+            ctx.drawImage(assets.base, 0, 0, w, h);
+        }
+        if (assets.overlay) {
+            /* The blend mode is what makes the overlay read as light rather
+               than as a sheet of paint. A luminance map (white = lit, grey =
+               shadowed) must multiply: at source-over its near-white body
+               would veil the artwork and desaturate it completely. Canvas
+               ignores an unrecognized value and silently leaves source-over,
+               so the whitelist here is also what keeps a typo from becoming
+               an invisible rendering regression. */
+            const blend = OVERLAY_BLENDS.indexOf(tpl.overlayBlend) > -1
+                ? tpl.overlayBlend
+                : "source-over";
+            ctx.save();
+            ctx.globalCompositeOperation = blend;
+            ctx.drawImage(assets.overlay, 0, 0, w, h);
+            ctx.restore();
+        }
     }
 
     /* ----------------------------------------------------------------------
@@ -371,6 +658,16 @@
         }
 
         const config = PRODUCTS[currentProduct];
+
+        /* Photographic templates have no colorway concept: the whole field
+           disappears instead of presenting an empty radio group. */
+        if (colorField) {
+            colorField.hidden = !config.colors;
+        }
+        if (!config.colors) {
+            return;
+        }
+
         Object.keys(config.colors).forEach((key) => {
             const info = config.colors[key];
             const btn = document.createElement("button");
@@ -399,14 +696,24 @@
        Product template switch
        ---------------------------------------------------------------------- */
 
+    /* Placement controls only apply where the design is freely positioned:
+       a warped (non-rectangular) print zone maps the design corner-to-corner
+       instead, so the size slider is disabled there. */
+    function syncPlacementControls() {
+        const config = PRODUCTS[currentProduct];
+        scaleInput.disabled = config.type === "photo" && !zoneIsRect(config.template.warpZone);
+    }
+
     productSelect.addEventListener("change", () => {
         currentProduct = PRODUCTS[productSelect.value] ? productSelect.value : "tshirt";
-        if (!PRODUCTS[currentProduct].colors[currentColor]) {
-            currentColor = Object.keys(PRODUCTS[currentProduct].colors)[0];
+        const palette = PRODUCTS[currentProduct].colors;
+        if (palette && !palette[currentColor]) {
+            currentColor = Object.keys(palette)[0];
         }
         offsetX = 0;
         offsetY = 0;
         renderColorSwatches();
+        syncPlacementControls();
         persist();
         draw();
     });
@@ -632,12 +939,27 @@
        the starting product, then paint.
        ---------------------------------------------------------------------- */
 
+    /* Photographic templates register as additional select options, so a
+       new registry entry appears in the editor with zero markup changes. */
+    const photoKeys = Object.keys(PRODUCTS).filter(isPhotoProduct);
+    if (photoKeys.length) {
+        const group = document.createElement("optgroup");
+        group.label = "Poster and Frame Mockups";
+        photoKeys.forEach((key) => {
+            const opt = document.createElement("option");
+            opt.value = key;
+            opt.textContent = PRODUCTS[key].label;
+            group.appendChild(opt);
+        });
+        productSelect.appendChild(group);
+    }
+
     const saved = TB.storageGet(STORAGE_KEY);
     if (saved) {
         if (PRODUCTS[saved.product]) {
             currentProduct = saved.product;
         }
-        if (PRODUCTS[currentProduct].colors[saved.color]) {
+        if (PRODUCTS[currentProduct].colors && PRODUCTS[currentProduct].colors[saved.color]) {
             currentColor = saved.color;
         }
         if (typeof saved.scale === "number" && saved.scale >= 30 && saved.scale <= 100) {
@@ -654,11 +976,28 @@
         }
     }
 
+    /* A catalog card can pre-select which mockup opens (data-doc hand-off
+       via TB.takePreset). The value is only ever matched against PRODUCTS,
+       so a tampered preset resolves to nothing worse than a template that
+       already ships. It outranks the saved product because it represents a
+       fresh, explicit card choice. */
+    const preset = TB.takePreset();
+    if (typeof preset === "string" && Object.prototype.hasOwnProperty.call(PRODUCTS, preset)) {
+        currentProduct = preset;
+        const presetPalette = PRODUCTS[currentProduct].colors;
+        if (presetPalette && !presetPalette[currentColor]) {
+            currentColor = Object.keys(presetPalette)[0];
+        }
+        offsetX = 0;
+        offsetY = 0;
+    }
+
     productSelect.value = currentProduct;
     scaleInput.value = String(Math.round(designScale * 100));
     scaleOutput.textContent = scaleInput.value + "%";
 
     renderColorSwatches();
+    syncPlacementControls();
     renderTray();
     draw();
 
