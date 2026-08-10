@@ -1729,23 +1729,60 @@ main:has(.home-layout) {
    Full reasoning: docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md
    -------------------------------------------------------------------------- */
 
-/* Give the editor page extra width once a rail is in play, so the rail is
-   added beside the panes rather than taken out of them. Only above the rail
-   gate: narrower than that no rail mounts and the standard width applies. */
+/* The editor page's width with NO rail in play. These two tiers widened the
+   page so the old in-flow rail was added beside the panes rather than taken
+   out of them. The rail is out of flow now (see the Photopea-layout note
+   below), so what these describe is only the layout a visitor sees when the
+   zone is dormant, the script is blocked, or an ad blocker is running -- and
+   that layout is precisely the one that must not change. Left untouched for
+   that reason; the override once a rail does mount is further down. */
 @media (min-width: 84rem) {
     main:has(.editor-shell) {
         max-width: 84rem;
     }
 }
 
-/* Very wide screens carry a three-slot 300px rail instead of one 160px
-   unit, which needs 324px including the gap. Widening the page to 93rem
-   keeps the editing panes at the 540px they had before any rail existed,
-   so the extra inventory is added beside the workspace, never taken from
-   it -- the same rule the 84rem gate enforces one band down. */
 @media (min-width: 93rem) {
     main:has(.editor-shell) {
         max-width: 93rem;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   The fixed full-height ad column (August 10, 2026).
+
+   The rail used to be a sticky block inside the page, offset to clear the
+   header. It is now a column fixed to the right edge of the window running
+   the full height of the viewport, y=0 to the foot, with the whole page --
+   the menu bar included -- inset to its left. This is the Photopea layout,
+   reinstated deliberately by the owner after an earlier attempt at the same
+   shape was reverted; see docs/memory/PROJECT_STATUS.md before undoing it.
+
+   The inset is ONE mechanism: a single padding-right on <body>, applied by a
+   class js/ads.js adds only once a banner has actually filled. Everything in
+   normal flow inherits it, which is why .site-header needs no rule of its own
+   -- it is position: sticky, so it stays in flow, and its background stops
+   cleanly at the column's edge exactly as Photopea's menu bar does. If a
+   width or margin hack on the header ever looks necessary, the padding is
+   being applied in the wrong place.
+   -------------------------------------------------------------------------- */
+
+/* The column's width, declared once and read by both the column and the body
+   padding that reserves it. It is the creative plus one --space-lg of gutter
+   split evenly either side -- exactly what the old in-flow rail plus its flex
+   gap occupied, which is what lets the page caps below shed the column
+   without a single editing pane narrowing. */
+:root {
+    --ad-rail-creative: 160px;
+    --ad-rail-w: calc(var(--ad-rail-creative) + var(--space-lg));
+}
+
+/* The three-slot band swaps the creative, and the column widens with it. Same
+   93rem boundary as the JS band gate, so the width reserved can never
+   disagree with the unit that actually mounted. */
+@media (min-width: 93rem) {
+    :root {
+        --ad-rail-creative: 300px;
     }
 }
 
@@ -1753,28 +1790,35 @@ main:has(.home-layout) {
    this, it IS this -- asked for in those words, and sharing the selector is
    the only reading of "the same rail" that cannot drift apart later. The two
    pages differ solely in which viewport band mounts it, which is a media
-   query below and a matchMedia call in js/ads.js.
-
-   Both are flex-row children of a parent with align-items: flex-start, which
-   is what lets the rail keep its own height while the column beside it runs
-   thousands of pixels past. Stretch alignment would make the rail as tall as
-   that column and sticky would have nothing left to travel through. */
+   query below and a matchMedia call in js/ads.js. */
 .editor-rail,
 .home-rail {
-    flex: 0 0 auto;
-    position: sticky;
-    /* Clears the sticky site header rather than sliding under it */
-    top: 5.75rem;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--ad-rail-w);
+    /* Above the sticky header's 20 so the column reads as the window's edge
+       rather than as page furniture. Nothing overlaps it in practice: the
+       header is inset by the same padding that reserves this width. */
+    z-index: 25;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: var(--space-md);
-    /* Three stacked units come to 782px and can exceed a short viewport.
-       Capping the rail and letting it scroll internally keeps the page beside
-       it unaffected either way; on a tall screen the cap never engages. The
-       trade is that on a short screen the lower slots sit inside a scroller
-       most visitors will not scroll. Accepted on both pages as the price of
-       the layout never moving. */
-    max-height: calc(100vh - 7rem);
+    padding: var(--space-md) calc(var(--space-lg) / 2);
+    background-color: var(--color-card);
+    /* Inset shadow rather than border-left: a border would eat a pixel of the
+       creative's width inside the border box and raise a scrollbar in the
+       column. This draws the same line and costs no width. */
+    box-shadow: inset 1px 0 0 var(--color-border);
+    /* top and bottom pin the height to the viewport, so the old
+       max-height: calc(100vh - 7rem) has nothing left to subtract -- that 7rem
+       was the 5.75rem header clearance plus breathing room, and a column
+       starting at y=0 clears nothing. Three stacked units still come to more
+       than a short viewport holds, so the internal scroll stays; on a tall
+       screen it never engages. The trade is unchanged: on a short screen the
+       lower slots sit inside a scroller most visitors will not scroll. */
     overflow-y: auto;
     scrollbar-width: none;
 }
@@ -1782,6 +1826,22 @@ main:has(.home-layout) {
 .editor-rail::-webkit-scrollbar,
 .home-rail::-webkit-scrollbar {
     display: none;
+}
+
+/* The disclosure label is kept -- an ad has to be identifiable as an ad, and
+   on a product whose promise is that nothing leaves the visitor's device,
+   naming third-party content plainly is load-bearing. But it is set small
+   here, the same treatment .site-anchor and .editor-anchor already give it
+   and for the same reason: it is charged against the creative's own space.
+   At full size it cost 23.6px above a 600px skyscraper, which on a 638px
+   laptop viewport pushed the foot of the unit just below the fold; at this
+   size it costs about 16px and the whole creative fits. Removing it would
+   buy nothing further -- the zone is booked at a fixed 160x600 and does not
+   grow into space the label gives up. */
+.editor-rail .ad-label,
+.home-rail .ad-label {
+    font-size: 0.5625rem;
+    margin-bottom: 0.125rem;
 }
 
 /* A slot with no filled banner leaves no gap in the stack */
@@ -1819,6 +1879,59 @@ main:has(.home-layout) {
 @media (max-width: 74.9375rem) {
     .home-rail {
         display: none;
+    }
+}
+
+/* Reserve the column's width. This single padding is the whole inset: the
+   header, the category tabs, the mega-menu, the editing panes and the sticky
+   export bar are all in normal flow inside <body> and inherit it, so not one
+   of them needs a rule of its own to stay clear of the column.
+
+   js/ads.js adds .has-ad-rail only once a banner has actually filled -- the
+   same discipline .has-site-anchor follows -- so a dormant, blocked or
+   wrong-viewport zone leaves every page byte-identical to having no placement
+   at all. The two floors mirror the rail's own display gates above exactly,
+   so a window dragged below a floor after load drops the reservation together
+   with the column instead of leaving a gap behind it. (Ads mount once at load
+   via matchMedia and are never remounted, so CSS is the only thing that can
+   follow a resize.) */
+@media (min-width: 75rem) {
+    body.has-ad-rail:has(.home-rail) {
+        padding-right: var(--ad-rail-w);
+    }
+}
+
+@media (min-width: 84rem) {
+    body.has-ad-rail:has(.editor-rail) {
+        padding-right: var(--ad-rail-w);
+    }
+}
+
+/* The editor page's width once a rail IS in play. The body padding above has
+   already taken the column out of the page, so the two tiers further up would
+   reserve it a second time and the panes would pay for it twice. One flat cap
+   replaces both: 72.75rem is 93rem minus the 324px the three-slot column
+   occupies. It holds the panes at 546px in the stack band -- identical to the
+   tiered layout -- and at 546px rather than 544px in the single-unit band, so
+   no pane anywhere is narrower than it was. Measured before/after widths are
+   in docs/implementation/FIXED_FULL_HEIGHT_AD_RAIL.md. */
+@media (min-width: 84rem) {
+    body.has-ad-rail main:has(.editor-shell) {
+        max-width: 72.75rem;
+    }
+}
+
+/* Same correction for the homepage. Its 96rem cap was chosen with the in-flow
+   rail sitting inside it -- cap and rail landed in the same commit -- so
+   leaving it alone would hand the feed the column's full width the moment the
+   column left the flow, and the cards would grow by a third on a wide screen.
+   Shedding exactly the reserved width keeps the feed where it was: it
+   measures 8px wider at every width in both bands, that 8px being the
+   difference between the --space-xl flex gap the rail used to sit behind and
+   the --space-lg gutter it now carries. */
+@media (min-width: 75rem) {
+    body.has-ad-rail main:has(.home-layout) {
+        max-width: calc(96rem - var(--ad-rail-w));
     }
 }
 
@@ -3945,6 +4058,13 @@ legend {
     body.has-ad-anchor,
     body.has-site-anchor {
         padding-bottom: 0 !important;
+    }
+
+    /* Same for the fixed column's reserved width. The column itself is hidden
+       above, and the sheet must print across the full page rather than inset
+       by a placement that is not on the paper. */
+    body.has-ad-rail {
+        padding-right: 0 !important;
     }
 
     /* The shell is a flex row purely to seat the rail, which is hidden

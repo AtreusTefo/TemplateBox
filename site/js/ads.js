@@ -120,6 +120,22 @@ const TBAds = (() => {
         return true;
     }
 
+    /* The rail is a column fixed to the right edge of the window, running the
+       full height of the viewport, so the page has to make room for it:
+       .has-ad-rail puts one padding-right on <body> and everything in normal
+       flow -- the sticky header included -- is inset to the left of the
+       column. The class is added only when a banner actually filled, the same
+       discipline .has-site-anchor and .has-ad-anchor follow, so a dormant or
+       blocked zone leaves the page byte-identical to having no placement at
+       all. How much width to reserve is a CSS token that tracks the band, so
+       this never has to know which unit mounted. */
+    function reserveRailWidth(filled) {
+        if (filled) {
+            document.body.classList.add("has-ad-rail");
+        }
+        return filled;
+    }
+
     /* Leaderboard host: desktop 728x90 zone with a 320x50 mobile swap.
        Uses matchMedia at mount time (ad tags cannot be live-reflowed after
        injection without double-counting impressions, so the choice is made
@@ -252,16 +268,18 @@ const TBAds = (() => {
                it too and no rule reads it on either page. Kept because the
                two rails are meant to stay interchangeable. */
             rail.classList.add("is-stack");
+            let filled = false;
             HOME_RAIL_STACK.forEach((zoneName, index) => {
-                mountPlacement(slots[index], zoneName);
+                filled = mountPlacement(slots[index], zoneName) || filled;
             });
+            reserveRailWidth(filled);
             return;
         }
 
         /* Narrower than the stack band: one 160x600 in the first slot, the
            other two left empty and collapsed by .home-rail > div:empty. */
         if (slots.length && window.matchMedia(HOME_RAIL_MIN).matches) {
-            mountPlacement(slots[0], "skyscraper");
+            reserveRailWidth(mountPlacement(slots[0], "skyscraper"));
             return;
         }
 
@@ -302,8 +320,12 @@ const TBAds = (() => {
        panes plus a rail. Below 84rem the page is capped by the viewport
        rather than by its own max-width, so a rail stops using spare margin
        and starts eating the panes: at 1200px it cost each pane 68px. At
-       84rem and above the panes measure 544px, marginally wider than the
-       540px they had before any rail existed.
+       84rem and above the panes measure 546px, marginally wider than the
+       540px they had before any rail existed. That held when the rail was a
+       sticky block inside the page and it still holds now the rail is a fixed
+       column and the width is reserved by body padding instead -- the page
+       cap sheds exactly what the padding takes. See the
+       --ad-rail-w / .has-ad-rail rules in css/style.css.
 
        Between 48rem and 84rem there is no room beside the panes, so that
        band gets a leaderboard above the workspace instead. It scrolls away,
@@ -332,11 +354,13 @@ const TBAds = (() => {
 
         if (slots.length && window.matchMedia(EDITOR_RAIL_STACK_MIN).matches) {
             rail.classList.add("is-stack");
+            let filled = false;
             EDITOR_RAIL_STACK.forEach((zoneName, index) => {
-                mountPlacement(slots[index], zoneName);
+                filled = mountPlacement(slots[index], zoneName) || filled;
             });
+            reserveRailWidth(filled);
         } else if (slots.length && window.matchMedia(EDITOR_RAIL_MIN).matches) {
-            mountPlacement(slots[0], "skyscraper");
+            reserveRailWidth(mountPlacement(slots[0], "skyscraper"));
         }
 
         /* mountPlacement directly rather than mountLeaderboard(): the mobile
