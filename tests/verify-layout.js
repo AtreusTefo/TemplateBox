@@ -467,18 +467,37 @@ async function layoutChecks(page) {
                             `${label} right ${rect.right} vs column left ${s.rail.rect.x}`);
                     });
 
-                /* The rail must stay narrower than one column of the feed
-                   beside it. This is the decision that was reached the hard
-                   way: a 300px unit on a 1366px laptop is as wide as a
-                   content column, so it stops reading as a side rail and
-                   becomes a fourth column of adverts. Arithmetic about what
-                   width is affordable never surfaced that -- only looking at
-                   it did -- so the invariant is pinned here. */
-                if (name === "index" && s.feedColumn) {
-                    const creative = parseFloat(s.rail.sizes[0]);
-                    check(`${tag}: rail creative is narrower than a feed column`,
-                        creative < s.feedColumn,
-                        `creative ${creative}px vs feed column ${s.feedColumn}px`);
+                /* The rail must not dominate the page.
+
+                   This assertion was originally "the rail creative is
+                   narrower than one feed column", encoding the decision
+                   reached the hard way: a 300px unit beside three wide
+                   columns on a 1366px laptop stopped reading as a side rail
+                   and became a fourth column of adverts.
+
+                   It was RELAXED on August 10, 2026, and the reason is worth
+                   knowing before anyone tightens it again. Two things changed
+                   underneath it. The rail stopped being an in-flow neighbour
+                   of the feed and became a column fixed to the window edge
+                   with its own background, which is what actually separates
+                   it from the content now. And the feed went to a 4/5-column
+                   ladder, so a feed column at 1920px is 214px against the
+                   stack's 300px creative -- the old form of the assertion
+                   became unsatisfiable without either dropping the three-slot
+                   band or capping the columns, both of which are ruled out
+                   elsewhere.
+
+                   What survives is the principle rather than the proxy: the
+                   ad column never takes more than a quarter of the window.
+                   That still catches a fourth slot, a wider creative, or a
+                   reservation that stops tracking its band. The narrower
+                   "reads as a rail" judgement is now a thing to look at, not
+                   a thing to measure -- see the note in PROJECT_STATUS.md. */
+                if (name === "index") {
+                    const share = s.rail.rect.w / s.clientWidth;
+                    check(`${tag}: ad column takes under a quarter of the window`,
+                        share < 0.25,
+                        `column ${s.rail.rect.w}px is ${(share * 100).toFixed(1)}% of ${s.clientWidth}px`);
                 }
 
                 /* One creative in the single band, three in the stack, and

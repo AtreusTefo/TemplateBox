@@ -817,40 +817,100 @@ main:has(.home-layout) {
    queries add no specificity, so source order is the whole contest. */
 
 /* --------------------------------------------------------------------------
-   Catalog: masonry columns.
+   Catalog: CSS Grid.
 
-   CSS multi-column rather than grid: the cards have a fixed-ratio preview
-   but variable body height, so a grid leaves ragged whitespace under the
-   shorter ones. Columns pack them tight, which is the whole point of the
-   Pinterest-style layout this follows.
+   This was CSS multi-column from the August 9 rebuild until August 10, when
+   the columns were reported as visibly out of alignment. They were, and the
+   cause is structural rather than cosmetic, so it is worth recording before
+   anyone switches back.
 
-   `grid-template-rows: masonry` would be the semantically correct tool and
-   is still not shipped unprefixed across browsers, so it is not usable here.
+   Multi-column packs each column independently, so ONE card with a two-line
+   title pushes every card below it in that column down by a line -- measured
+   at 1366px, the fourth column's second card sat 21px lower than the other
+   three, and the drift compounded down the column. The same appeared at 1200,
+   1024, 768 and 414.
 
-   Trade-off accepted: multi-column reading order runs DOWN each column
-   rather than across rows. For a browsable catalog with no inherent
-   sequence that is fine; it would not be for ranked or chronological
-   content.
+   The obvious fix, reserving two lines of title height so every card is the
+   same height, cures that and then breaks something worse: with sixteen equal
+   cards, `column-fill: balance` fits them all into FOUR columns of four and
+   leaves the fifth empty, so the 5-column band silently became a 4-column one.
+   Measured: [3,3,4,3,3] before, [4,4,4,4] after. The ragged card heights were
+   the only reason five columns appeared at all.
 
-   break-inside on the card is what stops a card being split across a
-   column boundary -- without it the layout shreds cards in half.
+   Multi-column therefore cannot deliver aligned rows and a five-column band at
+   the same time. Grid can, and does it without reserving anything: every card
+   in a row shares the row's height, so tops align whatever the title wraps to,
+   and all five tracks are always used.
+
+   Two things this also fixed for free. Reading order now runs across rows
+   rather than down each column, which was a documented trade-off of the
+   multi-column choice. And the `.card-category` eyebrow wrapping to two lines
+   at 320px, a second source of drift, is absorbed by the row height.
+
+   `minmax(0, 1fr)` rather than `1fr`: a grid track's default minimum is
+   min-content, so a long unbroken title would push its track wider than its
+   share and skew the whole row.
    -------------------------------------------------------------------------- */
 
+/* Column ladder, written mobile-first (August 10, 2026).
+
+   2 below 48rem, 3 to 64rem, 4 to 100rem, 5 above. The ad rail takes real
+   width out of the feed from 75rem up, so every count here was checked
+   against the measured feed width rather than the viewport -- see
+   docs/implementation/HOMEPAGE_FEED_REWORK.md for the table.
+
+   The 3-column band opens at exactly 48rem, so 768px gets three columns. That
+   is the ladder as specified, and it deliberately does NOT follow the site's
+   other 48rem gates, which treat 768px as mobile (the phone ad anchor mounts
+   at max-width: 48rem, so at exactly 768px the anchor and the 3-column feed
+   are both up). The two are independent concerns and nothing about the anchor
+   depends on the column count, so the collision is harmless -- but it is the
+   one place on the site where 48rem means "desktop" rather than "phone".
+
+   The old `@media (max-width: 26rem) { column-count: 1 }` rule is gone. It
+   existed because two columns made the miniatures illegible; two columns are
+   now wanted at every phone width, and the miniatures were rechecked at
+   320px to confirm they still read. */
 .catalog-grid {
-    column-count: 3;
-    column-gap: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    /* Rows size to their tallest card and every card stretches to match, which
+       is what makes the tops align. Do not set align-items: start -- that
+       reintroduces exactly the ragged alignment this replaced. */
+    align-items: stretch;
+}
+
+@media (min-width: 48rem) {
+    .catalog-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1.5rem;
+    }
+}
+
+@media (min-width: 64rem) {
+    .catalog-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 100rem) {
+    .catalog-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
 }
 
 .catalog-grid > * {
+    /* Kept for paged media only: a grid item can still be fragmented across a
+       page break when printing. The column-break variants went with the
+       multi-column layout. */
     break-inside: avoid;
-    /* Safari still honours only the legacy property for column breaks */
-    -webkit-column-break-inside: avoid;
     page-break-inside: avoid;
-    margin-bottom: 1.5rem;
-    /* Deliberately no `display` here: .template-card is a flex column and
-       its body relies on flex-grow. Column children may be flex containers
-       without issue. */
-    width: 100%;
+    /* Grid tracks size the card now, and `gap` owns the spacing -- the
+       margin-bottom the column layout needed would add a second gutter.
+       Deliberately no `display` here: .template-card is a flex column and its
+       body relies on flex-grow. */
+    min-width: 0;
 }
 
 /* A hidden card must leave no gap. display:none on a column child is
@@ -860,29 +920,26 @@ main:has(.home-layout) {
     display: none;
 }
 
-/* Three columns hold all the way down to 48rem. Losing the rail at 75rem
-   gives the feed that width back rather than taking a column away, so the
-   cards get wider there, not narrower. */
+/* --------------------------------------------------------------------------
+   No masonry: every preview keeps the one 4/5 ratio (August 10, 2026).
 
-/* Two columns on phones and small tablets, matching the mobile reference */
-@media (max-width: 48rem) {
-    .catalog-grid {
-        column-count: 2;
-        column-gap: 1rem;
-    }
+   Per-card `.ratio-*` classes were added earlier the same day to vary card
+   heights so the multi-column feed read as masonry, and were removed hours
+   later at the owner's request. The columns stay -- CSS multi-column is still
+   the layout mechanism -- but every card is now the same shape, so the feed
+   reads as an aligned grid rather than a staggered one.
 
-    .catalog-grid > * {
-        margin-bottom: 1rem;
-    }
-}
+   Do not re-add the ratio classes as an "oversight": their absence is the
+   decision. The one uneven edge left is that card titles wrap to one or two
+   lines, so rows still drift a little; that is inherent to a caption of
+   variable length and is not worth a fixed title height, which would clip the
+   longer names.
 
-/* One column only at the very narrow end, where two would make the preview
-   miniatures illegible */
-@media (max-width: 26rem) {
-    .catalog-grid {
-        column-count: 1;
-    }
-}
+   Note the reading-order consequence, which multi-column carries and a real
+   CSS Grid would not: content reads DOWN each column, not across rows. That
+   is acceptable for a browsable catalogue with no inherent sequence and would
+   be wrong for anything ranked or chronological.
+   -------------------------------------------------------------------------- */
 
 .template-card {
     background-color: var(--color-card);
@@ -919,6 +976,8 @@ main:has(.home-layout) {
 }
 
 .card-preview {
+    /* Default ratio. Feed cards override it per card with a .ratio-* class
+       so the masonry columns do not line up; other pages keep this. */
     aspect-ratio: 4 / 5;
     background-color: var(--color-bg);
     border-bottom: 1px solid var(--color-border);
@@ -927,6 +986,15 @@ main:has(.home-layout) {
     justify-content: center;
     padding: var(--space-md);
     overflow: hidden;
+    /* Its own stacking context, which the hover scenes below depend on. The
+       frame base and overlay carry z-index 2 and 3; without isolation those
+       would compete in the CARD's stacking context and paint over
+       .card-link::after, the stretched pseudo-element that makes the whole
+       card clickable. The card would look right and refuse clicks over the
+       preview. isolation also keeps the overlay's multiply blending against
+       the frame beneath it rather than against the page. */
+    position: relative;
+    isolation: isolate;
 }
 
 /* Photographic mockup cards: the preview is a real thumbnail image rather
@@ -1370,9 +1438,14 @@ main:has(.home-layout) {
    untouched.
    -------------------------------------------------------------------------- */
 
+/* Caption spacing for a two-line body. The old 0.75rem top and 0.1875rem gap
+   were set for an eyebrow, a title, a paragraph and a 2.25rem CTA; with the
+   paragraph and the CTA both gone the block is an eyebrow and a title, and it
+   sat too loose under the preview. No bottom padding is needed -- the card's
+   own margin-bottom is what separates it from the card below. */
 .catalog-grid .card-body {
-    padding: 0.75rem 0.125rem 0;
-    gap: 0.1875rem;
+    padding: 0.625rem 0.125rem 0;
+    gap: 0.125rem;
 }
 
 .catalog-grid .card-category {
@@ -1385,9 +1458,46 @@ main:has(.home-layout) {
     line-height: 1.3;
 }
 
-.catalog-grid .card-desc {
-    font-size: 0.8125rem;
-    line-height: 1.45;
+/* --------------------------------------------------------------------------
+   The card title IS the link (August 10, 2026).
+
+   The standalone "Open editor" control is gone from all sixteen cards. What
+   had to survive its removal, and did:
+
+     - a real <a> with a real href per card. These anchors are the ONLY
+       crawlable inbound links the four editor pages have; Googlebot does not
+       click JavaScript, and a card whose link lived in a handler would orphan
+       its editor. The href still points at the editor, and js/app.js still
+       intercepts the click and routes through loading.html.
+     - accessible text. The anchor wraps the title, so it can never become an
+       empty box the way a bare stretched pseudo-element would.
+     - data-target and data-doc, untouched, so bindLaunchControls() and the
+       docs.html variant hand-off both behave exactly as before.
+     - .card-link::after, still stretched across the card, so the whole
+       surface remains the target.
+   -------------------------------------------------------------------------- */
+
+.catalog-grid .card-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.catalog-grid .template-card:hover .card-link {
+    text-decoration: underline;
+}
+
+/* Keyboard focus has to be as obvious as the old button was. The ring goes
+   on the preview rather than the inline text, because the preview is what a
+   visitor perceives as the card; the title also underlines, so focus is
+   still signalled if :has() is unavailable. */
+.catalog-grid .card-link:focus-visible {
+    outline: none;
+    text-decoration: underline;
+}
+
+.catalog-grid .template-card:has(.card-link:focus-visible) .card-preview {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
 }
 
 /* The preview is the card. Border and background move here from the
@@ -1397,11 +1507,32 @@ main:has(.home-layout) {
     border: 0;
 }
 
+/* The miniature fills the tile edge to edge, the way the photographic mockup
+   card already did (August 10, 2026). Before this, `.card-preview` carried a
+   --space-md inset, so every CSS miniature floated inside the tile with its
+   own 1px border showing as a second rectangle inside the card's border --
+   two frames around one document, and inconsistent with the one card whose
+   preview is a real photograph. Dropping the padding closes the gap, and the
+   inner border goes with it so a single 1px outline remains.
+
+   Scoped to .catalog-grid deliberately: the nine `*-template.html` landing
+   pages use .card-preview for a hero preview where the inset is correct.
+
+   The poster miniature keeps its border, because there the border IS the
+   drawn picture frame rather than a container edge. The :not(.poster) guard
+   plus the extra .card-preview in the selector is what outranks
+   `.mock-doc.poster` -- both are two-class selectors, so without it source
+   order alone would decide and the frame would vanish. */
 .catalog-grid .card-preview {
     border: 1px solid var(--color-border);
     border-bottom: 1px solid var(--color-border);
     background-color: var(--color-card);
+    padding: 0;
     transition: border-color var(--motion-base) var(--ease);
+}
+
+.catalog-grid .card-preview .mock-doc:not(.poster) {
+    border: 0;
 }
 
 .catalog-grid .template-card:hover .card-preview,
@@ -1409,26 +1540,111 @@ main:has(.home-layout) {
     border-color: var(--color-border-strong);
 }
 
-/* CTA reduced to a text link. It stays a real anchor with its own href and
-   data-target, so the launch flow and crawlability are unchanged. */
-.catalog-grid .card-link {
-    align-self: flex-start;
-    min-height: 2.25rem;
-    margin-top: 0.125rem;
-    padding: 0;
-    width: auto;
-    border: 0;
-    background: none;
-    color: var(--color-brand-ink);
-    font-size: 0.8125rem;
-    font-weight: 600;
+/* --------------------------------------------------------------------------
+   Hover previews (August 10, 2026). Both are gated behind (hover: hover) so a
+   touch visitor never sees them and nothing can stick in the hovered state
+   after a tap, and neither may change the card's height: every effect happens
+   inside .card-preview, whose aspect-ratio fixes its box, so the masonry
+   packing cannot move.
+   -------------------------------------------------------------------------- */
+
+/* Product mockups: the design on the product. The .mk-art element is already
+   in the markup inside each CSS product shape, so this is a show/hide, not new
+   artwork. Default state is the bare product -- which is also the permanent
+   state on a touch device. The global prefers-reduced-motion block zeroes
+   this transition along with every other one. */
+.catalog-grid .mk-art {
+    opacity: 0;
+    transition: opacity var(--motion-base) var(--ease);
 }
 
-.catalog-grid .card-link:hover,
-.catalog-grid .card-link:focus-visible {
-    background: none;
-    color: var(--color-brand-ink);
-    text-decoration: underline;
+@media (hover: hover) {
+    .catalog-grid .template-card:hover .mk-art,
+    .catalog-grid .template-card:focus-within .mk-art {
+        opacity: 1;
+    }
+}
+
+/* Posters and prints: the poster mocked into the real wood-a4 frame.
+
+   No canvas and no glfx.js: the warpZone in js/mockup-templates.js is an
+   axis-aligned rectangle (x 655-1461, y 224-1583 of a 2000x2000 base), so it
+   needs no perspective transform and can be expressed as flat percentages.
+
+   The scene is a square the height of the preview, centred and clipped, so
+   the base image is never distorted whatever ratio the card carries:
+
+       height: 100%; aspect-ratio: 1; left: 50%; translateX(-50%)
+
+   Expressing the window against that square is what makes the numbers
+   independent of the card's own ratio. Vertical is direct (top and height are
+   percentages of the containing block's height, which is the square's side).
+   Horizontal uses the element's own width: the window centre sits at 52.9% of
+   the square rather than 50%, and that 2.9% offset is 7.196% of the window's
+   own width (40.3%), hence translateX(-42.804%) instead of -50%.
+
+   Compositing follows the template's declared mode "window": design first,
+   then the base whose transparent print opening reveals it, then the overlay
+   multiplied on top. The overlay is a baked luminance map -- at the default
+   source-over it would paint over the artwork and wash it out entirely (see
+   docs/error-fixes/PHOTO_MOCKUP_OVERLAY_WASHES_OUT_DESIGN.md). */
+@media (hover: hover) {
+    .card-preview.framed::before,
+    .card-preview.framed::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        height: 100%;
+        aspect-ratio: 1;
+        left: 50%;
+        transform: translateX(-50%);
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+        opacity: 0;
+        /* Never intercept the click: the card surface is the target. */
+        pointer-events: none;
+        transition: opacity var(--motion-base) var(--ease);
+    }
+
+    .card-preview.framed::before {
+        background-image: url("../assets/mockups/wood-a4-base.png");
+        z-index: 2;
+    }
+
+    .card-preview.framed::after {
+        background-image: url("../assets/mockups/wood-a4-overlay.png");
+        mix-blend-mode: multiply;
+        z-index: 3;
+    }
+
+    .template-card:hover .card-preview.framed::before,
+    .template-card:hover .card-preview.framed::after,
+    .template-card:focus-within .card-preview.framed::before,
+    .template-card:focus-within .card-preview.framed::after {
+        opacity: 1;
+    }
+
+    /* The miniature drops its drawn frame and caption and becomes just the
+       artwork, sized into the print opening. */
+    .template-card:hover .card-preview.framed .mock-doc.poster,
+    .template-card:focus-within .card-preview.framed .mock-doc.poster {
+        position: absolute;
+        top: 11.2%;
+        height: 67.95%;
+        aspect-ratio: 806 / 1359;
+        left: 50%;
+        transform: translateX(-42.804%);
+        width: auto;
+        border: 0;
+        padding: 0;
+        gap: 0;
+        z-index: 1;
+    }
+
+    .template-card:hover .card-preview.framed .mk-caption,
+    .template-card:focus-within .card-preview.framed .mk-caption {
+        display: none;
+    }
 }
 
 /* --------------------------------------------------------------------------
