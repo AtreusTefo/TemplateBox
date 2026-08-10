@@ -744,6 +744,59 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Theme toggle (August 11, 2026).
+
+       The theme is already applied by the time this runs: every page carries a
+       tiny inline script in <head> that reads the same localStorage key and
+       writes data-theme onto <html> before first paint, so a returning visitor
+       never sees a flash of the wrong theme. This function only wires up the
+       button and keeps its accessible name truthful.
+
+       THEME_KEY is duplicated in that inline snippet by necessity -- the
+       snippet has to run before any external file loads, so it cannot import
+       from here. Both spellings are asserted identical by
+       tests/verify-layout.js, which is the guard against them drifting.
+
+       Storage is wrapped because a visitor with cookies and site data blocked
+       throws on localStorage access; the toggle still works for the session.
+       ---------------------------------------------------------------------- */
+    const THEME_KEY = "tb_theme";
+
+    function initThemeToggle() {
+        const button = document.querySelector("[data-theme-toggle]");
+        if (!button) {
+            return;
+        }
+
+        const root = document.documentElement;
+
+        /* The button names the ACTION, not the current state, which is what a
+           screen reader user needs in order to know what pressing it does. */
+        function label() {
+            const dark = root.getAttribute("data-theme") === "dark";
+            const text = dark ? "Switch to light theme" : "Switch to dark theme";
+            button.setAttribute("aria-label", text);
+            button.setAttribute("title", text);
+        }
+
+        label();
+
+        button.addEventListener("click", () => {
+            const dark = root.getAttribute("data-theme") !== "dark";
+            /* Always write an explicit value, never remove the attribute: an
+               absent attribute means "follow the OS", so a visitor choosing
+               light on a dark-set machine would be overruled on next load. */
+            root.setAttribute("data-theme", dark ? "dark" : "light");
+            try {
+                window.localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
+            } catch (err) {
+                /* Storage unavailable: the choice holds for this page only. */
+            }
+            label();
+        });
+    }
+
+    /* ----------------------------------------------------------------------
        Scroll direction (August 10, 2026).
 
        ONE utility for every element that hides on scroll-down, rather than a
@@ -1038,7 +1091,8 @@ const TB = (() => {
             initFormNav,
             initNavMore,
             initSearch,
-            initScrollDirection
+            initScrollDirection,
+            initThemeToggle
         ].forEach((init) => {
             try {
                 init();

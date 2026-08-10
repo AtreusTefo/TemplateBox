@@ -1,7 +1,14 @@
 /* ==========================================================================
    TemplateBox - Unified Global Stylesheet
    Theme: Fabric Film Studio inspired minimalist e-commerce system
-   Palette: Cream #F4F3EF | Charcoal #1A1A1A | Card White #FFFFFF | Border #EAE8E3
+   Palette (light): Cream #F4F3EF | Charcoal #1A1A1A | Card White #FFFFFF | Border #EAE8E3
+   Palette (dark, added August 11, 2026): Warm near-black #14130F | Warm
+   off-white #F2F0EA | Raised surface #1D1C17 | Border #3A382F. Every colour
+   lives in the --l-* / --d-* source pairs below and every rule reads the
+   active --color-* alias, so the theme is a value swap and never a rewrite.
+   Two surfaces deliberately do NOT swap: document sheets stay light because
+   they depict printed paper, and print output stays light regardless of the
+   on-screen theme. See docs/implementation/DARK_MODE.md.
    Geometry: Flat, sharp, rectangular -- EXCEPT the homepage catalogue cards,
    which are rounded (--radius-card) for the Pinterest-style feed, at the
    owner's instruction on August 10, 2026. That is a deliberate exception to
@@ -10,23 +17,72 @@
    ========================================================================== */
 
 :root {
-    --color-bg: #F4F3EF;
-    --color-text: #1A1A1A;
-    --color-card: #FFFFFF;
-    --color-border: #EAE8E3;
-    --color-muted: #6B6B66;
+    /* ----------------------------------------------------------------------
+       Source palettes. Each colour is written ONCE here, in an --l-* (light)
+       and a --d-* (dark) pair. Nothing in the stylesheet reads these directly;
+       rules read the --color-* aliases below, and switching theme only
+       re-points those aliases. A colour change is therefore a one-line edit
+       in one place, and the two alias blocks further down stay purely
+       mechanical -- tests/verify-layout.js asserts they never drift apart.
+       ---------------------------------------------------------------------- */
+    --l-bg: #F4F3EF;
+    --l-text: #1A1A1A;
+    --l-card: #FFFFFF;
+    --l-border: #EAE8E3;
+    --l-border-strong: #C9C5BC;
+    --l-muted: #6B6B66;
+    --l-brand: #8A5A2B;
+    --l-brand-ink: #6E4620;
+    --l-ok: #2E5E4E;
+    --l-warn: #8A1F1F;
+
+    /* Warm near-black rather than a blind inversion, so the dark theme keeps
+       the cream/charcoal character. Measured against --d-bg: text 16.4:1,
+       muted 7.7:1, brand 6.9:1, ok 8.7:1, warn 9.2:1; --d-border-strong is
+       3.05:1 against --d-card, which is the 1.4.11 threshold for the input
+       borders that depend on it. */
+    --d-bg: #14130F;
+    --d-text: #F2F0EA;
+    --d-card: #1D1C17;
+    --d-border: #3A382F;
+    --d-border-strong: #6B665A;
+    --d-muted: #A8A59B;
+    --d-brand: #C8925A;
+    --d-brand-ink: #E0B183;
+    --d-ok: #6FBF9B;
+    --d-warn: #FF9A8A;
+
+    /* ----------------------------------------------------------------------
+       Active aliases. Light by default; the two blocks after this rule
+       re-point them for dark.
+       ---------------------------------------------------------------------- */
+    --color-bg: var(--l-bg);
+    --color-text: var(--l-text);
+    --color-card: var(--l-card);
+    --color-border: var(--l-border);
+    --color-muted: var(--l-muted);
 
     /* Brand accent. Distinct from --color-text so interactive emphasis and
        active state read as deliberate rather than as plain body copy. Used
        for links-in-context, active state and focus rings only; document
        sheets keep their own per-document accent (see --accent below). */
-    --color-brand: #8A5A2B;
-    --color-brand-ink: #6E4620;
-    --color-border-strong: #C9C5BC;
+    --color-brand: var(--l-brand);
+    --color-brand-ink: var(--l-brand-ink);
+    --color-border-strong: var(--l-border-strong);
+
+    /* Status colours. Previously hardcoded at the two use sites; they need a
+       token because the light values (a forest green and a deep red) fall
+       below readable contrast on a dark ground. */
+    --color-ok: var(--l-ok);
+    --color-warn: var(--l-warn);
 
     /* Document accent. The resume editor overwrites this per document via
-       the swatch row, so it must stay independent of --color-brand. */
+       the swatch row, so it must stay independent of --color-brand. It is
+       also deliberately NOT themed: it is ink on a document sheet, and those
+       sheets stay light in both themes. */
     --accent: #1A1A1A;
+
+    color-scheme: light;
 
     --font-serif: "Playfair Display", Georgia, serif;
     --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -56,6 +112,99 @@
     --motion-fast: 120ms;
     --motion-base: 180ms;
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --------------------------------------------------------------------------
+   Dark theme (August 11, 2026).
+
+   Three states, in the order a visitor meets them:
+
+     1. Never toggled, OS prefers dark  -> the media query below applies.
+     2. Never toggled, OS prefers light -> the :root defaults apply.
+     3. Toggled                         -> js/app.js writes data-theme onto
+                                           <html> and the explicit block wins.
+
+   The media query is written `:root:not([data-theme])`, matching only when the
+   attribute is ABSENT. js/app.js always writes an explicit value, so in
+   practice this branch serves visitors with JavaScript disabled -- and because
+   it does not fire once the attribute exists, choosing light on a dark-set OS
+   is honoured rather than fought.
+
+   The two blocks are aliases only, never literals: change a colour in the
+   --d-* pairs above and both follow. They must stay identical to each other,
+   which tests/verify-layout.js asserts.
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        --color-bg: var(--d-bg);
+        --color-text: var(--d-text);
+        --color-card: var(--d-card);
+        --color-border: var(--d-border);
+        --color-muted: var(--d-muted);
+        --color-brand: var(--d-brand);
+        --color-brand-ink: var(--d-brand-ink);
+        --color-border-strong: var(--d-border-strong);
+        --color-ok: var(--d-ok);
+        --color-warn: var(--d-warn);
+        color-scheme: dark;
+    }
+}
+
+:root[data-theme="dark"] {
+    --color-bg: var(--d-bg);
+    --color-text: var(--d-text);
+    --color-card: var(--d-card);
+    --color-border: var(--d-border);
+    --color-muted: var(--d-muted);
+    --color-brand: var(--d-brand);
+    --color-brand-ink: var(--d-brand-ink);
+    --color-border-strong: var(--d-border-strong);
+    --color-ok: var(--d-ok);
+    --color-warn: var(--d-warn);
+    color-scheme: dark;
+}
+
+/* --------------------------------------------------------------------------
+   Paper surfaces never go dark.
+
+   .resume-sheet, .doc-sheet and the feed's .mock-doc miniatures all depict
+   printed paper. They already hardcoded white grounds and near-black ink, but
+   their DESCENDANTS read --color-* like everything else -- labels, rules,
+   table headers, the navy/forest/brand document accents. Swapping the theme
+   underneath them would have put light grey labels and #1F4E79 headings on
+   white paper.
+
+   Rather than rewriting those component rules, the light palette is simply
+   re-declared at the top of each paper surface, so every descendant resolves
+   to light values without knowing a theme exists. One block, no component
+   touched, and it stays correct automatically if the dark palette changes.
+   -------------------------------------------------------------------------- */
+:root[data-theme="dark"] .mock-doc,
+:root[data-theme="dark"] .resume-sheet,
+:root[data-theme="dark"] .doc-sheet {
+    --color-bg: var(--l-bg);
+    --color-text: var(--l-text);
+    --color-card: var(--l-card);
+    --color-border: var(--l-border);
+    --color-muted: var(--l-muted);
+    --color-brand: var(--l-brand);
+    --color-brand-ink: var(--l-brand-ink);
+    --color-border-strong: var(--l-border-strong);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .mock-doc,
+    :root:not([data-theme]) .resume-sheet,
+    :root:not([data-theme]) .doc-sheet {
+        --color-bg: var(--l-bg);
+        --color-text: var(--l-text);
+        --color-card: var(--l-card);
+        --color-border: var(--l-border);
+        --color-muted: var(--l-muted);
+        --color-brand: var(--l-brand);
+        --color-brand-ink: var(--l-brand-ink);
+        --color-border-strong: var(--l-border-strong);
+    }
 }
 
 /* Honour the OS-level reduced-motion preference: strip transitions rather
@@ -251,6 +400,79 @@ button {
     transition: color var(--motion-fast) var(--ease);
 }
 
+/* --------------------------------------------------------------------------
+   Theme toggle (August 11, 2026).
+
+   A real <button> carrying its own accessible name, updated by js/app.js to
+   state the action rather than the icon ("Switch to dark theme"), so it is
+   never a bare unlabelled glyph. The two inline SVGs follow the site's flat
+   icon convention -- stroke: currentColor, no fill, square joins -- matching
+   the wordmark and the footer social row, and only one is shown at a time.
+
+   Sits as the last child of .site-nav where one exists so it joins the
+   existing right-hand group rather than becoming a fourth flex child and
+   redistributing the header; loading.html has no nav, so there it is the last
+   child of the header itself.
+   -------------------------------------------------------------------------- */
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* Matches the 2.75rem touch target every other header control uses */
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    cursor: pointer;
+    transition: color var(--motion-fast) var(--ease);
+}
+
+.theme-toggle:hover {
+    color: var(--color-text);
+}
+
+.theme-toggle svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+}
+
+/* Show the icon for the theme the button would switch TO. Default (light
+   showing) offers the moon; dark offers the sun. */
+.theme-toggle .icon-sun {
+    display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle .icon-sun {
+    display: block;
+}
+
+:root[data-theme="dark"] .theme-toggle .icon-moon {
+    display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .theme-toggle .icon-sun {
+        display: block;
+    }
+
+    :root:not([data-theme]) .theme-toggle .icon-moon {
+        display: none;
+    }
+}
+
+/* No control to press without JavaScript, so do not advertise one. */
+.no-js .theme-toggle {
+    display: none;
+}
+
 .site-nav a:hover,
 .site-nav a[aria-current="page"] {
     color: var(--color-text);
@@ -350,8 +572,15 @@ button {
    necessary rather than merely convenient.
    -------------------------------------------------------------------------- */
 
+/* Deliberately NOT a positioning context. The panel below anchors to
+   .site-header instead (which is position: sticky, and therefore a containing
+   block), so its width can be clamped against the header rather than against
+   this button. Anchored here, the panel's left edge depended on how many
+   controls happened to sit to its right: adding the theme toggle on
+   August 11, 2026 pushed it 5px off-screen at 1200px, and it had only 3px of
+   margin left at 1024px before that. */
 .nav-more {
-    position: relative;
+    display: inline-flex;
 }
 
 .nav-more > button {
@@ -388,10 +617,14 @@ button {
     transform: rotate(180deg);
 }
 
+/* Anchored to the header's padding box, inset by the header's own gutter, and
+   clamped so it can never leave the viewport. `width` rather than `min-width`
+   on purpose: min-width beats max-width when the two conflict, so a min-width
+   panel cannot be clamped at all. */
 .nav-more-panel {
     position: absolute;
     top: calc(100% + 0.75rem);
-    right: 0;
+    right: var(--space-lg);
     z-index: 30;
     display: grid;
     grid-template-columns: repeat(5, minmax(9rem, 1fr));
@@ -399,7 +632,8 @@ button {
     background-color: var(--color-card);
     border: 1px solid var(--color-border-strong);
     padding: var(--space-lg) var(--space-xl);
-    min-width: 52rem;
+    width: 52rem;
+    max-width: calc(100% - 2 * var(--space-lg));
 }
 
 .nav-more-panel[hidden] {
@@ -2578,15 +2812,15 @@ body.has-site-anchor {
 }
 
 .save-state.is-saved::before {
-    background-color: #2E5E4E;
+    background-color: var(--color-ok);
 }
 
 .save-state.is-saved {
-    color: #2E5E4E;
+    color: var(--color-ok);
 }
 
 .save-state.is-unavailable::before {
-    background-color: #8A1F1F;
+    background-color: var(--color-warn);
 }
 
 /* First-run sample content notice.
@@ -3420,7 +3654,7 @@ legend {
 }
 
 .form-error {
-    color: #8A1F1F;
+    color: var(--color-warn);
     font-size: 0.8125rem;
     margin-top: 0.375rem;
     min-height: 1.25rem;
@@ -4358,6 +4592,31 @@ legend {
    -------------------------------------------------------------------------- */
 
 @media print {
+    /* Paper is paper. The on-screen theme must not reach the printer: without
+       this, a visitor printing a receipt in dark mode would send --color-text
+       (a near-white) onto a white sheet and get an almost blank page. Forcing
+       the light aliases back is one block and covers every rule that reads a
+       token, including ones added later.
+
+       This has to be the FIRST rule in the print block so the explicit
+       overrides below it still win, and it is written with a specificity that
+       beats :root[data-theme="dark"] rather than relying on source order. */
+    :root,
+    :root[data-theme],
+    :root[data-theme="dark"] {
+        --color-bg: var(--l-bg);
+        --color-text: var(--l-text);
+        --color-card: var(--l-card);
+        --color-border: var(--l-border);
+        --color-muted: var(--l-muted);
+        --color-brand: var(--l-brand);
+        --color-brand-ink: var(--l-brand-ink);
+        --color-border-strong: var(--l-border-strong);
+        --color-ok: var(--l-ok);
+        --color-warn: var(--l-warn);
+        color-scheme: light;
+    }
+
     body {
         background-color: #FFFFFF;
     }

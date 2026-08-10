@@ -107,6 +107,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Theme, applied before first paint so a returning visitor never sees a
+         flash of the wrong one. Deliberately inline and synchronous: an
+         external file would load after the first paint and the flash is
+         exactly what this exists to prevent. The key is duplicated from
+         js/app.js by necessity; tests/verify-layout.js asserts they match. -->
+    <script>
+        (function () {
+            try {
+                var saved = window.localStorage.getItem("tb_theme");
+                var dark = saved
+                    ? saved === "dark"
+                    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+                document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+            } catch (err) {
+                /* Storage blocked: fall through to the prefers-color-scheme
+                   rules in the stylesheet, which key on the attribute being
+                   absent. */
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -188,6 +208,7 @@
                     </div>
                 </div>
             </div>
+            <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to dark theme" title="Switch to dark theme"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></button>
         </nav>
     </header>
 

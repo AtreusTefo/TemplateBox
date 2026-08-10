@@ -219,6 +219,56 @@ function staticChecks() {
     check("loading.html's inline route whitelist matches EDITOR_ROUTES",
         appRoutes !== null && appRoutes === inlineRoutes,
         `js/app.js: ${appRoutes} | loading.html: ${inlineRoutes}`);
+
+    /* 1g. The dark theme is declared twice -- once for the explicit
+           data-theme="dark" attribute and once for the prefers-color-scheme
+           fallback that serves visitors without JavaScript. CSS has no way to
+           share one declaration block between them, so the two must be kept
+           identical by hand, and a colour added to one but not the other would
+           show up only for the half of visitors hitting the other branch. */
+    const darkExplicit = css.match(/:root\[data-theme="dark"\]\s*\{([^}]+)\}/);
+    const darkFallback = css.match(/:root:not\(\[data-theme\]\)\s*\{([^}]+)\}/);
+    const decls = (block) => (block ? block[1]
+        .split(";").map((d) => d.trim()).filter(Boolean).sort().join(" | ") : null);
+    check("the two dark-theme declaration blocks are identical",
+        darkExplicit && darkFallback && decls(darkExplicit) === decls(darkFallback),
+        darkExplicit && darkFallback
+            ? `explicit: ${decls(darkExplicit)}\n      fallback: ${decls(darkFallback)}`
+            : "one of the two dark blocks is missing");
+
+    /* 1h. Every page carries an inline no-flash snippet in <head> that reads
+           the theme from localStorage before first paint. It cannot import the
+           key from js/app.js -- it has to run before any external file loads --
+           so the string is duplicated per page. A rename on one side would
+           silently give every returning visitor a flash of the wrong theme,
+           which is precisely the failure the snippet exists to prevent. */
+    const keyMatch = appJs.match(/THEME_KEY\s*=\s*"([^"]+)"/);
+    const themeKey = keyMatch ? keyMatch[1] : null;
+    check("js/app.js declares a THEME_KEY", !!themeKey);
+
+    const themed = pages.filter((f) =>
+        /href="[^"]*css\/style\.css"/.test(fs.readFileSync(f, "utf8")));
+    const missingSnippet = [];
+    const wrongKey = [];
+    themed.forEach((file) => {
+        const rel = path.relative(ROOT, file);
+        const html = fs.readFileSync(file, "utf8");
+        const snippet = html.match(/localStorage\.getItem\("([^"]+)"\)/);
+        if (!/setAttribute\("data-theme"/.test(html)) { missingSnippet.push(rel); return; }
+        if (!snippet || snippet[1] !== themeKey) { wrongKey.push(rel + " -> " + (snippet ? snippet[1] : "none")); }
+    });
+    check(`every themed page carries the no-flash snippet (${themed.length} pages)`,
+        missingSnippet.length === 0, "missing on: " + missingSnippet.join(", "));
+    check("every no-flash snippet uses the same key as js/app.js",
+        wrongKey.length === 0, `THEME_KEY is "${themeKey}"; mismatched: ${wrongKey.join(", ")}`);
+
+    /* 1i. Print must never inherit the screen theme: a receipt printed in dark
+           mode would otherwise put a near-white --color-text onto white paper.
+           The print block re-points the aliases back to the light palette. */
+    const printBlock = css.slice(css.indexOf("@media print"));
+    check("the print block resets the palette to the light aliases",
+        /:root\[data-theme="dark"\][\s\S]{0,400}--color-text:\s*var\(--l-text\)/.test(printBlock),
+        "print output would inherit the dark palette");
 }
 
 /* ==========================================================================
