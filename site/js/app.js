@@ -851,10 +851,18 @@ const TB = (() => {
     /* ----------------------------------------------------------------------
        Header mega-menu.
 
-       The homepage carries no footer, so without this the landing pages and
-       legal pages would be unreachable from it except by finding a catalog
-       card. Desktop only -- CSS hides the control below 62rem, where the
-       footer on every other page already covers the same links.
+       Originally homepage-only, because the homepage was the one page with
+       no footer and the landing and legal pages would otherwise have been
+       unreachable from it. As of August 13, 2026 NO page has a footer --
+       the link columns moved into this panel site-wide -- so this is now
+       the primary navigation surface on every page, at every width.
+
+       That "at every width" matters: the panel used to be hidden below
+       62rem on the grounds that the footer covered the same links on small
+       screens. With no footer left, hiding it would strand the legal pages
+       on phones, so the CSS restyles the panel for narrow viewports instead
+       of hiding the control. Nothing here changes by width; the behaviour
+       is entirely CSS.
        ---------------------------------------------------------------------- */
     function initNavMore() {
         const root = document.querySelector("[data-nav-more]");

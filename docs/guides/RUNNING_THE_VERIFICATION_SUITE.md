@@ -50,7 +50,7 @@ under test is the layout a real visitor gets.
 ### 2. Layout (5 pages x 10 widths)
 
 Widths are 1920, 1600, 1488, 1440, 1366, 1344, 1200, 1024, 768 and 320 — including 1344 and
-1488, which are the 84rem and 93rem band gates themselves.
+1488, which are the 93rem stack gate and (with 1199/1200) the 75rem rail floor shared by the homepage and, since August 13, 2026, the editors.
 
 - **Exactly one ad band mounts**, never two and never none. The one documented exception is
   the homepage between 48rem and 75rem, which shows nothing by design.
