@@ -1083,7 +1083,8 @@ main:has(.home-layout) {
 }
 
 /* --------------------------------------------------------------------------
-   Hide on scroll-down, show on scroll-up (August 10, 2026).
+   Hide on scroll-down, show on scroll-up (August 10, 2026; .feed-tabs opted
+   back out on August 13, 2026 -- see below).
 
    js/app.js writes one class, `.is-nav-hidden`, onto <body> and knows nothing
    about these elements; everything below is the opt-in.
@@ -1100,22 +1101,35 @@ main:has(.home-layout) {
    body padding. A transform moves the paint, not the box, so the inset, the
    sticky behaviour and the header's right edge all survive untouched.
 
-   The tabs travel their own height PLUS their sticky offset, so they clear
-   the viewport entirely. Travelling only -100% would leave them parked on top
-   of the header on desktop, and visible below a hidden header on mobile. */
+   Only .site-header responds to is-nav-hidden now, and only below 48rem --
+   desktop never hides it, so nothing here changes there. .feed-tabs stopped
+   hiding entirely: filtering is a primary action on this page and should
+   stay reachable through a scroll, not disappear with the chrome around it.
+   It stays pinned via its own `position: sticky` at every width, unaffected
+   by scroll direction.
+
+   Below 48rem the tabs still move, but only to close the gap the header's
+   retraction would otherwise leave. `.feed-tabs` sticks at `top: 4.75rem`
+   (below), which is calibrated to sit just under the header WHEN THE HEADER
+   IS VISIBLE. That offset does not know the header is gone: it is a fixed
+   distance from the viewport top, not a measurement of the header's live
+   box, so once the header transforms off-screen the tabs would stay parked
+   4.75rem down, leaving a dead unpainted strip above them the exact height
+   of the header. Translating the tabs by that same -4.75rem, on the same
+   is-nav-hidden class and the same shared transition as the header, slides
+   them up in lockstep so they land flush with the viewport top exactly as
+   the header clears it. The value comes from the header's known, fixed
+   mobile height, not from reading the header's box at runtime -- which is
+   what keeps this free of jump risk if the two elements' transitions were
+   ever to fall a frame out of sync. */
 .feed-tabs,
 body:has(.home-layout) .site-header {
     transition: transform var(--motion-base) var(--ease);
 }
 
-body:has(.home-layout).is-nav-hidden .feed-tabs {
-    transform: translateY(calc(-100% - 5.25rem));
-}
-
 @media (max-width: 48rem) {
-    /* The tabs sit 4.75rem down on phones, and the header goes with them. */
     body:has(.home-layout).is-nav-hidden .feed-tabs {
-        transform: translateY(calc(-100% - 4.75rem));
+        transform: translateY(-4.75rem);
     }
 
     body:has(.home-layout).is-nav-hidden .site-header {
@@ -1123,11 +1137,15 @@ body:has(.home-layout).is-nav-hidden .feed-tabs {
     }
 }
 
-/* Focus must never be stranded off-screen. Tabbing into a hidden bar brings
-   it straight back, so a keyboard visitor can always see what they have
-   focused even if the page is mid scroll-down. This has to come after the
-   rules above to win on source order at equal specificity. */
-body.is-nav-hidden .feed-tabs:focus-within,
+/* Focus must never be stranded off-screen. .site-header is the only element
+   that can still leave the viewport, so it is the only one this needs to
+   rescue. .feed-tabs never fully hides any more -- it only rises to close
+   the header's gap -- so it does not need this, and adding it back would
+   actively fight that rise: focusing a pill while the header is hidden
+   would force .feed-tabs's transform to none, dropping it back down to its
+   normal 4.75rem offset and reopening the exact gap this rule exists to
+   close, while the header stayed hidden regardless (focus-within only ever
+   sees inside its own element). */
 body.is-nav-hidden .site-header:focus-within {
     transform: none;
 }
