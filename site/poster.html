@@ -90,12 +90,120 @@
 </head>
 <body>
 
-    <header class="site-header">
-        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
+    <!-- Editor toolbar. This is still .site-header, deliberately: that class is
+         what the fixed ad rail's inset mechanism keys on (one body padding-right
+         insets everything in normal flow, and the header inherits it with no rule
+         of its own), and tests/verify-layout.js asserts the header's right edge
+         lands exactly on the column's left edge on every page including this one.
+         Replacing the ELEMENT would have broken that contract; replacing its
+         CONTENTS is what "a minimal editor bar" actually needs.
+
+         The wordmark is replaced by a home button per the reference layout, and
+         the Templates/Guides/About links are gone -- but the "More" mega-menu
+         below is kept, because it is the only route from an editor to the privacy
+         policy and terms (the editors carry no footer, a gap PROJECT_STATUS.md
+         already flags as worth revisiting rather than widening). -->
+    <header class="site-header editor-bar">
+        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+
+        <label class="sr-only" for="doc-name">Poster name</label>
+        <input type="text" class="doc-name" id="doc-name" maxlength="80" value="Untitled poster" aria-label="Poster name">
+
+        <div class="editor-actions">
+            <button type="button" class="icon-btn" id="act-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 0 12h-3"/></svg></button>
+            <button type="button" class="icon-btn" id="act-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 12h3"/></svg></button>
+
+            <!-- Autosave state as an icon rather than a line of prose. The words
+                 are not dropped, only stopped from occupying permanent chrome:
+                 they remain in the title tooltip and in a visually hidden span
+                 that assistive technology still reads. js/app.js writes into
+                 [data-save-label] when it is present. -->
+            <span class="save-cloud" id="save-state" role="status" aria-live="polite" title="Saves automatically">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 18.5A3.5 3.5 0 0 1 6 11.6a5 5 0 0 1 9.7-1.5A4 4 0 0 1 18.5 18.5Z"/><path class="tick" d="m9.5 14 2 2 3.5-3.5"/></svg>
+                <span class="sr-only" data-save-label>Saves automatically</span>
+            </span>
+
+            <div class="dl" data-download>
+                <button type="button" class="btn dl-toggle" id="dl-toggle" aria-expanded="false" aria-controls="dl-panel">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>
+                    Download
+                </button>
+
+                <div class="dl-panel" id="dl-panel" hidden>
+                    <p class="dl-heading">Download</p>
+
+                    <label class="dl-label" for="dl-type">File type</label>
+                    <select id="dl-type" class="dl-type">
+                        <option value="png">PNG - best for complex images, illustrations</option>
+                        <option value="jpg">JPG - best for sharing</option>
+                        <option value="pdf">PDF - best for documents and printing</option>
+                        <option value="svg">SVG - best for web design and scaling</option>
+                        <option value="pptx">PPTX - Microsoft PowerPoint document</option>
+                    </select>
+
+                    <div id="dl-group-size">
+                        <label class="dl-label" for="dl-dpi">Resolution</label>
+                        <select id="dl-dpi">
+                            <option value="300">300 DPI - print quality</option>
+                            <option value="150">150 DPI - large format / draft</option>
+                            <option value="72">72 DPI - screen only</option>
+                        </select>
+                        <p class="dl-note" id="dl-dimensions"></p>
+                    </div>
+
+                    <div id="dl-group-jpg" hidden>
+                        <label class="dl-label" for="dl-jpg-quality">Quality</label>
+                        <select id="dl-jpg-quality">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high" selected>High</option>
+                        </select>
+                    </div>
+
+                    <div id="dl-group-png" hidden>
+                        <label class="dl-label" for="dl-png-quality">Size</label>
+                        <select id="dl-png-quality">
+                            <option value="compress">Compress - 60 percent scale</option>
+                            <option value="high" selected>High - full scale</option>
+                            <option value="limit">Limit size - 80 percent scale</option>
+                        </select>
+                        <p class="dl-note">PNG is lossless, so this changes output scale rather than compression quality.</p>
+                        <label class="dl-check"><input type="checkbox" id="dl-transparent"> Transparent background</label>
+                    </div>
+
+                    <div id="dl-group-pdf" hidden>
+                        <label class="dl-label" for="dl-pdf-preset">Preset</label>
+                        <select id="dl-pdf-preset">
+                            <option value="digital">Digital</option>
+                            <option value="print">Print</option>
+                        </select>
+                        <label class="dl-check"><input type="checkbox" id="dl-pdf-compress"> Compress PDF</label>
+
+                        <div id="dl-group-pdf-print" hidden>
+                            <label class="dl-label" for="dl-pdf-profile">Colour profile</label>
+                            <select id="dl-pdf-profile">
+                                <option value="rgb">RGB - best for digital use</option>
+                                <option value="cmyk">CMYK - device values, not a colour-managed separation</option>
+                            </select>
+                            <label class="dl-check"><input type="checkbox" id="dl-pdf-crop"> Crop marks and 3 mm bleed</label>
+                        </div>
+
+                        <details class="dl-adv">
+                            <summary>Advanced settings</summary>
+                            <label class="dl-check"><input type="checkbox" id="dl-pdf-flatten"> Flatten PDF (text becomes part of the image)</label>
+                            <label class="dl-check"><input type="checkbox" id="dl-pdf-notes"> Include document properties</label>
+                            <label class="dl-label" for="dl-pdf-password">Password protection</label>
+                            <input type="password" id="dl-pdf-password" placeholder="Leave blank for none" autocomplete="new-password">
+                        </details>
+                        <p class="dl-note">Text is written with the jsPDF native text API, so it stays selectable and searchable unless you flatten it.</p>
+                    </div>
+
+                    <button type="button" class="btn btn-block dl-go" id="dl-go">Download</button>
+                </div>
+            </div>
+        </div>
+
         <nav class="site-nav" aria-label="Primary">
-            <a href="index.html" aria-current="page">Templates</a>
-            <a href="blog.html">Guides</a>
-            <a href="about.html">About</a>
             <!-- Mega-menu. This page carries no footer: its link columns live
                  here instead, matching index.html, so every page exposes the
                  same navigation from the same place. Links are real anchors
@@ -173,9 +281,82 @@
     <main data-ads-static>
         <div class="editor-head">
             <h1 class="sr-only">Custom Poster and Canvas Maker</h1>
-            <!-- Autosave state: persistence was previously silent, which
-                 wasted the trust payoff of a no-account product -->
-            <p class="save-state" id="save-state" role="status" aria-live="polite">Saves automatically</p>
+            <!-- The autosave indicator moved into the toolbar above as an icon.
+                 There is deliberately no second copy here: js/app.js targets
+                 #save-state by id, so two would leave one of them permanently
+                 stale. -->
+        </div>
+
+        <!-- Text formatting toolbar. Hidden until a text element is selected,
+             because every control on it acts on the selection and a toolbar
+             that is always visible but usually inert reads as broken. -->
+        <div class="text-toolbar" id="text-toolbar" role="toolbar" aria-label="Text formatting" hidden>
+            <select id="t-font" aria-label="Font"></select>
+
+            <label class="sr-only" for="t-size">Font size</label>
+            <input type="number" id="t-size" min="5" max="200" step="1" aria-label="Font size" title="Font size">
+
+            <span class="tt-sep" aria-hidden="true"></span>
+
+            <button type="button" class="icon-btn" id="t-bold" aria-pressed="false" title="Bold" aria-label="Bold"><strong>B</strong></button>
+            <button type="button" class="icon-btn" id="t-italic" aria-pressed="false" title="Italic" aria-label="Italic"><em>I</em></button>
+            <button type="button" class="icon-btn" id="t-underline" aria-pressed="false" title="Underline" aria-label="Underline"><span style="text-decoration:underline">U</span></button>
+            <button type="button" class="icon-btn" id="t-strike" aria-pressed="false" title="Strikethrough" aria-label="Strikethrough"><span style="text-decoration:line-through">S</span></button>
+            <button type="button" class="icon-btn" id="t-upper" aria-pressed="false" title="Uppercase" aria-label="Uppercase">aA</button>
+
+            <label class="tt-color" title="Text colour">
+                <span class="sr-only">Text colour</span>
+                <input type="color" id="t-color" value="#1A1A1A">
+            </label>
+
+            <span class="tt-sep" aria-hidden="true"></span>
+
+            <select id="t-align" aria-label="Alignment" title="Alignment">
+                <option value="left">Align left</option>
+                <option value="center">Align centre</option>
+                <option value="right">Align right</option>
+            </select>
+
+            <select id="t-list" aria-label="List style" title="List style">
+                <option value="none">No list</option>
+                <option value="bullet">Bulleted</option>
+                <option value="number">Numbered</option>
+            </select>
+
+            <details class="tt-adv">
+                <summary title="Spacing, position and typography">Advanced</summary>
+                <div class="tt-adv-panel">
+                    <label for="t-letter">Letter spacing</label>
+                    <input type="number" id="t-letter" min="-0.2" max="1" step="0.01">
+
+                    <label for="t-line">Line spacing</label>
+                    <input type="number" id="t-line" min="0.7" max="3" step="0.05">
+
+                    <label for="t-anchor">Text box</label>
+                    <select id="t-anchor">
+                        <option value="box">Anchored box (wraps)</option>
+                        <option value="free">Free (single line)</option>
+                    </select>
+
+                    <label for="t-boxw">Box width (percent)</label>
+                    <input type="number" id="t-boxw" min="5" max="100" step="1">
+
+                    <label for="t-posx">Position across (percent)</label>
+                    <input type="number" id="t-posx" min="0" max="100" step="1">
+
+                    <label for="t-posy">Position down (percent)</label>
+                    <input type="number" id="t-posy" min="0" max="100" step="1">
+
+                    <label for="t-opacity">Opacity (percent)</label>
+                    <input type="number" id="t-opacity" min="0" max="100" step="1">
+
+                    <!-- Named for what the Canvas API can actually control.
+                         There is no direct OpenType ligature switch on a 2D
+                         context; fontKerning is the real lever, so the label
+                         does not promise more than the renderer delivers. -->
+                    <button type="button" class="icon-btn tt-wide" id="t-lig" aria-pressed="true" title="Kerning and ligatures">Kerning and ligatures</button>
+                </div>
+            </details>
         </div>
 
         <!-- Mobile-only tab switcher between controls and canvas -->
@@ -203,22 +384,40 @@
                         <p class="upload-hint">JPG, PNG, or WebP. Validated client-side before drawing.</p>
                         <p class="form-error" id="p-image-error" role="alert"></p>
                     </div>
+
                     <div class="field">
-                        <label for="p-caption">Caption</label>
-                        <input type="text" id="p-caption" maxlength="80" placeholder="Til death do us part">
+                        <label for="t-caption">Text</label>
+                        <div class="caption-row">
+                            <textarea id="t-caption" rows="2" maxlength="240" placeholder="Til death do us part"></textarea>
+                            <button type="button" class="icon-btn emoji-toggle" id="emoji-toggle" aria-expanded="false" aria-controls="emoji-panel" title="Insert emoji" aria-label="Insert emoji">&#128512;</button>
+                        </div>
+                        <!-- Native Unicode emoji only: an image-based picker would
+                             be a network dependency inside an editor whose whole
+                             proposition is that nothing leaves the device. -->
+                        <div class="emoji-panel" id="emoji-panel" hidden>
+                            <div class="emoji-grid" id="emoji-grid"></div>
+                        </div>
+                        <p class="upload-hint">Click text on the canvas to select it, then drag to reposition.</p>
                     </div>
+
+                    <div class="field field-row">
+                        <button type="button" class="btn btn-ghost" id="t-add">Add text</button>
+                        <button type="button" class="btn btn-ghost" id="t-delete">Delete selected</button>
+                    </div>
+
+                    <div class="field">
+                        <label for="p-size">Paper Size</label>
+                        <select id="p-size"></select>
+                        <p class="upload-hint">Sets the document proportions. Export resolution is chosen in the Download panel.</p>
+                    </div>
+
                     <div class="field">
                         <label for="p-frame">Frame Style</label>
-                        <select id="p-frame">
-                            <option value="black">Solid Black</option>
-                            <option value="wood">Matte Wood</option>
-                            <option value="gold">Polished Gold</option>
-                        </select>
+                        <select id="p-frame"></select>
                     </div>
                 </form>
                 <div class="preview-actions">
-                    <button type="button" class="btn btn-block" id="download-png">Download PNG</button>
-                    <p class="upload-hint">Exports a high-resolution 1200 x 1500 pixel PNG directly to your device.</p>
+                    <p class="upload-hint">Use the Download button in the toolbar to export as PNG, JPG, PDF, SVG or PPTX. Nothing leaves your device.</p>
                 </div>
             </section>
 
@@ -252,8 +451,17 @@
          of it; without that the ad would sit on top of the Download button. -->
     <div class="editor-anchor" data-ad-editor-anchor aria-label="Advertisement"></div>
 
+    <!-- Compilation engine: jsPDF native text API via clean CDN link. The
+         poster's artwork is a raster composite (it contains an uploaded photo),
+         but the TEXT is drawn again over it with doc.text(), so the PDF carries
+         real text operators and stays selectable rather than being a flat
+         picture of words. html2pdf.js is deliberately not used anywhere on this
+         site -- see docs/error-fixes/RESUME_PDF_RASTERIZED_TEXT_FIX.md. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+        integrity="sha512-yBpuTHfsMK8bcvfF6zAsIO4Nmls5rncLnPGgHb1FnnQyzhomsanid1QzjZvZgeC2spPTdDaKlUJIMSPNMh3wxw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
-    <script src="js/poster.js"></script>
+    <script src="js/poster.js" defer></script>
 </body>
 </html>

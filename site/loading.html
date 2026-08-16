@@ -63,7 +63,6 @@
          this page unless that is actually wanted. -->
 
     <main data-ads-static>
-        <div class="loading-layout">
         <div class="loading-wrap">
             <div class="loading-card">
                 <h1>Your Editor Is Opening</h1>
@@ -111,53 +110,55 @@
                          atOptions variable, and two copies sharing one page
                          context can clobber or dedupe each other. Each slot
                          has its own distinct zone key so Adsterra reports
-                         their impressions separately. -->
+                         their impressions separately.
+
+                         overflow:hidden on the srcdoc body is load-bearing and
+                         must match buildBannerFrame() in js/ads.js: a creative
+                         laying out larger than its booked size scrolls the
+                         iframe's OWN document, and that scrollbar paints
+                         inside the frame where the parent .ad-slot's
+                         overflow:hidden cannot reach it. scrolling="no" is the
+                         deprecated attribute that no longer reliably does
+                         this. -->
                     <div class="ad-slot" id="ad-banner-1">
                         <iframe title="Advertisement" width="300" height="250" scrolling="no" style="border:0;display:block"
-                            srcdoc="<body style='margin:0'><script>atOptions={'key':'4a408738c2170da16b47c5ac05b3780a','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js'></script></body>"></iframe>
+                            srcdoc="<body style='margin:0;overflow:hidden'><script>atOptions={'key':'4a408738c2170da16b47c5ac05b3780a','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js'></script></body>"></iframe>
                     </div>
                     <div class="ad-slot" id="ad-banner-2">
                         <iframe title="Advertisement" width="300" height="250" scrolling="no" style="border:0;display:block"
-                            srcdoc="<body style='margin:0'><script>atOptions={'key':'70d844a3963c8415efa49af391c897a0','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/70d844a3963c8415efa49af391c897a0/invoke.js'></script></body>"></iframe>
+                            srcdoc="<body style='margin:0;overflow:hidden'><script>atOptions={'key':'70d844a3963c8415efa49af391c897a0','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/70d844a3963c8415efa49af391c897a0/invoke.js'></script></body>"></iframe>
                     </div>
                 </div>
-
-                <!-- Gives the interval content rather than leaving it empty -->
-                <ul class="loading-points">
-                    <li>Everything you type stays on this device. Nothing is uploaded.</li>
-                    <li>Your work saves automatically as you go.</li>
-                    <li>Export a finished PDF or PNG with no watermark.</li>
-                </ul>
             </div>
         </div>
 
-            <!-- Sticky rail, desktop only: the three-slot stack at 93rem and
-                 above, a single 160x600 from 83.5rem, matching the other
-                 content-rail pages' bands exactly, because this reuses
-                 mountContentAds() unchanged -- same markup contract
-                 ([data-ad-content-rail] host, three [data-ad-rail-slot]
-                 children), zero new JavaScript. What it deliberately does
-                 NOT reuse is that function's CSS: .content-rail is
-                 position:fixed, full viewport height, reserving its width
-                 with body padding, which is correct on pages where the ad
-                 content runs to the true bottom of the document. This page's
-                 two banners sit MID-page inside a centred card, so a fixed
-                 element pins to the viewport regardless of scroll position
-                 and can cover them on a short viewport even though they are
-                 nowhere near the document's actual end -- this page tried
-                 exactly that once and reverted it (see the .loading-rail
-                 rule in css/style.css and the mountSiteAnchor comment in
-                 js/ads.js). Keeping the "loading-rail" class instead of
-                 "content-rail" is what keeps it on position:sticky in this
-                 flex row, which cannot overlap anything by construction
-                 because it moves with the content instead of pinning over
-                 it. -->
-            <aside class="loading-rail" data-ad-content-rail aria-label="Advertisements">
-                <div data-ad-rail-slot></div>
-                <div data-ad-rail-slot></div>
-                <div data-ad-rail-slot></div>
-            </aside>
-        </div>
+        <!-- Rail, desktop only: the three-slot stack at 93rem and above, a
+             single 160x600 from 75rem, matching every other rail context on
+             the site (index.html, the four editors, and the content-rail
+             family) exactly, via mountContentAds() -- same markup contract
+             ([data-ad-content-rail] host, three [data-ad-rail-slot]
+             children), zero new JavaScript. Full display now (August 16,
+             2026): the .loading-rail class joins the shared
+             .editor-rail/.home-rail/.content-rail selector in css/style.css
+             instead of carrying its own position:sticky rule, reversing that
+             choice. The earlier reasoning conflated two different fixed
+             placements -- see the corrected mountSiteAnchor comment in
+             js/ads.js and the .loading-rail comment in css/style.css before
+             touching this again: a fixed BOTTOM anchor pins over whatever the
+             visitor has scrolled to, which is unsafe beside this page's
+             mid-page card, but a fixed SIDE rail reserves its width with body
+             padding for the entire page rather than floating over scrolled
+             content, so nothing is ever positioned underneath it regardless
+             of scroll position -- the same mechanism index.html and the
+             editors already rely on. This page has more headroom than the
+             other content-rail pages besides: .loading-wrap caps at 44rem,
+             far under the 72rem main cap the family's 75rem floor exists to
+             protect elsewhere. -->
+        <aside class="loading-rail" data-ad-content-rail aria-label="Advertisements">
+            <div data-ad-rail-slot></div>
+            <div data-ad-rail-slot></div>
+            <div data-ad-rail-slot></div>
+        </aside>
     </main>
 
     <!-- No footer on this page: it is a ten-second, noindex intermediary with

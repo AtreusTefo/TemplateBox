@@ -1084,7 +1084,8 @@ main:has(.home-layout) {
 
 /* --------------------------------------------------------------------------
    Hide on scroll-down, show on scroll-up (August 10, 2026; .feed-tabs opted
-   back out on August 13, 2026 -- see below).
+   back out on August 13, 2026; reinstated at every width on August 14, 2026
+   -- see below).
 
    js/app.js writes one class, `.is-nav-hidden`, onto <body> and knows nothing
    about these elements; everything below is the opt-in.
@@ -1092,8 +1093,8 @@ main:has(.home-layout) {
    Scoped to the homepage with `body:has(.home-layout)`. The class is written
    on every page that loads js/app.js, and the editors deliberately do not opt
    in: they carry their own sticky export bar and a fixed ad anchor, and a
-   header that moves underneath those has not been tested. Extending this is a
-   deliberate decision, not a one-line CSS addition.
+   header that moves underneath those has not been tested. Extending this to
+   the editors is a deliberate decision, not a one-line CSS addition.
 
    translateY, never display:none. These are position: sticky, and collapsing
    them would drop their boxes out of flow -- the ad-rail inset on index.html
@@ -1101,51 +1102,71 @@ main:has(.home-layout) {
    body padding. A transform moves the paint, not the box, so the inset, the
    sticky behaviour and the header's right edge all survive untouched.
 
-   Only .site-header responds to is-nav-hidden now, and only below 48rem --
-   desktop never hides it, so nothing here changes there. .feed-tabs stopped
-   hiding entirely: filtering is a primary action on this page and should
-   stay reachable through a scroll, not disappear with the chrome around it.
-   It stays pinned via its own `position: sticky` at every width, unaffected
-   by scroll direction.
+   **August 14, 2026: the header now hides at every width, not only below
+   48rem.** The August 13 entry directly below this one argued the opposite --
+   that filtering is a primary action and .feed-tabs should stay reachable
+   without disappearing with the chrome around it -- and reasoned from that to
+   confining the whole hide behaviour to mobile. That argument is still
+   correct on its own terms, and it is knowingly overridden here: asked for
+   explicitly, in those words ("do the same for all devices"), because the
+   mobile behaviour reads as the more polished one and the inconsistency
+   between mobile and desktop was itself the complaint. Nothing about
+   .feed-tabs's own reachability changes -- it never stops being sticky, it
+   only rises to close the gap the header leaves, exactly as it already did on
+   mobile. What changes is that this now happens everywhere.
 
-   Below 48rem the tabs still move, but only to close the gap the header's
-   retraction would otherwise leave. `.feed-tabs` sticks at `top: 4.75rem`
-   (below), which is calibrated to sit just under the header WHEN THE HEADER
-   IS VISIBLE. That offset does not know the header is gone: it is a fixed
-   distance from the viewport top, not a measurement of the header's live
-   box, so once the header transforms off-screen the tabs would stay parked
-   4.75rem down, leaving a dead unpainted strip above them the exact height
-   of the header. Translating the tabs by that same -4.75rem, on the same
-   is-nav-hidden class and the same shared transition as the header, slides
-   them up in lockstep so they land flush with the viewport top exactly as
-   the header clears it. The value comes from the header's known, fixed
-   mobile height, not from reading the header's box at runtime -- which is
-   what keeps this free of jump risk if the two elements' transitions were
-   ever to fall a frame out of sync. */
+   The tabs move to close the gap the header's retraction would otherwise
+   leave, at every width. `.feed-tabs` sticks at `top: 5.25rem` on desktop and
+   `top: 4.75rem` below 48rem (both set further down this file), calibrated to
+   sit just under the header WHEN THE HEADER IS VISIBLE. That offset does not
+   know the header is gone: it is a fixed distance from the viewport top, not
+   a measurement of the header's live box, so once the header transforms
+   off-screen the tabs would stay parked at their normal offset, leaving a
+   dead unpainted strip above them the exact height of the header. Translating
+   the tabs by that same negative offset, on the same is-nav-hidden class and
+   the same shared transition as the header, slides them up in lockstep so
+   they land flush with the viewport top exactly as the header clears it.
+
+   Both offsets were checked against the header's REAL rendered height rather
+   than assumed, because the header uses flex-wrap and carries a search box
+   that can wrap it onto more than one line: measured, the header is a stable
+   85px (5.313rem) at every width from 769px up to 1920px, 1px off the 84px
+   the desktop 5.25rem offset reserves -- close enough to be its own border.
+   Below 48rem the header can grow past 200px on very narrow phones (search
+   box and nav stacking under the wordmark), and the 4.75rem/76px offset
+   already undershoots there. That mismatch predates this change, is
+   unrelated to it, and is not fixed by it -- below 48rem the tabs still only
+   partially close the gap on the narrowest phones, same as before. */
 .feed-tabs,
 body:has(.home-layout) .site-header {
     transition: transform var(--motion-base) var(--ease);
+}
+
+body:has(.home-layout).is-nav-hidden .site-header {
+    transform: translateY(-100%);
+}
+
+body:has(.home-layout).is-nav-hidden .feed-tabs {
+    transform: translateY(-5.25rem);
 }
 
 @media (max-width: 48rem) {
     body:has(.home-layout).is-nav-hidden .feed-tabs {
         transform: translateY(-4.75rem);
     }
-
-    body:has(.home-layout).is-nav-hidden .site-header {
-        transform: translateY(-100%);
-    }
 }
 
 /* Focus must never be stranded off-screen. .site-header is the only element
    that can still leave the viewport, so it is the only one this needs to
-   rescue. .feed-tabs never fully hides any more -- it only rises to close
-   the header's gap -- so it does not need this, and adding it back would
-   actively fight that rise: focusing a pill while the header is hidden
-   would force .feed-tabs's transform to none, dropping it back down to its
-   normal 4.75rem offset and reopening the exact gap this rule exists to
-   close, while the header stayed hidden regardless (focus-within only ever
-   sees inside its own element). */
+   rescue. .feed-tabs never fully hides -- it only rises to close the header's
+   gap -- so it does not need this, and adding it back would actively fight
+   that rise: focusing a pill while the header is hidden would force
+   .feed-tabs's transform to none, dropping it back down to its normal offset
+   and reopening the exact gap this rule exists to close, while the header
+   stayed hidden regardless (focus-within only ever sees inside its own
+   element). Unscoped by width on purpose, now that the header hides
+   everywhere: a keyboard user tabbing into it on desktop needs the same
+   rescue a mobile visitor already had. */
 body.is-nav-hidden .site-header:focus-within {
     transform: none;
 }
@@ -2164,96 +2185,41 @@ body.is-nav-hidden .site-header:focus-within {
    Loading page (loading.html)
    -------------------------------------------------------------------------- */
 
-/* Loading page: the countdown card, plus a sticky ad rail beside it on
-   desktop.
+/* Loading page: the countdown card, plus the shared fixed full-height ad
+   rail beside it on desktop.
 
-   The rail replaced a fixed bottom anchor. The anchor sat position:fixed
-   over the foot of the viewport while this page's two 300x250 banners sit
-   mid-page inside the centred card, so on a short viewport the bar covered
-   them -- reserving body padding does not help when the thing being covered
-   is not at the end of the document. A rail in this flex row cannot overlap
-   anything by construction: it moves with the content instead of pinning
-   over it, which is why it stays position:sticky rather than joining the
-   .editor-rail/.home-rail/.content-rail fixed-column family below, even
-   though it reuses that family's mounting code (August 13, 2026: upgraded
-   from a single skyscraper to the real three-slot stack via
-   mountContentAds() -- same [data-ad-content-rail]/[data-ad-rail-slot]
-   markup contract, zero new JavaScript, deliberately not that function's
-   CSS). Neither .loading-wrap (44rem) nor the rail (--ad-rail-w, 11.5rem
-   single-unit / 20.25rem stack) comes close to this page's own 72rem main
-   cap even added together with the 2rem gap between them, so unlike the
-   other content-rail pages there is no main-squeeze risk here to protect
-   against -- the floor below is inherited from mountContentAds()'s own
-   75rem/93rem gates for consistency with those pages, not chosen to shed
-   width main never had reserved.
+   Full display now (August 16, 2026): .loading-rail joins the
+   .editor-rail/.home-rail/.content-rail selector list below instead of
+   carrying its own position:sticky rule here, reversing that earlier
+   choice. What changed is not the risk assessment, which was correct as
+   far as it went, but the object it was assessed against. The original
+   comment reasoned from the fixed BOTTOM anchor this page tried and
+   reverted: a position:fixed bar at the foot of the viewport pins to
+   wherever the visitor has scrolled to, and reserving body padding only
+   guarantees clearance once scrolled to the document's true end, not at
+   every scroll position along the way -- unsafe beside banners that sit
+   mid-page inside a centred card. A fixed SIDE rail is a different
+   mechanism, not a smaller version of the same risk: .editor-rail,
+   .home-rail and .content-rail all reserve their width with a single
+   body padding-right for the ENTIRE page, at every scroll position, not
+   just at the document's end -- there is no scroll position where content
+   could occupy that reserved column, because the column's width is
+   removed from the page's available width outright rather than floated
+   over it. That is exactly the mechanism index.html and the four editors
+   already rely on, and it is why this page's rail can safely match them.
+   See the corrected mountSiteAnchor comment in js/ads.js, which still
+   documents the real anchor lesson.
 
-   One inherited side effect worth knowing about: mountContentAds() calls
-   reserveRailWidth() regardless of which host filled it, so a mounted
-   .loading-rail still adds .has-ad-rail to <body>. Confirmed harmless --
-   every screen-mode rule keyed on it also requires :has(.home-rail),
-   :has(.editor-rail) or :has(.content-rail) on the same body, or
-   :has(.editor-shell)/:has(.home-layout) on main, and this page has none of
-   those, so no padding-right is ever actually reserved. Only the print
-   reset (body.has-ad-rail { padding-right: 0 !important; }) is unqualified,
-   and it is a no-op here since there was nothing to zero. Left as-is rather
-   than forking mountContentAds() to skip it, per "reuse the markup contract,
-   not the CSS" -- forking the function would have been new JavaScript for a
-   class addition that does nothing on this page. */
-.loading-layout {
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 2rem;
-}
-
-.loading-rail {
-    flex: 0 0 auto;
-    position: sticky;
-    top: 1.5rem;
-    width: var(--ad-rail-w);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-md) calc(var(--space-lg) / 2);
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-}
-
-.loading-rail .ad-label {
-    font-size: 0.5625rem;
-    margin-bottom: 0.125rem;
-}
-
-/* A slot with no filled banner leaves no gap in the stack */
-.loading-rail > div:empty {
-    display: none;
-}
-
-/* mountContentAds() gates the actual mount at 75rem/93rem (see
-   CONTENT_RAIL_MIN/CONTENT_RAIL_STACK_MIN in js/ads.js), so nothing fills
-   the three slots below 75rem regardless of what this rule allows -- the
-   :not(:has(.ad-slot)) collapse below already hides an unfilled rail. This
-   display:none exists so the empty flex slot the rail would otherwise
-   occupy in .loading-layout does not affect centring below that width, and
-   its value tracks the JS gate exactly rather than being an independent
-   number, so CSS and JS can never disagree about where the floor is. It
-   moved with that gate from 83.5rem to 75rem on August 13, 2026.
-   74.9375rem = one pixel below 75rem, same convention as the other
-   content-rail pages' own hide gate. */
-@media (max-width: 74.9375rem) {
-    .loading-rail {
-        display: none;
-    }
-}
-
-/* The rail always contains its three slot elements once mounted, so :empty
-   never matches it -- the test has to be whether any slot actually received
-   a banner, same reasoning as .editor-rail/.home-rail/.content-rail. */
-.loading-rail:not(:has(.ad-slot)) {
-    display: none;
-}
-
+   This page also has more headroom than the other content-rail pages:
+   .loading-wrap caps at 44rem, far under the 72rem main cap the family's
+   75rem floor exists to protect elsewhere -- the floor here is kept at
+   75rem purely for consistency with every other rail context (mounted at
+   identical widths sitewide), not because this page needs it. Mounting
+   still goes through mountContentAds() unchanged (August 13, 2026: upgraded
+   from a single skyscraper to the real three-slot stack) -- same
+   [data-ad-content-rail]/[data-ad-rail-slot] markup contract, zero new
+   JavaScript, now sharing that function's CSS too instead of deliberately
+   not doing so. */
 .loading-wrap {
     max-width: 44rem;
     margin: 0 auto;
@@ -2373,35 +2339,6 @@ body.is-nav-hidden .site-header:focus-within {
     color: var(--color-muted);
 }
 
-/* What the visitor gets on the other side: gives the interval content */
-
-.loading-points {
-    list-style: none;
-    max-width: 22rem;
-    margin: var(--space-lg) auto 0;
-    text-align: left;
-    border-top: 1px solid var(--color-border);
-    padding-top: var(--space-md);
-}
-
-.loading-points li {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    padding-left: var(--space-md);
-    position: relative;
-    margin-bottom: var(--space-3xs);
-}
-
-.loading-points li::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0.5rem;
-    width: 0.375rem;
-    height: 0.375rem;
-    background-color: var(--color-brand);
-}
-
 .ad-row {
     display: flex;
     justify-content: center;
@@ -2411,29 +2348,31 @@ body.is-nav-hidden .site-header:focus-within {
 }
 
 /* Below 70rem, .loading-card already stacks a headline, status copy, a
-   template preview, a progress bar, a countdown and a three-item trust list
-   above this row -- a second 300x250 beneath all of that is what pushes a
-   short phone into scroll. Dropping to one banner is necessary but, measured
-   at a 667px-tall viewport, not sufficient on its own: the content alone
-   (excluding every padding and margin) already totals ~685px, more than a
-   667px viewport before a single pixel of spacing is added. The fixed
-   bottom anchor other pages use was tried here once already and reverted
-   (see the mountSiteAnchor comment in js/ads.js): it is position:fixed, so
-   it pins to the viewport rather than the document and can cover this
-   mid-page content on a short screen for the exact same reason the rail
-   above cannot be position:fixed either -- cutting banner count doesn't
-   change that, and neither does anything below; only not adding the anchor
-   does. So alongside the single banner, this block also tightens the
-   vertical rhythm around it and drops the trust list, which is the least
-   load-bearing content on the page (the template preview above it stays --
-   it is what personalises the wait). Measured before/after at 400x667: 1091px
-   of document height down to within the viewport, zero vertical scroll. */
+   template preview, a progress bar and a countdown above this row -- a
+   second 300x250 beneath all of that is what pushes a short phone into
+   scroll. Dropping to one banner is necessary but, measured at a 667px-tall
+   viewport, not sufficient on its own: the content alone (excluding every
+   padding and margin) already totals ~685px, more than a 667px viewport
+   before a single pixel of spacing is added. The fixed bottom anchor other
+   pages use was tried here once already and reverted (see the
+   mountSiteAnchor comment in js/ads.js): it is position:fixed, so it pins
+   to the viewport rather than the document and can cover this mid-page
+   content on a short screen -- cutting banner count doesn't change that,
+   and neither does anything below; only not adding the anchor does. So
+   alongside the single banner, this block also tightens the vertical
+   rhythm around it. The three-item trust list that used to be the next
+   thing to give up its space here was removed from the page entirely
+   (August 16, 2026, alongside the rail change above) as space-wasting
+   copy, so there is nothing left to hide at this breakpoint. Measured
+   before/after at 400x667: 1091px of document height down to within the
+   viewport, zero
+   vertical scroll. */
 @media (max-width: 70rem) {
     #ad-banner-2 {
         display: none;
     }
 
-    main:has(.loading-layout) {
+    main:has(.loading-wrap) {
         padding: var(--space-xs) var(--space-md) var(--space-xs);
     }
 
@@ -2475,13 +2414,6 @@ body.is-nav-hidden .site-header:focus-within {
     .ad-row {
         margin-top: var(--space-sm);
     }
-
-    /* Reassurance content, not the countdown or the ad itself -- the first
-       thing to give up the space it costs (129px plus its own top margin)
-       when the viewport is too short to hold everything. */
-    .loading-points {
-        display: none;
-    }
 }
 
 /* Second pass (same day): the mobile site-wide anchor was added back to
@@ -2513,7 +2445,7 @@ body.is-nav-hidden .site-header:focus-within {
        320px's narrower text still wraps the status line and countdown
        label onto more lines each, so a further ~50px was still short.
        Layered on top of the 70rem tier's own reductions above. */
-    main:has(.loading-layout) {
+    main:has(.loading-wrap) {
         padding: var(--space-3xs) var(--space-sm) var(--space-3xs);
     }
 
@@ -2551,6 +2483,136 @@ body.is-nav-hidden .site-header:focus-within {
        clearly as the headline number of the page. */
     .countdown {
         font-size: 2rem;
+    }
+}
+
+/* Short viewports at desktop WIDTH -- the laptop case, which neither tier
+   above reaches because both key on width and a 1366px laptop is nowhere near
+   70rem. Reported as: the two 300x250 banners are below the fold, so seeing
+   them requires scrolling a page whose whole purpose is a ten-second wait an
+   ad is being served during. Measured at 1366x625 (a 768px-tall laptop screen
+   less browser chrome) before this tier: the ad row's bottom edge sat at
+   725px against a 625px viewport -- 100px under the fold -- and the document
+   ran to 870px.
+
+   The generous default rhythm is kept above the threshold rather than
+   compressed everywhere: on a 1080p screen (roughly a 937px viewport) the
+   whole 870px document already fits with room over, so there is nothing to
+   buy there and the spacing is what makes the card read as a considered page
+   rather than a cramped one. 56.25rem = 900px, chosen as the point below
+   which the untouched layout stops fitting, not as a device guess.
+
+   Scoped to min-width 70.0625rem (one pixel above the 70rem tier's ceiling)
+   so this and the two width tiers above are disjoint by construction. They
+   set many of the same properties, and media queries carry no specificity --
+   overlapping them would make source order decide the winner on a short
+   phone, which is exactly the class of silent bug the rail's own gate
+   ordering already documents.
+
+   Every reduction here is spacing, never content: the template preview, the
+   status copy and the countdown label all survive at this width. That is the
+   difference between this tier and the two above, which do drop content
+   (the second banner, then the preview) because a phone genuinely cannot
+   hold it all. Measured after: the ad row's bottom lands at 562px and the
+   document totals 615px, so at 1366x625 the page now fits entirely with no
+   scroll at all, and the banners stay fully visible down to a 590px
+   viewport. */
+@media (min-width: 70.0625rem) and (max-height: 56.25rem) {
+    /* The foot padding is trimmed as far as the top one rather than left at
+       the site default: those last 8px are the difference between a 1366x625
+       laptop (the reported case) fitting the whole document with no scrollbar
+       at all and carrying one for the sake of blank space below the banners. */
+    main:has(.loading-wrap) {
+        padding-top: var(--space-md);
+        padding-bottom: var(--space-md);
+    }
+
+    .loading-wrap {
+        padding: var(--space-xs) 0;
+    }
+
+    .loading-card {
+        padding: var(--space-lg) 2rem;
+    }
+
+    .loading-card h1 {
+        margin-bottom: var(--space-2xs);
+    }
+
+    .loading-status {
+        margin-bottom: var(--space-sm);
+    }
+
+    .loading-template {
+        margin-bottom: var(--space-sm);
+        padding: var(--space-xs);
+    }
+
+    /* The preview shrinks rather than disappearing -- it is what tells the
+       visitor which template is opening, and at 40x50 it still reads as a
+       document miniature. */
+    .loading-template-thumb {
+        width: 2.5rem;
+        height: 3.125rem;
+    }
+
+    .progress-track {
+        margin-bottom: var(--space-xs);
+    }
+
+    .countdown-row {
+        margin-bottom: var(--space-3xs);
+    }
+
+    .ad-row {
+        margin-top: var(--space-md);
+    }
+}
+
+/* Deeper tier for genuinely short desktop viewports -- a 1280x720 laptop
+   leaves roughly 550px once browser chrome is taken off, and the tier above
+   alone still put the banners' bottom edge at 573px there, 23px under the
+   fold. Everything above trims spacing only; this one also steps the two
+   display type sizes down, which is the first thing on the page that can give
+   up height without removing anything. 37.5rem = 600px.
+
+   Nested inside the same min-width guard for the same disjointness reason,
+   and declared after the tier above so it layers on top of it rather than
+   restating it -- only the further reductions appear here. Measured after:
+   the ad row's bottom lands at 535px at 1280x550, clear of the fold with
+   room over. */
+@media (min-width: 70.0625rem) and (max-height: 37.5rem) {
+    main:has(.loading-wrap) {
+        padding-top: var(--space-xs);
+    }
+
+    .loading-card {
+        padding-top: var(--space-md);
+    }
+
+    /* 1.375rem still carries the page's only heading clearly at this size;
+       the serif face is what does the work, not the scale. */
+    .loading-card h1 {
+        font-size: 1.375rem;
+    }
+
+    .loading-status {
+        margin-bottom: var(--space-xs);
+    }
+
+    .loading-template {
+        margin-bottom: var(--space-xs);
+    }
+
+    /* The headline number of the page, so it is stepped down rather than
+       shrunk to the body scale -- 30px still reads as the thing being
+       counted. */
+    .countdown {
+        font-size: 1.875rem;
+    }
+
+    .ad-row {
+        margin-top: var(--space-sm);
     }
 }
 
@@ -2667,12 +2729,16 @@ body.is-nav-hidden .site-header:focus-within {
 
 /* The one rail definition on the site. The homepage rail is not a copy of
    this, it IS this -- asked for in those words, and sharing the selector is
-   the only reading of "the same rail" that cannot drift apart later. The two
+   the only reading of "the same rail" that cannot drift apart later. The
    pages differ solely in which viewport band mounts it, which is a media
-   query below and a matchMedia call in js/ads.js. */
+   query below and a matchMedia call in js/ads.js. .loading-rail joined this
+   list August 16, 2026 -- see the loading.html section above for why a
+   fixed side rail does not carry the overlap risk a fixed bottom anchor
+   does. */
 .editor-rail,
 .home-rail,
-.content-rail {
+.content-rail,
+.loading-rail {
     position: fixed;
     top: 0;
     right: 0;
@@ -2705,7 +2771,8 @@ body.is-nav-hidden .site-header:focus-within {
 
 .editor-rail::-webkit-scrollbar,
 .home-rail::-webkit-scrollbar,
-.content-rail::-webkit-scrollbar {
+.content-rail::-webkit-scrollbar,
+.loading-rail::-webkit-scrollbar {
     display: none;
 }
 
@@ -2721,7 +2788,8 @@ body.is-nav-hidden .site-header:focus-within {
    grow into space the label gives up. */
 .editor-rail .ad-label,
 .home-rail .ad-label,
-.content-rail .ad-label {
+.content-rail .ad-label,
+.loading-rail .ad-label {
     font-size: 0.5625rem;
     margin-bottom: 0.125rem;
 }
@@ -2729,7 +2797,8 @@ body.is-nav-hidden .site-header:focus-within {
 /* A slot with no filled banner leaves no gap in the stack */
 .editor-rail > div:empty,
 .home-rail > div:empty,
-.content-rail > div:empty {
+.content-rail > div:empty,
+.loading-rail > div:empty {
     display: none;
 }
 
@@ -2810,6 +2879,16 @@ body.is-nav-hidden .site-header:focus-within {
     }
 }
 
+/* Fourth context: loading.html, which needed no floor-derivation of its own
+   -- see the loading.html section above. Kept at the same 75rem as every
+   other rail context purely for consistency, not because this page's 44rem
+   .loading-wrap comes anywhere near being squeezed by it. */
+@media (max-width: 74.9375rem) {
+    .loading-rail {
+        display: none;
+    }
+}
+
 /* Reserve the column's width. This single padding is the whole inset: the
    header, the category tabs, the mega-menu, the editing panes and the sticky
    export bar are all in normal flow inside <body> and inherit it, so not one
@@ -2845,6 +2924,17 @@ body.is-nav-hidden .site-header:focus-within {
    A max-width cannot hand back width the viewport does not have. */
 @media (min-width: 75rem) {
     body.has-ad-rail:has(.content-rail) {
+        padding-right: var(--ad-rail-w);
+    }
+}
+
+/* loading.html needs no main:has() cap-shedding rule either, for a plainer
+   reason than the content-rail pages above: .loading-wrap caps at 44rem, so
+   even added to the rail's own width plus the gap between them it never
+   comes close to squeezing anything -- there was never a cap here to shed
+   in the first place. */
+@media (min-width: 75rem) {
+    body.has-ad-rail:has(.loading-rail) {
         padding-right: var(--ad-rail-w);
     }
 }
@@ -2906,7 +2996,8 @@ body.is-nav-hidden .site-header:focus-within {
    the test has to be whether any slot actually received a banner. */
 .editor-rail:not(:has(.ad-slot)),
 .home-rail:not(:has(.ad-slot)),
-.content-rail:not(:has(.ad-slot)) {
+.content-rail:not(:has(.ad-slot)),
+.loading-rail:not(:has(.ad-slot)) {
     display: none;
 }
 
@@ -3204,6 +3295,462 @@ body.has-site-anchor {
 
 .save-state.is-unavailable::before {
     background-color: var(--color-warn);
+}
+
+/* --------------------------------------------------------------------------
+   Poster editor toolbar (poster.html)
+
+   This is .site-header with different contents, not a different element --
+   the fixed ad rail insets everything in normal flow via one body
+   padding-right, and the header inherits that with no rule of its own. Giving
+   the editor bar its own width or margin would break exactly the mechanism
+   FIXED_FULL_HEIGHT_AD_RAIL.md warns against, so nothing here sets either.
+   -------------------------------------------------------------------------- */
+
+.editor-bar {
+    gap: var(--space-sm);
+}
+
+.editor-home {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    color: var(--color-text);
+}
+
+.editor-home svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.editor-home:hover {
+    color: var(--color-brand);
+}
+
+/* The document name is an input rather than a heading: it is editable, and a
+   contenteditable heading would need its own sanitisation path for no gain. */
+.doc-name {
+    flex: 1 1 8rem;
+    min-width: 0;
+    max-width: 18rem;
+    font-family: var(--font-serif);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    padding: 0.3125rem var(--space-xs);
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: var(--color-text);
+}
+
+.doc-name:hover {
+    border-color: var(--color-border);
+}
+
+.doc-name:focus {
+    border-color: var(--color-brand);
+    background-color: var(--color-bg);
+    outline: none;
+}
+
+.editor-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    margin-left: auto;
+}
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 var(--space-2xs);
+    font-size: 0.8125rem;
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.icon-btn svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.icon-btn:hover:not(:disabled) {
+    background-color: var(--color-bg);
+    border-color: var(--color-border);
+}
+
+/* A disabled undo button that looks identical to an enabled one is a lie
+   about what the history stack holds. */
+.icon-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.icon-btn[aria-pressed="true"] {
+    background-color: var(--color-brand);
+    border-color: var(--color-brand);
+    color: #FFFFFF;
+}
+
+/* Autosave as an icon. The tick is hidden until a write actually lands, so
+   the cloud alone means "will save" and cloud-plus-tick means "saved" -- the
+   same two states the prose version had, in the same element. */
+.save-cloud {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    color: var(--color-muted);
+    transition: color var(--motion-base) var(--ease);
+}
+
+.save-cloud svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.save-cloud .tick {
+    opacity: 0;
+    transition: opacity var(--motion-base) var(--ease);
+}
+
+.save-cloud.is-saved {
+    color: var(--color-ok);
+}
+
+.save-cloud.is-saved .tick {
+    opacity: 1;
+}
+
+.save-cloud.is-unavailable {
+    color: var(--color-warn);
+}
+
+/* Download control and its panel */
+
+.dl {
+    position: relative;
+}
+
+.dl-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    padding: 0.375rem var(--space-sm);
+    font-size: 0.8125rem;
+}
+
+.dl-toggle svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Anchored to the button, right-aligned, and capped in height with its own
+   scroll: the PDF branch is the tallest and would otherwise run past a short
+   laptop viewport with the Download action below the fold. */
+.dl-panel {
+    position: absolute;
+    top: calc(100% + var(--space-2xs));
+    right: 0;
+    z-index: 40;
+    width: 20rem;
+    max-width: calc(100vw - 2rem);
+    max-height: min(32rem, calc(100vh - 6rem));
+    overflow-y: auto;
+    padding: var(--space-md);
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+    text-align: left;
+}
+
+.dl-heading {
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: var(--space-sm);
+}
+
+.dl-label {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    margin: var(--space-sm) 0 var(--space-3xs);
+}
+
+.dl-panel select,
+.dl-panel input[type="password"] {
+    width: 100%;
+    padding: 0.375rem var(--space-2xs);
+    font-size: 0.8125rem;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+.dl-note {
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: var(--color-muted);
+    margin-top: var(--space-3xs);
+}
+
+.dl-check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2xs);
+    font-size: 0.8125rem;
+    margin-top: var(--space-xs);
+    cursor: pointer;
+}
+
+.dl-check input {
+    margin-top: 0.1875rem;
+    flex-shrink: 0;
+}
+
+.dl-adv {
+    margin-top: var(--space-sm);
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-xs);
+}
+
+.dl-adv summary {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dl-go {
+    margin-top: var(--space-md);
+}
+
+/* --------------------------------------------------------------------------
+   Text formatting toolbar
+   -------------------------------------------------------------------------- */
+
+.text-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+    padding: var(--space-2xs) var(--space-xs);
+    margin-bottom: var(--space-md);
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+
+.text-toolbar select,
+.text-toolbar input[type="number"] {
+    padding: 0.25rem var(--space-3xs);
+    font-size: 0.8125rem;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+.text-toolbar input[type="number"] {
+    width: 4rem;
+}
+
+.tt-sep {
+    width: 1px;
+    height: 1.25rem;
+    background-color: var(--color-border);
+    margin: 0 var(--space-3xs);
+}
+
+.tt-color input[type="color"] {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    background: none;
+    cursor: pointer;
+}
+
+.tt-adv {
+    position: relative;
+}
+
+.tt-adv summary {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.25rem var(--space-2xs);
+    cursor: pointer;
+    list-style: none;
+}
+
+.tt-adv-panel {
+    position: absolute;
+    top: calc(100% + var(--space-3xs));
+    left: 0;
+    z-index: 30;
+    width: 15rem;
+    max-width: calc(100vw - 2rem);
+    padding: var(--space-sm);
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.tt-adv-panel label {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    margin: var(--space-xs) 0 var(--space-3xs);
+}
+
+.tt-adv-panel input,
+.tt-adv-panel select {
+    width: 100%;
+}
+
+.tt-wide {
+    width: 100%;
+    margin-top: var(--space-sm);
+    border-color: var(--color-border);
+}
+
+/* --------------------------------------------------------------------------
+   Caption field and emoji picker
+   -------------------------------------------------------------------------- */
+
+.caption-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2xs);
+}
+
+.caption-row textarea {
+    flex: 1 1 auto;
+    min-width: 0;
+    resize: vertical;
+}
+
+.emoji-toggle {
+    flex-shrink: 0;
+    font-size: 1.125rem;
+    border-color: var(--color-border);
+}
+
+.emoji-panel {
+    margin-top: var(--space-2xs);
+    max-height: 14rem;
+    overflow-y: auto;
+    padding: var(--space-xs);
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+
+.emoji-grid h4 {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    margin: var(--space-xs) 0 var(--space-3xs);
+}
+
+.emoji-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.125rem;
+}
+
+.emoji-row button {
+    width: 1.875rem;
+    height: 1.875rem;
+    font-size: 1.0625rem;
+    line-height: 1;
+    background: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.emoji-row button:hover {
+    background-color: var(--color-bg);
+    border-color: var(--color-border);
+}
+
+.field-row {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.btn-ghost {
+    flex: 1 1 auto;
+    background-color: transparent;
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.btn-ghost:hover {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+}
+
+/* The canvas is now interactive (click to select text, drag to position),
+   which the default arrow cursor gives no hint of. */
+#poster-canvas {
+    cursor: crosshair;
+    touch-action: none;
+}
+
+/* Below the editor's two-pane breakpoint the toolbar would otherwise wrap to
+   four rows and push the canvas off screen. */
+@media (max-width: 48rem) {
+    .doc-name {
+        flex-basis: 5rem;
+    }
+
+    .text-toolbar {
+        gap: 0.125rem;
+    }
+
+    .dl-panel {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: auto;
+        max-height: 70vh;
+    }
 }
 
 /* First-run sample content notice.
@@ -5003,6 +5550,7 @@ legend {
     .editor-anchor,
     .home-rail,
     .content-rail,
+    .loading-rail,
     .site-anchor,
     .editor-leaderboard,
     .form-nav,

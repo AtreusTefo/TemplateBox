@@ -222,25 +222,29 @@ function staticChecks() {
     });
 
     /* 1f. Every page family's `display: none` gate must be declared AFTER the
-           shared .editor-rail/.home-rail/.content-rail rule. Media queries
-           carry no specificity, so written before it the gate loses to the
-           shared `display: flex` and the rail appears on every viewport it is
-           meant to skip -- with nothing failing anywhere to say so. Source
-           order is the whole contest, which makes it worth a test.
+           shared .editor-rail/.home-rail/.content-rail/.loading-rail rule.
+           Media queries carry no specificity, so written before it the gate
+           loses to the shared `display: flex` and the rail appears on every
+           viewport it is meant to skip -- with nothing failing anywhere to
+           say so. Source order is the whole contest, which makes it worth a
+           test.
 
            Each gate is matched by the SELECTOR it hides, never by its width
-           alone. As of August 13, 2026 all three rail families floor at
-           75rem and so share the identical 74.9375rem hide value, and
-           loading.html's unrelated .loading-rail uses it too -- a bare width
-           search matches whichever happens to sit earliest in the file, which
-           is exactly the false pass (and, once .loading-rail moved above the
-           shared rule, the false FAILURE) this pairing exists to avoid. */
+           alone. As of August 13, 2026 all three original rail families
+           floor at 75rem and so share the identical 74.9375rem hide value; a
+           bare width search would match whichever happens to sit earliest in
+           the file regardless of which selector it actually gates, which is
+           the false pass this pairing exists to avoid. loading.html's
+           .loading-rail joined the shared selector itself (August 16, 2026,
+           reversing its earlier position:sticky treatment) and is checked
+           the same way as the other three now rather than being the
+           unrelated edge case it used to be. */
     const css = fs.readFileSync(path.join(SITE, "css", "style.css"), "utf8");
-    const sharedRule = css.search(/\.editor-rail,\s*\.home-rail,\s*\.content-rail\s*\{/);
+    const sharedRule = css.search(/\.editor-rail,\s*\.home-rail,\s*\.content-rail,\s*\.loading-rail\s*\{/);
     const gateOf = (selector) => css.search(
         new RegExp("@media\\s*\\(max-width:\\s*74\\.9375rem\\)\\s*\\{\\s*\\" + selector + "\\s*\\{")
     );
-    [["homepage", ".home-rail"], ["editor", ".editor-rail"], ["content", ".content-rail"]]
+    [["homepage", ".home-rail"], ["editor", ".editor-rail"], ["content", ".content-rail"], ["loading", ".loading-rail"]]
         .forEach(([label, selector]) => {
             const gate = gateOf(selector);
             check(`the ${label} rail's display gate is declared after the shared rule`,
@@ -263,6 +267,28 @@ function staticChecks() {
     check("loading.html's inline route whitelist matches EDITOR_ROUTES",
         appRoutes !== null && appRoutes === inlineRoutes,
         `js/app.js: ${appRoutes} | loading.html: ${inlineRoutes}`);
+
+    /* 1f2. Every banner runs inside a srcdoc iframe, and the srcdoc body's
+            inline style is what suppresses a scrollbar when a creative lays
+            out larger than the size it was booked at -- the iframe's own
+            document scrolls, and that scrollbar paints inside the frame where
+            the parent .ad-slot's overflow:hidden cannot reach it (August 16,
+            2026). js/ads.js builds that string for every dynamically mounted
+            placement; loading.html hardcodes two of its own. Same duplication
+            shape as the route whitelist above and the footer constant that
+            already drifted once, so it is asserted rather than trusted: a
+            style added to the generator alone would leave loading.html's two
+            banners scrollbarred with nothing failing to say so. */
+    const adsBodyStyle = adsJs.match(/"<body style='([^']+)'>"/);
+    const loadingBodyStyles = [...loading.matchAll(/srcdoc="<body style='([^']+)'>/g)]
+        .map((m) => m[1]);
+    const norm = (s) => (s || "").split(";").map((d) => d.trim())
+        .filter(Boolean).sort().join(";");
+    check("loading.html's inline banner srcdoc body style matches js/ads.js",
+        adsBodyStyle !== null && loadingBodyStyles.length === 2 &&
+        loadingBodyStyles.every((s) => norm(s) === norm(adsBodyStyle[1])),
+        `js/ads.js: ${adsBodyStyle ? adsBodyStyle[1] : "not found"} | ` +
+        `loading.html: ${loadingBodyStyles.join(" , ") || "none found"}`);
 
     /* 1g. The dark theme is declared twice -- once for the explicit
            data-theme="dark" attribute and once for the prefers-color-scheme
@@ -436,7 +462,28 @@ function startServer(cwd, port) {
        on Windows refuses to spawn a .cmd shim without a shell (EINVAL), and
        passing args alongside shell:true is deprecated. The port is a literal
        defined in this file, so there is nothing here to escape. */
-    return spawn(`npx serve -l ${port}`, { cwd, stdio: "ignore", shell: true });
+    const proc = spawn(`npx serve -l ${port}`, { cwd, stdio: "ignore", shell: true });
+
+    /* shell:true means the child is the SHELL, and npx then spawns serve
+       beneath it. proc.kill() reaps only the shell, so every interrupted or
+       failed run used to leave a live server holding this port -- after which
+       the next run silently talked to a stale server from an older working
+       tree, or timed out against it. That surfaced as "navigation did not
+       settle within 20s" on an unrelated page, which reads like a site bug and
+       is not one. Kill the whole tree instead. */
+    proc.killTree = () => {
+        try {
+            if (process.platform === "win32") {
+                spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+            } else {
+                process.kill(-proc.pid, "SIGKILL");
+            }
+        } catch (err) {
+            /* Already gone. */
+        }
+        try { proc.kill(); } catch (err) { /* already gone */ }
+    };
+    return proc;
 }
 
 async function waitForServer(port) {
@@ -664,19 +711,43 @@ async function layoutChecks(page) {
     for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/docs.html", 1366],
             ["content page", "/about.html", 1920]]) {
         await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
+        /* Wait for the header to STOP MOVING rather than for a fixed two
+           frames. The homepage header hides on scroll-down (August 14, 2026)
+           by translating upward over a CSS transition, so two rAFs after a
+           scrollTo catches it mid-flight: this assertion failed roughly one
+           run in three with headerTop at fractional values like -1.9, which
+           is not a layout fault but a stopwatch started too early. Polling
+           until two consecutive samples agree is deterministic regardless of
+           how long the transition takes. */
         const r = await page.evaluate(`(async () => {
             window.scrollTo(0, 1400);
-            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const hdr = document.querySelector('.site-header');
+            let last = null;
+            for (let i = 0; i < 60; i += 1) {
+                await new Promise(r => requestAnimationFrame(r));
+                const y = +hdr.getBoundingClientRect().y.toFixed(1);
+                if (last !== null && y === last) { break; }
+                last = y;
+            }
             const rail = document.querySelector('.editor-rail, .home-rail, .content-rail');
             const rr = rail.getBoundingClientRect();
-            const hd = document.querySelector('.site-header').getBoundingClientRect();
+            const hd = hdr.getBoundingClientRect();
             return { railTop: +rr.y.toFixed(1), railBottom: +rr.bottom.toFixed(1),
                      railLeft: +rr.x.toFixed(1), headerTop: +hd.y.toFixed(1),
+                     headerHeight: +hd.height.toFixed(1),
                      headerRight: +hd.right.toFixed(1), innerHeight: window.innerHeight };
         })()`);
+        /* headerTop is no longer required to be exactly 0. This check is about
+           the INSET -- that the header's right edge stops at the column -- and
+           the rail's full height; the header's vertical offset belongs to the
+           hide-on-scroll feature, which legitimately parks it anywhere from 0
+           to minus its own height. Demanding 0 asserted the header does not do
+           the thing it was deliberately built to do, and only passed at all
+           because an instant scrollTo does not always trigger the hide. */
         check(`${label} scrolled: column still full height, header still inset`,
             r.railTop === 0 && Math.abs(r.railBottom - r.innerHeight) < 1 &&
-            r.headerTop === 0 && r.headerRight <= r.railLeft + 0.5,
+            r.headerTop <= 0.5 && r.headerTop >= -(r.headerHeight + 0.5) &&
+            r.headerRight <= r.railLeft + 0.5,
             JSON.stringify(r));
     }
 
@@ -802,7 +873,7 @@ async function parityChecks(browserPath) {
 
     const server = startServer(tmp, BASELINE_PORT);
     if (!await waitForServer(BASELINE_PORT)) {
-        server.kill();
+        server.killTree();
         console.log("SKIP  baseline server did not start");
         return;
     }
@@ -830,7 +901,7 @@ async function parityChecks(browserPath) {
         }
     }
     page.close();
-    server.kill();
+    server.killTree();
 
     check(`ads blocked: working tree matches HEAD (${comparisons} measurements)`,
         differences === 0, `${differences} differing measurements, listed above`);
@@ -850,7 +921,7 @@ async function main() {
         } else {
             const server = startServer(ROOT, PORT);
             if (!await waitForServer(PORT)) {
-                server.kill();
+                server.killTree();
                 throw new Error(`could not start \`npx serve\` on port ${PORT} from the repository root`);
             }
             const page = await connect(browserPath, CDP_PORT);
@@ -861,7 +932,7 @@ async function main() {
                 page.close();
             }
             if (!NO_BASELINE) { await parityChecks(browserPath); }
-            server.kill();
+            server.killTree();
         }
     }
 

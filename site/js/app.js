@@ -1031,6 +1031,24 @@ const TB = (() => {
     const SAVED_LABEL_MS = 1600;
     let saveResetTimer = 0;
 
+    /* Writes the state text. Editors that show the indicator as prose get it
+       as the element's own text, exactly as before. poster.html shows it as a
+       cloud-and-tick icon instead, so it supplies a [data-save-label] child
+       and the words go there -- visually hidden, still read by assistive
+       technology, and mirrored into the title attribute so hovering the icon
+       reveals them. Writing textContent on the element itself in that case
+       would delete the icon's SVG, which is exactly what this indirection
+       exists to prevent. */
+    function setSaveText(el, text) {
+        const label = el.querySelector("[data-save-label]");
+        if (label) {
+            label.textContent = text;
+        } else {
+            el.textContent = text;
+        }
+        el.setAttribute("title", text);
+    }
+
     function markSaved(ok) {
         const el = document.getElementById("save-state");
         if (!el) {
@@ -1040,18 +1058,18 @@ const TB = (() => {
         if (ok === false) {
             el.classList.remove("is-saved");
             el.classList.add("is-unavailable");
-            el.textContent = "Not saved on this device";
+            setSaveText(el, "Not saved on this device");
             return;
         }
 
         el.classList.remove("is-unavailable");
         el.classList.add("is-saved");
-        el.textContent = "Saved on this device";
+        setSaveText(el, "Saved on this device");
 
         window.clearTimeout(saveResetTimer);
         saveResetTimer = window.setTimeout(() => {
             el.classList.remove("is-saved");
-            el.textContent = "Saves automatically";
+            setSaveText(el, "Saves automatically");
         }, SAVED_LABEL_MS);
     }
 
@@ -1078,7 +1096,7 @@ const TB = (() => {
             markSaved(false);
             return;
         }
-        el.textContent = "Saves automatically";
+        setSaveText(el, "Saves automatically");
     }
 
     /* ----------------------------------------------------------------------

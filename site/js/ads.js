@@ -93,8 +93,20 @@ const TBAds = (() => {
         frame.setAttribute("scrolling", "no");
         frame.style.border = "0";
         frame.style.display = "block";
+        /* overflow:hidden on the srcdoc body, not just on the parent .ad-slot.
+           A creative that lays out wider or taller than the size it was booked
+           at scrolls the IFRAME'S OWN document, and that scrollbar is painted
+           inside the frame's box -- the parent's overflow:hidden clips what
+           escapes the box, which is a different thing and cannot remove it
+           (reported August 16, 2026 as a scrollbar under both loading.html
+           banners at laptop widths, where nothing in the surrounding layout
+           was squeezing them). scrolling="no" is the deprecated attribute that
+           used to do this and is no longer reliably honoured. The srcdoc
+           document inherits this page's origin, so its body is ours to style;
+           the nested cross-origin frame the ad script then injects is not, but
+           it is that outer document's scrollbar that shows. */
         frame.setAttribute("srcdoc",
-            "<body style='margin:0'>" +
+            "<body style='margin:0;overflow:hidden'>" +
             "<script>atOptions={'key':'" + zone.key + "','format':'iframe'," +
             "'height':" + zone.height + ",'width':" + zone.width + ",'params':{}};<\/script>" +
             "<script src='https://www.highperformanceformat.com/" + zone.key + "/invoke.js'><\/script>" +
@@ -420,13 +432,26 @@ const TBAds = (() => {
        touching either. It briefly carried the anchor (August 2026) on the
        reasoning that .has-site-anchor reserves body padding, so the fixed
        bar could not cover anything. That reasoning was wrong: reserving
-       body padding protects the END of a document, and this page's ad
-       content sits mid-page inside a centred card, so on a short viewport
-       the bar sat straight over it while scrolled past -- nowhere near the
-       document's actual end. It was removed and replaced with a sticky
-       [data-ad-content-rail] rail beside the card instead (still there,
-       still desktop-only, see mountContentAds below), which cannot overlap
-       anything by construction because it moves with the content.
+       body padding at the FOOT of the document only protects the end of it,
+       and this page's ad content sits mid-page inside a centred card, so on
+       a short viewport the bar sat straight over it while scrolled past --
+       nowhere near the document's actual end. It was removed and replaced
+       with a [data-ad-content-rail] rail beside the card instead (still
+       there, desktop-only, see mountContentAds below).
+
+       That rail itself briefly stayed position:sticky rather than joining
+       the fixed .editor-rail/.home-rail/.content-rail family, on reasoning
+       that generalised the anchor's lesson too far: it treated any fixed
+       placement on this page as unsafe, rather than distinguishing a fixed
+       BOTTOM bar (which pins to wherever the visitor has scrolled to, so
+       body padding only guarantees clearance at the document's end) from a
+       fixed SIDE rail (which reserves its width with body padding for the
+       entire page, at every scroll position, not just the end -- there is
+       no scroll position where content could occupy that column, because
+       the column's width is removed from the page outright rather than
+       floated over it). That is the mechanism index.html and the editors
+       already relied on safely, and the rail switched to it too (August 16,
+       2026) -- see the .loading-rail comment in css/style.css.
 
        The anchor came back on mobile a second time, once the page's own
        mobile layout was tuned to fit the viewport with zero scrolling (see
