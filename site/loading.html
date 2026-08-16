@@ -53,10 +53,14 @@
 </head>
 <body>
 
-    <header class="site-header">
-        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
-        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to dark theme" title="Switch to dark theme"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></button>
-    </header>
+    <!-- No header on this page, deliberately (August 13, 2026). The header
+         was only ever a wordmark link and a theme toggle -- no nav row to
+         strip separately. Removing it also removes the toggle: a visitor
+         cannot switch theme from this ten-second forced interstitial, which
+         is fine, because the inline script in <head> already applies
+         whichever theme was last saved before first paint, independent of
+         whether a toggle exists here. Do not add a toggle back elsewhere on
+         this page unless that is actually wanted. -->
 
     <main data-ads-static>
         <div class="loading-layout">
@@ -127,16 +131,32 @@
             </div>
         </div>
 
-            <!-- Sticky 160x600 rail, desktop only, the same pattern the
-                 guides pages use. This replaced a fixed bottom anchor.
-                 The anchor was position:fixed over the foot of the viewport
-                 and `.has-site-anchor` reserved body padding to make room
-                 for it -- but that only protects the END of a page, and
-                 this page's two 300x250 banners sit MID-page inside a
-                 centred card, so on a short viewport the bar covered them.
-                 A rail in the flex row beside the card cannot overlap
-                 anything by construction. -->
-            <aside class="loading-rail" data-ad-rail aria-label="Advertisement"></aside>
+            <!-- Sticky rail, desktop only: the three-slot stack at 93rem and
+                 above, a single 160x600 from 83.5rem, matching the other
+                 content-rail pages' bands exactly, because this reuses
+                 mountContentAds() unchanged -- same markup contract
+                 ([data-ad-content-rail] host, three [data-ad-rail-slot]
+                 children), zero new JavaScript. What it deliberately does
+                 NOT reuse is that function's CSS: .content-rail is
+                 position:fixed, full viewport height, reserving its width
+                 with body padding, which is correct on pages where the ad
+                 content runs to the true bottom of the document. This page's
+                 two banners sit MID-page inside a centred card, so a fixed
+                 element pins to the viewport regardless of scroll position
+                 and can cover them on a short viewport even though they are
+                 nowhere near the document's actual end -- this page tried
+                 exactly that once and reverted it (see the .loading-rail
+                 rule in css/style.css and the mountSiteAnchor comment in
+                 js/ads.js). Keeping the "loading-rail" class instead of
+                 "content-rail" is what keeps it on position:sticky in this
+                 flex row, which cannot overlap anything by construction
+                 because it moves with the content instead of pinning over
+                 it. -->
+            <aside class="loading-rail" data-ad-content-rail aria-label="Advertisements">
+                <div data-ad-rail-slot></div>
+                <div data-ad-rail-slot></div>
+                <div data-ad-rail-slot></div>
+            </aside>
         </div>
     </main>
 
@@ -144,6 +164,23 @@
          nowhere for a visitor to navigate to that beats waiting out the
          countdown, so the footer's links (and its ~300px) served no purpose
          here. It is still present on every indexable page. -->
+
+    <!-- Mobile site-wide anchor (August 13, 2026, second pass). Excluded
+         from this page when the anchor was first rolled out sitewide,
+         because a position:fixed bar at the foot of the viewport can cover
+         mid-page content on a short screen regardless of how much body
+         padding is reserved -- the reservation only guarantees no overlap
+         once scrolled to the true end, not at every scroll position along
+         the way. What changed: the mobile layout below 48rem is now tuned
+         to fit entirely within the viewport with no scrolling at all (see
+         the @media (max-width: 48rem) rules in css/style.css), which
+         removes the "scrolled past" case that made the anchor unsafe here
+         in the first place -- there is no scroll position for the anchor
+         to sit over content at, because the whole page is always fully on
+         screen. Filled by mountSiteAnchor() in js/ads.js, unconditionally,
+         exactly like every other page; the exclusion this page used to
+         document there no longer applies. -->
+    <div class="site-anchor" data-ad-anchor aria-label="Advertisement"></div>
 
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>

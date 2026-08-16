@@ -45,15 +45,45 @@ const QUICK = process.argv.includes("--quick");
 const NO_BASELINE = process.argv.includes("--no-baseline");
 
 /* Pages carrying the fixed rail, and the widths that exercise every band
-   boundary. 1344 and 1488 are the 84rem and 93rem gates themselves. */
+   boundary. 1488 is the 93rem stack gate. 1199/1200 straddle the 75rem rail
+   floor, which as of August 13, 2026 is shared by ALL THREE rail families --
+   homepage, editors and the content pages all mount at the same widths now.
+   1280 is the reported MacBook Air width that motivated that consolidation.
+   1335/1336 and 1344 are kept because they were the content-rail family's
+   old 83.5rem floor and the editors' old 84rem floor respectively: nothing
+   should change there any more, which is exactly why they are worth
+   covering. */
 const PAGES = [
     ["index", "/"],
     ["resume", "/resume.html"],
     ["docs", "/docs.html"],
     ["poster", "/poster.html"],
-    ["mockup", "/mockup.html"]
+    ["mockup", "/mockup.html"],
+    ["about", "/about.html"],
+    ["rent-receipt", "/rent-receipt-template.html"],
+    ["blog", "/blog.html"],
+    ["post", "/post.html"]
 ];
-const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1200, 1024, 768, 320];
+const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 768, 320];
+
+/* Pages whose rail floor sits above the mobile anchor's own ceiling (48rem)
+   show neither band in between -- home's rail starts at 75rem, the
+   content-rail family's at 83.5rem, and both leave a genuine gap rather than
+   falling back to a leaderboard the way the editors do. Keyed by page name,
+   [minPxExclusive, maxPxExclusive) mirrors the CSS floor exactly so a floor
+   changed in one place cannot quietly disagree with the other. */
+const RAIL_GAP = {
+    index: [768, 1200],
+    about: [768, 1200],
+    "rent-receipt": [768, 1200],
+    blog: [768, 1200],
+    post: [768, 1200]
+};
+
+/* Pages that deliberately run a top leaderboard alongside the side rail
+   rather than treating them as alternatives for one slot -- see the comment
+   at the "exactly N ad band mounts" check below. */
+const MULTI_UNIT_PAGES = new Set(["blog", "post"]);
 
 let passed = 0;
 const failures = [];
@@ -133,7 +163,7 @@ function staticChecks() {
 
     /* 1c. Rail slots must not repeat a zone key. Three slots sharing one key
            is one placement counted three times, not three placements. */
-    ["EDITOR_RAIL_STACK", "HOME_RAIL_STACK"].forEach((constName) => {
+    ["EDITOR_RAIL_STACK", "HOME_RAIL_STACK", "CONTENT_RAIL_STACK"].forEach((constName) => {
         const m = adsJs.match(new RegExp(constName + "\\s*=\\s*\\[([^\\]]+)\\]"));
         if (!m) { return; }
         const zones = m[1].match(/"([^"]+)"/g).map((q) => q.slice(1, -1));
@@ -191,18 +221,32 @@ function staticChecks() {
             absent.length ? `queried but present in no page: ${absent.join(", ")}` : "");
     });
 
-    /* 1f. The homepage's `display: none` gate must be declared AFTER the
-           shared .editor-rail/.home-rail rule. Media queries carry no
-           specificity, so written before it the gate loses to the shared
-           `display: flex` and the rail appears on every viewport it is meant
-           to skip -- with nothing failing anywhere to say so. Source order is
-           the whole contest, which makes it worth a test. */
+    /* 1f. Every page family's `display: none` gate must be declared AFTER the
+           shared .editor-rail/.home-rail/.content-rail rule. Media queries
+           carry no specificity, so written before it the gate loses to the
+           shared `display: flex` and the rail appears on every viewport it is
+           meant to skip -- with nothing failing anywhere to say so. Source
+           order is the whole contest, which makes it worth a test.
+
+           Each gate is matched by the SELECTOR it hides, never by its width
+           alone. As of August 13, 2026 all three rail families floor at
+           75rem and so share the identical 74.9375rem hide value, and
+           loading.html's unrelated .loading-rail uses it too -- a bare width
+           search matches whichever happens to sit earliest in the file, which
+           is exactly the false pass (and, once .loading-rail moved above the
+           shared rule, the false FAILURE) this pairing exists to avoid. */
     const css = fs.readFileSync(path.join(SITE, "css", "style.css"), "utf8");
-    const sharedRule = css.search(/\.editor-rail,\s*\.home-rail\s*\{/);
-    const homeGate = css.search(/@media\s*\(max-width:\s*74\.9375rem\)/);
-    check("the homepage rail's display gate is declared after the shared rule",
-        sharedRule !== -1 && homeGate !== -1 && homeGate > sharedRule,
-        `shared rule at ${sharedRule}, gate at ${homeGate}`);
+    const sharedRule = css.search(/\.editor-rail,\s*\.home-rail,\s*\.content-rail\s*\{/);
+    const gateOf = (selector) => css.search(
+        new RegExp("@media\\s*\\(max-width:\\s*74\\.9375rem\\)\\s*\\{\\s*\\" + selector + "\\s*\\{")
+    );
+    [["homepage", ".home-rail"], ["editor", ".editor-rail"], ["content", ".content-rail"]]
+        .forEach(([label, selector]) => {
+            const gate = gateOf(selector);
+            check(`the ${label} rail's display gate is declared after the shared rule`,
+                sharedRule !== -1 && gate !== -1 && gate > sharedRule,
+                `shared rule at ${sharedRule}, ${selector} gate at ${gate}`);
+        });
 
     /* 1e. Both copies of the editor route whitelist must agree, or the
            loading page's dependency-free fallback sends a visitor to the
@@ -414,10 +458,15 @@ const SNAPSHOT = `(() => {
     return { x: +b.x.toFixed(1), y: +b.y.toFixed(1), w: +b.width.toFixed(1),
              h: +b.height.toFixed(1), right: +b.right.toFixed(1), bottom: +b.bottom.toFixed(1) }; };
   const de = document.documentElement;
-  const rail = document.querySelector('.editor-rail, .home-rail');
+  const rail = document.querySelector('.editor-rail, .home-rail, .content-rail');
   const railShown = rail ? getComputedStyle(rail).display !== 'none' : false;
   const filled = rail ? [...rail.querySelectorAll('[data-ad-rail-slot] .ad-slot')] : [];
-  const lb = document.querySelector('.editor-leaderboard');
+  /* .editor-leaderboard is the editors' 48-84rem band; .ad-lead is the same
+     role's name on the blog surfaces (blog.html, post.html, blog/<slug>.html),
+     which mount a leaderboard at every width rather than only in one band --
+     both collapse to display:none while empty, one via .is-filled gating the
+     other via :empty, so one query reads either correctly. */
+  const lb = document.querySelector('.editor-leaderboard, .ad-lead');
   const anchor = document.querySelector('.editor-anchor, .site-anchor');
   const anchorShown = anchor ? getComputedStyle(anchor).display !== 'none' : false;
   return {
@@ -476,14 +525,29 @@ async function layoutChecks(page) {
                a renamed host attribute leaves the page looking perfect and
                earning nothing.
 
-               The single documented exception is the homepage between 48rem
-               and 75rem, which shows nothing by design: too narrow for the
-               rail, too wide for the phone anchor. */
+               The documented exceptions are RAIL_GAP above: the homepage
+               between 48rem and 75rem, and the content-rail family between
+               48rem and 83.5rem, both of which show nothing by design --
+               too narrow for the rail, too wide for the phone anchor.
+
+               This invariant is about one slot alternating between mutually
+               exclusive units, which is not what blog/post are: their
+               leaderboard is a top-of-page content unit that is DESIGNED to
+               run alongside the side rail (plus in-content and
+               end-of-article units elsewhere on the page), not an
+               alternative to it -- see the "already carry four units"
+               reasoning in js/ads.js's site-anchor comment. Skip the count
+               assertion there; the rail-specific checks below (geometry,
+               reservation, anchor-never-with-rail) still apply to them in
+               full. */
             const railUp = !!(s.rail && s.rail.shown && s.rail.filledCount > 0);
             const bands = [railUp, s.leaderboardShown, !!(s.anchor && s.anchor.shown)].filter(Boolean).length;
-            const expected = (name === "index" && width > 768 && width < 1200) ? 0 : 1;
-            check(`${tag}: exactly ${expected} ad band mounts`, bands === expected,
-                `got ${bands} -- rail=${railUp} leaderboard=${s.leaderboardShown} anchor=${!!(s.anchor && s.anchor.shown)}`);
+            const gap = RAIL_GAP[name];
+            const expected = (gap && width > gap[0] && width < gap[1]) ? 0 : 1;
+            if (!MULTI_UNIT_PAGES.has(name)) {
+                check(`${tag}: exactly ${expected} ad band mounts`, bands === expected,
+                    `got ${bands} -- rail=${railUp} leaderboard=${s.leaderboardShown} anchor=${!!(s.anchor && s.anchor.shown)}`);
+            }
 
             check(`${tag}: no horizontal page scroll`, s.scrollWidth <= s.clientWidth,
                 `scrollWidth ${s.scrollWidth} > clientWidth ${s.clientWidth}`);
@@ -597,12 +661,13 @@ async function layoutChecks(page) {
             JSON.stringify(r));
     }
 
-    for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/docs.html", 1366]]) {
+    for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/docs.html", 1366],
+            ["content page", "/about.html", 1920]]) {
         await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
         const r = await page.evaluate(`(async () => {
             window.scrollTo(0, 1400);
             await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-            const rail = document.querySelector('.editor-rail, .home-rail');
+            const rail = document.querySelector('.editor-rail, .home-rail, .content-rail');
             const rr = rail.getBoundingClientRect();
             const hd = document.querySelector('.site-header').getBoundingClientRect();
             return { railTop: +rr.y.toFixed(1), railBottom: +rr.bottom.toFixed(1),
@@ -617,11 +682,12 @@ async function layoutChecks(page) {
 
     /* Print must carry neither the column nor the width it reserved. */
     section("2c. Layout: print output");
-    for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/resume.html", 1366]]) {
+    for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/resume.html", 1366],
+            ["content page", "/about.html", 1920]]) {
         await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
         await page.call("Emulation.setEmulatedMedia", { media: "print" }, page.sessionId);
         const r = await page.evaluate(`(() => {
-            const rail = document.querySelector('.editor-rail, .home-rail');
+            const rail = document.querySelector('.editor-rail, .home-rail, .content-rail');
             return { railDisplay: getComputedStyle(rail).display,
                      padRight: parseFloat(getComputedStyle(document.body).paddingRight),
                      padBottom: parseFloat(getComputedStyle(document.body).paddingBottom) };
