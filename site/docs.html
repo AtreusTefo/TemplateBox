@@ -156,17 +156,17 @@
 
                     <fieldset>
                         <legend>Document</legend>
-                        <div class="field">
-                            <label for="f-doctype">Document Type</label>
-                            <select id="f-doctype">
-                                <option value="rent-receipt">Rent Receipt</option>
-                                <option value="payment-receipt">Cash Payment Receipt</option>
-                                <option value="business-receipt">Itemized Business Receipt</option>
-                                <option value="sales-receipt">Sales and Cash Receipt Form</option>
-                                <option value="invoice">Professional Invoice</option>
-                                <option value="warning-notice">Employee Warning Notice</option>
-                            </select>
-                        </div>
+                        <!-- The "Document Type" select stood here until
+                             August 11, 2026. It was removed because it undid
+                             the funnel that leads here: six catalog cards and
+                             six landing pages exist to choose the document
+                             BEFORE the editor opens, and a switcher inside the
+                             editor made that choice pointless. The type is now
+                             set once on arrival from the card's data-doc
+                             preset and is fixed for the session; changing
+                             document means going back to the catalog. Do not
+                             reintroduce a control here -- see
+                             docs/implementation/DOCS_TYPE_SELECT_REMOVAL.md. -->
                         <label class="radio-option">
                             <input type="checkbox" id="f-blank">
                             Blank printable form (keep empty fields as ruled lines to write on)
