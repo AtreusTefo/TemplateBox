@@ -163,6 +163,7 @@
     ];
 
     const DEFAULT_ACCENT = "#1A1A1A";
+    const DEFAULT_DOC_NAME = "Untitled document";
 
     const form = document.getElementById("docs-form");
     const sheet = document.getElementById("doc-sheet");
@@ -194,6 +195,7 @@
     let sessionDocType = DEFAULT_TYPE;
 
     const blankToggle = document.getElementById("f-blank");
+    const docNameInput = document.getElementById("doc-name");
     const itemList = document.getElementById("item-list");
     const tplItem = document.getElementById("tpl-item");
     const swatchRow = document.getElementById("swatch-row");
@@ -342,6 +344,7 @@
                nothing to re-check on every keystroke. */
             docType: sessionDocType,
             accent: currentAccent,
+            docName: TB.sanitize(docNameInput ? docNameInput.value : DEFAULT_DOC_NAME),
             blankForm: blankToggle.checked === true,
             fields: {},
             items: collectItems(),
@@ -1445,6 +1448,10 @@
         const saved = TB.storageGet(STORAGE_KEY);
         const state = saved && saved.fields ? saved : null;
 
+        if (docNameInput) {
+            docNameInput.value = TB.desanitize((state && state.docName) || DEFAULT_DOC_NAME);
+        }
+
         if (state) {
             applyAccent(state.accent);
             blankToggle.checked = state.blankForm === true;
@@ -1491,6 +1498,10 @@
            future input inside the form, including cloned line-item rows. */
         form.addEventListener("input", persistAndRender);
         form.addEventListener("change", persistAndRender);
+
+        if (docNameInput) {
+            docNameInput.addEventListener("input", persistAndRender);
+        }
 
         document.getElementById("add-item").addEventListener("click", () => {
             addItemRow();

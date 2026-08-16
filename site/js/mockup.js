@@ -458,6 +458,8 @@
     const downloadBtn = document.getElementById("download-mockup-png");
     const trayGrid = document.getElementById("tray-grid");
     const trayEmpty = document.getElementById("tray-empty");
+    const docNameInput = document.getElementById("doc-name");
+    const DEFAULT_DOC_NAME = "Untitled mockup";
 
     /* ----------------------------------------------------------------------
        State. The uploaded design lives only in memory: neither the source
@@ -833,9 +835,14 @@
             scale: Math.round(designScale * 100),
             offsetX,
             offsetY,
-            label: TB.sanitize(labelInput.value)
+            label: TB.sanitize(labelInput.value),
+            docName: TB.sanitize(docNameInput ? docNameInput.value : DEFAULT_DOC_NAME)
         });
         TB.markSaved();
+    }
+
+    if (docNameInput) {
+        docNameInput.addEventListener("input", persist);
     }
 
     labelInput.addEventListener("input", persist);
@@ -974,6 +981,9 @@
         if (typeof saved.label === "string") {
             labelInput.value = TB.desanitize(saved.label);
         }
+    }
+    if (docNameInput) {
+        docNameInput.value = TB.desanitize((saved && saved.docName) || DEFAULT_DOC_NAME);
     }
 
     /* A catalog card can pre-select which mockup opens (data-doc hand-off
