@@ -12,8 +12,11 @@
 
     const STORAGE_KEY = "tb_resume_v1";
 
+    const DEFAULT_DOC_NAME = "Untitled resume";
+
     const DEFAULT_STATE = {
         accent: "#1A1A1A",
+        docName: DEFAULT_DOC_NAME,
         fields: {
             name: "",
             title: "",
@@ -116,6 +119,7 @@
     const tplExperience = document.getElementById("tpl-experience");
     const tplEducation = document.getElementById("tpl-education");
     const swatchRow = document.getElementById("swatch-row");
+    const docNameInput = document.getElementById("doc-name");
 
     /* ----------------------------------------------------------------------
        State collection: sweep the live form, scrub every string through the
@@ -136,6 +140,7 @@
     function collectState() {
         const state = {
             accent: currentAccent,
+            docName: TB.sanitize(docNameInput ? docNameInput.value : DEFAULT_DOC_NAME),
             fields: {},
             experience: collectEntries(experienceList, ["role", "company", "dates", "description"]),
             education: collectEntries(educationList, ["degree", "school", "dates"])
@@ -433,6 +438,10 @@
 
         applyAccent(state.accent);
 
+        if (docNameInput) {
+            docNameInput.value = TB.desanitize(state.docName || DEFAULT_DOC_NAME);
+        }
+
         form.querySelectorAll("[data-bind]").forEach((input) => {
             input.value = TB.desanitize(state.fields[input.getAttribute("data-bind")] || "");
         });
@@ -450,6 +459,10 @@
         /* Real-time binding: one delegated listener covers every current and
            future input inside the form, including cloned entry rows. */
         form.addEventListener("input", persistAndRender);
+
+        if (docNameInput) {
+            docNameInput.addEventListener("input", persistAndRender);
+        }
 
         document.getElementById("add-experience").addEventListener("click", () => {
             addEntryRow(experienceList, tplExperience);

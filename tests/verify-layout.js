@@ -45,15 +45,45 @@ const QUICK = process.argv.includes("--quick");
 const NO_BASELINE = process.argv.includes("--no-baseline");
 
 /* Pages carrying the fixed rail, and the widths that exercise every band
-   boundary. 1344 and 1488 are the 84rem and 93rem gates themselves. */
+   boundary. 1488 is the 93rem stack gate. 1199/1200 straddle the 75rem rail
+   floor, which as of August 13, 2026 is shared by ALL THREE rail families --
+   homepage, editors and the content pages all mount at the same widths now.
+   1280 is the reported MacBook Air width that motivated that consolidation.
+   1335/1336 and 1344 are kept because they were the content-rail family's
+   old 83.5rem floor and the editors' old 84rem floor respectively: nothing
+   should change there any more, which is exactly why they are worth
+   covering. */
 const PAGES = [
     ["index", "/"],
     ["resume", "/resume.html"],
     ["docs", "/docs.html"],
     ["poster", "/poster.html"],
-    ["mockup", "/mockup.html"]
+    ["mockup", "/mockup.html"],
+    ["about", "/about.html"],
+    ["rent-receipt", "/rent-receipt-template.html"],
+    ["blog", "/blog.html"],
+    ["post", "/post.html"]
 ];
-const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1200, 1024, 768, 320];
+const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 768, 320];
+
+/* Pages whose rail floor sits above the mobile anchor's own ceiling (48rem)
+   show neither band in between -- home's rail starts at 75rem, the
+   content-rail family's at 83.5rem, and both leave a genuine gap rather than
+   falling back to a leaderboard the way the editors do. Keyed by page name,
+   [minPxExclusive, maxPxExclusive) mirrors the CSS floor exactly so a floor
+   changed in one place cannot quietly disagree with the other. */
+const RAIL_GAP = {
+    index: [768, 1200],
+    about: [768, 1200],
+    "rent-receipt": [768, 1200],
+    blog: [768, 1200],
+    post: [768, 1200]
+};
+
+/* Pages that deliberately run a top leaderboard alongside the side rail
+   rather than treating them as alternatives for one slot -- see the comment
+   at the "exactly N ad band mounts" check below. */
+const MULTI_UNIT_PAGES = new Set(["blog", "post"]);
 
 let passed = 0;
 const failures = [];
@@ -133,7 +163,7 @@ function staticChecks() {
 
     /* 1c. Rail slots must not repeat a zone key. Three slots sharing one key
            is one placement counted three times, not three placements. */
-    ["EDITOR_RAIL_STACK", "HOME_RAIL_STACK"].forEach((constName) => {
+    ["EDITOR_RAIL_STACK", "HOME_RAIL_STACK", "CONTENT_RAIL_STACK"].forEach((constName) => {
         const m = adsJs.match(new RegExp(constName + "\\s*=\\s*\\[([^\\]]+)\\]"));
         if (!m) { return; }
         const zones = m[1].match(/"([^"]+)"/g).map((q) => q.slice(1, -1));
@@ -191,18 +221,36 @@ function staticChecks() {
             absent.length ? `queried but present in no page: ${absent.join(", ")}` : "");
     });
 
-    /* 1f. The homepage's `display: none` gate must be declared AFTER the
-           shared .editor-rail/.home-rail rule. Media queries carry no
-           specificity, so written before it the gate loses to the shared
-           `display: flex` and the rail appears on every viewport it is meant
-           to skip -- with nothing failing anywhere to say so. Source order is
-           the whole contest, which makes it worth a test. */
+    /* 1f. Every page family's `display: none` gate must be declared AFTER the
+           shared .editor-rail/.home-rail/.content-rail/.loading-rail rule.
+           Media queries carry no specificity, so written before it the gate
+           loses to the shared `display: flex` and the rail appears on every
+           viewport it is meant to skip -- with nothing failing anywhere to
+           say so. Source order is the whole contest, which makes it worth a
+           test.
+
+           Each gate is matched by the SELECTOR it hides, never by its width
+           alone. As of August 13, 2026 all three original rail families
+           floor at 75rem and so share the identical 74.9375rem hide value; a
+           bare width search would match whichever happens to sit earliest in
+           the file regardless of which selector it actually gates, which is
+           the false pass this pairing exists to avoid. loading.html's
+           .loading-rail joined the shared selector itself (August 16, 2026,
+           reversing its earlier position:sticky treatment) and is checked
+           the same way as the other three now rather than being the
+           unrelated edge case it used to be. */
     const css = fs.readFileSync(path.join(SITE, "css", "style.css"), "utf8");
-    const sharedRule = css.search(/\.editor-rail,\s*\.home-rail\s*\{/);
-    const homeGate = css.search(/@media\s*\(max-width:\s*74\.9375rem\)/);
-    check("the homepage rail's display gate is declared after the shared rule",
-        sharedRule !== -1 && homeGate !== -1 && homeGate > sharedRule,
-        `shared rule at ${sharedRule}, gate at ${homeGate}`);
+    const sharedRule = css.search(/\.editor-rail,\s*\.home-rail,\s*\.content-rail,\s*\.loading-rail\s*\{/);
+    const gateOf = (selector) => css.search(
+        new RegExp("@media\\s*\\(max-width:\\s*74\\.9375rem\\)\\s*\\{\\s*\\" + selector + "\\s*\\{")
+    );
+    [["homepage", ".home-rail"], ["editor", ".editor-rail"], ["content", ".content-rail"], ["loading", ".loading-rail"]]
+        .forEach(([label, selector]) => {
+            const gate = gateOf(selector);
+            check(`the ${label} rail's display gate is declared after the shared rule`,
+                sharedRule !== -1 && gate !== -1 && gate > sharedRule,
+                `shared rule at ${sharedRule}, ${selector} gate at ${gate}`);
+        });
 
     /* 1e. Both copies of the editor route whitelist must agree, or the
            loading page's dependency-free fallback sends a visitor to the
@@ -219,6 +267,78 @@ function staticChecks() {
     check("loading.html's inline route whitelist matches EDITOR_ROUTES",
         appRoutes !== null && appRoutes === inlineRoutes,
         `js/app.js: ${appRoutes} | loading.html: ${inlineRoutes}`);
+
+    /* 1f2. Every banner runs inside a srcdoc iframe, and the srcdoc body's
+            inline style is what suppresses a scrollbar when a creative lays
+            out larger than the size it was booked at -- the iframe's own
+            document scrolls, and that scrollbar paints inside the frame where
+            the parent .ad-slot's overflow:hidden cannot reach it (August 16,
+            2026). js/ads.js builds that string for every dynamically mounted
+            placement; loading.html hardcodes two of its own. Same duplication
+            shape as the route whitelist above and the footer constant that
+            already drifted once, so it is asserted rather than trusted: a
+            style added to the generator alone would leave loading.html's two
+            banners scrollbarred with nothing failing to say so. */
+    const adsBodyStyle = adsJs.match(/"<body style='([^']+)'>"/);
+    const loadingBodyStyles = [...loading.matchAll(/srcdoc="<body style='([^']+)'>/g)]
+        .map((m) => m[1]);
+    const norm = (s) => (s || "").split(";").map((d) => d.trim())
+        .filter(Boolean).sort().join(";");
+    check("loading.html's inline banner srcdoc body style matches js/ads.js",
+        adsBodyStyle !== null && loadingBodyStyles.length === 2 &&
+        loadingBodyStyles.every((s) => norm(s) === norm(adsBodyStyle[1])),
+        `js/ads.js: ${adsBodyStyle ? adsBodyStyle[1] : "not found"} | ` +
+        `loading.html: ${loadingBodyStyles.join(" , ") || "none found"}`);
+
+    /* 1g. The dark theme is declared twice -- once for the explicit
+           data-theme="dark" attribute and once for the prefers-color-scheme
+           fallback that serves visitors without JavaScript. CSS has no way to
+           share one declaration block between them, so the two must be kept
+           identical by hand, and a colour added to one but not the other would
+           show up only for the half of visitors hitting the other branch. */
+    const darkExplicit = css.match(/:root\[data-theme="dark"\]\s*\{([^}]+)\}/);
+    const darkFallback = css.match(/:root:not\(\[data-theme\]\)\s*\{([^}]+)\}/);
+    const decls = (block) => (block ? block[1]
+        .split(";").map((d) => d.trim()).filter(Boolean).sort().join(" | ") : null);
+    check("the two dark-theme declaration blocks are identical",
+        darkExplicit && darkFallback && decls(darkExplicit) === decls(darkFallback),
+        darkExplicit && darkFallback
+            ? `explicit: ${decls(darkExplicit)}\n      fallback: ${decls(darkFallback)}`
+            : "one of the two dark blocks is missing");
+
+    /* 1h. Every page carries an inline no-flash snippet in <head> that reads
+           the theme from localStorage before first paint. It cannot import the
+           key from js/app.js -- it has to run before any external file loads --
+           so the string is duplicated per page. A rename on one side would
+           silently give every returning visitor a flash of the wrong theme,
+           which is precisely the failure the snippet exists to prevent. */
+    const keyMatch = appJs.match(/THEME_KEY\s*=\s*"([^"]+)"/);
+    const themeKey = keyMatch ? keyMatch[1] : null;
+    check("js/app.js declares a THEME_KEY", !!themeKey);
+
+    const themed = pages.filter((f) =>
+        /href="[^"]*css\/style\.css"/.test(fs.readFileSync(f, "utf8")));
+    const missingSnippet = [];
+    const wrongKey = [];
+    themed.forEach((file) => {
+        const rel = path.relative(ROOT, file);
+        const html = fs.readFileSync(file, "utf8");
+        const snippet = html.match(/localStorage\.getItem\("([^"]+)"\)/);
+        if (!/setAttribute\("data-theme"/.test(html)) { missingSnippet.push(rel); return; }
+        if (!snippet || snippet[1] !== themeKey) { wrongKey.push(rel + " -> " + (snippet ? snippet[1] : "none")); }
+    });
+    check(`every themed page carries the no-flash snippet (${themed.length} pages)`,
+        missingSnippet.length === 0, "missing on: " + missingSnippet.join(", "));
+    check("every no-flash snippet uses the same key as js/app.js",
+        wrongKey.length === 0, `THEME_KEY is "${themeKey}"; mismatched: ${wrongKey.join(", ")}`);
+
+    /* 1i. Print must never inherit the screen theme: a receipt printed in dark
+           mode would otherwise put a near-white --color-text onto white paper.
+           The print block re-points the aliases back to the light palette. */
+    const printBlock = css.slice(css.indexOf("@media print"));
+    check("the print block resets the palette to the light aliases",
+        /:root\[data-theme="dark"\][\s\S]{0,400}--color-text:\s*var\(--l-text\)/.test(printBlock),
+        "print output would inherit the dark palette");
 }
 
 /* ==========================================================================
@@ -342,7 +462,28 @@ function startServer(cwd, port) {
        on Windows refuses to spawn a .cmd shim without a shell (EINVAL), and
        passing args alongside shell:true is deprecated. The port is a literal
        defined in this file, so there is nothing here to escape. */
-    return spawn(`npx serve -l ${port}`, { cwd, stdio: "ignore", shell: true });
+    const proc = spawn(`npx serve -l ${port}`, { cwd, stdio: "ignore", shell: true });
+
+    /* shell:true means the child is the SHELL, and npx then spawns serve
+       beneath it. proc.kill() reaps only the shell, so every interrupted or
+       failed run used to leave a live server holding this port -- after which
+       the next run silently talked to a stale server from an older working
+       tree, or timed out against it. That surfaced as "navigation did not
+       settle within 20s" on an unrelated page, which reads like a site bug and
+       is not one. Kill the whole tree instead. */
+    proc.killTree = () => {
+        try {
+            if (process.platform === "win32") {
+                spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+            } else {
+                process.kill(-proc.pid, "SIGKILL");
+            }
+        } catch (err) {
+            /* Already gone. */
+        }
+        try { proc.kill(); } catch (err) { /* already gone */ }
+    };
+    return proc;
 }
 
 async function waitForServer(port) {
@@ -364,10 +505,15 @@ const SNAPSHOT = `(() => {
     return { x: +b.x.toFixed(1), y: +b.y.toFixed(1), w: +b.width.toFixed(1),
              h: +b.height.toFixed(1), right: +b.right.toFixed(1), bottom: +b.bottom.toFixed(1) }; };
   const de = document.documentElement;
-  const rail = document.querySelector('.editor-rail, .home-rail');
+  const rail = document.querySelector('.editor-rail, .home-rail, .content-rail');
   const railShown = rail ? getComputedStyle(rail).display !== 'none' : false;
   const filled = rail ? [...rail.querySelectorAll('[data-ad-rail-slot] .ad-slot')] : [];
-  const lb = document.querySelector('.editor-leaderboard');
+  /* .editor-leaderboard is the editors' 48-84rem band; .ad-lead is the same
+     role's name on the blog surfaces (blog.html, post.html, blog/<slug>.html),
+     which mount a leaderboard at every width rather than only in one band --
+     both collapse to display:none while empty, one via .is-filled gating the
+     other via :empty, so one query reads either correctly. */
+  const lb = document.querySelector('.editor-leaderboard, .ad-lead');
   const anchor = document.querySelector('.editor-anchor, .site-anchor');
   const anchorShown = anchor ? getComputedStyle(anchor).display !== 'none' : false;
   return {
@@ -426,14 +572,29 @@ async function layoutChecks(page) {
                a renamed host attribute leaves the page looking perfect and
                earning nothing.
 
-               The single documented exception is the homepage between 48rem
-               and 75rem, which shows nothing by design: too narrow for the
-               rail, too wide for the phone anchor. */
+               The documented exceptions are RAIL_GAP above: the homepage
+               between 48rem and 75rem, and the content-rail family between
+               48rem and 83.5rem, both of which show nothing by design --
+               too narrow for the rail, too wide for the phone anchor.
+
+               This invariant is about one slot alternating between mutually
+               exclusive units, which is not what blog/post are: their
+               leaderboard is a top-of-page content unit that is DESIGNED to
+               run alongside the side rail (plus in-content and
+               end-of-article units elsewhere on the page), not an
+               alternative to it -- see the "already carry four units"
+               reasoning in js/ads.js's site-anchor comment. Skip the count
+               assertion there; the rail-specific checks below (geometry,
+               reservation, anchor-never-with-rail) still apply to them in
+               full. */
             const railUp = !!(s.rail && s.rail.shown && s.rail.filledCount > 0);
             const bands = [railUp, s.leaderboardShown, !!(s.anchor && s.anchor.shown)].filter(Boolean).length;
-            const expected = (name === "index" && width > 768 && width < 1200) ? 0 : 1;
-            check(`${tag}: exactly ${expected} ad band mounts`, bands === expected,
-                `got ${bands} -- rail=${railUp} leaderboard=${s.leaderboardShown} anchor=${!!(s.anchor && s.anchor.shown)}`);
+            const gap = RAIL_GAP[name];
+            const expected = (gap && width > gap[0] && width < gap[1]) ? 0 : 1;
+            if (!MULTI_UNIT_PAGES.has(name)) {
+                check(`${tag}: exactly ${expected} ad band mounts`, bands === expected,
+                    `got ${bands} -- rail=${railUp} leaderboard=${s.leaderboardShown} anchor=${!!(s.anchor && s.anchor.shown)}`);
+            }
 
             check(`${tag}: no horizontal page scroll`, s.scrollWidth <= s.clientWidth,
                 `scrollWidth ${s.scrollWidth} > clientWidth ${s.clientWidth}`);
@@ -547,31 +708,57 @@ async function layoutChecks(page) {
             JSON.stringify(r));
     }
 
-    for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/docs.html", 1366]]) {
+    for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/docs.html", 1366],
+            ["content page", "/about.html", 1920]]) {
         await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
+        /* Wait for the header to STOP MOVING rather than for a fixed two
+           frames. The homepage header hides on scroll-down (August 14, 2026)
+           by translating upward over a CSS transition, so two rAFs after a
+           scrollTo catches it mid-flight: this assertion failed roughly one
+           run in three with headerTop at fractional values like -1.9, which
+           is not a layout fault but a stopwatch started too early. Polling
+           until two consecutive samples agree is deterministic regardless of
+           how long the transition takes. */
         const r = await page.evaluate(`(async () => {
             window.scrollTo(0, 1400);
-            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-            const rail = document.querySelector('.editor-rail, .home-rail');
+            const hdr = document.querySelector('.site-header');
+            let last = null;
+            for (let i = 0; i < 60; i += 1) {
+                await new Promise(r => requestAnimationFrame(r));
+                const y = +hdr.getBoundingClientRect().y.toFixed(1);
+                if (last !== null && y === last) { break; }
+                last = y;
+            }
+            const rail = document.querySelector('.editor-rail, .home-rail, .content-rail');
             const rr = rail.getBoundingClientRect();
-            const hd = document.querySelector('.site-header').getBoundingClientRect();
+            const hd = hdr.getBoundingClientRect();
             return { railTop: +rr.y.toFixed(1), railBottom: +rr.bottom.toFixed(1),
                      railLeft: +rr.x.toFixed(1), headerTop: +hd.y.toFixed(1),
+                     headerHeight: +hd.height.toFixed(1),
                      headerRight: +hd.right.toFixed(1), innerHeight: window.innerHeight };
         })()`);
+        /* headerTop is no longer required to be exactly 0. This check is about
+           the INSET -- that the header's right edge stops at the column -- and
+           the rail's full height; the header's vertical offset belongs to the
+           hide-on-scroll feature, which legitimately parks it anywhere from 0
+           to minus its own height. Demanding 0 asserted the header does not do
+           the thing it was deliberately built to do, and only passed at all
+           because an instant scrollTo does not always trigger the hide. */
         check(`${label} scrolled: column still full height, header still inset`,
             r.railTop === 0 && Math.abs(r.railBottom - r.innerHeight) < 1 &&
-            r.headerTop === 0 && r.headerRight <= r.railLeft + 0.5,
+            r.headerTop <= 0.5 && r.headerTop >= -(r.headerHeight + 0.5) &&
+            r.headerRight <= r.railLeft + 0.5,
             JSON.stringify(r));
     }
 
     /* Print must carry neither the column nor the width it reserved. */
     section("2c. Layout: print output");
-    for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/resume.html", 1366]]) {
+    for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/resume.html", 1366],
+            ["content page", "/about.html", 1920]]) {
         await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
         await page.call("Emulation.setEmulatedMedia", { media: "print" }, page.sessionId);
         const r = await page.evaluate(`(() => {
-            const rail = document.querySelector('.editor-rail, .home-rail');
+            const rail = document.querySelector('.editor-rail, .home-rail, .content-rail');
             return { railDisplay: getComputedStyle(rail).display,
                      padRight: parseFloat(getComputedStyle(document.body).paddingRight),
                      padBottom: parseFloat(getComputedStyle(document.body).paddingBottom) };
@@ -686,7 +873,7 @@ async function parityChecks(browserPath) {
 
     const server = startServer(tmp, BASELINE_PORT);
     if (!await waitForServer(BASELINE_PORT)) {
-        server.kill();
+        server.killTree();
         console.log("SKIP  baseline server did not start");
         return;
     }
@@ -714,7 +901,7 @@ async function parityChecks(browserPath) {
         }
     }
     page.close();
-    server.kill();
+    server.killTree();
 
     check(`ads blocked: working tree matches HEAD (${comparisons} measurements)`,
         differences === 0, `${differences} differing measurements, listed above`);
@@ -734,7 +921,7 @@ async function main() {
         } else {
             const server = startServer(ROOT, PORT);
             if (!await waitForServer(PORT)) {
-                server.kill();
+                server.killTree();
                 throw new Error(`could not start \`npx serve\` on port ${PORT} from the repository root`);
             }
             const page = await connect(browserPath, CDP_PORT);
@@ -745,7 +932,7 @@ async function main() {
                 page.close();
             }
             if (!NO_BASELINE) { await parityChecks(browserPath); }
-            server.kill();
+            server.killTree();
         }
     }
 

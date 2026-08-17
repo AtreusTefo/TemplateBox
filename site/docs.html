@@ -66,6 +66,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Theme, applied before first paint so a returning visitor never sees a
+         flash of the wrong one. Deliberately inline and synchronous: an
+         external file would load after the first paint and the flash is
+         exactly what this exists to prevent. The key is duplicated from
+         js/app.js by necessity; tests/verify-layout.js asserts they match. -->
+    <script>
+        (function () {
+            try {
+                var saved = window.localStorage.getItem("tb_theme");
+                var dark = saved
+                    ? saved === "dark"
+                    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+                document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+            } catch (err) {
+                /* Storage blocked: fall through to the prefers-color-scheme
+                   rules in the stylesheet, which key on the attribute being
+                   absent. */
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Compilation engine: jsPDF native text API via clean CDN link.
@@ -81,31 +101,33 @@
 
     <a class="skip-link" href="#editor-layout">Skip to main content</a>
 
-    <header class="site-header">
-        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
+    <header class="site-header editor-bar">
+        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+
+        <label class="sr-only" for="doc-name">Document name</label>
+        <input type="text" class="doc-name" id="doc-name" maxlength="80" value="Untitled document" aria-label="Document name">
+
+        <div class="editor-actions">
+            <span class="save-cloud" id="save-state" role="status" aria-live="polite" title="Saves automatically">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 18.5A3.5 3.5 0 0 1 6 11.6a5 5 0 0 1 9.7-1.5A4 4 0 0 1 18.5 18.5Z"/><path class="tick" d="m9.5 14 2 2 3.5-3.5"/></svg>
+                <span class="sr-only" data-save-label>Saves automatically</span>
+            </span>
+
+            <button type="button" class="btn dl-toggle" id="download-pdf"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>Download PDF</button>
+        </div>
+
         <nav class="site-nav" aria-label="Primary">
-            <a href="index.html" aria-current="page">Templates</a>
-            <a href="blog.html">Guides</a>
-            <a href="about.html">About</a>
         </nav>
     </header>
 
     <main data-ads-static>
-        <nav class="breadcrumb" aria-label="Breadcrumb">
-            <ol>
-                <li><a href="index.html">Templates</a></li>
-                <li><a href="free-invoice-template.html">Receipts and Invoices</a></li>
-                <li aria-current="page">Business Document Builder</li>
-            </ol>
-        </nav>
-
         <div class="editor-head">
-            <h1>Receipt, Invoice and Notice Builder</h1>
-            <!-- Autosave state: persistence was previously silent, which
-                 wasted the trust payoff of a no-account product -->
-            <p class="save-state" id="save-state" role="status" aria-live="polite">Saves automatically</p>
+            <h1 class="sr-only">Receipt, Invoice and Notice Builder</h1>
+            <!-- The autosave indicator moved into the toolbar above as an icon.
+                 There is deliberately no second copy here: js/app.js targets
+                 #save-state by id, so two would leave one of them permanently
+                 stale. -->
         </div>
-        <p class="editor-intro">One form drives six documents. Your progress saves on this device only. Nothing is uploaded to a server.</p>
 
         <!-- Mobile-only tab switcher between form and preview -->
         <div class="mobile-tabs" role="tablist" aria-label="Editor views">
@@ -135,17 +157,17 @@
 
                     <fieldset>
                         <legend>Document</legend>
-                        <div class="field">
-                            <label for="f-doctype">Document Type</label>
-                            <select id="f-doctype">
-                                <option value="rent-receipt">Rent Receipt</option>
-                                <option value="payment-receipt">Cash Payment Receipt</option>
-                                <option value="business-receipt">Itemized Business Receipt</option>
-                                <option value="sales-receipt">Sales and Cash Receipt Form</option>
-                                <option value="invoice">Professional Invoice</option>
-                                <option value="warning-notice">Employee Warning Notice</option>
-                            </select>
-                        </div>
+                        <!-- The "Document Type" select stood here until
+                             August 11, 2026. It was removed because it undid
+                             the funnel that leads here: six catalog cards and
+                             six landing pages exist to choose the document
+                             BEFORE the editor opens, and a switcher inside the
+                             editor made that choice pointless. The type is now
+                             set once on arrival from the card's data-doc
+                             preset and is fixed for the session; changing
+                             document means going back to the catalog. Do not
+                             reintroduce a control here -- see
+                             docs/implementation/DOCS_TYPE_SELECT_REMOVAL.md. -->
                         <label class="radio-option">
                             <input type="checkbox" id="f-blank">
                             Blank printable form (keep empty fields as ruled lines to write on)
@@ -385,11 +407,11 @@
             <section class="preview-pane" aria-label="Live document preview">
                 <h2>Live Preview</h2>
                 <div class="doc-sheet" id="doc-sheet"></div>
-                <!-- Sticky: the action that completes the task previously sat
-                     below a full rendered page and required scrolling past it -->
+                <!-- Sticky: Print and Clear stay reachable without scrolling
+                     back past the full control stack. Download moved into the
+                     editor-bar toolbar above, to match the other editors. -->
                 <div class="preview-actions">
                     <div class="doc-actions">
-                        <button type="button" class="btn" id="download-pdf">Download PDF</button>
                         <button type="button" class="btn btn-secondary" id="print-doc">Print</button>
                         <button type="button" class="btn btn-secondary" id="clear-doc">Clear Form</button>
                     </div>

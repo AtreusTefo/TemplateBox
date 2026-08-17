@@ -41,7 +41,9 @@ The rail is capped at `calc(100vh - 7rem)` with internal scrolling. Three stacke
 
 All three zones already existed and are live; no new Adsterra provisioning was needed. Every host is empty in the served markup and filled by `mountEditorAds()` in `site/js/ads.js`, which runs because each editor's `<main>` carries `data-ads-static`.
 
-### Why the rail gate is 84rem, not 75rem
+### Why the rail gate was 84rem, not 75rem
+
+**Superseded on August 13, 2026 — the gate is 75rem now. This section is kept because the arithmetic below is still correct and is what the current gate knowingly overrides; see "Revised: the gate moved to 75rem" immediately after.**
 
 The first implementation gated the rail at 75rem, which was wrong, and the arithmetic shows why. Below 84rem the page is capped by the viewport rather than by its own `max-width`, so there is no spare margin for the rail to occupy and it comes straight out of the panes instead:
 
@@ -55,6 +57,28 @@ The first implementation gated the rail at 75rem, which was wrong, and the arith
 At 1200px each pane lost 68px against the pre-rail layout — a real regression, on a common laptop width. Above 84rem (1344px) the page is at its full declared width, the rail sits in margin that was previously empty, and the panes measure 544px, marginally *wider* than the 540px they had before any rail existed.
 
 Raising the gate leaves the 48rem-to-84rem band with no room beside the panes, which is what the leaderboard is for.
+
+### Revised: the gate moved to 75rem (August 13, 2026)
+
+**This reverses the section above at the owner's instruction, accepting the pane cost it was written to avoid.** The reason is parity, not arithmetic: by August 13 the homepage rail (75rem floor) and the content-rail family (83.5rem floor) both showed a rail on a 1280px laptop while the editors did not, and the editors looked broken by comparison on the most common laptop width in use. The report was specifically a 1280x800 MacBook Air.
+
+Nothing in the arithmetic above changed. It was verified still accurate before the change, and the current cost was re-measured after:
+
+| Screen | Pane width, no rail | Pane width, rail at 75rem gate (now live) | Cost |
+|---|---|---|---|
+| 1200px | 540px | 465px | **−75px** |
+| 1280px | 540px | 505px | **−35px** |
+| 1344px | 540px | 537px | −3px |
+| 1366px | 540px | 546px | +6px |
+| 1440px and up | 540px | 546px | +6px |
+
+So the 75rem–84rem band buys rail parity by taking real width out of both editing panes, worst at the very bottom of the band. From 1366px up the panes are unaffected (in fact marginally wider), exactly as before.
+
+**Why a cap cannot rescue this.** `body.has-ad-rail main:has(.editor-shell) { max-width: 72.75rem; }` now applies from 75rem too, but in the 75–84rem band the page is viewport-bound well below 72.75rem anyway — the cap is not what decides the width there, the body padding is, and the panes absorb it. A `max-width` cannot hand back width the viewport does not have. This is why the original fix was to raise the *gate* rather than adjust the cap, and why lowering the gate necessarily reopens the cost.
+
+**What did not change:** the 93rem stack boundary (the three-slot rail still needs 1476px to hold panes at 540px), the leaderboard fallback (now covering 48rem–75rem instead of 48rem–84rem), the anchor below 48rem, and the never-two-bands-never-none invariant. Verified across 1199/1200/1280/1344/1366/1440/1488/1512/1920: exactly one band at every width, zero horizontal overflow, and the header's right edge landing exactly on the rail's left edge throughout.
+
+**If this is ever revisited,** the honest options are to restore 84rem (losing the parity), or to find a narrower creative for the 75–84rem band so the reservation costs less than 184px. Adjusting the cap is not one of them, for the reason above.
 
 ### Why the leaderboard is the fallback, not the primary
 

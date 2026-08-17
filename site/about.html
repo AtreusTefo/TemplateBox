@@ -58,6 +58,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Theme, applied before first paint so a returning visitor never sees a
+         flash of the wrong one. Deliberately inline and synchronous: an
+         external file would load after the first paint and the flash is
+         exactly what this exists to prevent. The key is duplicated from
+         js/app.js by necessity; tests/verify-layout.js asserts they match. -->
+    <script>
+        (function () {
+            try {
+                var saved = window.localStorage.getItem("tb_theme");
+                var dark = saved
+                    ? saved === "dark"
+                    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+                document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+            } catch (err) {
+                /* Storage blocked: fall through to the prefers-color-scheme
+                   rules in the stylesheet, which key on the attribute being
+                   absent. */
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -70,6 +90,77 @@
             <a href="index.html">Templates</a>
             <a href="blog.html">Guides</a>
             <a href="about.html" aria-current="page">About</a>
+            <!-- Mega-menu. This page carries no footer: its link columns live
+                 here instead, matching index.html, so every page exposes the
+                 same navigation from the same place. Links are real anchors
+                 in the served markup (the panel is hidden with the [hidden]
+                 attribute, not built in JS), so they stay crawlable and the
+                 internal-linking surface the footer used to provide is
+                 preserved. Unlike the original desktop-only menu, this is
+                 available at every width -- see the .nav-more rules in
+                 css/style.css -- because with the footer gone it is the only
+                 route to the legal and landing pages on a phone. -->
+            <div class="nav-more" data-nav-more>
+                <button type="button" aria-expanded="false" aria-controls="nav-more-panel" data-nav-more-toggle>
+                    More
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg>
+                </button>
+                <div class="nav-more-panel" id="nav-more-panel" hidden data-nav-more-panel>
+                    <div>
+                        <h2>Receipts and Invoices</h2>
+                        <ul>
+                            <li><a href="rent-receipt-template.html">Rent Receipt Template</a></li>
+                            <li><a href="cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
+                            <li><a href="itemized-receipt-template.html">Itemized Business Receipt</a></li>
+                            <li><a href="sales-receipt-template.html">Sales Receipt Form</a></li>
+                            <li><a href="free-invoice-template.html">Free Invoice Template</a></li>
+                            <li><a href="employee-warning-notice-template.html">Employee Warning Notice</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Resumes and Creative</h2>
+                        <ul>
+                            <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
+                            <li><a href="poster-maker.html">Poster Maker</a></li>
+                            <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Editors</h2>
+                        <ul>
+                            <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
+                            <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
+                            <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
+                            <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Learn</h2>
+                        <ul>
+                            <li><a href="blog.html">Guides and Articles</a></li>
+                            <li><a href="index.html#templates">All Templates</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Company</h2>
+                        <ul>
+                            <li><a href="about.html">About TemplateBox</a></li>
+                            <li><a href="privacy.html">Privacy Policy</a></li>
+                            <li><a href="terms.html">Terms of Use</a></li>
+                        </ul>
+                    </div>
+                    <div class="nav-more-social">
+                        <h2>Follow</h2>
+                        <div>
+                            <a href="https://x.com/Templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on X"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+                            <a href="https://www.facebook.com/profile.php?id=61592027191178" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Facebook"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+                            <a href="https://www.tiktok.com/@templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on TikTok"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+                            <a href="https://www.instagram.com/templatebox26/" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Instagram"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to dark theme" title="Switch to dark theme"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></button>
         </nav>
     </header>
 
@@ -115,81 +206,28 @@
             <h2>Follow along</h2>
             <p>New templates and guides are announced on <a href="https://x.com/Templatebox26" target="_blank" rel="noopener noreferrer">X</a>, <a href="https://www.instagram.com/templatebox26/" target="_blank" rel="noopener noreferrer">Instagram</a>, <a href="https://www.facebook.com/profile.php?id=61592027191178" target="_blank" rel="noopener noreferrer">Facebook</a> and <a href="https://www.tiktok.com/@templatebox26" target="_blank" rel="noopener noreferrer">TikTok</a>.</p>
         </article>
+        <!-- Ad rail, wide desktop only. Three stacked slots at 93rem and
+             above, a single 160x600 between 83.5rem and 93rem, nothing
+             below that -- the same shared markup, slots and zones as the
+             editor and homepage rails, not a third copy of the pattern.
+             Filled by js/ads.js; renders nothing when dormant. -->
+        <aside class="content-rail" data-ad-content-rail aria-label="Advertisements">
+            <div data-ad-rail-slot></div>
+            <div data-ad-rail-slot></div>
+            <div data-ad-rail-slot></div>
+        </aside>
     </main>
 
-    <footer class="site-footer">
-        <div class="footer-cols">
-            <div class="footer-col">
-                <h2>Receipts and Invoices</h2>
-                <ul>
-                    <li><a href="rent-receipt-template.html">Rent Receipt Template</a></li>
-                    <li><a href="cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
-                    <li><a href="itemized-receipt-template.html">Itemized Business Receipt</a></li>
-                    <li><a href="sales-receipt-template.html">Sales Receipt Form</a></li>
-                    <li><a href="free-invoice-template.html">Free Invoice Template</a></li>
-                    <li><a href="employee-warning-notice-template.html">Employee Warning Notice</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h2>Resumes and Creative</h2>
-                <ul>
-                    <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
-                    <li><a href="poster-maker.html">Poster Maker</a></li>
-                    <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h2>Editors</h2>
-                <ul>
-                    <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
-                    <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
-                    <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
-                    <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h2>Learn</h2>
-                <ul>
-                    <li><a href="blog.html">Guides and Articles</a></li>
-                    <li><a href="index.html#templates">All Templates</a></li>
-                </ul>
-            </div>
-            <div class="footer-col">
-                <h2>Company</h2>
-                <ul>
-                    <li><a href="about.html">About TemplateBox</a></li>
-                    <li><a href="privacy.html">Privacy Policy</a></li>
-                    <li><a href="terms.html">Terms of Use</a></li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="footer-base">
-            <div class="footer-social">
-                <a href="https://x.com/Templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on X">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                </a>
-                <a href="https://www.facebook.com/profile.php?id=61592027191178" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Facebook">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                </a>
-                <a href="https://www.tiktok.com/@templatebox26" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on TikTok">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
-                </a>
-                <a href="https://www.instagram.com/templatebox26/" target="_blank" rel="noopener noreferrer" aria-label="TemplateBox on Instagram">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
-                </a>
-            </div>
-            <p>TemplateBox. All editing happens locally in your browser. No data leaves your device.</p>
-        </div>
-    </footer>
 
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
 
-    <!-- Site-wide anchor: 320x50 under 48rem, 728x90 above, fixed to the foot
-         of the viewport for the whole visit. Filled by js/ads.js; suppressed
-         on desktop for pages that already carry a persistent rail, so no page
-         ever shows two. Collapses to nothing when unfilled. -->
+    <!-- Site-wide anchor: 320x50 under 48rem, fixed to the foot of the
+         viewport for the whole visit. Above 48rem the fixed rail inside
+         <main> takes over once there is room for it; between 48rem and the
+         rail's own floor (83.5rem) neither appears, the same gap the
+         homepage has between its own anchor and rail bands. Filled by
+         js/ads.js. Collapses to nothing when unfilled. -->
     <div class="site-anchor" data-ad-anchor aria-label="Advertisement"></div>
 
 </body>

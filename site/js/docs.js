@@ -163,6 +163,7 @@
     ];
 
     const DEFAULT_ACCENT = "#1A1A1A";
+    const DEFAULT_DOC_NAME = "Untitled document";
 
     const form = document.getElementById("docs-form");
     const sheet = document.getElementById("doc-sheet");
@@ -170,8 +171,31 @@
         return;
     }
 
-    const typeSelect = document.getElementById("f-doctype");
+    /* ----------------------------------------------------------------------
+       The document type for this session (August 11, 2026).
+
+       This used to be a visible <select> in the form, and that select WAS the
+       runtime source of truth: collectState() read its value on every
+       keystroke. The control was removed because it undermined the funnel it
+       sits at the end of -- six catalog cards and six landing pages exist to
+       route a visitor to one document before the editor opens, and a free
+       switcher inside the editor turned that into "one form, pick whatever",
+       which is the argument for a single generic Documents entry instead.
+
+       So the type is now resolved ONCE, on arrival, and is fixed for the
+       session. Deliberately no replacement control: any in-editor switcher
+       reintroduces exactly what was removed. Changing document means going
+       back to the catalog, which every editor's header already links.
+
+       Resolution order, unchanged from what the select was initialised with:
+         1. TB.takePreset()   -- a fresh arrival from a card or landing page
+         2. the saved state   -- a returning visitor resuming their own work
+         3. DEFAULT_TYPE      -- a direct visit to docs.html with neither
+       ---------------------------------------------------------------------- */
+    let sessionDocType = DEFAULT_TYPE;
+
     const blankToggle = document.getElementById("f-blank");
+    const docNameInput = document.getElementById("doc-name");
     const itemList = document.getElementById("item-list");
     const tplItem = document.getElementById("tpl-item");
     const swatchRow = document.getElementById("swatch-row");
@@ -314,12 +338,13 @@
     }
 
     function collectState() {
-        const requested = typeSelect.value;
         const state = {
-            docType: Object.prototype.hasOwnProperty.call(DOC_TYPES, requested)
-                ? requested
-                : DEFAULT_TYPE,
+            /* Fixed for the session -- see sessionDocType above. Already
+               validated against DOC_TYPES where it is resolved, so there is
+               nothing to re-check on every keystroke. */
+            docType: sessionDocType,
             accent: currentAccent,
+            docName: TB.sanitize(docNameInput ? docNameInput.value : DEFAULT_DOC_NAME),
             blankForm: blankToggle.checked === true,
             fields: {},
             items: collectItems(),
@@ -1423,6 +1448,10 @@
         const saved = TB.storageGet(STORAGE_KEY);
         const state = saved && saved.fields ? saved : null;
 
+        if (docNameInput) {
+            docNameInput.value = TB.desanitize((state && state.docName) || DEFAULT_DOC_NAME);
+        }
+
         if (state) {
             applyAccent(state.accent);
             blankToggle.checked = state.blankForm === true;
@@ -1450,19 +1479,29 @@
             showSampleNotice();
         }
 
-        /* A catalog card can pre-select which document opens. The value is
-           matched against DOC_TYPES, so an edited localStorage entry can only
-           ever resolve to a document this editor already ships. */
+        /* A catalog card or landing-page CTA pre-selects which document opens.
+           The value is matched against DOC_TYPES, so an edited localStorage
+           entry can only ever resolve to a document this editor already ships,
+           and a direct visit with no preset and no saved work falls through to
+           DEFAULT_TYPE rather than to nothing.
+
+           This is now the ONLY place the document type is decided; there is no
+           control that can change it afterwards. The saved-state branch is
+           what lets a returning visitor resume the document they were actually
+           working on instead of being reset to the default. */
         const preset = TB.takePreset();
-        const requested = Object.prototype.hasOwnProperty.call(DOC_TYPES, preset)
+        sessionDocType = Object.prototype.hasOwnProperty.call(DOC_TYPES, preset)
             ? preset
             : (state && DOC_TYPES[state.docType] ? state.docType : DEFAULT_TYPE);
-        typeSelect.value = requested;
 
         /* Real-time binding: one delegated listener covers every current and
            future input inside the form, including cloned line-item rows. */
         form.addEventListener("input", persistAndRender);
         form.addEventListener("change", persistAndRender);
+
+        if (docNameInput) {
+            docNameInput.addEventListener("input", persistAndRender);
+        }
 
         document.getElementById("add-item").addEventListener("click", () => {
             addItemRow();

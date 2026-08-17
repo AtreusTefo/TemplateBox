@@ -744,12 +744,125 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Theme toggle (August 11, 2026).
+
+       The theme is already applied by the time this runs: every page carries a
+       tiny inline script in <head> that reads the same localStorage key and
+       writes data-theme onto <html> before first paint, so a returning visitor
+       never sees a flash of the wrong theme. This function only wires up the
+       button and keeps its accessible name truthful.
+
+       THEME_KEY is duplicated in that inline snippet by necessity -- the
+       snippet has to run before any external file loads, so it cannot import
+       from here. Both spellings are asserted identical by
+       tests/verify-layout.js, which is the guard against them drifting.
+
+       Storage is wrapped because a visitor with cookies and site data blocked
+       throws on localStorage access; the toggle still works for the session.
+       ---------------------------------------------------------------------- */
+    const THEME_KEY = "tb_theme";
+
+    function initThemeToggle() {
+        const button = document.querySelector("[data-theme-toggle]");
+        if (!button) {
+            return;
+        }
+
+        const root = document.documentElement;
+
+        /* The button names the ACTION, not the current state, which is what a
+           screen reader user needs in order to know what pressing it does. */
+        function label() {
+            const dark = root.getAttribute("data-theme") === "dark";
+            const text = dark ? "Switch to light theme" : "Switch to dark theme";
+            button.setAttribute("aria-label", text);
+            button.setAttribute("title", text);
+        }
+
+        label();
+
+        button.addEventListener("click", () => {
+            const dark = root.getAttribute("data-theme") !== "dark";
+            /* Always write an explicit value, never remove the attribute: an
+               absent attribute means "follow the OS", so a visitor choosing
+               light on a dark-set machine would be overruled on next load. */
+            root.setAttribute("data-theme", dark ? "dark" : "light");
+            try {
+                window.localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
+            } catch (err) {
+                /* Storage unavailable: the choice holds for this page only. */
+            }
+            label();
+        });
+    }
+
+    /* ----------------------------------------------------------------------
+       Scroll direction (August 10, 2026).
+
+       ONE utility for every element that hides on scroll-down, rather than a
+       copy per element: this only decides which way the page is moving and
+       writes a single class onto <body>. Which elements react, and at which
+       widths, is entirely a CSS question -- today that is the homepage
+       category tabs at every width and the homepage header below 48rem.
+
+       Three deliberate details:
+
+         - The listener is passive, so it can never block scrolling, and the
+           work is deferred to one requestAnimationFrame per frame through a
+           flag. Reading scrollY inside the rAF rather than the event also
+           keeps the read out of the scroll handler's critical path.
+         - JITTER ignores sub-pixel and rubber-band noise that would otherwise
+           flip the class back and forth while the page is effectively still.
+         - REVEAL_ABOVE keeps everything visible near the top of the document,
+           so a short scroll on a nearly-unscrolled page does not hide the
+           navigation the visitor is still looking at.
+
+       The hidden state is a transform in CSS, never display:none, so it
+       animates and so the sticky elements keep their boxes -- index.html's
+       ad-rail inset depends on .site-header staying in normal flow.
+       ---------------------------------------------------------------------- */
+    function initScrollDirection() {
+        const JITTER = 6;
+        const REVEAL_ABOVE = 80;
+        let lastY = Math.max(0, window.pageYOffset || 0);
+        let queued = false;
+
+        function update() {
+            queued = false;
+            const y = Math.max(0, window.pageYOffset || 0);
+            if (Math.abs(y - lastY) < JITTER) {
+                return;
+            }
+            document.body.classList.toggle(
+                "is-nav-hidden",
+                y > lastY && y > REVEAL_ABOVE
+            );
+            lastY = y;
+        }
+
+        window.addEventListener("scroll", () => {
+            if (!queued) {
+                queued = true;
+                window.requestAnimationFrame(update);
+            }
+        }, { passive: true });
+    }
+
+    /* ----------------------------------------------------------------------
        Header mega-menu.
 
-       The homepage carries no footer, so without this the landing pages and
-       legal pages would be unreachable from it except by finding a catalog
-       card. Desktop only -- CSS hides the control below 62rem, where the
-       footer on every other page already covers the same links.
+       Originally homepage-only, because the homepage was the one page with
+       no footer and the landing and legal pages would otherwise have been
+       unreachable from it. As of August 13, 2026 NO page has a footer --
+       the link columns moved into this panel site-wide -- so this is now
+       the primary navigation surface on every page, at every width.
+
+       That "at every width" matters: the panel used to be hidden below
+       62rem on the grounds that the footer covered the same links on small
+       screens. With no footer left, hiding it would strand the legal pages
+       on phones, so the CSS restyles the panel for narrow viewports instead
+       of hiding the control. Nothing here changes by width; the behaviour
+       is entirely CSS.
        ---------------------------------------------------------------------- */
     function initNavMore() {
         const root = document.querySelector("[data-nav-more]");
@@ -918,6 +1031,24 @@ const TB = (() => {
     const SAVED_LABEL_MS = 1600;
     let saveResetTimer = 0;
 
+    /* Writes the state text. Editors that show the indicator as prose get it
+       as the element's own text, exactly as before. poster.html shows it as a
+       cloud-and-tick icon instead, so it supplies a [data-save-label] child
+       and the words go there -- visually hidden, still read by assistive
+       technology, and mirrored into the title attribute so hovering the icon
+       reveals them. Writing textContent on the element itself in that case
+       would delete the icon's SVG, which is exactly what this indirection
+       exists to prevent. */
+    function setSaveText(el, text) {
+        const label = el.querySelector("[data-save-label]");
+        if (label) {
+            label.textContent = text;
+        } else {
+            el.textContent = text;
+        }
+        el.setAttribute("title", text);
+    }
+
     function markSaved(ok) {
         const el = document.getElementById("save-state");
         if (!el) {
@@ -927,18 +1058,18 @@ const TB = (() => {
         if (ok === false) {
             el.classList.remove("is-saved");
             el.classList.add("is-unavailable");
-            el.textContent = "Not saved on this device";
+            setSaveText(el, "Not saved on this device");
             return;
         }
 
         el.classList.remove("is-unavailable");
         el.classList.add("is-saved");
-        el.textContent = "Saved on this device";
+        setSaveText(el, "Saved on this device");
 
         window.clearTimeout(saveResetTimer);
         saveResetTimer = window.setTimeout(() => {
             el.classList.remove("is-saved");
-            el.textContent = "Saves automatically";
+            setSaveText(el, "Saves automatically");
         }, SAVED_LABEL_MS);
     }
 
@@ -965,7 +1096,7 @@ const TB = (() => {
             markSaved(false);
             return;
         }
-        el.textContent = "Saves automatically";
+        setSaveText(el, "Saves automatically");
     }
 
     /* ----------------------------------------------------------------------
@@ -985,7 +1116,9 @@ const TB = (() => {
             initSaveState,
             initFormNav,
             initNavMore,
-            initSearch
+            initSearch,
+            initScrollDirection,
+            initThemeToggle
         ].forEach((init) => {
             try {
                 init();

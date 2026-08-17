@@ -29,16 +29,40 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Theme, applied before first paint so a returning visitor never sees a
+         flash of the wrong one. Deliberately inline and synchronous: an
+         external file would load after the first paint and the flash is
+         exactly what this exists to prevent. The key is duplicated from
+         js/app.js by necessity; tests/verify-layout.js asserts they match. -->
+    <script>
+        (function () {
+            try {
+                var saved = window.localStorage.getItem("tb_theme");
+                var dark = saved
+                    ? saved === "dark"
+                    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+                document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+            } catch (err) {
+                /* Storage blocked: fall through to the prefers-color-scheme
+                   rules in the stylesheet, which key on the attribute being
+                   absent. */
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-    <header class="site-header">
-        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
-    </header>
+    <!-- No header on this page, deliberately (August 13, 2026). The header
+         was only ever a wordmark link and a theme toggle -- no nav row to
+         strip separately. Removing it also removes the toggle: a visitor
+         cannot switch theme from this ten-second forced interstitial, which
+         is fine, because the inline script in <head> already applies
+         whichever theme was last saved before first paint, independent of
+         whether a toggle exists here. Do not add a toggle back elsewhere on
+         this page unless that is actually wanted. -->
 
     <main data-ads-static>
-        <div class="loading-layout">
         <div class="loading-wrap">
             <div class="loading-card">
                 <h1>Your Editor Is Opening</h1>
@@ -86,43 +110,78 @@
                          atOptions variable, and two copies sharing one page
                          context can clobber or dedupe each other. Each slot
                          has its own distinct zone key so Adsterra reports
-                         their impressions separately. -->
+                         their impressions separately.
+
+                         overflow:hidden on the srcdoc body is load-bearing and
+                         must match buildBannerFrame() in js/ads.js: a creative
+                         laying out larger than its booked size scrolls the
+                         iframe's OWN document, and that scrollbar paints
+                         inside the frame where the parent .ad-slot's
+                         overflow:hidden cannot reach it. scrolling="no" is the
+                         deprecated attribute that no longer reliably does
+                         this. -->
                     <div class="ad-slot" id="ad-banner-1">
                         <iframe title="Advertisement" width="300" height="250" scrolling="no" style="border:0;display:block"
-                            srcdoc="<body style='margin:0'><script>atOptions={'key':'4a408738c2170da16b47c5ac05b3780a','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js'></script></body>"></iframe>
+                            srcdoc="<body style='margin:0;overflow:hidden'><script>atOptions={'key':'4a408738c2170da16b47c5ac05b3780a','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/4a408738c2170da16b47c5ac05b3780a/invoke.js'></script></body>"></iframe>
                     </div>
                     <div class="ad-slot" id="ad-banner-2">
                         <iframe title="Advertisement" width="300" height="250" scrolling="no" style="border:0;display:block"
-                            srcdoc="<body style='margin:0'><script>atOptions={'key':'70d844a3963c8415efa49af391c897a0','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/70d844a3963c8415efa49af391c897a0/invoke.js'></script></body>"></iframe>
+                            srcdoc="<body style='margin:0;overflow:hidden'><script>atOptions={'key':'70d844a3963c8415efa49af391c897a0','format':'iframe','height':250,'width':300,'params':{}};</script><script src='https://www.highperformanceformat.com/70d844a3963c8415efa49af391c897a0/invoke.js'></script></body>"></iframe>
                     </div>
                 </div>
-
-                <!-- Gives the interval content rather than leaving it empty -->
-                <ul class="loading-points">
-                    <li>Everything you type stays on this device. Nothing is uploaded.</li>
-                    <li>Your work saves automatically as you go.</li>
-                    <li>Export a finished PDF or PNG with no watermark.</li>
-                </ul>
             </div>
         </div>
 
-            <!-- Sticky 160x600 rail, desktop only, the same pattern the
-                 guides pages use. This replaced a fixed bottom anchor.
-                 The anchor was position:fixed over the foot of the viewport
-                 and `.has-site-anchor` reserved body padding to make room
-                 for it -- but that only protects the END of a page, and
-                 this page's two 300x250 banners sit MID-page inside a
-                 centred card, so on a short viewport the bar covered them.
-                 A rail in the flex row beside the card cannot overlap
-                 anything by construction. -->
-            <aside class="loading-rail" data-ad-rail aria-label="Advertisement"></aside>
-        </div>
+        <!-- Rail, desktop only: the three-slot stack at 93rem and above, a
+             single 160x600 from 75rem, matching every other rail context on
+             the site (index.html, the four editors, and the content-rail
+             family) exactly, via mountContentAds() -- same markup contract
+             ([data-ad-content-rail] host, three [data-ad-rail-slot]
+             children), zero new JavaScript. Full display now (August 16,
+             2026): the .loading-rail class joins the shared
+             .editor-rail/.home-rail/.content-rail selector in css/style.css
+             instead of carrying its own position:sticky rule, reversing that
+             choice. The earlier reasoning conflated two different fixed
+             placements -- see the corrected mountSiteAnchor comment in
+             js/ads.js and the .loading-rail comment in css/style.css before
+             touching this again: a fixed BOTTOM anchor pins over whatever the
+             visitor has scrolled to, which is unsafe beside this page's
+             mid-page card, but a fixed SIDE rail reserves its width with body
+             padding for the entire page rather than floating over scrolled
+             content, so nothing is ever positioned underneath it regardless
+             of scroll position -- the same mechanism index.html and the
+             editors already rely on. This page has more headroom than the
+             other content-rail pages besides: .loading-wrap caps at 44rem,
+             far under the 72rem main cap the family's 75rem floor exists to
+             protect elsewhere. -->
+        <aside class="loading-rail" data-ad-content-rail aria-label="Advertisements">
+            <div data-ad-rail-slot></div>
+            <div data-ad-rail-slot></div>
+            <div data-ad-rail-slot></div>
+        </aside>
     </main>
 
     <!-- No footer on this page: it is a ten-second, noindex intermediary with
          nowhere for a visitor to navigate to that beats waiting out the
          countdown, so the footer's links (and its ~300px) served no purpose
          here. It is still present on every indexable page. -->
+
+    <!-- Mobile site-wide anchor (August 13, 2026, second pass). Excluded
+         from this page when the anchor was first rolled out sitewide,
+         because a position:fixed bar at the foot of the viewport can cover
+         mid-page content on a short screen regardless of how much body
+         padding is reserved -- the reservation only guarantees no overlap
+         once scrolled to the true end, not at every scroll position along
+         the way. What changed: the mobile layout below 48rem is now tuned
+         to fit entirely within the viewport with no scrolling at all (see
+         the @media (max-width: 48rem) rules in css/style.css), which
+         removes the "scrolled past" case that made the anchor unsafe here
+         in the first place -- there is no scroll position for the anchor
+         to sit over content at, because the whole page is always fully on
+         screen. Filled by mountSiteAnchor() in js/ads.js, unconditionally,
+         exactly like every other page; the exclusion this page used to
+         document there no longer applies. -->
+    <div class="site-anchor" data-ad-anchor aria-label="Advertisement"></div>
 
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>

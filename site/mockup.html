@@ -29,8 +29,8 @@
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "All",
         "browserRequirements": "Requires JavaScript and HTML5 support",
-        "description": "Free browser-based product mockup generator for print-on-demand sellers. Drop a design onto a t-shirt, hoodie, mug, packaging box or photographed poster frame and export a PNG. Artwork is rendered on a local canvas and never uploaded.",
-        "featureList": "T-shirt, hoodie, mug and box templates, photographic poster frame mockups with realistic shadows, colour variants, drag and scale placement, PNG export",
+        "description": "Free browser-based product mockup generator for print-on-demand sellers. Drop one or more designs onto a t-shirt, hoodie, mug, packaging box or photographed poster frame and export a PNG. Artwork is rendered on a local canvas and never uploaded.",
+        "featureList": "T-shirt, hoodie, mug and box templates, photographic poster frame mockups with realistic shadows, multiple design layers on one product, custom colour picker, drag, scale and rotate placement, PNG export",
         "offers": { "@type": "Offer", "price": "0.00", "priceCurrency": "USD" }
     }
     </script>
@@ -66,37 +66,59 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Theme, applied before first paint so a returning visitor never sees a
+         flash of the wrong one. Deliberately inline and synchronous: an
+         external file would load after the first paint and the flash is
+         exactly what this exists to prevent. The key is duplicated from
+         js/app.js by necessity; tests/verify-layout.js asserts they match. -->
+    <script>
+        (function () {
+            try {
+                var saved = window.localStorage.getItem("tb_theme");
+                var dark = saved
+                    ? saved === "dark"
+                    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+                document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+            } catch (err) {
+                /* Storage blocked: fall through to the prefers-color-scheme
+                   rules in the stylesheet, which key on the attribute being
+                   absent. */
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
     <a class="skip-link" href="#editor-layout">Skip to main content</a>
 
-    <header class="site-header">
-        <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
+    <header class="site-header editor-bar">
+        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+
+        <label class="sr-only" for="doc-name">Mockup name</label>
+        <input type="text" class="doc-name" id="doc-name" maxlength="80" value="Untitled mockup" aria-label="Mockup name">
+
+        <div class="editor-actions">
+            <span class="save-cloud" id="save-state" role="status" aria-live="polite" title="Saves automatically">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 18.5A3.5 3.5 0 0 1 6 11.6a5 5 0 0 1 9.7-1.5A4 4 0 0 1 18.5 18.5Z"/><path class="tick" d="m9.5 14 2 2 3.5-3.5"/></svg>
+                <span class="sr-only" data-save-label>Saves automatically</span>
+            </span>
+
+            <button type="button" class="btn dl-toggle" id="download-mockup-png"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>Download PNG</button>
+        </div>
+
         <nav class="site-nav" aria-label="Primary">
-            <a href="index.html" aria-current="page">Templates</a>
-            <a href="blog.html">Guides</a>
-            <a href="about.html">About</a>
         </nav>
     </header>
 
     <main data-ads-static>
-        <nav class="breadcrumb" aria-label="Breadcrumb">
-            <ol>
-                <li><a href="index.html">Templates</a></li>
-                <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
-                <li aria-current="page">Mockup Editor</li>
-            </ol>
-        </nav>
-
         <div class="editor-head">
-            <h1>Product Mockup Generator</h1>
-            <!-- Autosave state: persistence was previously silent, which
-                 wasted the trust payoff of a no-account product -->
-            <p class="save-state" id="save-state" role="status" aria-live="polite">Saves automatically</p>
+            <h1 class="sr-only">Product Mockup Generator</h1>
+            <!-- The autosave indicator moved into the toolbar above as an icon.
+                 There is deliberately no second copy here: js/app.js targets
+                 #save-state by id, so two would leave one of them permanently
+                 stale. -->
         </div>
-        <p class="editor-intro">Upload your design once, then switch between t-shirt, hoodie, mug, packaging and photographed poster frame templates. Artwork renders locally in this tab and is never uploaded.</p>
 
         <!-- Mobile-only tab switcher between controls and canvas -->
         <div class="mobile-tabs" role="tablist" aria-label="Editor views">
@@ -111,43 +133,153 @@
         <div class="editor-leaderboard" data-ad-editor-leaderboard aria-label="Advertisement"></div>
 
         <div class="editor-shell">
-        <div class="editor-layout show-edit" id="editor-layout">
+        <div class="editor-layout mockup-layout show-edit" id="editor-layout">
 
             <!-- Left pane: mockup controls -->
-            <section class="editor-pane" aria-label="Mockup controls">
+            <section class="editor-pane mockup-sidebar" aria-label="Mockup controls">
                 <h2>Mockup Controls</h2>
                 <form id="mockup-form">
-                    <div class="field">
-                        <label for="m-product">Product Template</label>
-                        <select id="m-product">
-                            <option value="tshirt">T-Shirt</option>
-                            <option value="hoodie">Hoodie</option>
-                            <option value="mug">Mug</option>
-                            <option value="box">Packaging Box</option>
-                        </select>
+                    <!-- No template picker: the mockup is chosen by the
+                         catalog card that opened this editor, handed over as
+                         a data-doc preset. Each product therefore needs its
+                         own card in index.html, or it becomes unreachable. -->
+
+                    <!-- DESIGN. This editor composites an ORDERED STACK of
+                         designs, not a single image: every row below is one
+                         layer, the "+" appends another, and the last row in
+                         the list is the one painted in front. -->
+                    <div class="field panel-block">
+                        <div class="panel-head">
+                            <span class="panel-title" id="m-design-label">Design</span>
+                            <button type="button" class="panel-add" id="m-add-design" data-tip="Add more design" aria-label="Add more design">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                            </button>
+                        </div>
+
+                        <!-- ONE file input serves every upload path on this
+                             page -- the "+", the empty-state button, and each
+                             row's Replace. js/mockup.js sets what the next
+                             pick means before opening it. It keeps this id
+                             and its accept filter because the mime validation
+                             is bound to it.
+
+                             .file-trigger, not .sr-only: see the rule's own
+                             comment in css/style.css. It is never focused or
+                             clicked directly, so it needs no label of its own
+                             -- the visible buttons carry the accessible
+                             names and call .click() on it. -->
+                        <input type="file" id="m-design" class="file-trigger" accept="image/*">
+
+                        <ul class="layer-list" id="m-layer-list" data-mockup-layers aria-labelledby="m-design-label"></ul>
+
+                        <button type="button" class="btn btn-secondary btn-block upload-cta" id="m-upload-design">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M4 20h16"/></svg>
+                            Upload Design
+                        </button>
+
+                        <p class="upload-hint">PNG, JPG, or WebP with a transparent background works best. Validated client-side before drawing.</p>
+                        <p class="form-error" id="m-design-error" role="alert"></p>
+
+                        <!-- Acts on the selected layer only. Hidden outright
+                             while nothing is selected, so the buttons never
+                             offer an action with no target. -->
+                        <div class="layer-actions" id="m-layer-actions" hidden>
+                            <button type="button" id="m-act-resize">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+                                Resize
+                            </button>
+                            <button type="button" id="m-act-replace">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11.5A8 8 0 0 0 6.3 6.3L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 12.5A8 8 0 0 0 17.7 17.7L20 15.5"/><path d="M20 20v-4.5h-4.5"/></svg>
+                                Replace
+                            </button>
+                            <button type="button" id="m-act-remove">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/><path d="M10.5 10.5v6"/><path d="M13.5 10.5v6"/></svg>
+                                Remove
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Hidden entirely for photographic templates, which
                          have no colorway concept -->
-                    <div class="field" id="m-color-field">
-                        <label id="m-color-label">Color</label>
+                    <div class="field panel-block" id="m-color-field">
+                        <div class="panel-head">
+                            <span class="panel-title" id="m-color-label">Color</span>
+                        </div>
+
+                        <div class="color-control">
+                            <button type="button" class="color-trigger" id="m-color-trigger" aria-haspopup="dialog" aria-expanded="false">
+                                <span class="color-trigger-dot" id="m-color-dot"></span>
+                                <span class="color-trigger-hex" id="m-color-hex">#FFFFFF</span>
+                                <svg class="color-trigger-caret" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 10 5 5 5-5"/></svg>
+                                <span class="sr-only">Open the colour picker</span>
+                            </button>
+
+                            <!-- Saturation/value square and hue strip are
+                                 plain elements painted with CSS gradients, not
+                                 canvases or a library: the picker needs no
+                                 pixel readback, only the pointer's position
+                                 within each track. -->
+                            <div class="color-popover" id="m-color-popover" role="dialog" aria-label="Choose a product colour" hidden>
+                                <!-- Pointer-only, and hidden from assistive tech
+                                     on purpose: the Hex/R/G/B inputs directly
+                                     below set exactly the same value and are
+                                     fully keyboard-operable, so exposing the
+                                     gradients as well would announce the same
+                                     control twice with no way to use one. -->
+                                <div class="color-sv" id="m-color-sv" aria-hidden="true">
+                                    <span class="color-sv-thumb" id="m-color-sv-thumb"></span>
+                                </div>
+
+                                <div class="color-hue" id="m-color-hue" aria-hidden="true">
+                                    <span class="color-hue-thumb" id="m-color-hue-thumb"></span>
+                                </div>
+
+                                <div class="color-inputs">
+                                    <p class="color-input-cell">
+                                        <input type="text" id="m-color-in-hex" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex value">
+                                        <span class="color-input-tag">Hex</span>
+                                    </p>
+                                    <p class="color-input-cell">
+                                        <input type="number" id="m-color-in-r" min="0" max="255" step="1" aria-label="Red">
+                                        <span class="color-input-tag">R</span>
+                                    </p>
+                                    <p class="color-input-cell">
+                                        <input type="number" id="m-color-in-g" min="0" max="255" step="1" aria-label="Green">
+                                        <span class="color-input-tag">G</span>
+                                    </p>
+                                    <p class="color-input-cell">
+                                        <input type="number" id="m-color-in-b" min="0" max="255" step="1" aria-label="Blue">
+                                        <span class="color-input-tag">B</span>
+                                    </p>
+                                </div>
+
+                                <div class="color-presets" id="m-color-presets" role="group" aria-label="Preset colours"></div>
+                            </div>
+                        </div>
+
+                        <!-- The product's own colorways stay as one-click
+                             quick picks beside the free picker above. -->
                         <div class="color-row" id="m-color-row" role="radiogroup" aria-labelledby="m-color-label"></div>
                     </div>
 
-                    <div class="field">
-                        <label for="m-design">Upload Design</label>
-                        <input type="file" id="m-design" accept="image/*">
-                        <p class="upload-hint">PNG, JPG, or WebP with a transparent background works best. Validated client-side before drawing.</p>
-                        <p class="form-error" id="m-design-error" role="alert"></p>
-                    </div>
-
-                    <div class="field">
-                        <label for="m-scale">Design Size</label>
-                        <div class="range-row">
-                            <input type="range" id="m-scale" min="30" max="100" value="75" step="1">
-                            <output id="m-scale-output" for="m-scale">75%</output>
+                    <div class="field panel-block">
+                        <div class="panel-head">
+                            <label class="panel-title" for="m-scale">Design Size</label>
+                            <div class="size-head">
+                                <span class="size-number">
+                                    <input type="number" id="m-scale-number" min="5" max="200" step="1" value="75" aria-label="Design size percentage">
+                                    <span class="size-unit" aria-hidden="true">%</span>
+                                </span>
+                                <button type="button" class="icon-round" id="m-scale-reset" data-tip="Reset size" aria-label="Reset design size">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11.5A8 8 0 1 0 18 17"/><path d="M20 5.5V11h-5.5"/></svg>
+                                </button>
+                            </div>
                         </div>
-                        <p class="upload-hint">Drag your design directly on the preview to reposition it on the product.</p>
+                        <div class="range-row">
+                            <input type="range" id="m-scale" min="5" max="200" value="75" step="1">
+                            <output id="m-scale-output" class="sr-only" for="m-scale">75%</output>
+                        </div>
+                        <p class="upload-hint">Drag a design on the preview to move it. Corner handles resize it, and the round handle above rotates it.</p>
                     </div>
 
                     <div class="field">
@@ -156,11 +288,11 @@
                     </div>
                 </form>
 
-                <!-- Sticky: keeps both completing actions reachable without
-                     scrolling back past the full control stack -->
+                <!-- Sticky: keeps the tray action reachable without scrolling
+                     back past the full control stack. Download moved into the
+                     editor-bar toolbar above, to match the other editors. -->
                 <div class="preview-actions">
                     <button type="button" class="btn btn-block" id="add-to-tray">Add to My Mockups</button>
-                    <button type="button" class="btn btn-secondary btn-block" id="download-mockup-png">Download PNG</button>
                 </div>
             </section>
 
@@ -168,9 +300,24 @@
             <section class="preview-pane" aria-label="Mockup preview">
                 <h2>Live Preview</h2>
                 <div class="mockup-stage">
-                    <!-- Fixed internal resolution keeps exports high-quality;
-                         CSS scales the visible element responsively -->
-                    <canvas id="mockup-canvas" width="1000" height="1000"></canvas>
+                    <div class="mockup-canvas-wrap">
+                        <!-- Fixed internal resolution keeps exports high-quality;
+                             CSS scales the visible element responsively.
+                             aria-label is set from js/mockup.js to name the active
+                             mockup: with the template picker gone, this is the
+                             only text that identifies which one is loaded. -->
+                        <canvas id="mockup-canvas" width="1000" height="1000" role="img" aria-label="Mockup preview"></canvas>
+
+                        <!-- Selection chrome (bounding box, corner handles,
+                             rotate handle, layer name tag) is drawn HERE and
+                             never on the canvas above. Export and the tray
+                             thumbnails both read #mockup-canvas alone, so
+                             keeping the handles on a separate surface is what
+                             stops them being baked into a downloaded PNG.
+                             pointer-events:none lets every pointer event fall
+                             through to the canvas underneath. -->
+                        <canvas id="mockup-overlay" class="mockup-overlay" width="1000" height="1000" aria-hidden="true"></canvas>
+                    </div>
                 </div>
 
                 <div class="mockup-tray">

@@ -12,12 +12,19 @@
    Dependencies: none. Load this before js/blog.js on pages that use both.
 
    Page families and how they mount:
-     - blog.html / post.html   js/blog.js mounts as it renders
+     - blog.html / post.html   js/blog.js mounts the top/in-article hosts as
+                               it renders; the content rail is static markup
+                               and mounts through mountContentAds instead
      - blog/<slug>.html        hosts are in the served markup, auto-mounted
-     - *-template.html         same, auto-mounted
+     - *-template.html,        same, auto-mounted
+       about/terms/privacy
      - the four editors        same, auto-mounted (rail + mobile anchor)
    Auto-mounting is opt-in through [data-ads-static] on the page's <main>, so
    a page whose renderer does its own mounting can never double-count.
+   mountSiteAnchor and mountContentAds are the two exceptions: both run
+   unconditionally on every page regardless of that gate, because
+   about/terms/privacy and the blog surfaces carry neither a renderer nor
+   [data-ads-static] and still need the anchor and the rail to mount.
 
    Ad policy this file enforces by omission: only passive banner formats live
    here. The Popunder (index.html) and Social Bar (loading.html) are declared
@@ -86,8 +93,20 @@ const TBAds = (() => {
         frame.setAttribute("scrolling", "no");
         frame.style.border = "0";
         frame.style.display = "block";
+        /* overflow:hidden on the srcdoc body, not just on the parent .ad-slot.
+           A creative that lays out wider or taller than the size it was booked
+           at scrolls the IFRAME'S OWN document, and that scrollbar is painted
+           inside the frame's box -- the parent's overflow:hidden clips what
+           escapes the box, which is a different thing and cannot remove it
+           (reported August 16, 2026 as a scrollbar under both loading.html
+           banners at laptop widths, where nothing in the surrounding layout
+           was squeezing them). scrolling="no" is the deprecated attribute that
+           used to do this and is no longer reliably honoured. The srcdoc
+           document inherits this page's origin, so its body is ours to style;
+           the nested cross-origin frame the ad script then injects is not, but
+           it is that outer document's scrollbar that shows. */
         frame.setAttribute("srcdoc",
-            "<body style='margin:0'>" +
+            "<body style='margin:0;overflow:hidden'>" +
             "<script>atOptions={'key':'" + zone.key + "','format':'iframe'," +
             "'height':" + zone.height + ",'width':" + zone.width + ",'params':{}};<\/script>" +
             "<script src='https://www.highperformanceformat.com/" + zone.key + "/invoke.js'><\/script>" +
@@ -200,13 +219,6 @@ const TBAds = (() => {
         mountPlacement(root.querySelector("[data-ad-incontent]"), "inContent");
         mountPlacement(root.querySelector("[data-ad-endofarticle]"), "endOfArticle");
 
-        /* The 160x600 rail only exists on viewports wide enough to hold it
-           beside the content column. */
-        if (window.matchMedia("(min-width: 70rem)").matches) {
-            mountPlacement(root.querySelector("[data-ad-rail]"), "skyscraper");
-            mountPlacement(root.querySelector("[data-ad-sidebar]"), "skyscraper");
-        }
-
         mountEditorAds(root);
         mountHomeAds(root);
     }
@@ -316,30 +328,34 @@ const TBAds = (() => {
        are deliberately non-overlapping to the pixel, so no viewport can ever
        mount two placements or none.
 
-       The rail gate is 84rem, not the blog's 70rem, because an editor is two
-       panes plus a rail. Below 84rem the page is capped by the viewport
-       rather than by its own max-width, so a rail stops using spare margin
-       and starts eating the panes: at 1200px it cost each pane 68px. At
-       84rem and above the panes measure 546px, marginally wider than the
-       540px they had before any rail existed. That held when the rail was a
-       sticky block inside the page and it still holds now the rail is a fixed
-       column and the width is reserved by body padding instead -- the page
-       cap sheds exactly what the padding takes. See the
-       --ad-rail-w / .has-ad-rail rules in css/style.css.
+       The rail gate is 75rem, matching the homepage exactly (August 13,
+       2026, at the owner's instruction, reversing this file's own prior
+       84rem gate) -- NOT the mathematically "safe" floor. 84rem was the
+       measured break-even where the rail sits in genuinely spare margin: at
+       1200px (this new 75rem floor) each pane loses real width against the
+       pre-rail 540px, roughly 20-35px depending on how the cap sheds it,
+       the same class of cost the original EDITOR_PAGE_AD_PLACEMENT.md
+       measured as 68px and rejected. That cost is accepted here, knowingly,
+       for parity with the homepage's rail appearing at the same laptop
+       widths (1280px MacBook Air was the reported case) rather than staying
+       viewport-bound until 1344px. See
+       docs/implementation/EDITOR_PAGE_AD_PLACEMENT.md for the original
+       84rem reasoning this reverses, and its "Revised" section for this
+       change and the exact numbers.
 
-       Between 48rem and 84rem there is no room beside the panes, so that
+       Between 48rem and 75rem there is no room beside the panes, so that
        band gets a leaderboard above the workspace instead. It scrolls away,
        which is why it is the fallback rather than the primary: the whole
        argument for advertising on editors is session-long visibility. */
-    const EDITOR_RAIL_MIN = "(min-width: 84rem)";
+    const EDITOR_RAIL_MIN = "(min-width: 75rem)";
     const EDITOR_LEADERBOARD_BAND =
-        "(min-width: 48.0625rem) and (max-width: 83.9375rem)";
+        "(min-width: 48.0625rem) and (max-width: 74.9375rem)";
     const EDITOR_ANCHOR_MAX = "(max-width: 48rem)";
 
     /* A three-slot 300px rail needs 324px including its gap. Holding the
        editing panes at the 540px they had before any rail existed therefore
        takes 1476px of viewport, so the stack only appears at 93rem and up.
-       Between 84rem and 93rem there is room for the 160px skyscraper but not
+       Between 75rem and 93rem there is room for the 160px skyscraper but not
        for the stack, and that band keeps the single unit. */
     const EDITOR_RAIL_STACK_MIN = "(min-width: 93rem)";
     const EDITOR_RAIL_STACK = ["editorRail1", "editorRail2", "editorRail3"];
@@ -384,13 +400,16 @@ const TBAds = (() => {
     }
 
     /* ----------------------------------------------------------------------
-       Site-wide anchor.
+       Site-wide anchor: mobile only.
 
-       The editors proved the format: a unit fixed to the foot of the viewport
-       is visible for the whole session instead of scrolling away after two
-       seconds. This carries the same placement to every other page except the
-       four listed below, so a visitor reading a landing page or an article
-       sees one persistent unit the way an editing visitor does.
+       Originally this mounted at every width -- 320x50 under 48rem, 728x90
+       above it, forever. That desktop half is retired (August 13, 2026): a
+       persistent bottom bar was a placeholder for the fixed rail this page
+       family did not have yet. Now that .content-rail exists (below), the
+       anchor's job stops at the mobile breakpoint and the rail takes over
+       once there is room for it; between 48rem and the rail's own floor
+       neither appears, matching the gap the homepage's own rail has always
+       had between its anchor and its rail band. See mountContentAds.
 
        Deliberately absent from:
          index.html    the page Google indexes and the first impression every
@@ -404,51 +423,138 @@ const TBAds = (() => {
          blog/*.html   same two zones -- an anchor here would serve one zone
                        key twice in a single page view, which is not the same
                        thing as reusing a key across different pages. They
-                       also already carry four units including a 160x600
-                       rail. Giving them an anchor needs a dedicated Adsterra
-                       zone first (a duplicate size requires a support
-                       ticket); see docs/memory/PROJECT_STATUS.md.
+                       also already carry four units including the rail.
+                       Giving them an anchor needs a dedicated Adsterra zone
+                       first (a duplicate size requires a support ticket);
+                       see docs/memory/PROJECT_STATUS.md.
 
-       Size follows the viewport: 320x50 under 48rem, 728x90 above. That is
-       what makes it "the same thing on desktop" rather than a second design
-       -- one host, one behavior, one padding mechanism.
+       loading.html's history with this anchor is worth knowing before
+       touching either. It briefly carried the anchor (August 2026) on the
+       reasoning that .has-site-anchor reserves body padding, so the fixed
+       bar could not cover anything. That reasoning was wrong: reserving
+       body padding at the FOOT of the document only protects the end of it,
+       and this page's ad content sits mid-page inside a centred card, so on
+       a short viewport the bar sat straight over it while scrolled past --
+       nowhere near the document's actual end. It was removed and replaced
+       with a [data-ad-content-rail] rail beside the card instead (still
+       there, desktop-only, see mountContentAds below).
 
-       loading.html does NOT use this anchor, and the reason is instructive.
-       It briefly did (August 2026) on the reasoning that .has-site-anchor
-       reserves body padding, so the fixed bar could not cover anything.
-       That reasoning was wrong: reserving body padding protects the END of
-       a document, and this page's two 300x250 banners sit MID-page inside
-       a centred card. On a short viewport the bar sat straight over them.
-       It now carries a sticky [data-ad-rail] beside the card instead,
-       filled by mountHosts, which cannot overlap by construction. See the
-       .loading-layout rules in css/style.css.
+       That rail itself briefly stayed position:sticky rather than joining
+       the fixed .editor-rail/.home-rail/.content-rail family, on reasoning
+       that generalised the anchor's lesson too far: it treated any fixed
+       placement on this page as unsafe, rather than distinguishing a fixed
+       BOTTOM bar (which pins to wherever the visitor has scrolled to, so
+       body padding only guarantees clearance at the document's end) from a
+       fixed SIDE rail (which reserves its width with body padding for the
+       entire page, at every scroll position, not just the end -- there is
+       no scroll position where content could occupy that column, because
+       the column's width is removed from the page outright rather than
+       floated over it). That is the mechanism index.html and the editors
+       already relied on safely, and the rail switched to it too (August 16,
+       2026) -- see the .loading-rail comment in css/style.css.
+
+       The anchor came back on mobile a second time, once the page's own
+       mobile layout was tuned to fit the viewport with zero scrolling (see
+       the loading.html-scoped rules under @media (max-width: 48rem) in
+       css/style.css). That is what actually fixes the original problem:
+       the overlap only ever happened while the ad content was being
+       scrolled past a fixed element, and a page that never scrolls has no
+       such moment. The anchor is unsafe to add back to ANY page that still
+       scrolls its ad content past the viewport foot, regardless of how
+       little content remains below it -- verify zero scroll at the
+       targeted viewport sizes first, the way loading.html's own
+       verification script does, before reusing this reasoning elsewhere.
        ---------------------------------------------------------------------- */
     const SITE_ANCHOR_MOBILE = "(max-width: 48rem)";
 
     function mountSiteAnchor(scope) {
         const root = scope || document;
         const anchor = root.querySelector("[data-ad-anchor]");
-        if (!anchor) {
+        if (!anchor || !window.matchMedia(SITE_ANCHOR_MOBILE).matches) {
             return false;
         }
-
-        const mobile = window.matchMedia(SITE_ANCHOR_MOBILE).matches;
 
         /* .has-site-anchor reserves the space the fixed bar occupies, and is
            only added when a banner actually filled -- a dormant or blocked
            zone leaves the layout untouched. */
-        if (mountPlacement(anchor, mobile ? "leaderboardMobile" : "leaderboard")) {
+        if (mountPlacement(anchor, "leaderboardMobile")) {
             document.body.classList.add("has-site-anchor");
             return true;
         }
         return false;
     }
 
+    /* ----------------------------------------------------------------------
+       Content rail (August 13, 2026): the fixed full-height rail carried to
+       a third context -- plain single-column pages that are neither a
+       two-pane editor nor a masonry feed. Nine landing pages, about, terms,
+       privacy, and the three blog surfaces (blog.html, post.html and the
+       generated blog/<slug>.html pages) all mount through this one function.
+       Same markup, same slots, same zones as mountEditorAds/mountHomeAds --
+       deliberately the third page family sharing the pattern, not a fourth
+       rail design. It replaces the desktop half of the site-wide anchor on
+       these pages, and on the blog surfaces it replaces the older in-flow
+       sticky .post-rail/.blog-sidebar single skyscraper, which could not
+       have run alongside this without showing two persistent units at once.
+
+       The floor is 75rem, the same as the homepage and (since the same day)
+       the editors -- all three rail contexts now appear at identical
+       widths, which is the whole point of the number. It was 83.5rem
+       first, derived as this family's own break-even: below it the
+       reserved column starts eating into `main`'s 72rem cap rather than
+       sitting in spare margin (72rem + 11.5rem = 83.5rem exactly). That
+       derivation is still correct and 75rem knowingly overrides it, the
+       same trade the editors took: between 75rem and 83.5rem a content
+       page's text column is narrower than its cap would otherwise allow.
+       Prose reflowing narrower is a far cheaper cost than an editor's
+       fixed panes losing width, which is why this was the easier of the
+       two calls. Below 75rem these pages show the mobile anchor (under
+       48rem) or nothing at all (48rem to 75rem), the same shape the
+       homepage has always had between its own anchor and rail bands. */
+    const CONTENT_RAIL_MIN = "(min-width: 75rem)";
+    const CONTENT_RAIL_STACK_MIN = "(min-width: 93rem)";
+    const CONTENT_RAIL_STACK = ["editorRail1", "editorRail2", "editorRail3"];
+
+    function mountContentAds(scope) {
+        const root = scope || document;
+        const rail = root.querySelector("[data-ad-content-rail]");
+        const slots = rail
+            ? Array.prototype.slice.call(rail.querySelectorAll("[data-ad-rail-slot]"))
+            : [];
+
+        if (!slots.length) {
+            return false;
+        }
+
+        if (window.matchMedia(CONTENT_RAIL_STACK_MIN).matches) {
+            rail.classList.add("is-stack");
+            let filled = false;
+            CONTENT_RAIL_STACK.forEach((zoneName, index) => {
+                filled = mountPlacement(slots[index], zoneName) || filled;
+            });
+            return reserveRailWidth(filled);
+        }
+
+        if (window.matchMedia(CONTENT_RAIL_MIN).matches) {
+            return reserveRailWidth(mountPlacement(slots[0], "skyscraper"));
+        }
+
+        return false;
+    }
+
+    /* mountSiteAnchor and mountContentAds both run unconditionally on every
+       page load, exactly like each other: each queries its own host and
+       no-ops when that host is absent, so it is safe to run on pages that
+       carry neither, either, or (never, by construction of the CSS floors)
+       both filled at once. Neither depends on [data-ads-static] -- that gate
+       is for mountHosts, which pages with their own renderer (blog.html,
+       post.html) deliberately skip to control mount timing themselves. */
     document.addEventListener("DOMContentLoaded", () => {
         if (document.querySelector("[data-ads-static]")) {
             mountHosts();
         }
         mountSiteAnchor();
+        mountContentAds();
     });
 
     return {
@@ -460,6 +566,7 @@ const TBAds = (() => {
         mountHosts,
         mountEditorAds,
         mountHomeAds,
-        mountSiteAnchor
+        mountSiteAnchor,
+        mountContentAds
     };
 })();

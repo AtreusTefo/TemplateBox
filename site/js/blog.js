@@ -410,12 +410,13 @@ const TBBlog = (() => {
             return;
         }
 
-        TBAds.mountLeaderboard(document.querySelector("[data-ad-leaderboard]"));
-
-        const sidebar = document.querySelector("[data-ad-sidebar]");
-        if (sidebar && window.matchMedia("(min-width: 70rem)").matches) {
-            TBAds.mountPlacement(sidebar, "skyscraper");
-        }
+        /* No ad mounting here at all any more. The top leaderboard this used
+           to fill was removed from blog.html on August 13, 2026 (the page
+           now carries one unit: the fixed rail from 75rem, the fixed mobile
+           anchor under 48rem), and both of those are static markup mounted
+           by TBAds.mountContentAds() / mountSiteAnchor() unconditionally on
+           DOMContentLoaded -- so no placement on this page depends on this
+           renderer having run first. */
 
         const posts = getVisiblePosts();
         featuredHost.textContent = "";
@@ -622,16 +623,10 @@ const TBBlog = (() => {
 
         layout.appendChild(article);
 
-        /* 160x600 skyscraper rail: only rendered on wide viewports and only
-           once its zone key exists; otherwise the rail element is absent and
-           the article takes the full column. */
-        if (TBAds.AD_ZONES.skyscraper.key &&
-            window.matchMedia("(min-width: 70rem)").matches) {
-            const rail = document.createElement("aside");
-            rail.className = "post-rail";
-            TBAds.mountPlacement(rail, "skyscraper");
-            layout.appendChild(rail);
-        }
+        /* The desktop rail is static markup ([data-ad-content-rail]) in
+           post.html itself, mounted by TBAds.mountContentAds() on
+           DOMContentLoaded -- no longer built here, so it no longer depends
+           on this renderer having run first. */
 
         root.appendChild(layout);
     }
