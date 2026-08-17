@@ -4,7 +4,9 @@
    vector product illustrations composed on HTML5 Canvas (t-shirt, hoodie,
    mug, packaging box), photographic mockup templates composited with the
    three-layer "Sandwich Method" (scene photograph, warped/placed design,
-   shadow-and-glare overlay), pointer-driven design placement, real-time
+   shadow-and-glare overlay), an ORDERED STACK of design layers each with its
+   own position, size, rotation and visibility, direct manipulation of the
+   selected layer on the canvas, a dependency-free HSV colour picker, real-time
    localStorage retention of non-image settings, an in-memory "My Mockups"
    tray, and PNG export through a local canvas.toDataURL() stream.
    Depends on: js/app.js (TB.sanitize, TB.desanitize, TB.storageGet/Set,
@@ -29,6 +31,20 @@
         return;
     }
     const ctx = canvas.getContext("2d");
+
+    /* Selection chrome is painted on a SEPARATE canvas stacked over the one
+       above. Export and the tray thumbnails both read #mockup-canvas via
+       toDataURL(), so anything drawn there ends up in the visitor's file --
+       handles, the bounding box and the layer name tag must therefore never
+       touch it. */
+    const overlay = document.getElementById("mockup-overlay");
+    const octx = overlay ? overlay.getContext("2d") : null;
+
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
 
     /* ----------------------------------------------------------------------
        Small canvas path helper. Written locally instead of relying on
@@ -300,10 +316,6 @@
         };
     });
 
-    function isPhotoProduct(key) {
-        return PRODUCTS[key].type === "photo";
-    }
-
     /* Axis-aligned bounding box of a four-corner warp zone. */
     function zoneBounds(zone) {
         const xs = zone.map((p) => p.x);
@@ -390,10 +402,15 @@
        angled template actually needs it, so rectangular templates cost no
        extra payload. If the library or a WebGL context is unavailable the
        design falls back to an unwarped draw across the zone's bounding box.
+
+       Layers are composited into an offscreen "artwork sheet" FIRST and the
+       sheet is what gets warped, so a leaning frame carries the whole stack
+       through a single GPU pass rather than one pass per layer.
        ---------------------------------------------------------------------- */
 
     let warpLibState = "idle"; /* idle | loading | ready | failed */
     let fxCanvas = null;
+    let sheetCanvas = null;
 
     function ensureWarpLib() {
         if (warpLibState !== "idle") {
@@ -413,11 +430,33 @@
         document.head.appendChild(script);
     }
 
+    /* The flattened artwork sheet handed to the warp, sized to the zone's
+       bounding box so layer placement carries across unchanged. The white
+       fill is the paper backing the previous single-design path drew. */
+    function renderSheet(area) {
+        const w = Math.max(1, Math.round(area.w));
+        const h = Math.max(1, Math.round(area.h));
+        if (!sheetCanvas) {
+            sheetCanvas = document.createElement("canvas");
+        }
+        if (sheetCanvas.width !== w || sheetCanvas.height !== h) {
+            sheetCanvas.width = w;
+            sheetCanvas.height = h;
+        }
+        const sctx = sheetCanvas.getContext("2d");
+        sctx.clearRect(0, 0, w, h);
+        sctx.fillStyle = "#FFFFFF";
+        sctx.fillRect(0, 0, w, h);
+        paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, false);
+        return sheetCanvas;
+    }
+
     function drawWarpedDesign(zone) {
+        const area = zoneBounds(zone);
         if (warpLibState === "ready") {
             try {
                 fxCanvas = fxCanvas || window.fx.canvas();
-                const texture = fxCanvas.texture(design);
+                const texture = fxCanvas.texture(renderSheet(area));
                 fxCanvas.draw(texture, canvas.width, canvas.height).perspective(
                     [0, 0, canvas.width, 0, canvas.width, canvas.height, 0, canvas.height],
                     [
@@ -429,9 +468,15 @@
                 ).update();
                 ctx.drawImage(fxCanvas, 0, 0);
                 texture.destroy();
-                /* Dragging is not offered on warped quads: the design maps
-                   corner-to-corner onto the zone. */
-                lastDesignRect = null;
+                /* Direct manipulation is not offered on warped quads: mapping
+                   a pointer back into sheet space needs the inverse of the
+                   perspective transform, which the GPU pass above does not
+                   hand back. Layers keep no hit rect, so nothing on the
+                   canvas is grabbable and the sidebar controls are the only
+                   way to place artwork here. */
+                layers.forEach((layer) => {
+                    layer.rect = null;
+                });
                 return;
             } catch (err) {
                 warpLibState = "failed";
@@ -439,19 +484,119 @@
         } else {
             ensureWarpLib();
         }
-        drawDesignInArea(zoneBounds(zone), 0);
+        drawLayersInArea(area, 0);
     }
+
+    /* ----------------------------------------------------------------------
+       Colour maths for the picker. Everything here is plain arithmetic on
+       sRGB triples -- no library, no CDN, no canvas readback.
+       ---------------------------------------------------------------------- */
+
+    function hexToRgb(value) {
+        const raw = String(value == null ? "" : value).trim().replace(/^#/, "");
+        const full = raw.length === 3
+            ? raw[0] + raw[0] + raw[1] + raw[1] + raw[2] + raw[2]
+            : raw;
+        if (!/^[0-9a-f]{6}$/i.test(full)) {
+            return null;
+        }
+        const n = parseInt(full, 16);
+        return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+    }
+
+    function rgbToHex(r, g, b) {
+        const part = (v) => {
+            const s = clamp(Math.round(v), 0, 255).toString(16);
+            return s.length === 1 ? "0" + s : s;
+        };
+        return ("#" + part(r) + part(g) + part(b)).toUpperCase();
+    }
+
+    function rgbToHsv(r, g, b) {
+        const rn = r / 255;
+        const gn = g / 255;
+        const bn = b / 255;
+        const max = Math.max(rn, gn, bn);
+        const min = Math.min(rn, gn, bn);
+        const d = max - min;
+        let h = 0;
+        if (d !== 0) {
+            if (max === rn) { h = ((gn - bn) / d) % 6; }
+            else if (max === gn) { h = (bn - rn) / d + 2; }
+            else { h = (rn - gn) / d + 4; }
+            h *= 60;
+            if (h < 0) { h += 360; }
+        }
+        return { h: h, s: max === 0 ? 0 : d / max, v: max };
+    }
+
+    function hsvToRgb(h, s, v) {
+        const c = v * s;
+        const hp = (((h % 360) + 360) % 360) / 60;
+        const x = c * (1 - Math.abs((hp % 2) - 1));
+        let rgb = [0, 0, 0];
+        if (hp < 1) { rgb = [c, x, 0]; }
+        else if (hp < 2) { rgb = [x, c, 0]; }
+        else if (hp < 3) { rgb = [0, c, x]; }
+        else if (hp < 4) { rgb = [0, x, c]; }
+        else if (hp < 5) { rgb = [x, 0, c]; }
+        else { rgb = [c, 0, x]; }
+        const m = v - c;
+        return { r: (rgb[0] + m) * 255, g: (rgb[1] + m) * 255, b: (rgb[2] + m) * 255 };
+    }
+
+    /* Vector products need an outline colour as well as a fill. The shipped
+       colorways carry a hand-picked one; a freely chosen colour derives its
+       own by darkening, which keeps every seam and rib visible whatever the
+       visitor picks -- including on white, where a pure-white outline would
+       erase the garment's silhouette entirely. */
+    function deriveOutline(hex) {
+        const c = hexToRgb(hex) || { r: 0, g: 0, b: 0 };
+        return rgbToHex(c.r * 0.78, c.g * 0.78, c.b * 0.78);
+    }
+
+    /* Presets mirror the reference picker: a greyscale run, then a spread of
+       saturated hues wide enough to reach most brand colours in one click. */
+    const COLOR_PRESETS = [
+        "#FFFFFF", "#D6D6D6", "#9B9B9B", "#4A4A4A", "#000000", "#E9A13B", "#F5D547",
+        "#8B5A2B", "#6E8B3D", "#7ED321", "#22B573", "#4A90D9", "#2F4FCD", "#8E44AD",
+        "#1A1A1A", "#6B6B66", "#B9B7B2", "#D0021B", "#00C853", "#0033CC", "#FFEB00",
+        "#FF2D95", "#00E0E0", "#F5A623", "#5B2C82", "#0B6E2E", "#1F2A44", "#B5352E"
+    ];
 
     /* ----------------------------------------------------------------------
        DOM references
        ---------------------------------------------------------------------- */
 
-    const productSelect = document.getElementById("m-product");
     const colorField = document.getElementById("m-color-field");
     const colorRow = document.getElementById("m-color-row");
+    const colorTrigger = document.getElementById("m-color-trigger");
+    const colorPopover = document.getElementById("m-color-popover");
+    const colorDot = document.getElementById("m-color-dot");
+    const colorHexLabel = document.getElementById("m-color-hex");
+    const svArea = document.getElementById("m-color-sv");
+    const svThumb = document.getElementById("m-color-sv-thumb");
+    const hueArea = document.getElementById("m-color-hue");
+    const hueThumb = document.getElementById("m-color-hue-thumb");
+    const inHex = document.getElementById("m-color-in-hex");
+    const inR = document.getElementById("m-color-in-r");
+    const inG = document.getElementById("m-color-in-g");
+    const inB = document.getElementById("m-color-in-b");
+    const presetGrid = document.getElementById("m-color-presets");
+
     const fileInput = document.getElementById("m-design");
     const fileError = document.getElementById("m-design-error");
+    const layerList = document.getElementById("m-layer-list");
+    const layerActions = document.getElementById("m-layer-actions");
+    const addDesignBtn = document.getElementById("m-add-design");
+    const uploadDesignBtn = document.getElementById("m-upload-design");
+    const actResize = document.getElementById("m-act-resize");
+    const actReplace = document.getElementById("m-act-replace");
+    const actRemove = document.getElementById("m-act-remove");
+
     const scaleInput = document.getElementById("m-scale");
+    const scaleNumber = document.getElementById("m-scale-number");
+    const scaleReset = document.getElementById("m-scale-reset");
     const scaleOutput = document.getElementById("m-scale-output");
     const labelInput = document.getElementById("m-label");
     const addToTrayBtn = document.getElementById("add-to-tray");
@@ -462,39 +607,121 @@
     const DEFAULT_DOC_NAME = "Untitled mockup";
 
     /* ----------------------------------------------------------------------
-       State. The uploaded design lives only in memory: neither the source
-       image nor the tray thumbnails are written to localStorage, matching
-       the poster editor's precedent of keeping image data off disk to
-       respect browser storage quotas. Position/scale/product/color are
-       plain numbers and strings, so those alone are persisted.
+       State. Design bitmaps live only in memory: neither a layer's source
+       image nor the tray thumbnails are written to localStorage, matching the
+       poster editor's precedent of keeping image data off disk to respect
+       browser storage quotas. What IS persisted is every layer's placement --
+       name, size, offset, rotation, visibility -- so a returning visitor
+       re-uploads the files into a composition that is already arranged, the
+       same bargain the single-design version struck for one image.
+
+       Array order is paint order: index 0 is the back of the stack, the last
+       entry is the front. The sidebar list renders the reverse, front-most
+       first, which is what every layers panel does.
        ---------------------------------------------------------------------- */
+
+    const CUSTOM_COLOR = "custom";
+    const MIN_SCALE = 0.05;
+    const MAX_SCALE = 2;
+    const DEFAULT_SCALE = 0.75;
+    /* Additional layers are usually badges and logos beside a main print, so
+       they start smaller rather than at the first layer's size. */
+    const EXTRA_SCALE = 0.35;
+    /* A sanity ceiling. Tampered storage cannot spawn an unbounded list, and
+       a real composition never needs this many. */
+    const MAX_LAYERS = 12;
 
     let currentProduct = "tshirt";
     let currentColor = "black";
-    let design = null;
-    let designScale = 0.75;
-    let offsetX = 0;
-    let offsetY = 0;
-    let lastDesignRect = null;
+    let customHex = "#FFFFFF";
+    let pickerHue = 0;
 
-    let dragging = false;
-    let dragStart = { x: 0, y: 0 };
-    let dragOffsetStart = { x: 0, y: 0 };
+    let layers = [];
+    let selectedId = null;
+    let layerCounter = 0;
+
+    /* Which layer the next file pick lands on: a fresh one, or a named
+       existing layer whose placement survives the swap. */
+    let uploadIntent = { mode: "add", id: null };
+
+    let drag = null;
 
     /* In-memory tray of one-click "added" mockups for this browser tab. */
     let trayItems = [];
+
+    function selectedLayer() {
+        if (selectedId === null) {
+            return null;
+        }
+        for (let i = 0; i < layers.length; i += 1) {
+            if (layers[i].id === selectedId) {
+                return layers[i];
+            }
+        }
+        return null;
+    }
+
+    function readyLayers() {
+        return layers.filter((layer) => layer.img);
+    }
 
     /* ----------------------------------------------------------------------
        Canvas composition
        ---------------------------------------------------------------------- */
 
-    function drawDesignInArea(area, cornerRadius) {
+    /* Paints every layer into `area` of `context`. Hit rectangles are recorded
+       only for the real canvas: the offscreen warp sheet shares this painter
+       but its coordinates mean nothing to a pointer. */
+    function paintLayers(context, area, recordRects) {
+        layers.forEach((layer) => {
+            if (recordRects) {
+                layer.rect = null;
+            }
+            if (!layer.img) {
+                return;
+            }
+
+            const containBase = Math.min(area.w / layer.img.width, area.h / layer.img.height);
+            const drawW = layer.img.width * containBase * layer.scale;
+            const drawH = layer.img.height * containBase * layer.scale;
+
+            /* Half the print area in each direction: a layer can hang off the
+               edge (the clip hides the excess) but cannot be lost entirely
+               beyond it. */
+            const maxOffsetX = area.w / 2;
+            const maxOffsetY = area.h / 2;
+            layer.offsetX = clamp(layer.offsetX, -maxOffsetX, maxOffsetX);
+            layer.offsetY = clamp(layer.offsetY, -maxOffsetY, maxOffsetY);
+
+            const cx = area.x + area.w / 2 + layer.offsetX;
+            const cy = area.y + area.h / 2 + layer.offsetY;
+
+            if (recordRects) {
+                layer.rect = { cx: cx, cy: cy, w: drawW, h: drawH, rotation: layer.rotation };
+            }
+
+            if (!layer.visible) {
+                return;
+            }
+
+            context.save();
+            context.translate(cx, cy);
+            if (layer.rotation) {
+                context.rotate(layer.rotation);
+            }
+            context.drawImage(layer.img, -drawW / 2, -drawH / 2, drawW, drawH);
+            context.restore();
+        });
+    }
+
+    function drawLayersInArea(area, cornerRadius) {
         const r = typeof cornerRadius === "number" ? cornerRadius : 16;
         /* Placeholder styling scales with the canvas, which runs at 1000px
            for vector products but at the base photograph's native size for
            photographic templates. */
         const k = canvas.width / CANVAS_W;
-        if (!design) {
+
+        if (!readyLayers().length) {
             ctx.save();
             roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
             ctx.fillStyle = "#F4F3EF";
@@ -510,34 +737,20 @@
             ctx.textBaseline = "middle";
             ctx.fillText("Upload your design", area.x + area.w / 2, area.y + area.h / 2, area.w - 40 * k);
             ctx.restore();
-            lastDesignRect = null;
+            layers.forEach((layer) => {
+                layer.rect = null;
+            });
             return;
         }
-
-        const containBase = Math.min(area.w / design.width, area.h / design.height);
-        const drawW = design.width * containBase * designScale;
-        const drawH = design.height * containBase * designScale;
-
-        const maxOffsetX = area.w / 2;
-        const maxOffsetY = area.h / 2;
-        offsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, offsetX));
-        offsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, offsetY));
-
-        const centerX = area.x + area.w / 2 + offsetX;
-        const centerY = area.y + area.h / 2 + offsetY;
-        const drawX = centerX - drawW / 2;
-        const drawY = centerY - drawH / 2;
 
         ctx.save();
         roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
         ctx.clip();
-        ctx.drawImage(design, drawX, drawY, drawW, drawH);
+        paintLayers(ctx, area, true);
         ctx.restore();
-
-        lastDesignRect = { x: drawX, y: drawY, w: drawW, h: drawH };
     }
 
-    function draw() {
+    function paint() {
         const product = PRODUCTS[currentProduct] ? currentProduct : "tshirt";
         currentProduct = product;
         const config = PRODUCTS[currentProduct];
@@ -552,14 +765,16 @@
             canvas.height = CANVAS_H;
         }
 
-        if (!config.colors[currentColor]) {
-            currentColor = Object.keys(config.colors)[0];
-        }
-        const color = config.colors[currentColor];
+        const color = activeColor(config);
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         config.drawBase(ctx, color.hex, color.outline);
-        drawDesignInArea(config.printArea, 16);
+        drawLayersInArea(config.printArea, 16);
+    }
+
+    function draw() {
+        paint();
+        drawOverlay();
     }
 
     /* The Sandwich Method compositor for photographic templates. Layer
@@ -593,7 +808,9 @@
                 canvas.width - 80
             );
             ctx.restore();
-            lastDesignRect = null;
+            layers.forEach((layer) => {
+                layer.rect = null;
+            });
             return;
         }
 
@@ -612,7 +829,7 @@
         const area = zoneBounds(tpl.warpZone);
 
         const paintDesign = () => {
-            if (design && !rectZone) {
+            if (readyLayers().length && !rectZone) {
                 drawWarpedDesign(tpl.warpZone);
                 return;
             }
@@ -621,7 +838,7 @@
                opaque behind a transparent "window" base. */
             ctx.fillStyle = "#FFFFFF";
             ctx.fillRect(area.x, area.y, area.w, area.h);
-            drawDesignInArea(area, 0);
+            drawLayersInArea(area, 0);
         };
 
         if (tpl.mode === "surface") {
@@ -650,9 +867,504 @@
     }
 
     /* ----------------------------------------------------------------------
-       Color swatches: rebuilt whenever the product template changes, since
-       each product offers a different palette.
+       Selection chrome, on its own canvas. Handle sizes are quoted in SCREEN
+       pixels and converted, so they stay the same visual size whether the
+       canvas is a 1000px vector square scaled down or a 4000px photograph.
        ---------------------------------------------------------------------- */
+
+    const HANDLE_SIZE = 11;   /* screen px, corner square side -- big enough to hold a glyph */
+    const HANDLE_HIT = 16;    /* screen px, grab radius -- generous for touch */
+    const ROTATE_GAP = 26;    /* screen px, rotate handle's lift above the top edge */
+    const CHROME_COLOR = "#D0021B";
+
+    function canvasPerScreenPx() {
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) {
+            return 1;
+        }
+        return canvas.width / rect.width;
+    }
+
+    function rectCorners(rect) {
+        const hw = rect.w / 2;
+        const hh = rect.h / 2;
+        const cos = Math.cos(rect.rotation);
+        const sin = Math.sin(rect.rotation);
+        return [
+            { x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }
+        ].map((p) => ({
+            x: rect.cx + p.x * cos - p.y * sin,
+            y: rect.cy + p.x * sin + p.y * cos
+        }));
+    }
+
+    function rotateHandlePoint(rect, k) {
+        const lift = rect.h / 2 + ROTATE_GAP * k;
+        return {
+            x: rect.cx + lift * Math.sin(rect.rotation),
+            y: rect.cy - lift * Math.cos(rect.rotation)
+        };
+    }
+
+    function distance(a, b) {
+        return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+    }
+
+    /* A short double-headed arrow along `angle`, chevron caps on both ends --
+       the standard "resize" glyph, oriented along the corner's own diagonal
+       (the direction a drag there actually resizes along) so a corner handle
+       reads as "resize" rather than as an anonymous square. Rotating the
+       layer rotates `angle` with it, so the arrow stays aligned to the true
+       diagonal instead of the screen's. */
+    function drawResizeGlyph(context, cx, cy, angle, len, head) {
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        const nx = -dy;
+        const ny = dx;
+        const half = len / 2;
+
+        context.beginPath();
+        context.moveTo(cx - dx * half, cy - dy * half);
+        context.lineTo(cx + dx * half, cy + dy * half);
+        context.stroke();
+
+        [[-1, -dx, -dy], [1, dx, dy]].forEach(([, ox, oy]) => {
+            const tipX = cx + ox * half;
+            const tipY = cy + oy * half;
+            const backX = tipX - ox * head;
+            const backY = tipY - oy * head;
+            context.beginPath();
+            context.moveTo(backX + nx * head * 0.6, backY + ny * head * 0.6);
+            context.lineTo(tipX, tipY);
+            context.lineTo(backX - nx * head * 0.6, backY - ny * head * 0.6);
+            context.stroke();
+        });
+    }
+
+    /* A circular arrow -- the same "rotate/refresh" shape already used for
+       the Reset design size button in the sidebar (there an SVG, here drawn
+       on canvas), so the rotate handle reads as "rotate" rather than as a
+       plain dot indistinguishable from a move handle. */
+    function drawRotateGlyph(context, cx, cy, r) {
+        const start = -Math.PI * 0.6;
+        const end = Math.PI * 0.65;
+
+        context.beginPath();
+        context.arc(cx, cy, r, start, end, false);
+        context.stroke();
+
+        /* Arrowhead at the arc's leading end, tangent to the direction the
+           arc was just drawn in (canvas sweeps clockwise as angle
+           increases), so it reads as the arrow's point rather than a loose
+           mark beside the curve. */
+        const tipX = cx + Math.cos(end) * r;
+        const tipY = cy + Math.sin(end) * r;
+        const tangent = end + Math.PI / 2;
+        const armLen = r * 0.9;
+        const backX = tipX - Math.cos(tangent) * armLen;
+        const backY = tipY - Math.sin(tangent) * armLen;
+        const nx = Math.cos(end);
+        const ny = Math.sin(end);
+        const spread = r * 0.62;
+
+        context.beginPath();
+        context.moveTo(backX + nx * spread, backY + ny * spread);
+        context.lineTo(tipX, tipY);
+        context.lineTo(backX - nx * spread, backY - ny * spread);
+        context.stroke();
+    }
+
+    /* Point-in-layer, done by rotating the point back into the layer's own
+       unrotated frame rather than by testing a rotated polygon. */
+    function hitsBody(rect, pt) {
+        const dx = pt.x - rect.cx;
+        const dy = pt.y - rect.cy;
+        const cos = Math.cos(-rect.rotation);
+        const sin = Math.sin(-rect.rotation);
+        const lx = dx * cos - dy * sin;
+        const ly = dx * sin + dy * cos;
+        return Math.abs(lx) <= rect.w / 2 && Math.abs(ly) <= rect.h / 2;
+    }
+
+    function drawNameTag(layer, corners, k) {
+        const fontSize = 13 * k;
+        octx.font = "500 " + fontSize.toFixed(1) + 'px "Inter", sans-serif';
+        const text = TB.desanitize(layer.name);
+        const padX = 9 * k;
+        const padY = 6 * k;
+        const glyph = 8 * k;
+        const gap = 6 * k;
+        const w = padX * 2 + glyph + gap + octx.measureText(text).width;
+        const h = fontSize + padY * 2;
+
+        /* Anchored off the corner nearest the bottom-right, then pulled back
+           inside the canvas so the tag is never clipped at an edge. */
+        let anchor = corners[0];
+        corners.forEach((p) => {
+            if (p.x + p.y > anchor.x + anchor.y) {
+                anchor = p;
+            }
+        });
+        const x = clamp(anchor.x + 8 * k, 2 * k, overlay.width - w - 2 * k);
+        const y = clamp(anchor.y + 8 * k, 2 * k, overlay.height - h - 2 * k);
+
+        roundRectPath(octx, x, y, w, h, h / 2);
+        octx.fillStyle = "rgba(255, 255, 255, 0.96)";
+        octx.fill();
+        octx.strokeStyle = "rgba(0, 0, 0, 0.15)";
+        octx.lineWidth = Math.max(1, k);
+        octx.stroke();
+
+        octx.fillStyle = CHROME_COLOR;
+        octx.fillRect(x + padX, y + h / 2 - glyph / 2, glyph, glyph);
+
+        octx.fillStyle = "#1A1A1A";
+        octx.textAlign = "left";
+        octx.textBaseline = "middle";
+        octx.fillText(text, x + padX + glyph + gap, y + h / 2);
+    }
+
+    function drawOverlay() {
+        if (!octx) {
+            return;
+        }
+        if (overlay.width !== canvas.width || overlay.height !== canvas.height) {
+            overlay.width = canvas.width;
+            overlay.height = canvas.height;
+        }
+        octx.clearRect(0, 0, overlay.width, overlay.height);
+
+        const layer = selectedLayer();
+        if (!layer || !layer.rect || !layer.visible) {
+            return;
+        }
+
+        const k = canvasPerScreenPx();
+        const corners = rectCorners(layer.rect);
+        const rot = rotateHandlePoint(layer.rect, k);
+
+        octx.save();
+        octx.strokeStyle = CHROME_COLOR;
+        octx.lineWidth = Math.max(1, 1.5 * k);
+
+        octx.beginPath();
+        octx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < corners.length; i += 1) {
+            octx.lineTo(corners[i].x, corners[i].y);
+        }
+        octx.closePath();
+        octx.stroke();
+
+        /* Stem linking the box to the rotate handle */
+        octx.beginPath();
+        octx.moveTo((corners[0].x + corners[1].x) / 2, (corners[0].y + corners[1].y) / 2);
+        octx.lineTo(rot.x, rot.y);
+        octx.stroke();
+
+        const side = HANDLE_SIZE * k;
+        octx.fillStyle = "#FFFFFF";
+        corners.forEach((p) => {
+            octx.beginPath();
+            octx.rect(p.x - side / 2, p.y - side / 2, side, side);
+            octx.fill();
+            octx.stroke();
+        });
+
+        const rotR = side * 0.8;
+        octx.beginPath();
+        octx.arc(rot.x, rot.y, rotR, 0, Math.PI * 2);
+        octx.fill();
+        octx.stroke();
+
+        /* Glyphs drawn last and at a lighter weight than the box/handle
+           outlines above, so a corner reads as "resize" and the top handle
+           reads as "rotate" instead of both being anonymous shapes -- the
+           same distinction a cursor icon gives on desktop, made visible here
+           since canvas has no cursor-per-pixel to rely on. */
+        octx.lineWidth = Math.max(1, k);
+        corners.forEach((p) => {
+            const angle = Math.atan2(p.y - layer.rect.cy, p.x - layer.rect.cx);
+            drawResizeGlyph(octx, p.x, p.y, angle, side * 0.62, side * 0.22);
+        });
+        drawRotateGlyph(octx, rot.x, rot.y, rotR * 0.6);
+
+        drawNameTag(layer, corners, k);
+        octx.restore();
+    }
+
+    /* ----------------------------------------------------------------------
+       Layer list. Built with createElement and textContent only, per the
+       project's DOM-XSS prevention rule -- the filename is visitor-supplied
+       text and never reaches innerHTML.
+       ---------------------------------------------------------------------- */
+
+    const ICONS = {
+        eye: ["M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6-10-6-10-6Z", "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"],
+        eyeOff: ["M4 4l16 16", "M9.6 9.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-1.2", "M6.3 6.6C3.8 8.2 2 12 2 12s3.8 6 10 6c1.7 0 3.2-.4 4.5-1.1", "M19.5 15.4C21.2 13.9 22 12 22 12s-3.8-6-10-6c-.7 0-1.4.1-2 .2"],
+        upload: ["M12 16V4", "m7.5 8.5 4.5-4.5 4.5 4.5", "M4 20h16"]
+    };
+
+    function icon(paths) {
+        const svg = document.createElementNS(SVG_NS, "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+        paths.forEach((d) => {
+            const path = document.createElementNS(SVG_NS, "path");
+            path.setAttribute("d", d);
+            svg.appendChild(path);
+        });
+        return svg;
+    }
+
+    function iconButton(paths, label) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "layer-tool";
+        btn.setAttribute("aria-label", label);
+        btn.setAttribute("title", label);
+        btn.appendChild(icon(paths));
+        return btn;
+    }
+
+    function renderLayerList() {
+        while (layerList.firstChild) {
+            layerList.removeChild(layerList.firstChild);
+        }
+
+        /* Front-most first: the list reads top-to-bottom as front-to-back,
+           the reverse of the paint order. */
+        layers.slice().reverse().forEach((layer) => {
+            const readable = TB.desanitize(layer.name);
+            const li = document.createElement("li");
+            li.className = "layer-row" +
+                (layer.id === selectedId ? " is-selected" : "") +
+                (layer.img ? "" : " is-pending") +
+                (layer.visible ? "" : " is-hidden");
+
+            const main = document.createElement("button");
+            main.type = "button";
+            main.className = "layer-main";
+            main.setAttribute("aria-pressed", String(layer.id === selectedId));
+
+            const thumb = document.createElement("span");
+            thumb.className = "layer-thumb";
+            if (layer.img) {
+                const img = document.createElement("img");
+                img.src = layer.img.src;
+                img.alt = "";
+                thumb.appendChild(img);
+            }
+            main.appendChild(thumb);
+
+            const text = document.createElement("span");
+            text.className = "layer-text";
+
+            const nameEl = document.createElement("span");
+            nameEl.className = "layer-name";
+            nameEl.textContent = readable;
+            text.appendChild(nameEl);
+
+            if (!layer.img) {
+                const note = document.createElement("span");
+                note.className = "layer-note";
+                note.textContent = "Re-upload to restore";
+                text.appendChild(note);
+            }
+
+            main.appendChild(text);
+            main.addEventListener("click", () => selectLayer(layer.id));
+            li.appendChild(main);
+
+            const tools = document.createElement("span");
+            tools.className = "layer-tools";
+
+            const eye = iconButton(
+                layer.visible ? ICONS.eye : ICONS.eyeOff,
+                (layer.visible ? "Hide " : "Show ") + readable
+            );
+            eye.addEventListener("click", () => {
+                layer.visible = !layer.visible;
+                persist();
+                renderLayerList();
+                draw();
+            });
+            tools.appendChild(eye);
+
+            const replace = iconButton(ICONS.upload, "Replace " + readable);
+            replace.addEventListener("click", () => requestUpload("replace", layer.id));
+            tools.appendChild(replace);
+
+            li.appendChild(tools);
+            layerList.appendChild(li);
+        });
+
+        layerList.hidden = layers.length === 0;
+        /* The full-width upload button is the empty state; once a stack
+           exists the "+" in the section header is the way to extend it. */
+        uploadDesignBtn.hidden = layers.length > 0;
+        addDesignBtn.disabled = layers.length >= MAX_LAYERS;
+    }
+
+    function syncLayerActions() {
+        layerActions.hidden = !selectedLayer();
+    }
+
+    function selectLayer(id) {
+        selectedId = id;
+        renderLayerList();
+        syncScaleControls();
+        syncLayerActions();
+        /* Only the chrome changed, so the product and layers underneath do
+           not need repainting. */
+        drawOverlay();
+    }
+
+    function addLayer(img, name) {
+        layerCounter += 1;
+        /* Stagger each addition so a second upload reads as its own object
+           instead of hiding exactly behind the first. */
+        const step = (layers.length % 4) * 24;
+        layers.push({
+            id: "L" + layerCounter + "-" + Date.now(),
+            name: name,
+            img: img,
+            scale: layers.length ? EXTRA_SCALE : DEFAULT_SCALE,
+            offsetX: step,
+            offsetY: step,
+            rotation: 0,
+            visible: true,
+            rect: null
+        });
+        selectedId = layers[layers.length - 1].id;
+    }
+
+    /* ----------------------------------------------------------------------
+       Image upload with explicit mime-type validation. EVERY upload path on
+       the page -- the "+", the empty-state button and each row's Replace --
+       funnels through this one input and this one check, so no route can
+       reach the canvas without it.
+       ---------------------------------------------------------------------- */
+
+    function requestUpload(mode, id) {
+        uploadIntent = { mode: mode, id: id || null };
+        /* Clearing first means re-picking the same file still fires change. */
+        fileInput.value = "";
+        fileInput.click();
+    }
+
+    fileInput.addEventListener("change", () => {
+        fileError.textContent = "";
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            return;
+        }
+
+        if (!/^image\//.test(file.type)) {
+            fileError.textContent = "That file is not an image. Please choose a JPG, PNG, or WebP file.";
+            fileInput.value = "";
+            return;
+        }
+
+        if (uploadIntent.mode === "add" && layers.length >= MAX_LAYERS) {
+            fileError.textContent = "That is the maximum number of designs on one mockup.";
+            fileInput.value = "";
+            return;
+        }
+
+        const name = TB.sanitize(file.name).slice(0, 60) || "design";
+
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+            const img = new Image();
+            img.addEventListener("load", () => {
+                if (uploadIntent.mode === "replace") {
+                    const target = layers.filter((layer) => layer.id === uploadIntent.id)[0];
+                    if (target) {
+                        /* Size, offset and rotation are deliberately kept: a
+                           replace is a swap of artwork, not of placement. */
+                        target.img = img;
+                        target.name = name;
+                        selectedId = target.id;
+                    }
+                } else {
+                    addLayer(img, name);
+                }
+                fileInput.value = "";
+                persist();
+                renderLayerList();
+                syncScaleControls();
+                syncLayerActions();
+                draw();
+            });
+            img.addEventListener("error", () => {
+                fileError.textContent = "That image could not be decoded. Please try a different file.";
+                fileInput.value = "";
+            });
+            img.src = reader.result;
+        });
+        reader.readAsDataURL(file);
+    });
+
+    addDesignBtn.addEventListener("click", () => requestUpload("add", null));
+    uploadDesignBtn.addEventListener("click", () => requestUpload("add", null));
+
+    actReplace.addEventListener("click", () => {
+        const layer = selectedLayer();
+        if (layer) {
+            requestUpload("replace", layer.id);
+        }
+    });
+
+    actRemove.addEventListener("click", () => {
+        const layer = selectedLayer();
+        if (!layer) {
+            return;
+        }
+        layers = layers.filter((entry) => entry.id !== layer.id);
+        selectedId = layers.length ? layers[layers.length - 1].id : null;
+        fileError.textContent = "";
+        persist();
+        renderLayerList();
+        syncScaleControls();
+        syncLayerActions();
+        draw();
+    });
+
+    /* Resize has no separate mode: the handles are already live on the
+       selected layer, so this points at the numeric control for anyone who
+       would rather type a size than drag a corner. */
+    actResize.addEventListener("click", () => {
+        if (!selectedLayer()) {
+            return;
+        }
+        scaleNumber.focus();
+        scaleNumber.select();
+    });
+
+    /* ----------------------------------------------------------------------
+       Colour: the product's own colorways as quick picks, plus a free HSV
+       picker. Both write to the same state the canvas reads.
+       ---------------------------------------------------------------------- */
+
+    function activeColor(config) {
+        if (!config.colors) {
+            return null;
+        }
+        if (currentColor === CUSTOM_COLOR) {
+            return { name: "Custom", hex: customHex, outline: deriveOutline(customHex) };
+        }
+        if (!config.colors[currentColor]) {
+            currentColor = Object.keys(config.colors)[0];
+        }
+        return config.colors[currentColor];
+    }
+
+    function activeHex() {
+        const config = PRODUCTS[currentProduct];
+        const color = activeColor(config);
+        return color ? color.hex : customHex;
+    }
 
     function renderColorSwatches() {
         while (colorRow.firstChild) {
@@ -674,19 +1386,15 @@
             const info = config.colors[key];
             const btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "swatch" + (key === currentColor ? " is-active" : "");
+            btn.className = "swatch";
             btn.style.backgroundColor = info.hex;
             btn.setAttribute("role", "radio");
-            btn.setAttribute("aria-checked", String(key === currentColor));
+            btn.setAttribute("aria-checked", "false");
             btn.setAttribute("aria-label", info.name);
+            btn.setAttribute("data-hex", info.hex.toUpperCase());
             btn.addEventListener("click", () => {
                 currentColor = key;
-                colorRow.querySelectorAll(".swatch").forEach((s) => {
-                    s.classList.remove("is-active");
-                    s.setAttribute("aria-checked", "false");
-                });
-                btn.classList.add("is-active");
-                btn.setAttribute("aria-checked", "true");
+                syncColorUI();
                 persist();
                 draw();
             });
@@ -694,85 +1402,288 @@
         });
     }
 
-    /* ----------------------------------------------------------------------
-       Product template switch
-       ---------------------------------------------------------------------- */
+    function buildColorPresets() {
+        if (!presetGrid) {
+            return;
+        }
+        while (presetGrid.firstChild) {
+            presetGrid.removeChild(presetGrid.firstChild);
+        }
 
-    /* Placement controls only apply where the design is freely positioned:
-       a warped (non-rectangular) print zone maps the design corner-to-corner
-       instead, so the size slider is disabled there. */
-    function syncPlacementControls() {
-        const config = PRODUCTS[currentProduct];
-        scaleInput.disabled = config.type === "photo" && !zoneIsRect(config.template.warpZone);
+        /* Native colour sampling where the browser offers it (Chromium's
+           EyeDropper). No polyfill and no button at all elsewhere: a control
+           that silently does nothing is worse than one that is absent. */
+        if (window.EyeDropper) {
+            const drop = document.createElement("button");
+            drop.type = "button";
+            drop.className = "color-eyedropper";
+            drop.setAttribute("aria-label", "Pick a colour from the screen");
+            drop.setAttribute("title", "Pick a colour from the screen");
+            drop.appendChild(icon([
+                "m2 22 4-1 11-11-3-3L3 18l-1 4Z",
+                "m15 5 4-4 4 4-4 4",
+                "m13 7 4 4"
+            ]));
+            drop.addEventListener("click", () => {
+                new window.EyeDropper().open().then((result) => {
+                    setCustomColor(result.sRGBHex);
+                }, () => {
+                    /* Dismissed with Escape: nothing to do. */
+                });
+            });
+            presetGrid.appendChild(drop);
+        }
+
+        COLOR_PRESETS.forEach((hex) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "color-preset";
+            btn.style.backgroundColor = hex;
+            btn.setAttribute("aria-label", hex);
+            btn.setAttribute("title", hex);
+            btn.addEventListener("click", () => setCustomColor(hex));
+            presetGrid.appendChild(btn);
+        });
     }
 
-    productSelect.addEventListener("change", () => {
-        currentProduct = PRODUCTS[productSelect.value] ? productSelect.value : "tshirt";
-        const palette = PRODUCTS[currentProduct].colors;
-        if (palette && !palette[currentColor]) {
-            currentColor = Object.keys(palette)[0];
+    /* Repaints every part of the colour UI from the active hex. `skip` names
+       an input the visitor is currently typing in, which must not be
+       rewritten underneath the caret. */
+    function syncColorUI(skip) {
+        const hex = activeHex();
+        const rgb = hexToRgb(hex) || { r: 255, g: 255, b: 255 };
+        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+
+        /* A greyscale colour carries no meaningful hue, so the strip keeps
+           its last position instead of snapping to red. */
+        if (hsv.s > 0.001 && hsv.v > 0.001) {
+            pickerHue = hsv.h;
         }
-        offsetX = 0;
-        offsetY = 0;
-        renderColorSwatches();
-        syncPlacementControls();
+
+        if (colorDot) {
+            colorDot.style.backgroundColor = hex;
+        }
+        if (colorHexLabel) {
+            colorHexLabel.textContent = hex;
+        }
+        if (svArea) {
+            svArea.style.setProperty("--picker-hue", String(Math.round(pickerHue)));
+        }
+        if (svThumb) {
+            svThumb.style.left = (hsv.s * 100) + "%";
+            svThumb.style.top = ((1 - hsv.v) * 100) + "%";
+            svThumb.style.backgroundColor = hex;
+        }
+        if (hueThumb) {
+            hueThumb.style.left = ((pickerHue / 360) * 100) + "%";
+        }
+
+        if (inHex && skip !== inHex) { inHex.value = hex; }
+        if (inR && skip !== inR) { inR.value = String(rgb.r); }
+        if (inG && skip !== inG) { inG.value = String(rgb.g); }
+        if (inB && skip !== inB) { inB.value = String(rgb.b); }
+
+        /* Highlight whichever quick pick matches, whether it was reached by
+           its own button or by landing on that exact value in the picker. */
+        colorRow.querySelectorAll(".swatch").forEach((sw) => {
+            const on = sw.getAttribute("data-hex") === hex.toUpperCase();
+            sw.classList.toggle("is-active", on);
+            sw.setAttribute("aria-checked", String(on));
+        });
+    }
+
+    function setCustomColor(hex, skip) {
+        const rgb = hexToRgb(hex);
+        if (!rgb) {
+            return false;
+        }
+        customHex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        currentColor = CUSTOM_COLOR;
+        syncColorUI(skip);
         persist();
         draw();
-    });
+        return true;
+    }
 
-    /* ----------------------------------------------------------------------
-       Image upload with explicit mime-type validation. Execution terminates
-       immediately when file.type does not match the image.* designation.
-       ---------------------------------------------------------------------- */
+    /* --- popover open/close --- */
 
-    fileInput.addEventListener("change", () => {
-        fileError.textContent = "";
-        const file = fileInput.files && fileInput.files[0];
-        if (!file) {
+    function onPickerOutside(evt) {
+        if (colorPopover.contains(evt.target) || colorTrigger.contains(evt.target)) {
             return;
         }
+        closePicker();
+    }
 
-        if (!/^image\//.test(file.type)) {
-            fileError.textContent = "That file is not an image. Please choose a JPG, PNG, or WebP file.";
-            fileInput.value = "";
-            design = null;
-            draw();
-            return;
+    function onPickerKey(evt) {
+        if (evt.key === "Escape") {
+            closePicker();
+            colorTrigger.focus();
         }
+    }
 
-        const reader = new FileReader();
-        reader.addEventListener("load", () => {
-            const img = new Image();
-            img.addEventListener("load", () => {
-                design = img;
-                offsetX = 0;
-                offsetY = 0;
-                draw();
-            });
-            img.addEventListener("error", () => {
-                fileError.textContent = "That image could not be decoded. Please try a different file.";
-                fileInput.value = "";
-            });
-            img.src = reader.result;
+    function openPicker() {
+        colorPopover.hidden = false;
+        colorTrigger.setAttribute("aria-expanded", "true");
+        syncColorUI();
+        document.addEventListener("pointerdown", onPickerOutside, true);
+        document.addEventListener("keydown", onPickerKey, true);
+    }
+
+    function closePicker() {
+        colorPopover.hidden = true;
+        colorTrigger.setAttribute("aria-expanded", "false");
+        document.removeEventListener("pointerdown", onPickerOutside, true);
+        document.removeEventListener("keydown", onPickerKey, true);
+    }
+
+    if (colorTrigger && colorPopover) {
+        colorTrigger.addEventListener("click", () => {
+            if (colorPopover.hidden) {
+                openPicker();
+            } else {
+                closePicker();
+            }
         });
-        reader.readAsDataURL(file);
+    }
+
+    /* --- gradient tracks --- */
+
+    function trackRatio(el, evt) {
+        const rect = el.getBoundingClientRect();
+        return {
+            x: rect.width ? clamp((evt.clientX - rect.left) / rect.width, 0, 1) : 0,
+            y: rect.height ? clamp((evt.clientY - rect.top) / rect.height, 0, 1) : 0
+        };
+    }
+
+    function bindTrack(el, apply) {
+        if (!el) {
+            return;
+        }
+        let active = false;
+        el.addEventListener("pointerdown", (evt) => {
+            active = true;
+            el.setPointerCapture(evt.pointerId);
+            apply(evt);
+            evt.preventDefault();
+        });
+        el.addEventListener("pointermove", (evt) => {
+            if (active) {
+                apply(evt);
+            }
+        });
+        const stop = () => { active = false; };
+        el.addEventListener("pointerup", stop);
+        el.addEventListener("pointercancel", stop);
+    }
+
+    bindTrack(svArea, (evt) => {
+        const r = trackRatio(svArea, evt);
+        const rgb = hsvToRgb(pickerHue, r.x, 1 - r.y);
+        setCustomColor(rgbToHex(rgb.r, rgb.g, rgb.b));
+    });
+
+    bindTrack(hueArea, (evt) => {
+        const r = trackRatio(hueArea, evt);
+        pickerHue = r.x * 360;
+        const current = hexToRgb(activeHex()) || { r: 255, g: 255, b: 255 };
+        const hsv = rgbToHsv(current.r, current.g, current.b);
+        /* A pure white or black start has no saturation to rotate, so the new
+           hue would produce the same greyscale colour and the strip would
+           look broken. Fall back to a fully saturated sample instead. */
+        const s = hsv.s > 0.001 ? hsv.s : 1;
+        const v = hsv.v > 0.001 ? hsv.v : 1;
+        const rgb = hsvToRgb(pickerHue, s, v);
+        setCustomColor(rgbToHex(rgb.r, rgb.g, rgb.b));
+    });
+
+    /* --- hex / R / G / B --- */
+
+    if (inHex) {
+        inHex.addEventListener("input", () => {
+            if (hexToRgb(inHex.value)) {
+                setCustomColor(inHex.value, inHex);
+            }
+        });
+        inHex.addEventListener("blur", () => syncColorUI());
+    }
+
+    [inR, inG, inB].forEach((input) => {
+        if (!input) {
+            return;
+        }
+        input.addEventListener("input", () => {
+            const r = clamp(parseInt(inR.value, 10) || 0, 0, 255);
+            const g = clamp(parseInt(inG.value, 10) || 0, 0, 255);
+            const b = clamp(parseInt(inB.value, 10) || 0, 0, 255);
+            setCustomColor(rgbToHex(r, g, b), input);
+        });
+        input.addEventListener("blur", () => syncColorUI());
     });
 
     /* ----------------------------------------------------------------------
-       Design size slider
+       Design size. The slider, the numeric field and the corner handles all
+       write the SELECTED layer's scale; nothing here is global any more.
        ---------------------------------------------------------------------- */
+
+    function syncScaleControls() {
+        const layer = selectedLayer();
+        const enabled = !!(layer && layer.img);
+        scaleInput.disabled = !enabled;
+        scaleNumber.disabled = !enabled;
+        scaleReset.disabled = !enabled;
+
+        const pct = Math.round((layer ? layer.scale : DEFAULT_SCALE) * 100);
+        scaleInput.value = String(pct);
+        scaleNumber.value = String(pct);
+        scaleOutput.textContent = pct + "%";
+    }
+
+    function applyScalePercent(pct, skip) {
+        const layer = selectedLayer();
+        if (!layer) {
+            return;
+        }
+        layer.scale = clamp(pct / 100, MIN_SCALE, MAX_SCALE);
+        const rounded = Math.round(layer.scale * 100);
+        if (skip !== scaleInput) { scaleInput.value = String(rounded); }
+        if (skip !== scaleNumber) { scaleNumber.value = String(rounded); }
+        scaleOutput.textContent = rounded + "%";
+        persist();
+        draw();
+    }
 
     scaleInput.addEventListener("input", () => {
-        designScale = Number(scaleInput.value) / 100;
-        scaleOutput.textContent = scaleInput.value + "%";
+        applyScalePercent(Number(scaleInput.value), scaleInput);
+    });
+
+    scaleNumber.addEventListener("input", () => {
+        const value = parseInt(scaleNumber.value, 10);
+        if (!isNaN(value)) {
+            applyScalePercent(value, scaleNumber);
+        }
+    });
+
+    scaleNumber.addEventListener("blur", syncScaleControls);
+
+    scaleReset.addEventListener("click", () => {
+        const layer = selectedLayer();
+        if (!layer) {
+            return;
+        }
+        layer.scale = DEFAULT_SCALE;
+        layer.rotation = 0;
+        layer.offsetX = 0;
+        layer.offsetY = 0;
+        syncScaleControls();
         persist();
         draw();
     });
 
     /* ----------------------------------------------------------------------
-       Pointer-driven repositioning. Drag only begins when the pointer
-       actually lands on the currently drawn design image, so the rest of
-       the product illustration stays inert.
+       Direct manipulation. One pointer pipeline drives move, resize and
+       rotate: which one is chosen depends only on where the press landed --
+       the rotate handle, a corner, a layer's body, or empty space.
        ---------------------------------------------------------------------- */
 
     function getCanvasPoint(evt) {
@@ -785,44 +1696,123 @@
         };
     }
 
+    /* Which grab, if any, a point lands on. Handles beat bodies, and the
+       front-most layer beats the ones behind it. */
+    function hitTest(pt, k) {
+        const tol = HANDLE_HIT * k;
+        const sel = selectedLayer();
+
+        if (sel && sel.rect && sel.visible) {
+            if (distance(pt, rotateHandlePoint(sel.rect, k)) <= tol) {
+                return { mode: "rotate", layer: sel };
+            }
+            const corners = rectCorners(sel.rect);
+            for (let i = 0; i < corners.length; i += 1) {
+                if (distance(pt, corners[i]) <= tol) {
+                    return { mode: "resize", layer: sel };
+                }
+            }
+        }
+
+        for (let i = layers.length - 1; i >= 0; i -= 1) {
+            const layer = layers[i];
+            if (layer.rect && layer.visible && hitsBody(layer.rect, pt)) {
+                return { mode: "move", layer: layer };
+            }
+        }
+        return null;
+    }
+
     canvas.addEventListener("pointerdown", (evt) => {
-        if (!design || !lastDesignRect) {
-            return;
-        }
+        const k = canvasPerScreenPx();
         const pt = getCanvasPoint(evt);
-        const hit = pt.x >= lastDesignRect.x && pt.x <= lastDesignRect.x + lastDesignRect.w &&
-            pt.y >= lastDesignRect.y && pt.y <= lastDesignRect.y + lastDesignRect.h;
+        const hit = hitTest(pt, k);
+
         if (!hit) {
+            if (selectedId !== null) {
+                selectLayer(null);
+            }
             return;
         }
-        dragging = true;
-        dragStart = pt;
-        dragOffsetStart = { x: offsetX, y: offsetY };
+
+        if (hit.layer.id !== selectedId) {
+            selectLayer(hit.layer.id);
+        }
+
+        const rect = hit.layer.rect;
+        const center = { x: rect.cx, y: rect.cy };
+        drag = {
+            mode: hit.mode,
+            layer: hit.layer,
+            start: pt,
+            center: center,
+            startOffset: { x: hit.layer.offsetX, y: hit.layer.offsetY },
+            startScale: hit.layer.scale,
+            startDistance: distance(pt, center),
+            startRotation: hit.layer.rotation,
+            startAngle: Math.atan2(pt.y - center.y, pt.x - center.x)
+        };
+
         canvas.setPointerCapture(evt.pointerId);
         canvas.classList.add("is-dragging");
+        evt.preventDefault();
     });
 
     canvas.addEventListener("pointermove", (evt) => {
-        if (!dragging) {
+        const k = canvasPerScreenPx();
+        const pt = getCanvasPoint(evt);
+
+        if (!drag) {
+            const hit = hitTest(pt, k);
+            canvas.style.cursor = hit
+                ? (hit.mode === "move" ? "grab" : (hit.mode === "rotate" ? "crosshair" : "nwse-resize"))
+                : "default";
             return;
         }
-        const pt = getCanvasPoint(evt);
-        offsetX = dragOffsetStart.x + (pt.x - dragStart.x);
-        offsetY = dragOffsetStart.y + (pt.y - dragStart.y);
+
+        if (drag.mode === "move") {
+            drag.layer.offsetX = drag.startOffset.x + (pt.x - drag.start.x);
+            drag.layer.offsetY = drag.startOffset.y + (pt.y - drag.start.y);
+        } else if (drag.mode === "resize") {
+            if (drag.startDistance > 0.5) {
+                applyScalePercent(
+                    (drag.startScale * (distance(pt, drag.center) / drag.startDistance)) * 100
+                );
+                return;
+            }
+        } else if (drag.mode === "rotate") {
+            const angle = Math.atan2(pt.y - drag.center.y, pt.x - drag.center.x);
+            let next = drag.startRotation + (angle - drag.startAngle);
+            if (evt.shiftKey) {
+                const step = Math.PI / 12;
+                next = Math.round(next / step) * step;
+            }
+            drag.layer.rotation = next;
+        }
         draw();
     });
 
     function endDrag() {
-        if (!dragging) {
+        if (!drag) {
             return;
         }
-        dragging = false;
+        drag = null;
         canvas.classList.remove("is-dragging");
         persist();
     }
 
     canvas.addEventListener("pointerup", endDrag);
     canvas.addEventListener("pointercancel", endDrag);
+
+    /* Handle sizes are quoted in screen pixels, so the chrome has to be
+       repainted whenever the canvas's displayed width changes -- on a window
+       resize, and on the mobile tab switch, which changes it without firing
+       one. */
+    window.addEventListener("resize", drawOverlay);
+    const tabPreview = document.getElementById("tab-preview");
+    if (tabPreview) {
+        tabPreview.addEventListener("click", () => window.requestAnimationFrame(drawOverlay));
+    }
 
     /* ----------------------------------------------------------------------
        Real-time retention of non-image settings in localStorage.
@@ -832,9 +1822,15 @@
         TB.storageSet(STORAGE_KEY, {
             product: currentProduct,
             color: currentColor,
-            scale: Math.round(designScale * 100),
-            offsetX,
-            offsetY,
+            customHex: customHex,
+            layers: layers.map((layer) => ({
+                name: layer.name,
+                scale: layer.scale,
+                offsetX: layer.offsetX,
+                offsetY: layer.offsetY,
+                rotation: layer.rotation,
+                visible: layer.visible
+            })),
             label: TB.sanitize(labelInput.value),
             docName: TB.sanitize(docNameInput ? docNameInput.value : DEFAULT_DOC_NAME)
         });
@@ -912,7 +1908,7 @@
     let trayCounter = 0;
 
     addToTrayBtn.addEventListener("click", () => {
-        if (!design) {
+        if (!layers.some((layer) => layer.img && layer.visible)) {
             fileError.textContent = "Upload a design before adding it to your mockups.";
             return;
         }
@@ -924,6 +1920,8 @@
         const item = {
             id: Date.now() + "-" + trayCounter,
             label: TB.sanitize(typed || fallback),
+            /* Reads the product canvas alone, so no selection chrome can
+               reach the thumbnail. */
             thumb: canvas.toDataURL("image/png")
         };
         trayItems.push(item);
@@ -942,23 +1940,70 @@
     });
 
     /* ----------------------------------------------------------------------
-       Initialization: hydrate saved settings, populate the color row for
-       the starting product, then paint.
+       Per-template control state
+
+       There is no in-editor template picker: the mockup is chosen by the
+       catalog card that opened the page (data-doc preset, consumed below).
+       The product therefore never changes during a session, so this runs
+       once at startup rather than on a change event.
+
+       With the picker gone, this label is the only text naming the loaded
+       mockup, so it carries the whole burden for screen-reader users.
        ---------------------------------------------------------------------- */
 
-    /* Photographic templates register as additional select options, so a
-       new registry entry appears in the editor with zero markup changes. */
-    const photoKeys = Object.keys(PRODUCTS).filter(isPhotoProduct);
-    if (photoKeys.length) {
-        const group = document.createElement("optgroup");
-        group.label = "Poster and Frame Mockups";
-        photoKeys.forEach((key) => {
-            const opt = document.createElement("option");
-            opt.value = key;
-            opt.textContent = PRODUCTS[key].label;
-            group.appendChild(opt);
+    function syncCanvasLabel() {
+        canvas.setAttribute("aria-label", PRODUCTS[currentProduct].label + " mockup preview");
+    }
+
+    /* ----------------------------------------------------------------------
+       Initialization: hydrate saved settings, populate the colour controls
+       for the starting product, then paint.
+       ---------------------------------------------------------------------- */
+
+    function numberIn(value, min, max, fallback) {
+        return typeof value === "number" && isFinite(value)
+            ? clamp(value, min, max)
+            : fallback;
+    }
+
+    function restoreLayers(saved) {
+        /* Saves written before this editor had layers held one design's
+           placement in flat top-level fields. Migrating them keeps a
+           returning visitor's size and position instead of silently
+           resetting to the default. */
+        const rows = Array.isArray(saved.layers)
+            ? saved.layers
+            : (typeof saved.scale === "number"
+                ? [{
+                    name: "design",
+                    scale: saved.scale / 100,
+                    offsetX: saved.offsetX,
+                    offsetY: saved.offsetY,
+                    rotation: 0,
+                    visible: true
+                }]
+                : []);
+
+        rows.slice(0, MAX_LAYERS).forEach((row) => {
+            if (!row || typeof row !== "object") {
+                return;
+            }
+            layerCounter += 1;
+            layers.push({
+                id: "L" + layerCounter + "-restored",
+                name: typeof row.name === "string" && row.name ? row.name.slice(0, 60) : "design",
+                /* No bitmap: image data is never written to storage, so a
+                   restored layer holds its placement and waits for the file
+                   to be handed back through Replace. */
+                img: null,
+                scale: numberIn(row.scale, MIN_SCALE, MAX_SCALE, DEFAULT_SCALE),
+                offsetX: numberIn(row.offsetX, -5000, 5000, 0),
+                offsetY: numberIn(row.offsetY, -5000, 5000, 0),
+                rotation: numberIn(row.rotation, -Math.PI * 4, Math.PI * 4, 0),
+                visible: row.visible !== false,
+                rect: null
+            });
         });
-        productSelect.appendChild(group);
     }
 
     const saved = TB.storageGet(STORAGE_KEY);
@@ -966,48 +2011,57 @@
         if (PRODUCTS[saved.product]) {
             currentProduct = saved.product;
         }
-        if (PRODUCTS[currentProduct].colors && PRODUCTS[currentProduct].colors[saved.color]) {
+        if (hexToRgb(saved.customHex)) {
+            const c = hexToRgb(saved.customHex);
+            customHex = rgbToHex(c.r, c.g, c.b);
+        }
+        if (saved.color === CUSTOM_COLOR) {
+            currentColor = CUSTOM_COLOR;
+        } else if (PRODUCTS[currentProduct].colors && PRODUCTS[currentProduct].colors[saved.color]) {
             currentColor = saved.color;
-        }
-        if (typeof saved.scale === "number" && saved.scale >= 30 && saved.scale <= 100) {
-            designScale = saved.scale / 100;
-        }
-        if (typeof saved.offsetX === "number") {
-            offsetX = saved.offsetX;
-        }
-        if (typeof saved.offsetY === "number") {
-            offsetY = saved.offsetY;
         }
         if (typeof saved.label === "string") {
             labelInput.value = TB.desanitize(saved.label);
         }
+        restoreLayers(saved);
     }
     if (docNameInput) {
         docNameInput.value = TB.desanitize((saved && saved.docName) || DEFAULT_DOC_NAME);
     }
 
-    /* A catalog card can pre-select which mockup opens (data-doc hand-off
-       via TB.takePreset). The value is only ever matched against PRODUCTS,
-       so a tampered preset resolves to nothing worse than a template that
-       already ships. It outranks the saved product because it represents a
-       fresh, explicit card choice. */
+    /* The catalog card that opened this editor decides which mockup loads
+       (data-doc hand-off via TB.takePreset), and since the template picker
+       was removed it is the ONLY way to choose one -- every product needs
+       its own card in index.html or it cannot be reached at all. The value
+       is only ever matched against PRODUCTS, so a tampered preset resolves
+       to nothing worse than a template that already ships. It outranks the
+       saved product because it represents a fresh, explicit card choice;
+       a direct visit with no preset falls back to the last one used. */
     const preset = TB.takePreset();
     if (typeof preset === "string" && Object.prototype.hasOwnProperty.call(PRODUCTS, preset)) {
         currentProduct = preset;
         const presetPalette = PRODUCTS[currentProduct].colors;
-        if (presetPalette && !presetPalette[currentColor]) {
+        if (presetPalette && currentColor !== CUSTOM_COLOR && !presetPalette[currentColor]) {
             currentColor = Object.keys(presetPalette)[0];
         }
-        offsetX = 0;
-        offsetY = 0;
+        /* Print areas differ between products, so a placement carried over
+           from the last one would land somewhere arbitrary on this one. */
+        layers.forEach((layer) => {
+            layer.offsetX = 0;
+            layer.offsetY = 0;
+            layer.rotation = 0;
+        });
     }
 
-    productSelect.value = currentProduct;
-    scaleInput.value = String(Math.round(designScale * 100));
-    scaleOutput.textContent = scaleInput.value + "%";
+    selectedId = layers.length ? layers[layers.length - 1].id : null;
 
+    buildColorPresets();
     renderColorSwatches();
-    syncPlacementControls();
+    syncColorUI();
+    renderLayerList();
+    syncScaleControls();
+    syncLayerActions();
+    syncCanvasLabel();
     renderTray();
     draw();
 

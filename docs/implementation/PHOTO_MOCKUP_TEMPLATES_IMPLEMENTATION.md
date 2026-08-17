@@ -54,6 +54,29 @@ The `warpZone` is four corners in base-image pixels (TL, TR, BR, BL).
 
 The warp path is structurally complete but **dormant and unverified**: no non-rectangular asset exists yet. Verify it visually when the first angled template is added.
 
+## The Template Picker Was Removed (July 30, 2026)
+
+The editor's "Product Template" `<select>` is gone, at the owner's instruction. The mockup is now chosen entirely by the catalog card that opened the editor, handed over as the `data-doc` preset — the Placeit-style flow the original brief asked for ("you pick a mockup you want to put your product image on, then upload the image").
+
+**The consequence is structural: a card is now the only route to a product.** Before this, three of the four vector products had no `data-doc` on their cards and were reachable only through the picker, so removing it alone would have silently pointed Mug, Packaging and Hoodie all at the T-shirt. Every product therefore had to be wired to its own card in the same change:
+
+| Card | `data-doc` |
+|---|---|
+| T-Shirt Mockup | `tshirt` |
+| Hoodie Mockup | `hoodie` |
+| Mug Mockup | `mug` |
+| Packaging Mockup | `box` |
+| Leaning Wood Frame Poster Mockup | `wood-a4` |
+
+**"Apparel Mockup: T-Shirt and Hoodie" had to be split into two cards.** One card can only open one product now, so a card covering two would have stranded whichever one it did not select. The hoodie got its own card and a `.mk-shape.hoodie` miniature, sharing the tee's `clip-path` in one grouped rule so the two silhouettes cannot drift, plus a hood opening and pocket built from pseudo-elements clipped by that silhouette. Catalog total went from 16 to 17.
+
+Two knock-on details worth knowing:
+
+- **The canvas carries an `aria-label` naming the active mockup**, set by `syncCanvasLabel()`. With the picker gone, no visible text identifies which template is loaded, so for a screen-reader user the canvas would otherwise be entirely unlabelled. This is the only thing naming it.
+- **Product switching no longer happens mid-session**, so the palette, placement-control and label sync run once at startup rather than from a `change` handler. `isPhotoProduct()` became dead code when the optgroup builder went and was removed.
+
+A direct visit to `mockup.html` with no preset falls back to the last product used (persisted in `tb_mockup_v1`), then to the T-shirt on a first visit. The mega-menu's generic "Product Mockup Generator" link deliberately carries no preset and uses that fallback.
+
 ## Adding a Template (data-only workflow)
 
 1. Save assets as `site/assets/mockups/<id>-base.png` and `<id>-overlay.png` (URL-safe names: lowercase, hyphens, no spaces - the folders supplied for wood-a4 contained spaces and commas and had to be renamed before they could be referenced).
@@ -63,7 +86,9 @@ The warp path is structurally complete but **dormant and unverified**: no non-re
 5. Add a catalog card in `index.html` with `data-target="mockup" data-doc="<id>"`, an `<img class="card-thumb">` preview inside `<div class="card-preview photo">`, and `data-category="mockups"`.
 6. Update the hero template count in `index.html`.
 
-The editor picks the template up automatically: registry entries become options in the Product Template select (under a "Poster and Frame Mockups" optgroup) and valid `data-doc` presets, with no `js/mockup.js` changes.
+The editor picks the template up automatically: a registry entry becomes a valid `data-doc` preset with no `js/mockup.js` changes.
+
+**Step 5 is not optional (revised July 30, 2026).** Registry entries used to also appear as options in an in-editor "Product Template" select, so a template was reachable even without a catalog card. That picker has been removed, making the catalog card the **only** way to open a mockup — a registry entry with no card is unreachable dead weight. See "The template picker was removed" below.
 
 ## Security and Integrity
 

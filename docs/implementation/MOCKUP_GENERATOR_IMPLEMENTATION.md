@@ -5,7 +5,9 @@ Updated: July 21, 2026 — added the loading-page countdown resilience fix and t
 
 ## Overview
 
-A third editor tool, alongside the resume builder and poster maker: a print-on-demand product mockup generator. Users upload artwork once, pick a product template (t-shirt, hoodie, mug, or packaging box), choose a color, then drag and scale the design directly on a live canvas preview. A one-click "Add to My Mockups" tray lets a user build several product renders for one design before downloading them for a store listing. Follows the same 100% client-side, ad-free-editor architecture as `resume.html` and `poster.html`.
+A third editor tool, alongside the resume builder and poster maker: a print-on-demand product mockup generator. Users pick a product template (t-shirt, hoodie, mug, or packaging box), upload artwork, choose a color, then drag and scale the design directly on a live canvas preview. A one-click "Add to My Mockups" tray lets a user build several product renders for one design before downloading them for a store listing. Follows the same 100% client-side, ad-free-editor architecture as `resume.html` and `poster.html`.
+
+**Revised July 30, 2026: the product is chosen before the editor opens, not inside it.** The in-editor "Product Template" `<select>` described below was removed; the catalog card's `data-doc` preset is now the only way to select a mockup, and each product has its own card. Read the "The Template Picker Was Removed" section of `PHOTO_MOCKUP_TEMPLATES_IMPLEMENTATION.md` before relying on anything below that mentions switching templates in the editor.
 
 ## Files Added
 

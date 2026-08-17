@@ -1758,11 +1758,40 @@ body.is-nav-hidden .site-header:focus-within {
     justify-content: center;
 }
 
-.mk-shape.tee {
+/* One silhouette for both garments: the hoodie is the tee outline plus a
+   hood opening and a pocket, exactly how js/mockup.js builds it on canvas.
+   Shared in a single rule so the two cannot drift apart. */
+.mk-shape.tee,
+.mk-shape.hoodie {
     width: 78%;
     aspect-ratio: 1 / 1;
     background-color: #1A1A1A;
     clip-path: polygon(30% 8%, 40% 4%, 60% 4%, 70% 8%, 100% 22%, 90% 42%, 78% 36%, 78% 96%, 22% 96%, 22% 36%, 10% 42%, 0 22%);
+}
+
+/* Hood opening at the collar. Both pseudo-elements are clipped by the
+   silhouette above, which is what keeps them inside the garment. */
+.mk-shape.hoodie::before {
+    content: "";
+    position: absolute;
+    top: 4%;
+    left: 34%;
+    right: 34%;
+    height: 14%;
+    border-radius: 0 0 50% 50%;
+    background-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Kangaroo pocket */
+.mk-shape.hoodie::after {
+    content: "";
+    position: absolute;
+    left: 30%;
+    right: 30%;
+    bottom: 10%;
+    height: 22%;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-bottom: 0;
 }
 
 .mk-shape.mug {
@@ -4468,6 +4497,20 @@ legend {
    Product mockup generator
    -------------------------------------------------------------------------- */
 
+/* The mockup editor's left pane is a tool panel, not a form, so it takes a
+   fixed control column beside a large stage rather than the even split the
+   other three editors use.
+
+   Declared INSIDE a min-width query on purpose. Below 48rem the shared
+   `.editor-layout { grid-template-columns: 1fr }` rule has to win, and it is
+   a single class -- a bare `.editor-layout.mockup-layout` would outrank it on
+   specificity and strand the sidebar in a two-column grid on a phone. */
+@media (min-width: 48.0625rem) {
+    .mockup-layout {
+        grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+    }
+}
+
 .mockup-stage {
     background-color: var(--color-bg);
     border: 1px solid var(--color-border);
@@ -4476,24 +4519,619 @@ legend {
     justify-content: center;
 }
 
-.mockup-stage canvas {
+/* Stacking context for the selection overlay, and the element that now caps
+   the preview's width (the canvases themselves fill it). */
+.mockup-canvas-wrap {
+    position: relative;
     width: 100%;
-    max-width: 26rem;
+    max-width: 32rem;
+}
+
+.mockup-stage canvas {
+    display: block;
+    width: 100%;
     height: auto;
-    /* Signals the design layer is draggable directly on the product */
-    cursor: grab;
     touch-action: none;
 }
 
+/* The resting cursor is set from js/mockup.js per hit target -- grab over a
+   layer's body, a resize arrow on a corner, a crosshair on the rotate handle,
+   default over bare product. A blanket `grab` here would claim the whole
+   illustration is draggable when only a placed layer is. */
 .mockup-stage canvas.is-dragging {
     cursor: grabbing;
+}
+
+/* Selection chrome only. Sized to the wrapper rather than by its own aspect
+   ratio so it tracks the canvas underneath exactly, and inert to pointers so
+   the canvas below keeps the whole interaction pipeline. */
+.mockup-stage canvas.mockup-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Mockup sidebar: section headers
+   -------------------------------------------------------------------------- */
+
+.panel-block {
+    margin-bottom: var(--space-lg);
+}
+
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-2xs);
+    min-height: 1.75rem;
+}
+
+.panel-title {
+    display: block;
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+}
+
+/* "Add more design". Ghost rather than a filled brand chip: --color-brand-ink
+   is a darker/lighter shade of the brand for TEXT, not a contrasting ink to
+   sit on top of it, so brand-on-brand would be unreadable in both themes. */
+.panel-add {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-brand);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) var(--ease),
+        color var(--motion-fast) var(--ease);
+}
+
+.panel-add svg,
+.icon-round svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.panel-add:hover:not(:disabled) {
+    border-color: var(--color-brand);
+}
+
+.panel-add:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Hover label, right-anchored so it grows inwards and can never widen the
+   pane -- a left-anchored tip would push past the viewport at 320px and the
+   suite's no-horizontal-scroll check would catch it. */
+[data-tip] {
+    position: relative;
+}
+
+[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    right: 0;
+    z-index: 6;
+    padding: 0.25rem var(--space-2xs);
+    background-color: var(--color-text);
+    color: var(--color-bg);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--motion-fast) var(--ease);
+}
+
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+    opacity: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Design layer list
+
+   One row per layer, front-most first -- the reverse of the paint order, the
+   same way every layers panel reads.
+   -------------------------------------------------------------------------- */
+
+/* The one file input behind every upload button on this editor. Taken out of
+   layout entirely rather than made .sr-only, because .sr-only cannot win here:
+   it is a single class, so `.field input`'s `width: 100%` (a class AND a type,
+   one step more specific) beats its `width: 1px`. The input is
+   position:absolute by then, so it resolved to the full width of its
+   containing block and pushed every viewport into a horizontal scroll. It is
+   never focused or clicked directly -- the visible buttons carry the
+   accessible names and call .click() on it -- so removing it costs nothing. */
+.file-trigger {
+    display: none;
+}
+
+/* Same trap, same cause: `.range-row output`'s min-width is more specific than
+   .sr-only's width, so this output kept reserving 3rem at the end of the row
+   even while invisible. The numeric field above shows the value now; this
+   element survives only as the slider's programmatic output. */
+.range-row output.sr-only {
+    min-width: 0;
+}
+
+.layer-list {
+    list-style: none;
+    margin: 0 0 var(--space-xs);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3xs);
+}
+
+/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`,
+   so both of these need to opt back out by hand or js/mockup.js setting
+   .hidden on them does nothing at all. */
+.layer-list[hidden],
+.layer-actions[hidden] {
+    display: none;
+}
+
+.layer-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3xs);
+    padding: 0.25rem;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    transition: border-color var(--motion-fast) var(--ease);
+}
+
+.layer-row.is-selected {
+    border-color: var(--color-brand);
+}
+
+.layer-row.is-hidden .layer-thumb,
+.layer-row.is-hidden .layer-name {
+    opacity: 0.45;
+}
+
+.layer-main {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    flex: 1 1 auto;
+    /* Without this the filename's ellipsis never engages and a long name
+       stretches the row past the pane. */
+    min-width: 0;
+    min-height: 2.5rem;
+    padding: 0.125rem;
+    background: none;
+    border: 0;
+    text-align: left;
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.layer-thumb {
+    flex: 0 0 auto;
+    display: block;
+    width: 2rem;
+    height: 2rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+
+/* Placement restored from storage, file not handed back yet: an empty dashed
+   square reads as "waiting for the image" instead of as a broken thumbnail. */
+.layer-row.is-pending .layer-thumb {
+    border-style: dashed;
+}
+
+.layer-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.layer-text {
+    display: block;
+    min-width: 0;
+}
+
+.layer-name {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.layer-note {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-warn);
+}
+
+.layer-tools {
+    display: flex;
+    flex: 0 0 auto;
+}
+
+.layer-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--color-muted);
+    cursor: pointer;
+}
+
+.layer-tool svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.layer-tool:hover {
+    color: var(--color-text);
+}
+
+.upload-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2xs);
+}
+
+.upload-cta svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Resize / Replace / Remove, acting on the selected layer only */
+.layer-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-3xs);
+    margin-top: var(--space-xs);
+    padding-top: var(--space-xs);
+    border-top: 1px solid var(--color-border);
+}
+
+.layer-actions button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1875rem;
+    min-height: 3rem;
+    padding: 0.375rem 0.25rem;
+    background: none;
+    border: 1px solid transparent;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    cursor: pointer;
+    transition: color var(--motion-fast) var(--ease),
+        border-color var(--motion-fast) var(--ease);
+}
+
+.layer-actions button:hover {
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+.layer-actions svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* --------------------------------------------------------------------------
+   Colour control: current value, and a free HSV picker behind it
+
+   The gradients are CSS, not canvases and not a library: the picker only ever
+   needs the pointer's position within each track, never a pixel readback, so
+   there is nothing here for a dependency to do.
+   -------------------------------------------------------------------------- */
+
+.color-control {
+    position: relative;
+}
+
+.color-trigger {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 var(--space-xs);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.color-trigger-dot {
+    flex: 0 0 auto;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 50%;
+    border: 1px solid var(--color-border-strong);
+}
+
+.color-trigger-hex {
+    flex: 1 1 auto;
+    text-align: left;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.color-trigger-caret {
+    flex: 0 0 auto;
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--color-muted);
+}
+
+.color-popover {
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    left: 0;
+    right: 0;
+    z-index: 5;
+    max-width: 17rem;
+    padding: var(--space-sm);
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border-strong);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.color-sv {
+    --picker-hue: 0;
+    position: relative;
+    height: 9rem;
+    cursor: crosshair;
+    touch-action: none;
+    background:
+        linear-gradient(to top, #000000, rgba(0, 0, 0, 0)),
+        linear-gradient(to right, #FFFFFF, hsl(var(--picker-hue), 100%, 50%));
+}
+
+.color-sv-thumb {
+    position: absolute;
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: 50%;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.color-hue {
+    position: relative;
+    height: 0.875rem;
+    margin-top: var(--space-xs);
+    cursor: ew-resize;
+    touch-action: none;
+    background: linear-gradient(to right,
+        #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000);
+}
+
+.color-hue-thumb {
+    position: absolute;
+    top: 50%;
+    width: 0.375rem;
+    height: calc(100% + 0.25rem);
+    background-color: #FFFFFF;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.color-inputs {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    gap: var(--space-3xs);
+    margin-top: var(--space-sm);
+}
+
+.color-input-cell {
+    margin: 0;
+    min-width: 0;
+}
+
+.color-input-cell input {
+    width: 100%;
+    min-width: 0;
+    min-height: 2rem;
+    padding: 0.25rem 0.125rem;
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+/* The spinners cost more width than they are worth in a 4-up row this narrow */
+.color-input-cell input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.color-input-cell input[type="number"]::-webkit-outer-spin-button,
+.color-input-cell input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.color-input-tag {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.6875rem;
+    color: var(--color-muted);
+    text-align: center;
+}
+
+.color-presets {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(1.5rem, 1fr));
+    gap: var(--space-3xs);
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-border);
+}
+
+.color-preset {
+    min-height: 1.75rem;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    cursor: pointer;
+}
+
+.color-eyedropper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.75rem;
+    padding: 0;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    cursor: pointer;
+}
+
+.color-eyedropper svg {
+    width: 0.9375rem;
+    height: 0.9375rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.color-eyedropper:hover {
+    color: var(--color-text);
 }
 
 .color-row {
     display: flex;
     gap: 0.75rem;
+    margin-top: var(--space-xs);
     margin-bottom: 1rem;
     flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   Design size: a typed percentage and a reset beside the slider
+   -------------------------------------------------------------------------- */
+
+.size-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3xs);
+}
+
+.size-number {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+}
+
+.size-number input {
+    width: 3rem;
+    min-height: 2rem;
+    padding: 0.25rem;
+    background: none;
+    border: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: right;
+}
+
+.size-number input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.size-number input[type="number"]::-webkit-outer-spin-button,
+.size-number input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.size-unit {
+    padding-right: var(--space-3xs);
+    font-size: 0.75rem;
+    color: var(--color-muted);
+}
+
+.icon-round {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+}
+
+.icon-round:hover:not(:disabled) {
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+.icon-round:disabled,
+.layer-actions button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .range-row {
@@ -5555,6 +6193,11 @@ legend {
     .editor-leaderboard,
     .form-nav,
     main > h1,
+    /* Selection chrome lives in .preview-pane, which DOES print -- unlike the
+       controls pane, which is hidden wholesale above. Without this a mockup
+       printed while a layer was selected would carry its handles and name
+       tag onto the paper. */
+    .mockup-overlay,
     .preview-pane h2 {
         display: none !important;
     }
