@@ -1447,6 +1447,29 @@ body.is-nav-hidden .site-header:focus-within {
     display: block;
 }
 
+/* Bare-product default, styled-demo on hover (August 18, 2026) -- the same
+   "default is the plain product" rule .mk-art and the framed poster scene
+   below already follow, extended to these two real photo thumbnails.
+   card-thumb-blank lays out the box normally and IS the permanent state on
+   touch, since it is never gated behind (hover: hover). card-thumb-hover
+   stacks on top absolutely -- .card-media is already position:relative for
+   the hover-zoom transform above, so it is the containing block -- and
+   crossfades in only where a hover state actually exists. Opacity only, so
+   this costs no layout and cannot perturb the masonry packing. */
+.card-preview.photo .card-thumb-hover {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity var(--motion-base) var(--ease);
+}
+
+@media (hover: hover) {
+    .catalog-grid .template-card:hover .card-preview.photo .card-thumb-hover,
+    .catalog-grid .template-card:focus-within .card-preview.photo .card-thumb-hover {
+        opacity: 1;
+    }
+}
+
 /* --------------------------------------------------------------------------
    Catalog preview miniatures.
 
