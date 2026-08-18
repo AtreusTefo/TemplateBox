@@ -308,11 +308,19 @@
         if (!valid) {
             return;
         }
+        /* Recolour needs BOTH a palette and a mask: without the mask there is
+           nothing to confine the tint to and it would flood the whole frame,
+           model included. Declaring only one of the pair leaves the colour
+           field hidden, exactly as it is for a framed poster. */
+        const recolorable = tpl.garment && tpl.garmentColors &&
+            typeof tpl.garmentColors === "object" &&
+            Object.keys(tpl.garmentColors).length > 0;
+
         PRODUCTS[tpl.id] = {
             type: "photo",
             label: typeof tpl.title === "string" && tpl.title ? tpl.title : tpl.id,
             template: tpl,
-            colors: null
+            colors: recolorable ? tpl.garmentColors : null
         };
     });
 
@@ -362,11 +370,21 @@
             return photoAssets[key];
         }
         const tpl = PRODUCTS[key].template;
+        /* Every optional map costs one more load to wait on. Only the base
+           is required; the rest degrade the render without breaking it. */
+        const extras = ["overlay", "displace", "shade", "light", "garment", "tone", "grain"]
+            .filter((k) => tpl[k]);
         const entry = {
             status: "loading",
             base: null,
             overlay: null,
-            pending: tpl.overlay ? 2 : 1
+            displace: null,
+            shade: null,
+            light: null,
+            garment: null,
+            tone: null,
+            grain: null,
+            pending: 1 + extras.length
         };
         photoAssets[key] = entry;
 
@@ -376,7 +394,10 @@
                 return;
             }
             /* A missing overlay only costs realism; a missing base is fatal
-               for the template. */
+               for the template. A missing displacement map is the same class
+               of loss as a missing overlay -- the artwork simply renders
+               flat, which is what every template did before the pass
+               existed. */
             entry.status = entry.base ? "ready" : "error";
             if (currentProduct === key) {
                 draw();
@@ -387,12 +408,12 @@
             entry.base = img;
             settle();
         });
-        if (tpl.overlay) {
-            loadTemplateImage(tpl.overlay, (img) => {
-                entry.overlay = img;
+        extras.forEach((k) => {
+            loadTemplateImage(tpl[k], (img) => {
+                entry[k] = img;
                 settle();
             });
-        }
+        });
         return entry;
     }
 
@@ -449,6 +470,34 @@
         sctx.fillRect(0, 0, w, h);
         paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, false);
         return sheetCanvas;
+    }
+
+    /* The sheet handed to the fabric displacement pass. Unlike renderSheet()
+       above it is the size of the WHOLE canvas, because the displacement and
+       shading maps are registered to the base photograph pixel-for-pixel and
+       the shader samples all three in one coordinate space. Layers are still
+       painted into the print zone, and their hit rects are still recorded --
+       displacement shifts the artwork by a few pixels at most, so unlike the
+       perspective warp this path keeps drag-to-position working. */
+    let fabricSheet = null;
+
+    function renderFabricSheet(area) {
+        if (!fabricSheet) {
+            fabricSheet = document.createElement("canvas");
+        }
+        if (fabricSheet.width !== canvas.width || fabricSheet.height !== canvas.height) {
+            fabricSheet.width = canvas.width;
+            fabricSheet.height = canvas.height;
+        }
+        const sctx = fabricSheet.getContext("2d");
+        sctx.clearRect(0, 0, fabricSheet.width, fabricSheet.height);
+        sctx.save();
+        sctx.beginPath();
+        sctx.rect(area.x, area.y, area.w, area.h);
+        sctx.clip();
+        paintLayers(sctx, area, true);
+        sctx.restore();
+        return fabricSheet;
     }
 
     function drawWarpedDesign(zone) {
@@ -783,6 +832,96 @@
        is painted first and the base then masks it; "surface" bases are
        opaque, so the design is painted over them. The shadow/glare overlay
        is always the final layer. */
+    /* ----------------------------------------------------------------------
+       Garment recolour.
+
+       A recoloured shirt is the shading that was already derived, tinted --
+       no extra maps and no per-colour assets. Flat colour, multiplied by the
+       fold structure, lifted by the specular, then confined to the garment
+       mask. Because both maps are measured against the fabric's own median,
+       a mid-tone colour lands at its true value where the garment is evenly
+       lit and darkens only where it genuinely folds.
+
+       The specular is what stops a dark colour reading as flat paint: on
+       black or navy almost everything the eye uses to identify cloth is in
+       the highlights, not the shadows.
+       ---------------------------------------------------------------------- */
+
+    /* Undyed cotton, the colour the fibres that miss the dye keep. Not pure
+       white: natural cotton is warm and slightly grey, and mixing toward
+       #FFFFFF gives a heather that reads as faded rather than blended. */
+    const NATURAL_FIBRE = { r: 242, g: 240, b: 236 };
+
+    function mixToward(hex, target, amount) {
+        const rgb = hexToRgb(hex);
+        if (!rgb) {
+            return hex;
+        }
+        const t = clamp(amount, 0, 1);
+        return rgbToHex(
+            Math.round(rgb.r + (target.r - rgb.r) * t),
+            Math.round(rgb.g + (target.g - rgb.g) * t),
+            Math.round(rgb.b + (target.b - rgb.b) * t)
+        );
+    }
+
+    let tintCanvas = null;
+
+    /* A heather is dyed fibres interleaved with undyed ones, so it needs two
+       things a flat dye does not: the mean lift toward natural fibre, and the
+       fibre speckle itself. The mean is exact arithmetic on the hex. The
+       speckle is the photograph's own weave, screened back on -- `tone` can
+       only multiply, so it can darken the dye but can never produce a fibre
+       lighter than it. */
+    function renderGarmentTint(colorInfo, assets, w, h) {
+        const heather = typeof colorInfo.heather === "number"
+            ? clamp(colorInfo.heather, 0, 1)
+            : 0;
+        const hex = heather > 0
+            ? mixToward(colorInfo.hex, NATURAL_FIBRE, heather)
+            : colorInfo.hex;
+        if (!tintCanvas) {
+            tintCanvas = document.createElement("canvas");
+        }
+        if (tintCanvas.width !== w || tintCanvas.height !== h) {
+            tintCanvas.width = w;
+            tintCanvas.height = h;
+        }
+        const t = tintCanvas.getContext("2d");
+        t.globalCompositeOperation = "source-over";
+        t.clearRect(0, 0, w, h);
+        t.fillStyle = hex;
+        t.fillRect(0, 0, w, h);
+
+        /* The TONE map, not the shade/light pair the print pass uses. Tone is
+           the garment's diffuse response normalised to its own peak, so a dye
+           can only ever darken -- which is what a dye does. Screening the
+           specular over a colour instead washes it out: navy measured
+           (140,146,159), a pale blue-grey, because on a white garment that
+           map is mostly bright DIFFUSE rather than true surface reflection. */
+        const shading = assets.tone || assets.shade;
+        if (shading) {
+            t.globalCompositeOperation = "multiply";
+            t.drawImage(shading, 0, 0, w, h);
+        }
+        /* The undyed fibres. Screened, because they are lighter than the dye
+           and no multiply can reach them. Scaled by the heather fraction, so
+           a 100% dyed colourway never touches this path at all. */
+        if (heather > 0 && assets.grain) {
+            t.globalCompositeOperation = "screen";
+            t.globalAlpha = heather * 0.35;
+            t.drawImage(assets.grain, 0, 0, w, h);
+            t.globalAlpha = 1;
+        }
+        /* Last, and the reason the tint cannot reach skin, hair or
+           background. The mask is feathered, so this also gives the recolour
+           the same soft edge the photograph has. */
+        t.globalCompositeOperation = "destination-in";
+        t.drawImage(assets.garment, 0, 0, w, h);
+        t.globalCompositeOperation = "source-over";
+        return tintCanvas;
+    }
+
     function drawPhoto(config) {
         const assets = ensurePhotoAssets(currentProduct);
 
@@ -828,21 +967,55 @@
         const rectZone = zoneIsRect(tpl.warpZone);
         const area = zoneBounds(tpl.warpZone);
 
+        /* A paper sheet sits behind artwork that does not fill a frame's
+           window, and keeps exports opaque behind a transparent base. A
+           GARMENT has no such backing: painting one would put a white
+           rectangle on the shirt. Templates may state it outright; absent
+           that, only "window" mode gets one. */
+        const backing = Object.prototype.hasOwnProperty.call(tpl, "backing")
+            ? tpl.backing
+            : (tpl.mode === "window" ? "#FFFFFF" : null);
+
         const paintDesign = () => {
             if (readyLayers().length && !rectZone) {
                 drawWarpedDesign(tpl.warpZone);
                 return;
             }
-            /* The white backing reads as the paper sheet behind a design
-               that does not cover the full print area, and keeps exports
-               opaque behind a transparent "window" base. */
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(area.x, area.y, area.w, area.h);
+            /* Fabric: displace the artwork around the folds and shade it
+               with the garment's own light, in one GPU pass. Returning null
+               means no WebGL, which is a quality loss and not an error -- the
+               flat draw below is exactly what shipped before this existed. */
+            if (readyLayers().length && assets.displace && window.TB_Displace) {
+                const out = window.TB_Displace.render(
+                    renderFabricSheet(area),
+                    assets.displace,
+                    assets.shade,
+                    tpl.displaceStrength,
+                    assets.light,
+                    typeof tpl.lightGain === "number" ? tpl.lightGain : 1
+                );
+                if (out) {
+                    ctx.drawImage(out, 0, 0);
+                    return;
+                }
+            }
+            if (backing) {
+                ctx.fillStyle = backing;
+                ctx.fillRect(area.x, area.y, area.w, area.h);
+            }
             drawLayersInArea(area, 0);
         };
 
         if (tpl.mode === "surface") {
             ctx.drawImage(assets.base, 0, 0, w, h);
+            /* Recolour sits between the photograph and the artwork: the print
+               is on top of the dyed shirt, not under it. The palette's
+               "original" entry is the garment as photographed, so it skips
+               the tint entirely rather than trying to reproduce itself. */
+            const garmentColor = activeColor(config);
+            if (assets.garment && garmentColor && !garmentColor.original) {
+                ctx.drawImage(renderGarmentTint(garmentColor, assets, w, h), 0, 0);
+            }
             paintDesign();
         } else {
             paintDesign();
@@ -1450,6 +1623,10 @@
        an input the visitor is currently typing in, which must not be
        rewritten underneath the caret. */
     function syncColorUI(skip) {
+        /* Every route that changes the colourway lands here -- swatch, hex
+           field, RGB fields, picker, eyedropper -- so it is the one place the
+           canvas label needs re-deriving. */
+        syncCanvasLabel();
         const hex = activeHex();
         const rgb = hexToRgb(hex) || { r: 255, g: 255, b: 255 };
         const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
@@ -1951,8 +2128,15 @@
        mockup, so it carries the whole burden for screen-reader users.
        ---------------------------------------------------------------------- */
 
+    /* With the template picker gone this label is the only thing naming the
+       mockup for a screen-reader user. Now that the colourway changes what is
+       rendered, it has to name that too -- otherwise choosing a colour
+       produces no perceivable feedback at all. */
     function syncCanvasLabel() {
-        canvas.setAttribute("aria-label", PRODUCTS[currentProduct].label + " mockup preview");
+        const config = PRODUCTS[currentProduct];
+        const color = activeColor(config);
+        const suffix = color && !color.original ? " in " + color.name : "";
+        canvas.setAttribute("aria-label", config.label + suffix + " mockup preview");
     }
 
     /* ----------------------------------------------------------------------
@@ -2051,6 +2235,21 @@
             layer.offsetY = 0;
             layer.rotation = 0;
         });
+    }
+
+    /* "black" is the module-level default and a reasonable one for a DRAWN
+       garment, but on a photographic template it would tint the shirt before
+       the visitor has asked for anything -- a first-time arrival would meet a
+       black shirt rather than the photograph the catalog card showed them.
+       Unless a colour was genuinely restored for THIS product, a photographic
+       template opens as photographed. */
+    const finalConfig = PRODUCTS[currentProduct];
+    const restoredForThisProduct = !!saved && saved.product === currentProduct &&
+        (saved.color === CUSTOM_COLOR ||
+            (finalConfig.colors && !!finalConfig.colors[saved.color]));
+    if (finalConfig.type === "photo" && finalConfig.colors &&
+        currentColor !== CUSTOM_COLOR && !restoredForThisProduct) {
+        currentColor = Object.keys(finalConfig.colors)[0];
     }
 
     selectedId = layers.length ? layers[layers.length - 1].id : null;

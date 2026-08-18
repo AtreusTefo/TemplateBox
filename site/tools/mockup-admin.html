@@ -1,122 +1,226 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex, nofollow">
-    <title>Mockup Coordinate Picker | TemplateBox Internal</title>
-    <style>
-        :root {
-            --ink: #1A1A1A;
-            --muted: #6B6B66;
-            --border: #D8D6D0;
-            --bg: #F4F3EF;
-            --accent: #B5352E;
-        }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: "Segoe UI", system-ui, sans-serif;
-            color: var(--ink);
-            background: var(--bg);
-        }
-        header {
-            padding: 1rem 1.5rem;
-            background: #FFFFFF;
-            border-bottom: 1px solid var(--border);
-        }
-        header h1 { margin: 0 0 0.25rem; font-size: 1.25rem; }
-        header p { margin: 0; color: var(--muted); font-size: 0.875rem; }
-        main {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) 24rem;
-            gap: 1.5rem;
-            padding: 1.5rem;
-            align-items: start;
-        }
-        @media (max-width: 60rem) {
-            main { grid-template-columns: 1fr; }
-        }
-        .panel {
-            background: #FFFFFF;
-            border: 1px solid var(--border);
-            padding: 1rem;
-        }
-        .stage-hint { color: var(--muted); font-size: 0.875rem; margin: 0 0 0.75rem; }
-        canvas {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            border: 1px solid var(--border);
-            cursor: crosshair;
-            background: repeating-conic-gradient(#EDECE7 0% 25%, #FFFFFF 0% 50%) 0 0 / 24px 24px;
-        }
-        label {
-            display: block;
-            font-size: 0.8125rem;
-            font-weight: 600;
-            margin: 0.75rem 0 0.25rem;
-        }
-        input[type="text"], select, textarea {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid var(--border);
-            font: inherit;
-            font-size: 0.875rem;
-        }
-        textarea {
-            font-family: Consolas, monospace;
-            font-size: 0.8125rem;
-            min-height: 18rem;
-            white-space: pre;
-        }
-        button {
-            font: inherit;
-            font-size: 0.875rem;
-            padding: 0.5rem 1rem;
-            border: 1px solid var(--ink);
-            background: var(--ink);
-            color: #FFFFFF;
-            cursor: pointer;
-            margin: 0.75rem 0.5rem 0 0;
-        }
-        button.secondary {
-            background: #FFFFFF;
-            color: var(--ink);
-        }
-        button:disabled { opacity: 0.4; cursor: not-allowed; }
-        .status { font-size: 0.8125rem; color: var(--muted); margin-top: 0.5rem; min-height: 1.2em; }
-        ol { padding-left: 1.25rem; font-size: 0.875rem; color: var(--muted); margin: 0.5rem 0 0; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Mockup Template Factory (internal)</title>
+<style>
+    :root {
+        --bg: #F7F6F3;
+        --panel: #FFFFFF;
+        --ink: #1C1B19;
+        --muted: #6B6862;
+        --line: #DFDCD5;
+        --accent: #B5352E;
+        --ok: #2E7D4F;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+    }
+    header { padding: 1.5rem 2rem 0.5rem; }
+    header h1 { margin: 0 0 0.35rem; font-size: 1.35rem; }
+    header p { margin: 0; color: var(--muted); font-size: 0.875rem; max-width: 70ch; }
+    main {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        gap: 1.25rem;
+        padding: 1.25rem 2rem 3rem;
+        align-items: start;
+    }
+    @media (max-width: 68rem) { main { grid-template-columns: 1fr; } }
+    .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 1.15rem;
+    }
+    .panel + .panel { margin-top: 1.25rem; }
+    .panel h2 {
+        margin: 0 0 0.75rem;
+        font-size: 0.8125rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+    }
+    canvas { max-width: 100%; border: 1px solid var(--line); border-radius: 6px; display: block; background: #fff; }
+    .stage-wrap { margin-top: 0.75rem; }
+    #stage { cursor: crosshair; }
+    label { display: block; font-size: 0.8125rem; font-weight: 600; margin: 0.85rem 0 0.3rem; }
+    input[type=text], input[type=number], select, textarea {
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        font: inherit;
+        background: #fff;
+        color: var(--ink);
+    }
+    textarea { min-height: 17rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; }
+    button {
+        margin-top: 0.75rem;
+        margin-right: 0.4rem;
+        padding: 0.5rem 0.9rem;
+        border-radius: 6px;
+        border: 1px solid var(--ink);
+        background: var(--ink);
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+    }
+    button.secondary { background: transparent; color: var(--ink); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .status { font-size: 0.8125rem; color: var(--muted); margin-top: 0.5rem; min-height: 1.2em; }
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--accent); }
+    ol { padding-left: 1.25rem; font-size: 0.875rem; color: var(--muted); margin: 0.5rem 0 0; }
+    ol li { margin-bottom: 0.3rem; }
+    .row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .row > div { flex: 1 1 8rem; }
+    .maps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 0.75rem; }
+    .maps figure { margin: 0; }
+    .maps figcaption { font-size: 0.6875rem; color: var(--muted); margin-top: 0.2rem; }
+    .stats {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.75rem;
+        color: var(--muted);
+        white-space: pre;
+        margin-top: 0.6rem;
+        overflow-x: auto;
+    }
+    .hint { font-size: 0.8125rem; color: var(--muted); margin: 0 0 0.5rem; }
+    .inline { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.85rem; }
+    .inline input[type=checkbox] { width: auto; }
+    .inline label { margin: 0; }
+    input[type=range] { width: 100%; }
+</style>
 </head>
 <body>
 
-    <header>
-        <h1>Mockup Coordinate Picker</h1>
-        <p>Internal tool. Loads a base image locally (nothing is uploaded), records the four print-area corners, and emits a ready-to-paste entry for js/mockup-templates.js.</p>
-    </header>
+<header>
+    <h1>Mockup Template Factory</h1>
+    <p>Internal tool. Everything runs locally in this tab -- nothing is uploaded. Load a base photograph, mark the print area, derive the fabric maps, tune the displacement against a test design, then download the assets and paste the registry entry.</p>
+</header>
 
-    <main>
+<main>
+    <!-- ================= LEFT: stage + zone ================= -->
+    <div>
         <section class="panel">
-            <p class="stage-hint" id="stage-hint">Load a base image, then click the print area's corners in order: top-left, top-right, bottom-right, bottom-left. For a "window" base, the corners are the edges of the transparent opening (shown as checkerboard).</p>
+            <h2>1. Base image and print area</h2>
+            <p class="hint" id="stage-hint">Load a base image, then click the print area's corners in order: top-left, top-right, bottom-right, bottom-left. For a "window" base the corners are the edges of the transparent opening.</p>
             <input type="file" id="base-file" accept="image/*">
-            <div style="margin-top:0.75rem;">
-                <canvas id="stage" width="800" height="800"></canvas>
-            </div>
-            <button type="button" class="secondary" id="undo-point" disabled>Undo Last Corner</button>
-            <button type="button" class="secondary" id="clear-points" disabled>Clear Corners</button>
+            <div class="stage-wrap"><canvas id="stage" width="800" height="800"></canvas></div>
+            <button type="button" class="secondary" id="suggest-zone" disabled>Suggest chest print zone</button>
+            <button type="button" class="secondary" id="undo-point" disabled>Undo last corner</button>
+            <button type="button" class="secondary" id="clear-points" disabled>Clear corners</button>
             <p class="status" id="click-status">No image loaded.</p>
         </section>
 
         <section class="panel">
+            <h2>2. Fabric maps</h2>
+            <p class="hint">Derived from the photograph's own luminance. Fabric is classified, the silhouette is filled before blurring so the garment edge does not leak a false gradient, then a Sobel gradient becomes the displacement map. Shading and specular split around the fabric's median, so the print darkens in folds and lifts on ridges instead of being uniformly dimmed. A separate tone map (normalised to the garment's peak) drives recolour, because screening the specular over a dye washes dark colours out. Rigid templates (frames, cards, boxes) do not need any of this -- leave it off.</p>
+
+            <div class="inline">
+                <input type="checkbox" id="fabric-on">
+                <label for="fabric-on">This template is fabric (generate displacement + shading)</label>
+            </div>
+
+            <div class="row">
+                <div>
+                    <label for="th-alpha">Alpha min</label>
+                    <input type="number" id="th-alpha" value="250" min="0" max="255">
+                </div>
+                <div>
+                    <label for="th-sat">Saturation max</label>
+                    <input type="number" id="th-sat" value="14" min="0" max="255">
+                </div>
+                <div>
+                    <label for="th-luma">Luma min</label>
+                    <input type="number" id="th-luma" value="110" min="0" max="255">
+                </div>
+                <div>
+                    <label for="th-blur">Blur radius</label>
+                    <input type="number" id="th-blur" value="5" min="1" max="40">
+                </div>
+            </div>
+            <p class="hint" style="margin-top:0.6rem;">Saturation separates fabric from skin; luma drops dark items like jeans and hair; alpha drops a cut-out background. Check the mask preview before trusting the maps.</p>
+
+            <button type="button" id="derive" disabled>Analyse and generate maps</button>
+            <p class="status" id="derive-status"></p>
+            <div class="stats" id="derive-stats"></div>
+
+            <div class="maps">
+                <figure><canvas id="map-mask"></canvas><figcaption>fabric mask</figcaption></figure>
+                <figure><canvas id="map-disp"></canvas><figcaption>displacement (R=dx, G=dy)</figcaption></figure>
+                <figure><canvas id="map-shade"></canvas><figcaption>shading (multiply)</figcaption></figure>
+                <figure><canvas id="map-light"></canvas><figcaption>specular (screen)</figcaption></figure>
+            </div>
+
+            <button type="button" class="secondary" id="dl-disp" disabled>Download -displace.png</button>
+            <button type="button" class="secondary" id="dl-shade" disabled>Download -shade.png</button>
+            <button type="button" class="secondary" id="dl-light" disabled>Download -light.png</button>
+            <button type="button" class="secondary" id="dl-garment" disabled>Download -garment.png</button>
+            <button type="button" class="secondary" id="dl-tone" disabled>Download -tone.png</button>
+            <button type="button" class="secondary" id="dl-grain" disabled>Download -grain.png</button>
+        </section>
+    </div>
+
+    <!-- ================= RIGHT: preview + output ================= -->
+    <div>
+        <section class="panel">
+            <h2>3. Preview and strength</h2>
+            <p class="hint">A hard grid is the diagnostic case: straight lines have nowhere to hide, so the right strength is the largest one where the grid still reads as printed rather than melted.</p>
+            <label for="strength">displaceStrength: <span id="strength-val">16</span> px</label>
+            <input type="range" id="strength" min="0" max="40" step="1" value="16">
+            <label for="light-gain">Specular gain: <span id="light-gain-val">1.0</span></label>
+            <input type="range" id="light-gain" min="0" max="2" step="0.1" value="1">
+            <div class="row" style="margin-top:0.5rem;">
+                <div>
+                    <label for="test-design">Test design</label>
+                    <select id="test-design">
+                        <option value="grid">Grid (diagnostic)</option>
+                        <option value="logo">Logo shapes</option>
+                        <option value="none">None (plain garment)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="stage-wrap"><canvas id="preview"></canvas></div>
+            <p class="status" id="preview-status">Load an image to preview.</p>
+        </section>
+
+        <section class="panel">
+            <h2>4. Thumbnail</h2>
+            <p class="hint">4:5 crop centred on the print area, flattened onto white, encoded as JPEG. Keep it under roughly 100KB -- the catalog carries one per template.</p>
+            <div class="row">
+                <div>
+                    <label for="thumb-w">Width</label>
+                    <input type="number" id="thumb-w" value="600" min="200" max="1600">
+                </div>
+                <div>
+                    <label for="thumb-q">JPEG quality</label>
+                    <input type="number" id="thumb-q" value="0.8" min="0.4" max="1" step="0.05">
+                </div>
+            </div>
+            <button type="button" id="make-thumb" disabled>Generate thumbnail</button>
+            <button type="button" class="secondary" id="dl-thumb" disabled>Download -thumb.jpg</button>
+            <p class="status" id="thumb-status"></p>
+            <div class="stage-wrap"><canvas id="thumb"></canvas></div>
+        </section>
+
+        <section class="panel">
+            <h2>5. Registry entry</h2>
             <label for="tpl-id">Template ID (lowercase, hyphenated)</label>
-            <input type="text" id="tpl-id" value="" placeholder="black-frame-desk">
+            <input type="text" id="tpl-id" value="" placeholder="tshirt-model-white">
 
             <label for="tpl-title">Title</label>
-            <input type="text" id="tpl-title" value="" placeholder="Black Frame on Desk">
+            <input type="text" id="tpl-title" value="" placeholder="White T-Shirt on Model">
 
             <label for="tpl-category">Thumbnail category folder</label>
-            <input type="text" id="tpl-category" value="posters-frames-canvas-billboards">
+            <input type="text" id="tpl-category" value="apparel">
 
             <label for="tpl-mode">Mode</label>
             <select id="tpl-mode">
@@ -127,211 +231,782 @@
             <!-- Choose by how the overlay looks on its own. Getting this
                  wrong silently washes the artwork out; see
                  docs/error-fixes/PHOTO_MOCKUP_OVERLAY_WASHES_OUT_DESIGN.md -->
-            <label for="tpl-blend">Overlay blend</label>
+            <label for="tpl-blend">Overlay blend (rigid templates only)</label>
             <select id="tpl-blend">
                 <option value="multiply">multiply (overlay is white with grey shading)</option>
                 <option value="screen">screen (overlay is black with bright streaks)</option>
                 <option value="source-over">source-over (dark shapes on transparency)</option>
             </select>
 
-            <label for="output">Registry entry (paste into window.TB_PHOTO_MOCKUPS)</label>
+            <label for="output">Paste into window.TB_PHOTO_MOCKUPS</label>
             <textarea id="output" readonly spellcheck="false"></textarea>
-            <button type="button" id="copy-output" disabled>Copy Entry</button>
+            <button type="button" id="copy-output" disabled>Copy entry</button>
             <p class="status" id="copy-status"></p>
 
-            <ol>
-                <li>Save assets as site/assets/mockups/&lt;id&gt;-base.png and &lt;id&gt;-overlay.png.</li>
-                <li>Generate a thumbnail under 100KB at site/assets/thumbnails/product-mockups/&lt;category&gt;/&lt;id&gt;-thumb.jpg.</li>
+            <ol id="checklist">
+                <li>Save the downloads into site/assets/mockups/ and the thumbnail into site/assets/thumbnails/product-mockups/&lt;category&gt;/.</li>
+                <li>Save the base photograph itself as &lt;id&gt;-base.png in the same folder.</li>
                 <li>Paste the entry into js/mockup-templates.js.</li>
                 <li>Add a catalog card in index.html with data-target="mockup" data-doc="&lt;id&gt;".</li>
+                <li>Run node tests/verify-layout.js.</li>
             </ol>
         </section>
-    </main>
+    </div>
+</main>
 
-    <script>
-    "use strict";
-    (() => {
-        const stage = document.getElementById("stage");
-        const ctx = stage.getContext("2d");
-        const fileInput = document.getElementById("base-file");
-        const undoBtn = document.getElementById("undo-point");
-        const clearBtn = document.getElementById("clear-points");
-        const clickStatus = document.getElementById("click-status");
-        const output = document.getElementById("output");
-        const copyBtn = document.getElementById("copy-output");
-        const copyStatus = document.getElementById("copy-status");
-        const idInput = document.getElementById("tpl-id");
-        const titleInput = document.getElementById("tpl-title");
-        const categoryInput = document.getElementById("tpl-category");
-        const modeSelect = document.getElementById("tpl-mode");
-        const blendSelect = document.getElementById("tpl-blend");
+<!-- The preview uses the SAME shader the editor ships, so what is tuned here
+     is what visitors get. Duplicating it would let the two drift. -->
+<script src="../js/mockup-displace.js"></script>
+<script>
+"use strict";
+(() => {
+    const $ = (id) => document.getElementById(id);
 
-        const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
+    const stage = $("stage");
+    const ctx = stage.getContext("2d");
+    const preview = $("preview");
+    const pctx = preview.getContext("2d");
 
-        let baseImage = null;
-        /* Corners recorded in the image's own pixel space. */
-        let points = [];
+    const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
 
-        function redraw() {
-            ctx.clearRect(0, 0, stage.width, stage.height);
-            if (baseImage) {
-                ctx.drawImage(baseImage, 0, 0, stage.width, stage.height);
-            }
-            if (!points.length) {
-                return;
-            }
-            const kx = stage.width / baseImage.naturalWidth;
-            const ky = stage.height / baseImage.naturalHeight;
+    let baseImage = null;
+    let baseData = null;          /* ImageData of the base at natural size */
+    let points = [];              /* print-area corners, image pixel space */
+    let dispCanvas = null;
+    let shadeCanvas = null;
+    let lightCanvas = null;
+    let garmentCanvas = null;
+    let toneCanvas = null;
+    let grainCanvas = null;
+    let maskCanvas = null;
+    let thumbBlob = null;
+    /* Set when a threshold changes after a derive, so the maps on screen and
+       behind the download buttons are never silently out of date with the
+       numbers beside them. */
+    let mapsStale = false;
 
-            ctx.save();
-            ctx.strokeStyle = "#B5352E";
-            ctx.fillStyle = "#B5352E";
-            ctx.lineWidth = 2;
+    /* ------------------------------------------------------------------
+       Stage
+       ------------------------------------------------------------------ */
+
+    function redraw() {
+        ctx.clearRect(0, 0, stage.width, stage.height);
+        if (baseImage) {
+            ctx.drawImage(baseImage, 0, 0, stage.width, stage.height);
+        }
+        if (!points.length || !baseImage) {
+            return;
+        }
+        const kx = stage.width / baseImage.naturalWidth;
+        const ky = stage.height / baseImage.naturalHeight;
+        ctx.save();
+        ctx.strokeStyle = "#B5352E";
+        ctx.fillStyle = "#B5352E";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        points.forEach((p, i) => {
+            const sx = p.x * kx, sy = p.y * ky;
+            if (i === 0) { ctx.moveTo(sx, sy); } else { ctx.lineTo(sx, sy); }
+        });
+        if (points.length === 4) { ctx.closePath(); }
+        ctx.stroke();
+        points.forEach((p) => {
             ctx.beginPath();
-            points.forEach((p, i) => {
-                const sx = p.x * kx;
-                const sy = p.y * ky;
-                if (i === 0) {
-                    ctx.moveTo(sx, sy);
-                } else {
-                    ctx.lineTo(sx, sy);
+            ctx.arc(p.x * kx, p.y * ky, 5, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.restore();
+    }
+
+    function updateStatus() {
+        if (!baseImage) {
+            $("click-status").textContent = "No image loaded.";
+        } else if (points.length < 4) {
+            $("click-status").textContent = "Image " + baseImage.naturalWidth + "x" + baseImage.naturalHeight +
+                ". Click corner " + (points.length + 1) + " of 4: " + CORNER_NAMES[points.length] + ".";
+        } else {
+            $("click-status").textContent = "All four corners recorded.";
+        }
+        $("undo-point").disabled = points.length === 0;
+        $("clear-points").disabled = points.length === 0;
+        $("suggest-zone").disabled = !baseImage;
+        $("derive").disabled = !baseImage;
+        $("make-thumb").disabled = !baseImage || points.length !== 4;
+    }
+
+    /* ------------------------------------------------------------------
+       Fabric classification and map derivation. This is the same maths the
+       first apparel template was built with, moved in-browser so adding a
+       template no longer needs a scratch script.
+       ------------------------------------------------------------------ */
+
+    function thresholds() {
+        return {
+            alpha: Number($("th-alpha").value) || 0,
+            sat: Number($("th-sat").value) || 0,
+            luma: Number($("th-luma").value) || 0,
+            blur: Math.max(1, Number($("th-blur").value) || 5)
+        };
+    }
+
+    function classify(data, W, H, t) {
+        const N = W * H;
+        const luma = new Float32Array(N);
+        const fabric = new Uint8Array(N);
+        for (let i = 0; i < N; i++) {
+            const o = i * 4, r = data[o], g = data[o + 1], b = data[o + 2], a = data[o + 3];
+            luma[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+            const sat = Math.max(r, g, b) - Math.min(r, g, b);
+            fabric[i] = (a >= t.alpha && sat < t.sat && luma[i] > t.luma) ? 1 : 0;
+        }
+        return { luma, fabric };
+    }
+
+    /* Separable box blur, three passes -- a close enough gaussian and fast
+       enough to keep the tool interactive on a 1.5 megapixel photograph. */
+    function blur(src, W, H, radius, passes) {
+        const N = W * H;
+        let cur = Float32Array.from(src);
+        const tmp = new Float32Array(N);
+        for (let p = 0; p < passes; p++) {
+            for (let y = 0; y < H; y++) {
+                const row = y * W;
+                let acc = 0, cnt = 0;
+                for (let x = -radius; x <= radius; x++) {
+                    acc += cur[row + Math.min(W - 1, Math.max(0, x))];
+                    cnt++;
                 }
-            });
-            if (points.length === 4) {
-                ctx.closePath();
+                for (let x = 0; x < W; x++) {
+                    tmp[row + x] = acc / cnt;
+                    acc += cur[row + Math.min(W - 1, x + radius + 1)] - cur[row + Math.max(0, x - radius)];
+                }
             }
-            ctx.stroke();
-            points.forEach((p) => {
-                ctx.beginPath();
-                ctx.arc(p.x * kx, p.y * ky, 5, 0, Math.PI * 2);
-                ctx.fill();
-            });
-            ctx.restore();
+            for (let x = 0; x < W; x++) {
+                let acc = 0, cnt = 0;
+                for (let y = -radius; y <= radius; y++) {
+                    acc += tmp[Math.min(H - 1, Math.max(0, y)) * W + x];
+                    cnt++;
+                }
+                for (let y = 0; y < H; y++) {
+                    cur[y * W + x] = acc / cnt;
+                    acc += tmp[Math.min(H - 1, y + radius + 1) * W + x] - tmp[Math.max(0, y - radius) * W + x];
+                }
+            }
+        }
+        return cur;
+    }
+
+    function canvasFrom(W, H, buf) {
+        const c = document.createElement("canvas");
+        c.width = W; c.height = H;
+        c.getContext("2d").putImageData(new ImageData(buf, W, H), 0, 0);
+        return c;
+    }
+
+    function showMap(id, source) {
+        const el = $(id);
+        const w = 240;
+        el.width = w;
+        el.height = Math.round(w * source.height / source.width);
+        el.getContext("2d").drawImage(source, 0, 0, el.width, el.height);
+    }
+
+    function derive() {
+        const W = baseImage.naturalWidth, H = baseImage.naturalHeight, N = W * H;
+        const t = thresholds();
+        const { luma, fabric } = classify(baseData.data, W, H, t);
+
+        let fmean = 0, fn = 0;
+        for (let i = 0; i < N; i++) { if (fabric[i]) { fmean += luma[i]; fn++; } }
+        if (!fn) {
+            $("derive-status").textContent = "No pixels classified as fabric. Loosen the thresholds.";
+            $("derive-status").className = "status warn";
+            return;
+        }
+        fmean /= fn;
+
+        /* Fill non-fabric with the fabric mean BEFORE blurring, or the
+           silhouette becomes the strongest gradient in the image. */
+        const filled = new Float32Array(N);
+        for (let i = 0; i < N; i++) { filled[i] = fabric[i] ? luma[i] : fmean; }
+        const smooth = blur(filled, W, H, t.blur, 3);
+        /* Fibre grain for heather recolour: a TIGHT high-pass, because
+           everything the weave contributes is high frequency. A wide radius
+           would pull fold shading in here, and folds already live in `tone`
+           -- doubling them reads as dirt rather than fibre. */
+        const tight = blur(filled, W, H, 2, 2);
+
+        /* Sobel -> displacement, encoded R = dx, G = dy, 128 = no offset. */
+        const gx = new Float32Array(N), gy = new Float32Array(N);
+        for (let y = 1; y < H - 1; y++) {
+            for (let x = 1; x < W - 1; x++) {
+                const i = y * W + x;
+                gx[i] = (smooth[i - W + 1] + 2 * smooth[i + 1] + smooth[i + W + 1]) -
+                        (smooth[i - W - 1] + 2 * smooth[i - 1] + smooth[i + W - 1]);
+                gy[i] = (smooth[i + W - 1] + 2 * smooth[i + W] + smooth[i + W + 1]) -
+                        (smooth[i - W - 1] + 2 * smooth[i - W] + smooth[i - W + 1]);
+            }
+        }
+        const mags = [];
+        for (let i = 0; i < N; i++) { if (fabric[i]) { mags.push(Math.hypot(gx[i], gy[i])); } }
+        mags.sort((a, b) => a - b);
+        const p99 = mags[Math.floor(mags.length * 0.99)] || 1;
+
+        /* High-pass statistics, needed before the per-pixel loop below. */
+        let hpMean = 0;
+        for (let i = 0; i < N; i++) { if (fabric[i]) { hpMean += luma[i] - tight[i]; } }
+        hpMean /= fn;
+        let hpVar = 0;
+        for (let i = 0; i < N; i++) {
+            if (fabric[i]) {
+                const e = (luma[i] - tight[i]) - hpMean;
+                hpVar += e * e;
+            }
+        }
+        const hpSd = Math.sqrt(hpVar / fn) || 1;
+        const grainBuf = new Uint8ClampedArray(N * 4);
+
+        const dispBuf = new Uint8ClampedArray(N * 4);
+        for (let i = 0; i < N; i++) {
+            const o = i * 4;
+            let vx = 128, vy = 128;
+            if (fabric[i]) {
+                vx = 128 + Math.max(-127, Math.min(127, (gx[i] / p99) * 127));
+                vy = 128 + Math.max(-127, Math.min(127, (gy[i] / p99) * 127));
+            }
+            dispBuf[o] = vx; dispBuf[o + 1] = vy; dispBuf[o + 2] = 128; dispBuf[o + 3] = 255;
         }
 
-        function updateStatus() {
-            if (!baseImage) {
-                clickStatus.textContent = "No image loaded.";
-            } else if (points.length < 4) {
-                clickStatus.textContent = "Image " + baseImage.naturalWidth + "x" + baseImage.naturalHeight +
-                    ". Click corner " + (points.length + 1) + " of 4: " + CORNER_NAMES[points.length] + ".";
+        /* Shading and light are split around the fabric's MEDIAN, not its
+           brightest percentile. Normalising to a near-peak reference makes
+           almost the whole garment read as "in shadow", so a print comes out
+           uniformly dimmed (measured: every pixel multiplied by ~0.935) with
+           no real modelling. Neutral at the median means the darker half
+           genuinely darkens through multiply and the brighter half genuinely
+           lifts through screen, which is the contrast a fold needs. */
+        const fl = [];
+        for (let i = 0; i < N; i++) { if (fabric[i]) { fl.push(luma[i]); } }
+        fl.sort((a, b) => a - b);
+        const ref = fl[Math.floor(fl.length * 0.50)] || 255;
+        /* 99.5th rather than the true max, so a single blown pixel cannot
+           flatten the whole specular range. */
+        const hiRef = fl[Math.floor(fl.length * 0.995)] || 255;
+
+        const shadeBuf = new Uint8ClampedArray(N * 4);
+        const lightBuf = new Uint8ClampedArray(N * 4);
+        /* Recolour needs its OWN shading: the diffuse response normalised to
+           the garment's peak, so a dye can only darken. Reusing the
+           median-split shade/light pair washes a dark colour out -- navy
+           measured (140,146,159), a pale blue-grey. */
+        const toneBuf = new Uint8ClampedArray(N * 4);
+        const garmentBuf = new Uint8ClampedArray(N * 4);
+        const maskBuf = new Uint8ClampedArray(N * 4);
+        let smin = 255, smax = 0, ssum = 0, lmax = 0, lcount = 0;
+
+        /* Anything brighter than the reference white is specular -- the light
+           catching a fold ridge. The shading map alone throws it away, since
+           multiply clamps at 1.0 and can only darken. Splitting it into its
+           own screen layer is what lets a print pick up the highlight the
+           garment actually has. */
+        const headroom = Math.max(1, hiRef - ref);
+
+        for (let i = 0; i < N; i++) {
+            const o = i * 4;
+            /* Some unblurred luma keeps the weave; the blurred field carries
+               the body of the shading. */
+            const v = fabric[i] ? (luma[i] * 0.6 + smooth[i] * 0.4) : ref;
+            const s = Math.max(0, Math.min(255, Math.round((v / ref) * 255)));
+            shadeBuf[o] = shadeBuf[o + 1] = shadeBuf[o + 2] = s;
+            shadeBuf[o + 3] = 255;
+
+            /* Centred at 128 so a screen pass lifts the light fibres and
+               leaves the dark ones; black off-garment, where screen is inert. */
+            grainBuf[o] = grainBuf[o + 1] = grainBuf[o + 2] = fabric[i]
+                ? Math.max(0, Math.min(255,
+                    Math.round(128 + (((luma[i] - tight[i]) - hpMean) / (2 * hpSd)) * 127)))
+                : 0;
+            grainBuf[o + 3] = 255;
+
+            const tv = Math.max(0, Math.min(255, Math.round(v / hiRef * 255)));
+            toneBuf[o] = toneBuf[o + 1] = toneBuf[o + 2] = tv;
+            toneBuf[o + 3] = 255;
+
+            const over = (fabric[i] && luma[i] > ref) ? (luma[i] - ref) : 0;
+            const l = Math.max(0, Math.min(255, Math.round((over / headroom) * 255)));
+            lightBuf[o] = lightBuf[o + 1] = lightBuf[o + 2] = l;
+            lightBuf[o + 3] = 255;
+            if (l > 0) { lcount++; if (l > lmax) { lmax = l; } }
+
+            if (fabric[i]) {
+                if (s < smin) { smin = s; }
+                if (s > smax) { smax = s; }
+                ssum += s;
+                maskBuf[o] = 46; maskBuf[o + 1] = 125; maskBuf[o + 2] = 79;
+                garmentBuf[o] = garmentBuf[o + 1] = garmentBuf[o + 2] = 255;
+                garmentBuf[o + 3] = 255;
             } else {
-                clickStatus.textContent = "All four corners recorded. Adjust the fields on the right, then copy the entry.";
+                maskBuf[o] = 240; maskBuf[o + 1] = 240; maskBuf[o + 2] = 240;
+                garmentBuf[o + 3] = 0;
             }
-            undoBtn.disabled = points.length === 0;
-            clearBtn.disabled = points.length === 0;
+            maskBuf[o + 3] = 255;
         }
 
-        function slug(value, fallback) {
-            const cleaned = value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
-            return cleaned || fallback;
+        dispCanvas = canvasFrom(W, H, dispBuf);
+        shadeCanvas = canvasFrom(W, H, shadeBuf);
+        lightCanvas = canvasFrom(W, H, lightBuf);
+        garmentCanvas = canvasFrom(W, H, garmentBuf);
+        toneCanvas = canvasFrom(W, H, toneBuf);
+        grainCanvas = canvasFrom(W, H, grainBuf);
+        maskCanvas = canvasFrom(W, H, maskBuf);
+        showMap("map-disp", dispCanvas);
+        showMap("map-shade", shadeCanvas);
+        showMap("map-mask", maskCanvas);
+        showMap("map-light", lightCanvas);
+
+        $("derive-stats").textContent =
+            "fabric px       " + fn + "  (" + (fn / N * 100).toFixed(1) + "% of frame)\n" +
+            "fabric mean luma " + fmean.toFixed(1) + "\n" +
+            "median luma      " + ref.toFixed(1) + "  (shading neutral)\n" +
+            "specular ceiling " + hiRef.toFixed(1) + "  (99.5th pct, also the tone peak)\n" +
+            "gradient p99     " + p99.toFixed(2) + "\n" +
+            "shade map        min " + smin + "  max " + smax + "  mean " + (ssum / fn).toFixed(1) + "\n" +
+            /* Below roughly 2 luma levels there is not enough weave in the
+               photograph for a heather colourway to read as fibre. */
+            "weave (grain) sd " + hpSd.toFixed(2) + " luma levels" +
+                (hpSd < 2 ? "  -- too smooth for convincing heather" : "") + "\n" +
+            "light map        " + lcount + " px (" + (lcount / fn * 100).toFixed(1) + "% of fabric)  max " + lmax;
+
+        $("derive-status").textContent = "Maps generated. Check the mask: green must cover the garment and nothing else.";
+        $("derive-status").className = "status ok";
+        $("dl-disp").disabled = false;
+        $("dl-shade").disabled = false;
+        $("dl-light").disabled = false;
+        $("dl-garment").disabled = false;
+        $("dl-tone").disabled = false;
+        $("dl-grain").disabled = false;
+        mapsStale = false;
+        renderPreview();
+        buildEntry();
+    }
+
+    /* ------------------------------------------------------------------
+       Chest print zone suggestion, from the fabric mask and real garment
+       proportions: collar-to-hem reads as 28in, a standard DTG area is
+       12x16in and starts 3in below the collar.
+       ------------------------------------------------------------------ */
+
+    function suggestZone() {
+        const W = baseImage.naturalWidth, H = baseImage.naturalHeight;
+        const t = thresholds();
+        const { fabric } = classify(baseData.data, W, H, t);
+        const isFab = (x, y) => fabric[y * W + x] === 1;
+
+        /* Centreline: median of the fabric span centre across the middle
+           band, which is torso rather than sleeves or hem. */
+        const centres = [];
+        for (let y = Math.round(H * 0.35); y < Math.round(H * 0.75); y += 5) {
+            let l = -1, r = -1;
+            for (let x = 0; x < W; x++) { if (isFab(x, y)) { if (l < 0) { l = x; } r = x; } }
+            if (l >= 0 && r > l) { centres.push((l + r) / 2); }
+        }
+        if (centres.length < 3) {
+            $("click-status").textContent = "Could not find the garment. Check the fabric thresholds first.";
+            return;
+        }
+        centres.sort((a, b) => a - b);
+        const cx = Math.round(centres[Math.floor(centres.length / 2)]);
+
+        let collar = -1, hem = -1;
+        for (let y = 0; y < H; y++) { if (isFab(cx, y)) { collar = y; break; } }
+        for (let y = H - 1; y > 0; y--) { if (isFab(cx, y)) { hem = y; break; } }
+        if (collar < 0 || hem <= collar) {
+            $("click-status").textContent = "Could not find the collar and hem on the centreline.";
+            return;
         }
 
-        function buildEntry() {
-            if (points.length !== 4) {
-                output.value = "";
-                copyBtn.disabled = true;
-                return;
-            }
-            const id = slug(idInput.value, "my-mockup");
-            const category = slug(categoryInput.value, "posters-frames-canvas-billboards");
-            const title = titleInput.value.trim() || id;
-            const corners = points.map((p) =>
-                "            { x: " + Math.round(p.x) + ", y: " + Math.round(p.y) + " }"
-            ).join(",\n");
+        const pxPerInch = (hem - collar) / 28;
+        let zw = Math.round(12 * pxPerInch);
+        let zh = Math.round(16 * pxPerInch);
+        let zx = Math.round(cx - zw / 2);
+        let zy = Math.round(collar + 3 * pxPerInch);
 
-            output.value =
-                "    {\n" +
-                "        id: \"" + id + "\",\n" +
-                "        title: \"" + title.replace(/\\/g, "").replace(/"/g, "'") + "\",\n" +
-                "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "-thumb.jpg\",\n" +
-                "        base: \"assets/mockups/" + id + "-base.png\",\n" +
-                "        overlay: \"assets/mockups/" + id + "-overlay.png\",\n" +
-                "        overlayBlend: \"" + blendSelect.value + "\",\n" +
-                "        mode: \"" + modeSelect.value + "\",\n" +
-                "        warpZone: [\n" + corners + "\n" +
-                "        ]\n" +
-                "    }";
-            copyBtn.disabled = false;
+        /* Shrink toward the centre until the zone is all fabric, so a zone
+           is never proposed across a sleeve seam or a bare arm. */
+        const purity = (x, y, w, h) => {
+            let ok = 0, n = 0;
+            for (let yy = y; yy < y + h; yy += 3) {
+                for (let xx = x; xx < x + w; xx += 3) {
+                    n++;
+                    if (xx >= 0 && yy >= 0 && xx < W && yy < H && isFab(xx, yy)) { ok++; }
+                }
+            }
+            return n ? ok / n : 0;
+        };
+        let guard = 0;
+        while (purity(zx, zy, zw, zh) < 0.999 && guard++ < 40) {
+            zw = Math.round(zw * 0.95);
+            zh = Math.round(zh * 0.95);
+            zx = Math.round(cx - zw / 2);
+            zy = Math.round(zy + pxPerInch * 0.15);
         }
 
-        fileInput.addEventListener("change", () => {
-            const file = fileInput.files && fileInput.files[0];
-            if (!file) {
-                return;
-            }
-            if (!/^image\//.test(file.type)) {
-                clickStatus.textContent = "That file is not an image.";
-                fileInput.value = "";
-                return;
-            }
-            const reader = new FileReader();
-            reader.addEventListener("load", () => {
-                const img = new Image();
-                img.addEventListener("load", () => {
-                    baseImage = img;
-                    points = [];
-                    /* Stage keeps the image's aspect ratio at a workable
-                       display width; clicks are mapped back to natural
-                       pixels, so display size never affects accuracy. */
-                    const displayW = 800;
-                    stage.width = displayW;
-                    stage.height = Math.round(displayW * img.naturalHeight / img.naturalWidth);
-                    redraw();
-                    updateStatus();
-                    buildEntry();
-                });
-                img.src = reader.result;
-            });
-            reader.readAsDataURL(file);
-        });
+        /* A garment close to the frame edge can push the derived rectangle
+           off-canvas; a zone outside the base is meaningless. */
+        zx = Math.max(0, Math.min(W - 1, zx));
+        zy = Math.max(0, Math.min(H - 1, zy));
+        zw = Math.max(8, Math.min(W - zx, zw));
+        zh = Math.max(8, Math.min(H - zy, zh));
 
-        stage.addEventListener("click", (evt) => {
-            if (!baseImage || points.length >= 4) {
-                return;
-            }
-            const rect = stage.getBoundingClientRect();
-            const x = (evt.clientX - rect.left) * (stage.width / rect.width) * (baseImage.naturalWidth / stage.width);
-            const y = (evt.clientY - rect.top) * (stage.height / rect.height) * (baseImage.naturalHeight / stage.height);
-            points.push({ x: x, y: y });
-            redraw();
-            updateStatus();
-            buildEntry();
-        });
-
-        undoBtn.addEventListener("click", () => {
-            points.pop();
-            redraw();
-            updateStatus();
-            buildEntry();
-        });
-
-        clearBtn.addEventListener("click", () => {
-            points = [];
-            redraw();
-            updateStatus();
-            buildEntry();
-        });
-
-        [idInput, titleInput, categoryInput].forEach((el) => el.addEventListener("input", buildEntry));
-        [modeSelect, blendSelect].forEach((el) => el.addEventListener("change", buildEntry));
-
-        copyBtn.addEventListener("click", () => {
-            output.select();
-            let copied = false;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(output.value).then(() => {
-                    copyStatus.textContent = "Copied to clipboard.";
-                });
-                copied = true;
-            } else {
-                copied = document.execCommand("copy");
-                copyStatus.textContent = copied ? "Copied to clipboard." : "Copy failed; select and copy manually.";
-            }
-        });
-
+        points = [
+            { x: zx, y: zy },
+            { x: zx + zw, y: zy },
+            { x: zx + zw, y: zy + zh },
+            { x: zx, y: zy + zh }
+        ];
+        redraw();
         updateStatus();
-    })();
-    </script>
+        buildEntry();
+        renderPreview();
+        $("click-status").textContent =
+            "Suggested " + zw + "x" + zh + " at " + zx + "," + zy +
+            "  (centreline " + cx + ", collar " + collar + ", hem " + hem +
+            ", " + pxPerInch.toFixed(1) + " px/in, " + (purity(zx, zy, zw, zh) * 100).toFixed(1) + "% fabric). Adjust by clicking corners if needed.";
+    }
+
+    /* ------------------------------------------------------------------
+       Preview
+       ------------------------------------------------------------------ */
+
+    function zoneRect() {
+        const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
+        const x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
+        return { x, y, w: Math.max.apply(null, xs) - x, h: Math.max.apply(null, ys) - y };
+    }
+
+    function testDesign(w, h, kind) {
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(w));
+        c.height = Math.max(1, Math.round(h));
+        const x = c.getContext("2d");
+        if (kind === "grid") {
+            x.fillStyle = "#12305C";
+            x.fillRect(0, 0, c.width, c.height);
+            x.strokeStyle = "#FFFFFF";
+            x.lineWidth = Math.max(2, c.width / 120);
+            for (let i = 0; i <= 10; i++) {
+                const p = i / 10 * c.width;
+                x.beginPath(); x.moveTo(p, 0); x.lineTo(p, c.height); x.stroke();
+            }
+            const rows = Math.round(10 * c.height / c.width);
+            for (let i = 0; i <= rows; i++) {
+                const p = i / rows * c.height;
+                x.beginPath(); x.moveTo(0, p); x.lineTo(c.width, p); x.stroke();
+            }
+            x.fillStyle = "#F5C542";
+            x.font = "700 " + Math.round(c.width * 0.17) + "px system-ui, sans-serif";
+            x.textAlign = "center"; x.textBaseline = "middle";
+            x.fillText("GRID", c.width / 2, c.height / 2);
+        } else if (kind === "logo") {
+            x.fillStyle = "#C1121F";
+            x.beginPath();
+            x.arc(c.width / 2, c.height * 0.38, c.width * 0.3, 0, Math.PI * 2);
+            x.fill();
+            x.fillStyle = "#1D3557";
+            x.fillRect(c.width * 0.2, c.height * 0.85, c.width * 0.6, Math.max(3, c.height * 0.02));
+        }
+        return c;
+    }
+
+    function renderPreview() {
+        if (!baseImage) { return; }
+        const W = baseImage.naturalWidth, H = baseImage.naturalHeight;
+        preview.width = W;
+        preview.height = H;
+        pctx.clearRect(0, 0, W, H);
+        pctx.drawImage(baseImage, 0, 0);
+
+        const kind = $("test-design").value;
+        if (kind === "none" || points.length !== 4) {
+            $("preview-status").textContent = points.length !== 4
+                ? "Mark the four corners to preview a design."
+                : "Plain garment.";
+            return;
+        }
+        const area = zoneRect();
+        const sheet = document.createElement("canvas");
+        sheet.width = W; sheet.height = H;
+        const sctx = sheet.getContext("2d");
+        sctx.drawImage(testDesign(area.w, area.h, kind), area.x, area.y);
+
+        const strength = Number($("strength").value);
+        if (dispCanvas && $("fabric-on").checked) {
+            const out = window.TB_Displace.render(
+                sheet, dispCanvas, shadeCanvas, strength,
+                lightCanvas, Number($("light-gain").value)
+            );
+            if (out) {
+                pctx.drawImage(out, 0, 0);
+                $("preview-status").textContent = "Displaced and shaded at " + strength + "px (WebGL).";
+                $("preview-status").className = "status ok";
+                return;
+            }
+            $("preview-status").textContent = "WebGL unavailable -- showing the flat fallback.";
+            $("preview-status").className = "status warn";
+        } else {
+            $("preview-status").textContent = dispCanvas
+                ? "Fabric mode off -- showing the flat draw."
+                : "Generate the maps to preview displacement.";
+            $("preview-status").className = "status";
+        }
+        pctx.drawImage(sheet, 0, 0);
+    }
+
+    /* ------------------------------------------------------------------
+       Thumbnail
+       ------------------------------------------------------------------ */
+
+    function makeThumb() {
+        const W = baseImage.naturalWidth, H = baseImage.naturalHeight;
+        const area = zoneRect();
+        const tw = Math.max(200, Number($("thumb-w").value) || 600);
+        const th = Math.round(tw * 1.25);
+
+        /* 4:5 crop, as wide as the frame allows, centred vertically on the
+           print area so the design is what the card shows. */
+        const cw = Math.min(W, Math.round(H * 0.8));
+        const ch = Math.round(cw * 1.25);
+        const cx = Math.round((W - cw) / 2);
+        const cy = Math.max(0, Math.min(H - ch, Math.round(area.y + area.h / 2 - ch / 2)));
+
+        const c = document.createElement("canvas");
+        c.width = tw; c.height = th;
+        const x = c.getContext("2d");
+        x.fillStyle = "#FFFFFF";
+        x.fillRect(0, 0, tw, th);
+        x.imageSmoothingQuality = "high";
+        x.drawImage(preview, cx, cy, cw, ch, 0, 0, tw, th);
+
+        const thumbEl = $("thumb");
+        thumbEl.width = 240;
+        thumbEl.height = 300;
+        thumbEl.getContext("2d").drawImage(c, 0, 0, 240, 300);
+
+        const q = Math.max(0.4, Math.min(1, Number($("thumb-q").value) || 0.8));
+        c.toBlob((blob) => {
+            thumbBlob = blob;
+            const kb = Math.round(blob.size / 1024);
+            $("thumb-status").textContent = tw + "x" + th + ", " + kb + "KB" +
+                (kb > 100 ? " -- over the 100KB catalog guideline; lower the quality or width." : ".");
+            $("thumb-status").className = kb > 100 ? "status warn" : "status ok";
+            $("dl-thumb").disabled = false;
+        }, "image/jpeg", q);
+    }
+
+    /* ------------------------------------------------------------------
+       Downloads and registry entry
+       ------------------------------------------------------------------ */
+
+    function slug(value, fallback) {
+        const cleaned = String(value || "").trim().toLowerCase()
+            .replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+        return cleaned || fallback;
+    }
+
+    function save(blob, name) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+
+    function saveCanvas(canvas, suffix) {
+        canvas.toBlob((b) => save(b, slug($("tpl-id").value, "my-mockup") + suffix), "image/png");
+    }
+
+    function buildEntry() {
+        if (points.length !== 4) {
+            $("output").value = "";
+            $("copy-output").disabled = true;
+            return;
+        }
+        const id = slug($("tpl-id").value, "my-mockup");
+        const category = slug($("tpl-category").value, "apparel");
+        const title = ($("tpl-title").value || "").trim() || id;
+        const fabric = $("fabric-on").checked;
+        const corners = points.map((p) =>
+            "            { x: " + Math.round(p.x) + ", y: " + Math.round(p.y) + " }"
+        ).join(",\n");
+
+        let body =
+            "    {\n" +
+            "        id: \"" + id + "\",\n" +
+            "        title: \"" + title.replace(/\\/g, "").replace(/"/g, "'") + "\",\n" +
+            "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "-thumb.jpg\",\n" +
+            "        base: \"assets/mockups/" + id + "-base.png\",\n";
+
+        if (fabric) {
+            body +=
+                "        overlay: null,\n" +
+                "        displace: \"assets/mockups/" + id + "-displace.png\",\n" +
+                "        shade: \"assets/mockups/" + id + "-shade.png\",\n" +
+                "        light: \"assets/mockups/" + id + "-light.png\",\n" +
+                "        lightGain: " + Number($("light-gain").value) + ",\n" +
+                "        garment: \"assets/mockups/" + id + "-garment.png\",\n" +
+                "        tone: \"assets/mockups/" + id + "-tone.png\",\n" +
+                "        grain: \"assets/mockups/" + id + "-grain.png\",\n" +
+                "        garmentColors: {\n" +
+                "            original: { name: \"As photographed\", hex: \"#E9E9EC\", original: true },\n" +
+                "            black: { name: \"Black\", hex: \"#1A1A1A\" },\n" +
+                "            navy: { name: \"Navy\", hex: \"#1F2A44\" },\n" +
+                "            heatherGrey: { name: \"Heather Grey\", hex: \"#6E6E69\", heather: 0.55 },\n" +
+                "            heatherNavy: { name: \"Heather Navy\", hex: \"#1F2A44\", heather: 0.20 },\n" +
+                "            red: { name: \"Red\", hex: \"#B5352E\" },\n" +
+                "            forest: { name: \"Forest Green\", hex: \"#2E4B3C\" },\n" +
+                "            sand: { name: \"Sand\", hex: \"#D8C7A9\" }\n" +
+                "        },\n" +
+                "        displaceStrength: " + Number($("strength").value) + ",\n" +
+                "        mode: \"surface\",\n" +
+                "        backing: null,\n";
+        } else {
+            body +=
+                "        overlay: \"assets/mockups/" + id + "-overlay.png\",\n" +
+                "        overlayBlend: \"" + $("tpl-blend").value + "\",\n" +
+                "        mode: \"" + $("tpl-mode").value + "\",\n";
+        }
+
+        body += "        warpZone: [\n" + corners + "\n        ]\n    }";
+        $("output").value = body;
+        $("copy-output").disabled = false;
+    }
+
+    /* ------------------------------------------------------------------
+       Wiring
+       ------------------------------------------------------------------ */
+
+    $("base-file").addEventListener("change", () => {
+        const file = $("base-file").files && $("base-file").files[0];
+        if (!file) { return; }
+        if (!/^image\//.test(file.type)) {
+            $("click-status").textContent = "That file is not an image.";
+            $("base-file").value = "";
+            return;
+        }
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+            const img = new Image();
+            img.addEventListener("load", () => {
+                baseImage = img;
+                points = [];
+                dispCanvas = shadeCanvas = lightCanvas = garmentCanvas = toneCanvas = grainCanvas = maskCanvas = null;
+                mapsStale = false;
+                ["dl-disp", "dl-shade", "dl-light", "dl-garment", "dl-tone", "dl-grain"].forEach((b) => { $(b).disabled = true; });
+                $("dl-thumb").disabled = true;
+                $("derive-stats").textContent = "";
+                $("derive-status").textContent = "";
+
+                /* Read the pixels once at natural size; every derivation
+                   works from this rather than re-reading the canvas. */
+                const off = document.createElement("canvas");
+                off.width = img.naturalWidth;
+                off.height = img.naturalHeight;
+                off.getContext("2d").drawImage(img, 0, 0);
+                baseData = off.getContext("2d").getImageData(0, 0, off.width, off.height);
+
+                const displayW = 800;
+                stage.width = displayW;
+                stage.height = Math.round(displayW * img.naturalHeight / img.naturalWidth);
+                redraw();
+                updateStatus();
+                buildEntry();
+                renderPreview();
+            });
+            img.src = reader.result;
+        });
+        reader.readAsDataURL(file);
+    });
+
+    stage.addEventListener("click", (evt) => {
+        if (!baseImage || points.length >= 4) { return; }
+        const rect = stage.getBoundingClientRect();
+        const x = (evt.clientX - rect.left) * (baseImage.naturalWidth / rect.width);
+        const y = (evt.clientY - rect.top) * (baseImage.naturalHeight / rect.height);
+        points.push({ x, y });
+        redraw();
+        updateStatus();
+        buildEntry();
+        renderPreview();
+    });
+
+    $("undo-point").addEventListener("click", () => {
+        points.pop(); redraw(); updateStatus(); buildEntry(); renderPreview();
+    });
+    $("clear-points").addEventListener("click", () => {
+        points = []; redraw(); updateStatus(); buildEntry(); renderPreview();
+    });
+    $("suggest-zone").addEventListener("click", suggestZone);
+    $("derive").addEventListener("click", () => {
+        $("derive-status").textContent = "Working...";
+        $("derive-status").className = "status";
+        setTimeout(derive, 20);
+    });
+    $("dl-disp").addEventListener("click", () => saveCanvas(dispCanvas, "-displace.png"));
+    $("dl-shade").addEventListener("click", () => saveCanvas(shadeCanvas, "-shade.png"));
+    $("dl-light").addEventListener("click", () => saveCanvas(lightCanvas, "-light.png"));
+    $("dl-garment").addEventListener("click", () => saveCanvas(garmentCanvas, "-garment.png"));
+    $("dl-tone").addEventListener("click", () => saveCanvas(toneCanvas, "-tone.png"));
+    $("dl-grain").addEventListener("click", () => saveCanvas(grainCanvas, "-grain.png"));
+
+    $("light-gain").addEventListener("input", () => {
+        $("light-gain-val").textContent = Number($("light-gain").value).toFixed(1);
+        renderPreview();
+        buildEntry();
+    });
+    $("make-thumb").addEventListener("click", makeThumb);
+    $("dl-thumb").addEventListener("click", () => {
+        if (thumbBlob) { save(thumbBlob, slug($("tpl-id").value, "my-mockup") + "-thumb.jpg"); }
+    });
+
+    $("strength").addEventListener("input", () => {
+        $("strength-val").textContent = $("strength").value;
+        renderPreview();
+        buildEntry();
+    });
+    $("test-design").addEventListener("change", renderPreview);
+    $("fabric-on").addEventListener("change", () => { renderPreview(); buildEntry(); });
+
+    ["th-alpha", "th-sat", "th-luma", "th-blur"].forEach((id) => {
+        $(id).addEventListener("input", () => {
+            if (!dispCanvas) { return; }
+            mapsStale = true;
+            $("derive-status").textContent =
+                "Thresholds changed -- the maps and figures below are from the previous run. Re-run Analyse.";
+            $("derive-status").className = "status warn";
+        });
+    });
+
+    ["tpl-id", "tpl-title", "tpl-category"].forEach((id) => $(id).addEventListener("input", buildEntry));
+    ["tpl-mode", "tpl-blend"].forEach((id) => $(id).addEventListener("change", buildEntry));
+
+    $("copy-output").addEventListener("click", () => {
+        const out = $("output");
+        out.select();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(out.value).then(() => {
+                $("copy-status").textContent = "Copied to clipboard.";
+            });
+        } else {
+            $("copy-status").textContent = document.execCommand("copy")
+                ? "Copied to clipboard."
+                : "Copy failed; select and copy manually.";
+        }
+    });
+
+    updateStatus();
+})();
+</script>
 </body>
 </html>
