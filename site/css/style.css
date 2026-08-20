@@ -3144,18 +3144,37 @@ body.is-nav-hidden .site-header:focus-within {
    apply was the override.
 
    Extending the gate to the tablet band brought the dead branch back to life
-   and it immediately over-reserved, because mountSiteAnchor mounts
-   leaderboardMobile (320x50) at every width it mounts at -- measured 116px of
-   padding under a 50px creative on every tablet page. Collapsing to the
-   4.75rem the phone band already verified is what makes the reservation match
-   the unit again. If a 728x90 is ever restored on this host, this needs a
-   second tier and the two must be gated on the same width the JS switches the
-   zone at, not on a remembered breakpoint. */
+   and it immediately over-reserved, because mountSiteAnchor was mounting
+   leaderboardMobile (320x50) at every width -- measured 116px of padding
+   under a 50px creative on every tablet page.
+
+   Later the same day the anchor became size-tiered for real: a 320px bar
+   centred in a 1024px window is mostly empty chrome, so the tablet band
+   mounts the 728x90 instead (mountAnchorUnit in js/ads.js). So the two tiers
+   below are back, but this time they are gated on ANCHOR_PHONE_MAX itself --
+   the exact line the JS switches the zone on -- rather than on a remembered
+   breakpoint that outlived the unit it was written for. That is the whole
+   difference between this and the rule it replaces. Move one and the other
+   has to move with it; `${tag}: anchor reservation matches the mounted unit`
+   in tests/verify-layout.js fails if they ever disagree. */
 body.has-site-anchor {
     padding-bottom: 4.75rem;
 }
 
-@media (max-width: 48rem) {
+@media (min-width: 48.0625rem) {
+    body.has-site-anchor {
+        padding-bottom: 7.25rem;
+    }
+}
+
+/* The editors' fixed anchor. Ran to 48rem until August 20, 2026, when the
+   editors' in-flow 728x90 tablet band was retired in favour of this: the
+   in-flow unit scrolled out of a session measured in minutes, which
+   contradicts the dwell-time argument that is the only reason editors carry
+   advertising at all. Same creative, now persistent. The ceiling is the
+   rail's floor, so the two meet exactly and no editor width shows both or
+   neither. */
+@media (max-width: 74.9375rem) {
     .editor-anchor.is-filled {
         display: flex;
         flex-direction: column;
@@ -3172,13 +3191,6 @@ body.has-site-anchor {
         padding-bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
     }
 
-    /* The disclosure label is kept, but small: on a 50px unit a full-size
-       label would nearly double the height the anchor costs. */
-    .editor-anchor .ad-label {
-        font-size: 0.5625rem;
-        margin-bottom: 0.125rem;
-    }
-
     /* Reserve the space the fixed anchor occupies. Without this the last of
        the page sits underneath it and cannot be scrolled clear. */
     body.has-ad-anchor {
@@ -3189,6 +3201,56 @@ body.has-site-anchor {
        be covered by the anchor. Lift it above. */
     body.has-ad-anchor .preview-actions {
         bottom: 4.75rem;
+    }
+}
+
+/* The disclosure label is kept, but small: on a 50px unit a full-size label
+   would nearly double the height the anchor costs.
+
+   Deliberately NOT scoped to the phone tier, which was tried and measured
+   wrong. Letting the tablet's 90px unit carry a full-size label looks fine in
+   isolation but takes the bar to 122.6px against the 7.25rem (116px) the tier
+   reserves, and the sticky export bar is lifted by that same 116px -- so the
+   bar ended up 18.6px INSIDE the anchor on all four editors at every tablet
+   width. The reservation, the lift and the label size are one system: change
+   the label and the other two have to be re-measured. Keeping the small label
+   at every width also matches .site-anchor, which has always had it
+   unscoped. */
+.editor-anchor .ad-label {
+    font-size: 0.5625rem;
+    margin-bottom: 0.125rem;
+}
+
+/* Tablet tier: mountAnchorUnit mounts the 728x90 above ANCHOR_PHONE_MAX, so
+   both the reservation and the export bar's lift grow to match it. Gated on
+   the same 48.0625rem line the JS switches the zone on -- see the
+   has-site-anchor note above for why that matters. */
+@media (min-width: 48.0625rem) and (max-width: 74.9375rem) {
+    body.has-ad-anchor {
+        padding-bottom: 7.25rem;
+    }
+
+    /* 8.25rem, not the 7.25rem the reservation uses, and the extra 1rem is
+       measured rather than padding-by-feel.
+
+       In this band -- and only in this band -- .preview-pane is
+       position: sticky (its rule starts at 48.0625rem), and with a sticky
+       pane the export bar's stuck position comes out a consistent 12px lower
+       than its `bottom` nominally asks for: at 1024x768 a `bottom: 116px`
+       bar sits with its foot at 664 where the arithmetic says 652, and the
+       same 12px appears at 769px and 1199px. Below 48.0625rem the pane is
+       not sticky and the offset lands exactly on its nominal value (measured
+       724 against 724 at 400x800), which is why the phone tier above needs
+       no such allowance and must not copy this one.
+
+       At 7.25rem the bar therefore finished 11.4px INSIDE the 115.4px-tall
+       anchor on all four editors at every tablet width -- the anchor is
+       z-index 30 against the bar's 5, so it painted over the export control.
+       8.25rem clears it by 4.6px. `${tag}: export bar clears the anchor` in
+       tests/verify-layout.js is what stops this silently regressing if the
+       pane's stickiness or the anchor's height ever changes. */
+    body.has-ad-anchor .preview-actions {
+        bottom: 8.25rem;
     }
 }
 

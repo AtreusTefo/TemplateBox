@@ -703,6 +703,23 @@ async function layoutChecks(page) {
                    failing. Under-reserving strands the foot of the document
                    beneath a fixed bar; over-reserving leaves dead space. Both
                    are silent, so both are asserted here. */
+                /* CLAUDE.md's own requirement: "the banner never overlaps the
+                   sticky export bar". The anchor is z-index 30 against the
+                   bar's 5, so an overlap paints over the control that
+                   completes the task. This went wrong the moment the editors'
+                   anchor was extended to tablets on August 20, 2026, because
+                   .preview-pane is position:sticky only above 48.0625rem and
+                   a sticky pane puts the bar's stuck position 12px below what
+                   its `bottom` asks for -- so the phone tier's arithmetic,
+                   which is exact, did not carry over. Asserted rather than
+                   reasoned about, since the two tiers now legitimately differ.
+                   A hidden bar measures as a zero rect and passes trivially,
+                   which is correct: there is nothing to overlap. */
+                check(`${tag}: export bar clears the anchor`,
+                    !s.exportBar || s.exportBar.h === 0 ||
+                    s.exportBar.bottom <= s.anchor.rect.y + 0.5,
+                    `export bar bottom ${s.exportBar && s.exportBar.bottom} vs anchor top ${s.anchor.rect.y}`);
+
                 check(`${tag}: anchor reservation matches the mounted unit`,
                     s.hasAnchorClass
                         ? s.bodyPadBottom >= s.anchor.rect.h - 1 &&
