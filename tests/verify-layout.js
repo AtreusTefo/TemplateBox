@@ -66,19 +66,28 @@ const PAGES = [
 ];
 const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 768, 320];
 
-/* Pages whose rail floor sits above the mobile anchor's own ceiling (48rem)
-   show neither band in between -- home's rail starts at 75rem, the
-   content-rail family's at 83.5rem, and both leave a genuine gap rather than
-   falling back to a leaderboard the way the editors do. Keyed by page name,
-   [minPxExclusive, maxPxExclusive) mirrors the CSS floor exactly so a floor
-   changed in one place cannot quietly disagree with the other. */
-const RAIL_GAP = {
-    index: [768, 1200],
-    about: [768, 1200],
-    "rent-receipt": [768, 1200],
-    blog: [768, 1200],
-    post: [768, 1200]
-};
+/* Pages that show NO band in some width range, keyed by page name, as
+   [minPxExclusive, maxPxExclusive).
+
+   This table used to carry index, about, rent-receipt, blog and post, all at
+   [768, 1200]: the anchor stopped at 48rem, the rail did not start until
+   75rem, and everything in between showed nothing. That band is every tablet
+   in portrait and most in landscape, so the whole class of device was served
+   no advertising at all -- and because this table said so, the suite asserted
+   the hole was correct and defended it.
+
+   Closed on August 20, 2026 by extending the anchor's ceiling to the rail's
+   own floor (SITE_ANCHOR_MAX and HOME_ANCHOR_MAX in js/ads.js). Those pages
+   now mount exactly one band at every width, like everything else, so they
+   are gone from here rather than being given a new range.
+
+   `post` is the one page that still has a genuine gap -- it carries no
+   [data-ad-anchor] host at all -- but it is in MULTI_UNIT_PAGES below and so
+   is skipped by the count assertion regardless, which is why it is not
+   listed. Left as an empty table rather than deleted: a page that legitimately
+   shows nothing in a range is a thing this suite should still be able to
+   express. */
+const RAIL_GAP = {};
 
 /* Pages that deliberately run a top leaderboard alongside the side rail
    rather than treating them as alternatives for one slot -- see the comment
@@ -520,6 +529,7 @@ const SNAPSHOT = `(() => {
     innerWidth: window.innerWidth, innerHeight: window.innerHeight,
     clientWidth: de.clientWidth, scrollWidth: de.scrollWidth,
     bodyPadRight: parseFloat(getComputedStyle(document.body).paddingRight),
+    bodyPadBottom: parseFloat(getComputedStyle(document.body).paddingBottom),
     hasRailClass: document.body.classList.contains('has-ad-rail'),
     hasAnchorClass: document.body.classList.contains('has-ad-anchor') ||
                     document.body.classList.contains('has-site-anchor'),
@@ -572,10 +582,12 @@ async function layoutChecks(page) {
                a renamed host attribute leaves the page looking perfect and
                earning nothing.
 
-               The documented exceptions are RAIL_GAP above: the homepage
-               between 48rem and 75rem, and the content-rail family between
-               48rem and 83.5rem, both of which show nothing by design --
-               too narrow for the rail, too wide for the phone anchor.
+               RAIL_GAP above is the exception table, and it is empty now: the
+               homepage and the content-rail family used to show nothing
+               between the anchor's old 48rem ceiling and the rail's 75rem
+               floor, and since August 20, 2026 the anchor covers that band
+               instead, so every non-editor page mounts exactly one unit at
+               every width.
 
                This invariant is about one slot alternating between mutually
                exclusive units, which is not what blog/post are: their
@@ -680,6 +692,23 @@ async function layoutChecks(page) {
                     !railUp && s.bodyPadRight === 0 &&
                     Math.abs(s.anchor.rect.w - s.clientWidth) < 1,
                     `anchor width ${s.anchor.rect.w} vs ${s.clientWidth}, railUp=${railUp}`);
+
+                /* The reservation has to match the unit actually mounted, not
+                   a unit that used to be mounted. body.has-site-anchor
+                   reserved 7.25rem (116px) for a 728x90 that was retired on
+                   August 13, 2026; the branch was unreachable while the anchor
+                   was phone-only, and came back to life the moment the anchor
+                   was extended to tablets on August 20 -- 116px of padding
+                   under a 50px bar, on every tablet page, with nothing
+                   failing. Under-reserving strands the foot of the document
+                   beneath a fixed bar; over-reserving leaves dead space. Both
+                   are silent, so both are asserted here. */
+                check(`${tag}: anchor reservation matches the mounted unit`,
+                    s.hasAnchorClass
+                        ? s.bodyPadBottom >= s.anchor.rect.h - 1 &&
+                          s.bodyPadBottom <= s.anchor.rect.h + 12
+                        : true,
+                    `padding-bottom ${s.bodyPadBottom} vs anchor height ${s.anchor.rect.h}`);
             }
         }
     }
@@ -749,6 +778,116 @@ async function layoutChecks(page) {
             r.headerTop <= 0.5 && r.headerTop >= -(r.headerHeight + 0.5) &&
             r.headerRight <= r.railLeft + 0.5,
             JSON.stringify(r));
+    }
+
+    /* ----------------------------------------------------------------------
+       2d. The category tabs must sit BELOW the header, not inside it.
+
+       .site-header is flex-wrap: wrap and its height is a function of how its
+       contents wrap, not of the viewport width: 85px from 600px up, but 145px
+       from 360px to 480px and 201px at 320px. Every sticky offset written as a
+       literal was therefore calibrated on desktop and wrong on phones. The
+       tabs' 76px put the whole 45px tab row inside the header's box, and the
+       header (z-index 20, against the tabs' 15) painted straight over it -- so
+       on every phone width the category filter was invisible and untappable
+       whenever the header was showing and the page was scrolled.
+
+       Nothing errored and nothing looked broken on a desktop, which is the
+       exact failure profile this suite exists for. The offset is a measured
+       --header-h now; these two checks are what stop it going back to a
+       literal. Both were mutation-tested by restoring the 4.75rem/5.25rem
+       literals: the overlap check failed at 320/360/390/414/768, and the
+       flush check failed at every width.
+       ---------------------------------------------------------------------- */
+    section("2d. Layout: sticky offsets track the header's real height");
+    for (const width of [320, 360, 390, 414, 768, 1024, 1366, 1920]) {
+        await page.navigate(`http://localhost:${PORT}/`, width);
+        const r = await page.evaluate(`(async () => {
+            const settle = async () => {
+                const hdr = document.querySelector('.site-header');
+                let last = null;
+                for (let i = 0; i < 60; i += 1) {
+                    await new Promise(r => requestAnimationFrame(r));
+                    const y = +hdr.getBoundingClientRect().y.toFixed(1);
+                    if (last !== null && y === last) { break; }
+                    last = y;
+                }
+            };
+            const fire = async (from, to, step) => {
+                for (let y = from; step > 0 ? y <= to : y >= to; y += step) {
+                    window.scrollTo(0, y);
+                    window.dispatchEvent(new Event('scroll'));
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                await settle();
+            };
+            const h = document.querySelector('.site-header');
+            const t = document.querySelector('.feed-tabs');
+            if (!h || !t) { return { skipped: true }; }
+
+            /* Scrolled down far enough to hide the header, then part-way back
+               up so it is revealed WHILE the page is still scrolled -- the
+               state in which a too-small offset hides the tabs. */
+            await fire(0, 600, 120);
+            await fire(600, 480, -60);
+            const hr = h.getBoundingClientRect(), tr = t.getBoundingClientRect();
+            const hit = document.elementFromPoint(tr.left + Math.min(60, tr.width / 2),
+                                                  tr.top + tr.height / 2);
+            const revealed = {
+                headerBottom: +hr.bottom.toFixed(1), tabsTop: +tr.top.toFixed(1),
+                overlap: +Math.max(0, hr.bottom - tr.top).toFixed(1),
+                coveredByHeader: hit ? h.contains(hit) : null
+            };
+
+            /* And scrolled down again, where the header is gone and the tabs
+               must close the gap it leaves rather than parking below it. */
+            await fire(480, 900, 120);
+            const t2 = t.getBoundingClientRect();
+            return { revealed, hiddenTabsTop: +t2.top.toFixed(1),
+                     navHidden: document.body.classList.contains('is-nav-hidden') };
+        })()`);
+        if (r.skipped) { continue; }
+
+        check(`category tabs @${width}: clear of the header, not painted over by it`,
+            r.revealed.overlap <= 0.5 && r.revealed.coveredByHeader === false,
+            JSON.stringify(r.revealed));
+
+        check(`category tabs @${width}: land flush at the viewport top when the header hides`,
+            !r.navHidden || Math.abs(r.hiddenTabsTop) <= 0.5,
+            JSON.stringify({ hiddenTabsTop: r.hiddenTabsTop, navHidden: r.navHidden }));
+    }
+
+    /* ----------------------------------------------------------------------
+       2e. No text field under 16px on a phone.
+
+       iOS Safari zooms the page in when a text-entry field smaller than that
+       takes focus, and does not zoom back out on blur -- once per field, on
+       pages whose whole purpose is filling fields in. It is a device
+       behaviour with a hard threshold, so this is a real contract and not a
+       taste question. Colour and range inputs are excluded because neither is
+       a text-entry field and neither triggers the zoom.
+
+       Mutation-tested by putting .doc-name back to 0.9375rem: fails on all
+       four editors.
+       ---------------------------------------------------------------------- */
+    section("2e. Layout: no phone text field small enough to trigger iOS zoom");
+    for (const [label, urlPath] of [["resume", "/resume.html"], ["docs", "/docs.html"],
+            ["poster", "/poster.html"], ["mockup", "/mockup.html"], ["homepage", "/"]]) {
+        await page.navigate(`http://localhost:${PORT}${urlPath}`, 390);
+        const small = await page.evaluate(`(() => {
+            const zoomy = new Set(['text','search','password','email','number','tel','url',
+                                   'date','datetime-local','month','week','time']);
+            const out = [];
+            document.querySelectorAll('input,select,textarea').forEach((el) => {
+                const t = (el.type || '').toLowerCase();
+                if (el.tagName === 'INPUT' && !zoomy.has(t)) { return; }
+                const fs = parseFloat(getComputedStyle(el).fontSize);
+                if (fs < 16) { out.push((el.id || el.className || el.tagName) + '@' + fs + 'px'); }
+            });
+            return out;
+        })()`);
+        check(`${label} @390: every text field is at least 16px`,
+            small.length === 0, small.join(", "));
     }
 
     /* Print must carry neither the column nor the width it reserved. */

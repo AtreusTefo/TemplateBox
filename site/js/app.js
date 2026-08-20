@@ -849,6 +849,54 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Publish the site header's real height as --header-h on <html>.
+
+       Nothing here knows about any element that consumes it, exactly as
+       initScrollDirection() knows nothing about who reacts to .is-nav-hidden:
+       this writes one custom property and CSS decides what to do with it.
+
+       It exists because .site-header's height is not a function of viewport
+       width. It is flex-wrap: wrap carrying a wordmark, a search box and five
+       nav controls, so its height depends on how those wrap: measured, 85px
+       from 600px up, 145px from 360px to 480px, and 201px at 320px. Every
+       sticky offset calibrated to sit "just under the header" was therefore a
+       literal that was correct on desktop and wrong on every phone -- the
+       category tabs' 76px put the entire tab row inside the header's box,
+       where the header painted straight over it.
+
+       ResizeObserver rather than a resize listener: the height changes when
+       the header's CONTENTS rewrap, which a viewport resize is only one cause
+       of (web fonts landing and the search box appearing at 62rem are two
+       others, and neither fires a resize event).
+       ---------------------------------------------------------------------- */
+    function initHeaderHeight() {
+        const header = document.querySelector(".site-header");
+        if (!header) {
+            return;
+        }
+
+        function publish() {
+            /* Rounded up: a fractional height would leave a sub-pixel seam of
+               page showing between the header's bottom edge and whatever sits
+               under it, which reads as a flicker while scrolling. */
+            const h = Math.ceil(header.getBoundingClientRect().height);
+            if (h > 0) {
+                document.documentElement.style.setProperty("--header-h", h + "px");
+            }
+        }
+
+        publish();
+
+        if (typeof ResizeObserver === "function") {
+            new ResizeObserver(publish).observe(header);
+        } else {
+            /* No ResizeObserver: the CSS fallbacks still hold, and a resize
+               listener recovers the common case of an orientation change. */
+            window.addEventListener("resize", publish, { passive: true });
+        }
+    }
+
+    /* ----------------------------------------------------------------------
        Header mega-menu.
 
        Originally homepage-only, because the homepage was the one page with
@@ -1117,6 +1165,9 @@ const TB = (() => {
             initFormNav,
             initNavMore,
             initSearch,
+            /* Before initScrollDirection: the hide transform reads --header-h,
+               so it should be published before anything can hide the header. */
+            initHeaderHeight,
             initScrollDirection,
             initThemeToggle
         ].forEach((init) => {

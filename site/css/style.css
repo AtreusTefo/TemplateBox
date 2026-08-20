@@ -1072,8 +1072,25 @@ main:has(.home-layout) {
 
 .feed-tabs {
     position: sticky;
-    /* Sits directly beneath the sticky site header */
-    top: 5.25rem;
+    /* Sits directly beneath the sticky site header.
+
+       --header-h is the header's REAL rendered height, written onto <html> by
+       initHeaderHeight() in js/app.js and kept current by a ResizeObserver.
+       A literal offset cannot work here: .site-header is flex-wrap: wrap and
+       carries a search box and five nav controls, so its height is a function
+       of how its contents wrap, not of the viewport width. Measured, it is
+       85px from 600px up but 145px from 360px to 480px and 201px at 320px,
+       against the 76px the old literal reserved -- so on every phone width the
+       whole 45px tab row sat INSIDE the header's box and was painted over by
+       it (the header is z-index 20, these tabs 15). Filtering is a primary
+       action on this page and it was invisible and untappable on any phone
+       whenever the header was showing and the page was scrolled.
+
+       The fallbacks are the old literals on purpose: if js/app.js fails to
+       load or throws, every offset here resolves to exactly what it was
+       before, so this degrades to the previous behaviour rather than to a
+       broken one. */
+    top: var(--header-h, 5.25rem);
     z-index: 15;
     background-color: var(--color-bg);
     border-bottom: 1px solid var(--color-border);
@@ -1146,13 +1163,18 @@ body:has(.home-layout).is-nav-hidden .site-header {
     transform: translateY(-100%);
 }
 
+/* Travels its own sticky offset, which is now the header's measured height,
+   so it lands flush at y=0 as the header clears -- at every width, including
+   the phone widths where that height is 145px or 201px rather than 85px. The
+   two-tier media query this replaces existed only to approximate that height
+   with a literal, and approximated it wrongly on exactly those widths. */
 body:has(.home-layout).is-nav-hidden .feed-tabs {
-    transform: translateY(-5.25rem);
+    transform: translateY(calc(-1 * var(--header-h, 5.25rem)));
 }
 
 @media (max-width: 48rem) {
     body:has(.home-layout).is-nav-hidden .feed-tabs {
-        transform: translateY(-4.75rem);
+        transform: translateY(calc(-1 * var(--header-h, 4.75rem)));
     }
 }
 
@@ -1209,7 +1231,7 @@ body.is-nav-hidden .site-header:focus-within {
 
 @media (max-width: 48rem) {
     .feed-tabs {
-        top: 4.75rem;
+        top: var(--header-h, 4.75rem);
         margin: 0 calc(var(--space-md) * -1) var(--space-md);
         padding: 0 var(--space-md);
     }
@@ -2420,10 +2442,6 @@ body.is-nav-hidden .site-header:focus-within {
    viewport, zero
    vertical scroll. */
 @media (max-width: 70rem) {
-    #ad-banner-2 {
-        display: none;
-    }
-
     main:has(.loading-wrap) {
         padding: var(--space-xs) var(--space-md) var(--space-xs);
     }
@@ -2488,6 +2506,28 @@ body.is-nav-hidden .site-header:focus-within {
    keeps this verifiable at a glance instead of needing a hand-checked list
    of which intermediate widths were and were not measured. */
 @media (max-width: 48rem) {
+    /* The second 300x250 is dropped on PHONES only, from August 20, 2026.
+
+       This gate was 70rem, which meant the whole tablet band -- every tablet
+       in portrait and most in landscape -- saw one banner where the page has
+       two zones to serve. The reason for cutting it was always vertical: a
+       second 300x250 stacked under the card is what pushes a short phone into
+       scroll. That reasoning is about STACKING, and it stops applying the
+       moment the two fit side by side. .ad-row is flex with wrap, so at 769px
+       and up the pair sits in one row (300 + 300 + 24px gap = 624px, inside
+       even the narrowest tablet) and costs the same 250px of height that one
+       banner costs. Below 48rem they stack and the second one genuinely does
+       not fit, which is why the rule survives here rather than being deleted.
+
+       Verified after the change, with the anchor's 76px reservation included:
+       both banners share one row and the page has zero vertical scroll at
+       800x1280, 810x1080, 820x1180, 1024x768, 1112x834, 1180x820 and
+       1199x800. 768x1024 is not in that list on purpose -- 768px IS 48rem, so
+       it is the phone band's top edge and correctly shows one banner. */
+    #ad-banner-2 {
+        display: none;
+    }
+
     .loading-template {
         display: none;
     }
@@ -3094,16 +3134,25 @@ body.is-nav-hidden .site-header:focus-within {
 }
 
 /* Reserve the space the fixed bar occupies, or the foot of the page sits
-   under it and cannot be scrolled clear. The desktop unit is 728x90, so it
-   needs noticeably more room than the 320x50 phone one. */
-body.has-site-anchor {
-    padding-bottom: 7.25rem;
-}
+   under it and cannot be scrolled clear.
 
-@media (max-width: 48rem) {
-    body.has-site-anchor {
-        padding-bottom: 4.75rem;
-    }
+   One value, because there is only one unit. This was 7.25rem here with a
+   4.75rem override below 48rem, sized for a 728x90 that mounted above that
+   breakpoint -- but that desktop half was retired on August 13, 2026, and
+   from then until August 20 the 7.25rem branch was unreachable dead code:
+   the anchor's own gate stopped at 48rem, so the only rule that could ever
+   apply was the override.
+
+   Extending the gate to the tablet band brought the dead branch back to life
+   and it immediately over-reserved, because mountSiteAnchor mounts
+   leaderboardMobile (320x50) at every width it mounts at -- measured 116px of
+   padding under a 50px creative on every tablet page. Collapsing to the
+   4.75rem the phone band already verified is what makes the reservation match
+   the unit again. If a 728x90 is ever restored on this host, this needs a
+   second tier and the two must be gated on the same width the JS switches the
+   zone at, not on a remembered breakpoint. */
+body.has-site-anchor {
+    padding-bottom: 4.75rem;
 }
 
 @media (max-width: 48rem) {
@@ -6154,6 +6203,54 @@ legend {
 
     .doc-table {
         font-size: 0.75rem;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   No text field may be smaller than 16px on a phone.
+
+   iOS Safari zooms the whole page in when a text-entry field whose computed
+   font-size is under 16px receives focus, and it does NOT zoom back out on
+   blur. The visitor is left at roughly 1.2x with the layout overflowing
+   sideways and has to pinch out by hand -- once per field, on a page whose
+   whole purpose is filling fields in. It is a device behaviour, not a style
+   choice, and 16px is the only threshold that switches it off.
+
+   Measured at 390px before this rule existed: 27 fields across the four
+   editors were under it -- .doc-name at 15px on all four, the poster text
+   toolbar and its Advanced and Download panels at 13px, and the mockup colour
+   and scale inputs at 12-13px. Twelve of them are on screen without opening
+   anything.
+
+   Scoped to the phone breakpoint deliberately. These are dense desktop
+   toolbars whose proportions are deliberate at full width, and the zoom
+   behaviour they are being protected from only exists on touch devices, so
+   there is nothing to gain by widening the controls on a desktop too.
+
+   The [type="..."] variants are listed alongside the bare element selectors
+   because several of the rules being overridden are themselves attribute
+   selectors, which outrank a bare tag selector regardless of source order.
+   Colour and range inputs are deliberately absent: neither is a text-entry
+   field and neither triggers the zoom.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 48rem) {
+    .doc-name,
+    .dl-panel select,
+    .dl-panel input,
+    .dl-panel input[type="password"],
+    .text-toolbar select,
+    .text-toolbar input,
+    .text-toolbar input[type="number"],
+    .tt-adv-panel input,
+    .tt-adv-panel input[type="number"],
+    .tt-adv-panel select,
+    .caption-row textarea,
+    .color-input-cell input,
+    .color-input-cell input[type="number"],
+    .size-number input,
+    .size-number input[type="number"] {
+        font-size: 1rem;
     }
 }
 

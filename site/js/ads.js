@@ -245,7 +245,12 @@ const TBAds = (() => {
        worth doing if homepage revenue needs measuring separately.
        ---------------------------------------------------------------------- */
     const HOME_RAIL_MIN = "(min-width: 75rem)";
-    const HOME_ANCHOR_MAX = "(max-width: 48rem)";
+    /* 48rem until August 20, 2026, which left every tablet width on the site's
+       most-visited page with no advertising at all -- the same hole the
+       site-wide anchor had, closed the same way and with the same number, so
+       the anchor and the rail meet exactly at the rail's floor with neither a
+       gap nor an overlap between them. See SITE_ANCHOR_MAX above. */
+    const HOME_ANCHOR_MAX = "(max-width: 74.9375rem)";
 
     /* The editor rail, on the homepage. Same markup, same slots, same three
        zones, and the same .editor-rail CSS rule -- not a copy of it, the same
@@ -465,12 +470,34 @@ const TBAds = (() => {
        targeted viewport sizes first, the way loading.html's own
        verification script does, before reusing this reasoning elsewhere.
        ---------------------------------------------------------------------- */
-    const SITE_ANCHOR_MOBILE = "(max-width: 48rem)";
+    /* Extended from 48rem to the rail's own floor on August 20, 2026: tablets
+       carried no advertising at all.
+
+       The August 13 rewrite retired the anchor's desktop half on the reasoning
+       that .content-rail had taken over "once there is room for it", and left
+       the gap between 48rem and the rail's floor deliberately empty to match
+       the shape the homepage already had. What that missed is that the gap is
+       not a sliver: 769px to 1199px is every tablet in portrait AND most in
+       landscape, so the whole class of device was served nothing, on the nine
+       landing pages, the legal pages, the blog index, 404 and the loading
+       interstitial alike. The homepage had the identical hole for the same
+       reason, and closes it with the same number below.
+
+       74.9375rem, not 75rem, so this stops exactly one pixel below where
+       CONTENT_RAIL_MIN starts. The two are mutually exclusive to the pixel and
+       no viewport can ever mount both or neither, which is the invariant the
+       editors' four bands already hold themselves to.
+
+       The unit stays leaderboardMobile (320x50), the same one phones get, as
+       asked. A 728x90 would fill a tablet better and its zone already exists,
+       but that is the format the August 13 change removed from this host and
+       putting it back is a separate decision from closing the hole. */
+    const SITE_ANCHOR_MAX = "(max-width: 74.9375rem)";
 
     function mountSiteAnchor(scope) {
         const root = scope || document;
         const anchor = root.querySelector("[data-ad-anchor]");
-        if (!anchor || !window.matchMedia(SITE_ANCHOR_MOBILE).matches) {
+        if (!anchor || !window.matchMedia(SITE_ANCHOR_MAX).matches) {
             return false;
         }
 
