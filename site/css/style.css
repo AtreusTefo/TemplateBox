@@ -336,7 +336,11 @@ button {
 .site-header {
     background-color: var(--color-card);
     border-bottom: 1px solid var(--color-border);
-    padding: 1.25rem 1.5rem;
+    /* Published as a token because the collapsed nav pins a control against
+       this exact gutter, and the gutter narrows on phones. A literal in both
+       places drifts the moment one of them changes. */
+    --header-pad-x: 1.5rem;
+    padding: 1.25rem var(--header-pad-x);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -402,12 +406,219 @@ button {
    gives back another 16px. */
 @media (max-width: 48rem) {
     .site-header {
-        padding-left: var(--space-md);
-        padding-right: var(--space-md);
+        --header-pad-x: var(--space-md);
     }
 
     .site-nav {
         gap: var(--space-sm);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Hamburger and search toggles (August 18, 2026).
+
+   Five controls in the bar wrapped onto a second row on a phone -- the whole
+   reason .site-nav carries flex-wrap at all -- which made the sticky header
+   tall enough to eat a real share of a small viewport. Below 48rem the
+   primary links collapse behind the hamburger and the bar keeps one row.
+
+   Both buttons are display:none above the breakpoint, so on a desktop this
+   whole section is inert and the header is byte-for-byte the layout it was.
+   They are NOT rendered at all on the four editor pages, whose .site-nav is
+   empty -- a control that opens nothing is worse than no control.
+   -------------------------------------------------------------------------- */
+.nav-toggle,
+.search-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    /* 2.75rem is the tap target the rest of the header already uses. */
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background-color var(--motion-fast) var(--ease);
+}
+
+.nav-toggle:hover,
+.search-toggle:hover,
+.nav-toggle[aria-expanded="true"],
+.search-toggle[aria-expanded="true"] {
+    background-color: var(--color-surface);
+}
+
+.nav-toggle svg,
+.search-toggle svg {
+    width: 1.375rem;
+    height: 1.375rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    display: block;
+}
+
+/* The collapsed bar runs to 74.9375rem, i.e. every width below the ad rail's
+   75rem floor. That is this project's own definition of "not a desktop": the
+   site anchor ends at 74.9375rem and the rail begins at 75rem, and the two
+   bands are documented as meeting exactly. Reusing that seam keeps the header
+   from disagreeing with the ad layout about what a tablet is. */
+@media (max-width: 74.9375rem) {
+    /* Visual order is set here rather than in the markup, because the
+       hamburger has to land beside the wordmark on 17 pages whose headers
+       do not all carry the same children -- the search field and its button
+       exist on the homepage only. Reordering in CSS keeps one rule instead
+       of 17 hand-placed buttons.
+
+       Every child needs an order once any of them has one: an unset order is
+       0, which would jump that item ahead of the wordmark.
+
+       The auto margin does the parking: an auto margin absorbs the free
+       space before justify-content gets any, so the wordmark and hamburger
+       stay together at the start and the rest stays at the end. It yields to
+       the search field's flex-grow where that field is present, which is
+       what keeps the tablet bar looking like the desktop one. */
+    .wordmark {
+        order: 1;
+    }
+
+    .nav-toggle {
+        display: inline-flex;
+        order: 2;
+        margin-right: auto;
+    }
+
+    /* Stays inline on tablets, where it still fits. Only phones trade it for
+       the button below. */
+    .site-search {
+        order: 3;
+    }
+
+    /* Collapsed by default. The theme toggle is not matched here: it is a
+       child of .site-header, not of .site-nav, so it stays in the bar.
+
+       `.site-header` is carried on the link selector purely for weight:
+       `.site-nav a` further down this file sets display:inline-flex at the
+       same (0,1,1) specificity and, being later in source order, would win.
+       A media query adds no specificity of its own, so the collapse has to
+       out-specify it rather than merely follow it. */
+    .site-header .site-nav > a,
+    .site-nav > .nav-more {
+        display: none;
+    }
+
+    /* Opened: the nav claims a full-width second row of the header's own
+       flex line rather than overlaying the page. Nothing is positioned, so
+       there is no stacking or containing-block interaction to get wrong,
+       and the mega-menu panel -- absolute against .site-header at top:100%
+       -- still lands under the grown header without a hardcoded height. */
+    .site-header.nav-open .site-nav {
+        flex: 0 0 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        margin-top: var(--space-2xs);
+        padding-top: var(--space-2xs);
+        border-top: 1px solid var(--color-border);
+    }
+
+    .site-header.nav-open .site-nav > a,
+    .site-header.nav-open .site-nav > .nav-more {
+        display: flex;
+    }
+
+    .site-header.nav-open .site-nav > .nav-more {
+        width: 100%;
+    }
+
+    .site-header.nav-open .site-nav > .nav-more > button {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .site-nav {
+        order: 5;
+    }
+
+    /* The theme toggle stays in the bar beside the search button rather than
+       riding the column down, so switching theme is one tap whether or not
+       the menu is open.
+
+       It has to leave the flow to do that: it is a child of .site-nav, and
+       .site-nav is the full-width second row. Re-parenting it in the markup
+       instead would have rebuilt the desktop bar (see the .theme-toggle
+       block above), so it is pinned here, and only while the menu is open.
+       .site-header is position:sticky and therefore already a containing
+       block, so this lands against the header's own padding box. The offsets
+       mirror that padding -- 1.25rem from the shorthand, and the gutter
+       token, which is 1.5rem on tablets and 1rem on phones. Hardcoding the
+       phone value here put it 8px past the gutter on every tablet. */
+    .site-header.nav-open .site-nav > .theme-toggle {
+        position: absolute;
+        top: 1.25rem;
+        right: var(--header-pad-x);
+    }
+
+    /* ...and the search button steps aside by exactly the toggle's width
+       (2.75rem) plus the header's own gap (1rem), or the two would occupy the
+       same corner -- without this they overlapped precisely and the toggle
+       simply covered the search. Getting the gap term wrong is visible: at
+       0.5rem the button jumped 8px sideways the moment the menu opened. */
+    .site-header.nav-open .search-toggle,
+    .site-header.nav-open .site-search {
+        margin-right: 3.75rem;
+    }
+}
+
+/* Phones only: the search FIELD is display:none under 62rem, so search would
+   otherwise be unreachable there. Above 62rem the field is inline and a
+   button as well would be two search affordances in one bar. */
+@media (max-width: 62rem) {
+    .search-toggle {
+        display: inline-flex;
+        order: 4;
+    }
+
+    /* Last, so the revealed field forms the final row under everything. */
+    .site-header.search-open .site-search {
+        order: 6;
+    }
+}
+
+/* At 320px the wordmark alone is 155px of the 288px between the gutters, so
+   the theme toggle still wrapped to a second row: 145px of header rather
+   than 85px. Dropping the word to the mark alone frees ~130px and the bar
+   fits on one line, which is what the Pinterest-style reference does too.
+
+   Hidden the .sr-only way rather than display:none on purpose -- the SVG is
+   aria-hidden, so the span is the link's ONLY accessible name and removing
+   it from the tree would leave an unlabelled link home. */
+@media (max-width: 22.5rem) {
+    .wordmark span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    /* The search field, revealed on demand as its own row. Beats the
+       display:none at 62rem below on specificity (0,2,1 against 0,1,0), so
+       source order between the two blocks does not matter. */
+    .site-header.search-open .site-search {
+        display: flex;
+        flex: 0 0 100%;
+        max-width: none;
+        margin-top: var(--space-2xs);
     }
 }
 
@@ -435,6 +646,13 @@ button {
    existing right-hand group rather than becoming a fourth flex child and
    redistributing the header; loading.html has no nav, so there it is the last
    child of the header itself.
+
+   Staying inside .site-nav is load-bearing, not incidental. Pulled out to a
+   header child it becomes a fourth space-between item, the leftover space
+   splits three ways instead of two, and the desktop bar visibly changes --
+   measured an 81px gap opening between the nav and the toggle, and the search
+   field sliding ~98px. The phones' hamburger therefore leaves it behind by
+   taking it out of flow (see the 48rem block), not by re-parenting it.
    -------------------------------------------------------------------------- */
 .theme-toggle {
     display: inline-flex;

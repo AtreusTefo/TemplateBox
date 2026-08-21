@@ -59,7 +59,10 @@
 
     <header class="site-header">
         <a class="wordmark" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
-        <nav class="site-nav" aria-label="Primary">
+        <!-- Collapses the primary links on phones so the bar stays one row.
+             Hidden above 48rem, where the links sit inline as before. -->
+        <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <nav class="site-nav" id="site-nav" aria-label="Primary">
             <a href="index.html">Templates</a>
             <a href="blog.html">Guides</a>
             <a href="about.html">About</a>

@@ -355,7 +355,8 @@
 '    <a class="skip-link" href="#main">Skip to main content</a>\n\n' +
 '    <header class="site-header">\n' +
 '        <a class="wordmark" href="../index.html">TemplateBox</a>\n' +
-'        <nav class="site-nav" aria-label="Primary">\n' +
+'        <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>\n' +
+'        <nav class="site-nav" id="site-nav" aria-label="Primary">\n' +
 '            <a href="../index.html">Templates</a>\n' +
 '            <a href="../blog.html" aria-current="page">Guides</a>\n' +
 '            <a href="../about.html">About</a>\n' +

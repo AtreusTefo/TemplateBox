@@ -897,6 +897,147 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Header hamburger and search toggle (August 18, 2026).
+
+       Five controls in the bar wrapped onto a second row on a phone, making
+       the sticky header tall enough to cost a real share of a small
+       viewport. Below 74.9375rem -- every width under the ad rail's floor,
+       so phones and tablets alike -- the primary links collapse behind a
+       hamburger sitting beside the wordmark. The search field is
+       display:none under 62rem, i.e. simply unavailable on a phone, so
+       there it also gets a button that reveals it as its own row; on a
+       tablet the field still fits and stays inline.
+
+       Everything about the collapsed/expanded LAYOUT is CSS. This only owns
+       the open/closed state and the accessibility plumbing, so a page whose
+       header does not carry the buttons (the four editor pages, whose
+       .site-nav is empty) needs no special case: the queries simply miss.
+       ---------------------------------------------------------------------- */
+    function initHeaderToggles() {
+        const header = document.querySelector(".site-header");
+        if (!header) {
+            return;
+        }
+        const navToggle = header.querySelector("[data-nav-toggle]");
+        const searchToggle = header.querySelector("[data-search-toggle]");
+        const nav = document.getElementById("site-nav");
+
+        /* Mirrors the stylesheet's collapse range exactly, so the two cannot
+           disagree about when the bar is collapsed. 74.9375rem is the width
+           just below the ad rail's 75rem floor -- the same seam the site
+           anchor stops at, and this project's own boundary for "not a
+           desktop". */
+        const collapsed = window.matchMedia("(max-width: 74.9375rem)");
+
+        function setNav(open) {
+            header.classList.toggle("nav-open", open);
+            if (navToggle) {
+                navToggle.setAttribute("aria-expanded", String(open));
+                navToggle.setAttribute(
+                    "aria-label",
+                    open ? "Close navigation menu" : "Open navigation menu"
+                );
+            }
+            /* Collapsing the bar hides .nav-more outright, so a mega-menu
+               left open would keep aria-expanded="true" on a control that is
+               no longer rendered, and would reappear already expanded the
+               next time the hamburger is opened. */
+            if (!open) {
+                const morePanel = header.querySelector("[data-nav-more-panel]");
+                const moreToggle = header.querySelector("[data-nav-more-toggle]");
+                if (morePanel && !morePanel.hidden) {
+                    morePanel.hidden = true;
+                    if (moreToggle) {
+                        moreToggle.setAttribute("aria-expanded", "false");
+                    }
+                }
+            }
+        }
+
+        function setSearch(open) {
+            header.classList.toggle("search-open", open);
+            if (searchToggle) {
+                searchToggle.setAttribute("aria-expanded", String(open));
+            }
+            if (open) {
+                const input = document.querySelector("[data-search-input]");
+                if (input) {
+                    input.focus();
+                }
+            }
+        }
+
+        if (navToggle && nav) {
+            navToggle.addEventListener("click", () => {
+                const open = !header.classList.contains("nav-open");
+                setNav(open);
+                /* Both rows open at once would put the bar back to the
+                   height this exists to avoid. */
+                if (open) {
+                    setSearch(false);
+                }
+            });
+
+            /* A tap on any link navigates, but an in-page hash link does
+                 not, and leaving the panel open over the destination is
+                 disorienting. Closing on any link covers both. */
+            nav.addEventListener("click", (event) => {
+                const link = event.target instanceof Element
+                    ? event.target.closest("a")
+                    : null;
+                if (link) {
+                    setNav(false);
+                }
+            });
+        }
+
+        if (searchToggle) {
+            searchToggle.addEventListener("click", () => {
+                const open = !header.classList.contains("search-open");
+                setSearch(open);
+                if (open) {
+                    setNav(false);
+                }
+            });
+        }
+
+        /* Escape closes whichever is open and returns focus to its trigger,
+           or a keyboard user who opened one has no way back out. */
+        header.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") {
+                return;
+            }
+            if (header.classList.contains("nav-open")) {
+                setNav(false);
+                if (navToggle) {
+                    navToggle.focus();
+                }
+            } else if (header.classList.contains("search-open")) {
+                setSearch(false);
+                if (searchToggle) {
+                    searchToggle.focus();
+                }
+            }
+        });
+
+        /* Widening past the breakpoint restores the inline bar, and a state
+           class left behind would keep .site-nav a full-width column on a
+           desktop. Cleared on the transition rather than on every resize. */
+        function onBreakpoint(event) {
+            if (!event.matches) {
+                setNav(false);
+                setSearch(false);
+            }
+        }
+        if (typeof collapsed.addEventListener === "function") {
+            collapsed.addEventListener("change", onBreakpoint);
+        } else if (typeof collapsed.addListener === "function") {
+            /* Safari before 14. */
+            collapsed.addListener(onBreakpoint);
+        }
+    }
+
+    /* ----------------------------------------------------------------------
        Header mega-menu.
 
        Originally homepage-only, because the homepage was the one page with
@@ -1163,6 +1304,7 @@ const TB = (() => {
             initGuidesStrip,
             initSaveState,
             initFormNav,
+            initHeaderToggles,
             initNavMore,
             initSearch,
             /* Before initScrollDirection: the hide transform reads --header-h,

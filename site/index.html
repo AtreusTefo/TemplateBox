@@ -149,7 +149,17 @@
             <button type="button" data-search-clear aria-label="Clear search">&times;</button>
         </div>
 
-        <nav class="site-nav" aria-label="Primary">
+        <!-- Phones get the search as a button rather than a permanent field.
+             The field itself is display:none under 62rem and stayed that way
+             on a phone, so search was simply unavailable there; this reveals
+             it as its own row on demand instead of costing bar height all the
+             time. Hidden at widths where the field is already visible. -->
+        <button type="button" class="search-toggle" data-search-toggle aria-expanded="false" aria-controls="site-search-input" aria-label="Search templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg></button>
+
+        <!-- Collapses the primary links on phones so the bar stays one row.
+             Hidden above 48rem, where the links sit inline as before. -->
+        <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <nav class="site-nav" id="site-nav" aria-label="Primary">
             <a href="index.html" aria-current="page">Templates</a>
             <a href="blog.html">Guides</a>
             <a href="about.html">About</a>
