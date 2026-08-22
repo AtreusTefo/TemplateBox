@@ -6373,6 +6373,46 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
+   Catalog thumbnail workspace (admin.html)
+
+   The preview is the homepage's own markup -- .catalog-grid > .template-card
+   > .card-preview.photo -- so the 4:5 window, the hover crossfade and the
+   card chrome are inherited rather than reimplemented. Only two things are
+   admin-specific: the grid is capped to one card's width, and the hover image
+   needs a real hide.
+   -------------------------------------------------------------------------- */
+
+/* One card, at roughly the width the homepage gives a card on a laptop. The
+   column override has to sit here rather than beside .catalog-grid: media
+   queries carry no specificity, so it beats the grid's 2/3/4-column ladder
+   only by being declared after it. */
+.admin-thumb-preview {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 15rem;
+    margin-top: 0.5rem;
+}
+
+/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`.
+   Both of these carry one: .catalog-grid sets display: grid on the wrapper,
+   and .card-preview.photo .card-thumb sets display: block on the images.
+   Without the second rule the hover slot would paint over the default image
+   whenever an item has no hover thumbnail -- which is the optional case, so
+   it is the common one. */
+.admin-thumb-preview[hidden] {
+    display: none;
+}
+
+.admin-thumb-preview .card-thumb[hidden] {
+    display: none;
+}
+
+.admin-thumb-paths {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    word-break: break-all;
+}
+
+/* --------------------------------------------------------------------------
    Responsive rules (layouts verified down to a 320px viewport)
    -------------------------------------------------------------------------- */
 

@@ -208,6 +208,140 @@
             </div>
             <div class="prose admin-preview" data-preview-target></div>
         </section>
+
+        <!-- Catalog thumbnails: the second workflow this panel drives, and it
+             is deliberately shaped like the blog one rather than like a CMS.
+             The homepage catalog has no data file, so there is nothing to
+             generate here the way js/blog-data.js is generated. What this
+             produces is an artifact pair: two renamed image downloads to drop
+             into the project, and the exact markup block to paste into
+             index.html. The workspace below is localStorage only, same as the
+             post drafts above, and nothing here reaches the live site until
+             those two artifacts are committed. -->
+        <section class="admin-panel" aria-label="Catalog thumbnails">
+            <div class="admin-panel-head">
+                <h2>Catalog Thumbnails</h2>
+                <p class="admin-sync" data-thumb-sync></p>
+            </div>
+
+            <div class="admin-actions">
+                <button class="btn" type="button" data-thumb-download-all>Download All Images</button>
+            </div>
+            <p class="admin-status" data-thumb-status aria-live="polite"></p>
+
+            <details class="admin-help">
+                <summary>How catalog thumbnails are published</summary>
+                <ol>
+                    <li>Pick a catalog item below, or choose "Add a new catalog item" and describe it.</li>
+                    <li>Upload the default thumbnail. This is what the card shows at rest, and it is required.</li>
+                    <li>Optionally upload a hover thumbnail. Leave it empty and the card simply has no hover state, which is a valid card.</li>
+                    <li>Save. The item joins the list above, stored in this browser only.</li>
+                    <li>Click Download on the item (or Download All Images) and put the downloaded files in the folder shown on the row. Both files are already named to the project convention.</li>
+                    <li>Click Copy Markup and paste it into <span class="mono">index.html</span>: over the item's existing <span class="mono">&lt;div class="card-preview"&gt;</span> block for an existing card, or as a new <span class="mono">&lt;article&gt;</span> inside <span class="mono">&lt;div class="catalog-grid"&gt;</span> for a new one.</li>
+                    <li>Commit and push to <span class="mono">main</span> (Netlify auto-deploys), or drag the <span class="mono">site</span> folder into Netlify.</li>
+                </ol>
+            </details>
+            <details class="admin-help">
+                <summary>Why images are downloaded instead of saved</summary>
+                <p>TemplateBox has no server and no build step, so a browser page cannot write into the project's <span class="mono">assets/</span> folder. Thumbnails are held here as data URIs in this browser's storage purely so the form survives a refresh; the published copies are the real files you place in the repository, exactly as post pages work.</p>
+                <p>That is also why the size cap is low. Storage is a few megabytes in total and is shared with the blog workspace, and the thumbnails already shipping are around 60 KB each.</p>
+            </details>
+
+            <div class="admin-list" data-thumb-list></div>
+
+            <form id="thumb-form" novalidate>
+                <div class="field">
+                    <label for="f-thumb-item">Catalog item</label>
+                    <select id="f-thumb-item" data-thumb-item></select>
+                    <p class="upload-hint">The 18 cards currently on the homepage, plus an option for one that is not there yet.</p>
+                </div>
+
+                <fieldset data-thumb-new-fields hidden>
+                    <legend>New catalog item</legend>
+                    <div class="field">
+                        <label for="f-thumb-id">Item id (used for the file names)</label>
+                        <input id="f-thumb-id" type="text" maxlength="60"
+                            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                            placeholder="canvas-tote-bag" autocomplete="off">
+                        <p class="upload-hint">Lowercase letters, numbers and hyphens. Produces <span class="mono">&lt;id&gt;-thumb-blank.jpg</span> and <span class="mono">&lt;id&gt;-thumb.jpg</span>.</p>
+                    </div>
+                    <div class="field">
+                        <label for="f-thumb-title">Card title</label>
+                        <input id="f-thumb-title" type="text" maxlength="120"
+                            placeholder="Canvas Tote Bag Mockup" autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label for="f-thumb-category">Category</label>
+                        <select id="f-thumb-category" data-thumb-category></select>
+                        <p class="upload-hint">Sets the card's filter category, its visible category label and the default destination folder.</p>
+                    </div>
+                    <div class="field">
+                        <label for="f-thumb-doc">Editor variant (optional)</label>
+                        <input id="f-thumb-doc" type="text" maxlength="60"
+                            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                            placeholder="tote-bag" autocomplete="off">
+                        <p class="upload-hint">Becomes <span class="mono">data-doc</span>. Only editors that open more than one template need it, and the value must already exist in that editor's own variant table. Leave empty otherwise.</p>
+                    </div>
+                </fieldset>
+
+                <div class="field">
+                    <label for="f-thumb-folder">Destination folder</label>
+                    <input id="f-thumb-folder" type="text" maxlength="120"
+                        pattern="[a-z0-9/-]+" autocomplete="off">
+                    <p class="upload-hint">Relative to <span class="mono">site/</span>. Existing photo cards keep their own sub-folder; everything else defaults by category.</p>
+                </div>
+
+                <fieldset>
+                    <legend>Thumbnails</legend>
+                    <div class="field">
+                        <label for="f-thumb-default">Default thumbnail (required)</label>
+                        <input id="f-thumb-default" type="file" accept="image/*" data-thumb-default-file>
+                        <p class="upload-hint">Shown at rest and on touch devices. JPEG, PNG or WebP, 4:5 to match the other cards, under 500 KB. Non-image files are rejected.</p>
+                        <p class="form-error" data-thumb-default-error></p>
+                        <button class="entry-remove" type="button" data-thumb-default-remove hidden>Remove Default Image</button>
+                    </div>
+                    <div class="field">
+                        <label for="f-thumb-hover">Hover thumbnail (optional)</label>
+                        <input id="f-thumb-hover" type="file" accept="image/*" data-thumb-hover-file>
+                        <p class="upload-hint">Crossfades in on hover and keyboard focus. Skip it and the card has no hover state; add it later and only this field changes.</p>
+                        <p class="form-error" data-thumb-hover-error></p>
+                        <button class="entry-remove" type="button" data-thumb-hover-remove hidden>Remove Hover Image</button>
+                    </div>
+                </fieldset>
+
+                <!-- Preview. Deliberately the production markup inside a real
+                     .catalog-grid wrapper: the hover crossfade, the 4:5 window
+                     and the card geometry all come from the homepage rules
+                     rather than from admin-only copies of them, so what shows
+                     here cannot disagree with what ships. -->
+                <div class="field">
+                    <p class="upload-hint">Preview. Hover the card to see the hover state, exactly as the homepage renders it.</p>
+                    <div class="catalog-grid admin-thumb-preview" data-thumb-preview hidden>
+                        <article class="template-card">
+                            <div class="card-preview photo" aria-hidden="true">
+                                <div class="card-media">
+                                    <img class="card-thumb card-thumb-blank" alt="" data-thumb-preview-default>
+                                    <img class="card-thumb card-thumb-hover" alt="" data-thumb-preview-hover hidden>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-category" data-thumb-preview-label></p>
+                                <h3 class="card-title" data-thumb-preview-title></h3>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+
+                <p class="form-error" data-thumb-error aria-live="polite"></p>
+
+                <div class="admin-actions">
+                    <button class="btn" type="submit" data-thumb-save>Save Thumbnails</button>
+                    <button class="btn btn-secondary" type="button" data-thumb-copy>Copy Markup</button>
+                    <button class="btn btn-secondary" type="button" data-thumb-clear>Clear Form</button>
+                </div>
+                <p class="admin-status" data-thumb-form-status aria-live="polite"></p>
+            </form>
+        </section>
     </main>
 
     <footer class="site-footer">

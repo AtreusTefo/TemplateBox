@@ -866,3 +866,863 @@ body + '\n' +
     renderList();
     renderSyncState();
 })();
+
+/* ==========================================================================
+   TemplateBox - Catalog Thumbnail Workspace (admin.html)
+   Scope: attaching a default thumbnail (required) and an optional hover
+   thumbnail to a homepage catalog card, previewing the pair in the
+   production markup, and exporting the two renamed image files plus the
+   markup block that references them.
+   Depends on: js/app.js (TB) only.
+
+   Why this is artifact-based rather than data-driven: the homepage catalog
+   has no data file. The 18 cards in index.html are hand-written markup, so
+   there is nothing here to generate the way js/blog-data.js is generated for
+   the blog, and inventing a catalog registry would mean rewriting index.html
+   to render from it -- a much larger change than "let me attach two images".
+   What this exports instead is what the workflow actually needs: the images,
+   named to the convention, and the block to paste.
+
+   The two-image convention it targets already exists in index.html: an
+   .card-thumb-blank image is the card at rest, and a .card-thumb-hover image
+   stacked on top of it crossfades in on hover and focus. A card with no
+   hover image is a complete card -- 16 of the 18 are exactly that today --
+   which is why the hover slot is optional here and never blocks a save.
+
+   Kept as its own IIFE, sharing nothing with the blog workspace above: the
+   two workflows have separate storage, separate exports and separate
+   failure modes, and either half can be absent from the page.
+   ========================================================================== */
+
+(() => {
+
+    const form = document.getElementById("thumb-form");
+    if (!form) {
+        return;
+    }
+
+    const STORAGE_KEY = "tb_admin_catalog_thumbs";
+
+    /* Images are held as data URIs in localStorage so the form survives a
+       refresh, and localStorage is a few megabytes shared with the blog
+       workspace. The thumbnails already shipping are around 60 KB each, so
+       this cap is roughly eight times the real requirement and still leaves
+       room for the whole catalog. */
+    const MAX_THUMB_BYTES = 500 * 1024;
+
+    /* Mime type to file extension, as a whitelist. Deriving the extension
+       from file.name instead would take it from a user-controlled string:
+       a file called "art.jpg" that is really a PNG would be downloaded as
+       .jpg and the generated markup would point at a file the deploy does
+       not contain. The mime type is what the mime gate already trusts. */
+    const EXT_BY_TYPE = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp"
+    };
+
+    /* One record per catalog category: the filter value on the card's
+       data-category, the visible label above the title, the editor the card
+       opens, and the folder new thumbnails default into. */
+    const CATEGORIES = {
+        documents: {
+            label: "Receipts and Invoices",
+            page: "docs.html",
+            target: "docs",
+            folder: "assets/thumbnails/documents"
+        },
+        resumes: {
+            label: "Resumes",
+            page: "resume.html",
+            target: "resume",
+            folder: "assets/thumbnails/resumes"
+        },
+        canvas: {
+            label: "Posters and Prints",
+            page: "poster.html",
+            target: "poster",
+            folder: "assets/thumbnails/posters"
+        },
+        mockups: {
+            label: "Product Mockups",
+            page: "mockup.html",
+            target: "mockup",
+            folder: "assets/thumbnails/product-mockups"
+        }
+    };
+
+    /* The catalog as index.html ships it, in source order. This is a picker,
+       not a database: nothing reads it at runtime on the public site, and a
+       card added to index.html without being added here still works -- it
+       just has to be re-entered as a new item to get thumbnails.
+
+       `id` is the file-name stem. Where a card carries data-doc it is that
+       value, so the file name matches the variant the card already names.
+       The three resume cards and the three poster cards carry no data-doc
+       (they all open the same editor with no preset), so their ids are
+       derived from their titles and `doc` is null -- the generated markup
+       omits the attribute rather than inventing one, which would send a
+       preset to an editor with no variant table to match it against.
+
+       `folder` is present only where a card already has thumbnails on disk,
+       so re-exporting one regenerates its existing path rather than moving
+       the file. Everything else falls back to the category default. */
+    const CATALOG_ITEMS = [
+        { id: "rent-receipt", title: "Rent Receipt", category: "documents", doc: "rent-receipt" },
+        { id: "payment-receipt", title: "Cash Payment Receipt", category: "documents", doc: "payment-receipt" },
+        { id: "business-receipt", title: "Itemized Business Receipt", category: "documents", doc: "business-receipt" },
+        { id: "sales-receipt", title: "Sales and Cash Receipt Form", category: "documents", doc: "sales-receipt" },
+        { id: "invoice", title: "Professional Invoice", category: "documents", doc: "invoice" },
+        { id: "warning-notice", title: "Employee Warning Notice", category: "documents", doc: "warning-notice" },
+        { id: "executive-resume", title: "Executive Resume", category: "resumes", doc: null },
+        { id: "modern-professional-cv", title: "Modern Professional CV", category: "resumes", doc: null },
+        { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: null },
+        { id: "framed-photo-poster", title: "Framed Photo Poster", category: "canvas", doc: null },
+        { id: "matte-wood-canvas", title: "Matte Wood Canvas", category: "canvas", doc: null },
+        { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: null },
+        { id: "tshirt", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt" },
+        { id: "hoodie", title: "Hoodie Mockup", category: "mockups", doc: "hoodie" },
+        { id: "mug", title: "Mug Mockup", category: "mockups", doc: "mug" },
+        { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },
+        {
+            id: "wood-a4", title: "Leaning Wood Frame Poster Mockup", category: "mockups", doc: "wood-a4",
+            folder: "assets/thumbnails/product-mockups/posters-frames-canvas-billboards"
+        },
+        {
+            id: "tshirt-model-white", title: "White T-Shirt on Model Mockup", category: "mockups", doc: "tshirt-model-white",
+            folder: "assets/thumbnails/product-mockups/apparel"
+        }
+    ];
+
+    const el = {
+        item: document.querySelector("[data-thumb-item]"),
+        newFields: document.querySelector("[data-thumb-new-fields]"),
+        newId: document.getElementById("f-thumb-id"),
+        newTitle: document.getElementById("f-thumb-title"),
+        newCategory: document.querySelector("[data-thumb-category]"),
+        newDoc: document.getElementById("f-thumb-doc"),
+        folder: document.getElementById("f-thumb-folder"),
+        defaultFile: document.querySelector("[data-thumb-default-file]"),
+        defaultError: document.querySelector("[data-thumb-default-error]"),
+        defaultRemove: document.querySelector("[data-thumb-default-remove]"),
+        hoverFile: document.querySelector("[data-thumb-hover-file]"),
+        hoverError: document.querySelector("[data-thumb-hover-error]"),
+        hoverRemove: document.querySelector("[data-thumb-hover-remove]"),
+        preview: document.querySelector("[data-thumb-preview]"),
+        previewDefault: document.querySelector("[data-thumb-preview-default]"),
+        previewHover: document.querySelector("[data-thumb-preview-hover]"),
+        previewLabel: document.querySelector("[data-thumb-preview-label]"),
+        previewTitle: document.querySelector("[data-thumb-preview-title]"),
+        error: document.querySelector("[data-thumb-error]"),
+        formStatus: document.querySelector("[data-thumb-form-status]"),
+        copy: document.querySelector("[data-thumb-copy]"),
+        clear: document.querySelector("[data-thumb-clear]"),
+        list: document.querySelector("[data-thumb-list]"),
+        sync: document.querySelector("[data-thumb-sync]"),
+        status: document.querySelector("[data-thumb-status]"),
+        downloadAll: document.querySelector("[data-thumb-download-all]")
+    };
+
+    const NEW_ITEM = "__new__";
+
+    /* Saved records, keyed by id. Shape:
+       { id, title, category, doc, folder,
+         defaultImage: { data, ext, w, h }, hoverImage: null | same, updated } */
+    const restored = TB.storageGet(STORAGE_KEY);
+    let items = Array.isArray(restored) ? restored : [];
+
+    /* The record being edited, or null. Images live here until saved so that
+       an abandoned edit never touches the stored workspace. */
+    let draftDefault = null;
+    let draftHover = null;
+    let editingId = null;
+
+    function setText(target, message) {
+        if (target) {
+            target.textContent = message || "";
+        }
+    }
+
+    function todayIso() {
+        const d = new Date();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return d.getFullYear() + "-" + mm + "-" + dd;
+    }
+
+    function slugish(value) {
+        return String(value || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+    }
+
+    function catalogItem(id) {
+        return CATALOG_ITEMS.find((entry) => entry.id === id) || null;
+    }
+
+    function savedItem(id) {
+        return items.find((entry) => entry.id === id) || null;
+    }
+
+    function defaultFolder(item) {
+        return item.folder || CATEGORIES[item.category].folder;
+    }
+
+    /* Both file names in one place. -thumb-blank is the resting state and
+       -thumb is the hover state, matching the two pairs already on disk. */
+    function thumbPath(record, which) {
+        const shot = which === "hover" ? record.hoverImage : record.defaultImage;
+        const suffix = which === "hover" ? "-thumb." : "-thumb-blank.";
+        return record.folder + "/" + record.id + suffix + shot.ext;
+    }
+
+    function fileName(record, which) {
+        const path = thumbPath(record, which);
+        return path.slice(path.lastIndexOf("/") + 1);
+    }
+
+    /* ----------------------------------------------------------------------
+       Persistence. TB.storageSet swallows quota and private-mode failures by
+       design, so the write is read back: a workspace holding several images
+       is exactly the case that fills the quota, and silently losing an
+       upload the operator believes is saved is the failure worth catching.
+       ---------------------------------------------------------------------- */
+    function save() {
+        TB.storageSet(STORAGE_KEY, items);
+        const stored = TB.storageGet(STORAGE_KEY);
+        const persisted = Array.isArray(stored) && stored.length === items.length;
+        renderList();
+        renderSyncState();
+        if (!persisted) {
+            setText(el.status, "Warning: this browser did not store the workspace, most likely because the images filled its quota. Download the images now; deleting exported items frees space.");
+        }
+        return persisted;
+    }
+
+    /* ----------------------------------------------------------------------
+       Image intake. Mime-type gate per the project standard: file.type must
+       be an image type, otherwise processing terminates immediately and the
+       input is cleared. The decode probe afterwards is a second gate -- a
+       file can carry an image mime type and still not be an image -- and it
+       is also where the intrinsic dimensions come from, which the generated
+       markup needs for its width/height attributes.
+       ---------------------------------------------------------------------- */
+    function readImage(file, onOk, onFail) {
+        if (!file.type.startsWith("image/")) {
+            onFail("Rejected: the selected file is not an image.");
+            return;
+        }
+        const ext = EXT_BY_TYPE[file.type];
+        if (!ext) {
+            onFail("Rejected: unsupported image format. Use JPEG, PNG or WebP.");
+            return;
+        }
+        if (file.size > MAX_THUMB_BYTES) {
+            onFail("Rejected: image exceeds 500 KB. Compress it before uploading; the shipped thumbnails are around 60 KB.");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => onFail("Rejected: the file could not be read.");
+        reader.onload = () => {
+            const data = String(reader.result || "");
+            const probe = new Image();
+            probe.onerror = () => onFail("Rejected: the file claims to be an image but could not be decoded.");
+            probe.onload = () => onOk({
+                data: data,
+                ext: ext,
+                w: probe.naturalWidth,
+                h: probe.naturalHeight
+            });
+            probe.src = data;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function bindUpload(input, errorTarget, removeBtn, assign) {
+        input.addEventListener("change", () => {
+            setText(errorTarget, "");
+            const file = input.files && input.files[0];
+            if (!file) {
+                return;
+            }
+            readImage(file, (shot) => {
+                assign(shot);
+                renderPreview();
+            }, (message) => {
+                input.value = "";
+                assign(null);
+                setText(errorTarget, message);
+                renderPreview();
+            });
+        });
+
+        removeBtn.addEventListener("click", () => {
+            input.value = "";
+            setText(errorTarget, "");
+            assign(null);
+            renderPreview();
+        });
+    }
+
+    bindUpload(el.defaultFile, el.defaultError, el.defaultRemove, (shot) => {
+        draftDefault = shot;
+    });
+    bindUpload(el.hoverFile, el.hoverError, el.hoverRemove, (shot) => {
+        draftHover = shot;
+    });
+
+    /* ----------------------------------------------------------------------
+       Form
+       ---------------------------------------------------------------------- */
+    function buildItemOptions() {
+        el.item.textContent = "";
+
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = "Select a catalog item";
+        el.item.appendChild(blank);
+
+        Object.keys(CATEGORIES).forEach((key) => {
+            const group = document.createElement("optgroup");
+            group.label = CATEGORIES[key].label;
+            CATALOG_ITEMS.filter((entry) => entry.category === key).forEach((entry) => {
+                const option = document.createElement("option");
+                option.value = entry.id;
+                option.textContent = entry.title + (savedItem(entry.id) ? " (has thumbnails)" : "");
+                group.appendChild(option);
+            });
+            el.item.appendChild(group);
+        });
+
+        /* Items saved here that are not in CATALOG_ITEMS: cards added to
+           index.html after this list was written, or ones not pasted in yet. */
+        const extra = items.filter((entry) => !catalogItem(entry.id));
+        if (extra.length) {
+            const group = document.createElement("optgroup");
+            group.label = "Added here";
+            extra.forEach((entry) => {
+                const option = document.createElement("option");
+                option.value = entry.id;
+                option.textContent = TB.desanitize(entry.title);
+                group.appendChild(option);
+            });
+            el.item.appendChild(group);
+        }
+
+        const addNew = document.createElement("option");
+        addNew.value = NEW_ITEM;
+        addNew.textContent = "Add a new catalog item";
+        el.item.appendChild(addNew);
+    }
+
+    function buildCategoryOptions() {
+        el.newCategory.textContent = "";
+        Object.keys(CATEGORIES).forEach((key) => {
+            const option = document.createElement("option");
+            option.value = key;
+            option.textContent = CATEGORIES[key].label;
+            el.newCategory.appendChild(option);
+        });
+    }
+
+    function isNewSelected() {
+        return el.item.value === NEW_ITEM;
+    }
+
+    function syncFormToSelection() {
+        const value = el.item.value;
+        el.newFields.hidden = value !== NEW_ITEM;
+        setText(el.error, "");
+        setText(el.formStatus, "");
+
+        if (!value) {
+            clearImages();
+            el.folder.value = "";
+            editingId = null;
+            renderPreview();
+            return;
+        }
+
+        if (value === NEW_ITEM) {
+            clearImages();
+            editingId = null;
+            el.folder.value = CATEGORIES[el.newCategory.value].folder;
+            renderPreview();
+            return;
+        }
+
+        const saved = savedItem(value);
+        const known = catalogItem(value);
+        editingId = value;
+        clearImages();
+
+        if (saved) {
+            draftDefault = saved.defaultImage;
+            draftHover = saved.hoverImage;
+            el.folder.value = saved.folder;
+        } else if (known) {
+            el.folder.value = defaultFolder(known);
+        }
+        renderPreview();
+    }
+
+    function clearImages() {
+        draftDefault = null;
+        draftHover = null;
+        el.defaultFile.value = "";
+        el.hoverFile.value = "";
+        setText(el.defaultError, "");
+        setText(el.hoverError, "");
+    }
+
+    /* The record the form currently describes, or an Error message. Used by
+       both save and Copy Markup, so the two can never disagree about what is
+       valid. */
+    function collectRecord() {
+        const value = el.item.value;
+        if (!value) {
+            throw new Error("Choose a catalog item first.");
+        }
+
+        let id;
+        let title;
+        let category;
+        let doc;
+
+        if (value === NEW_ITEM) {
+            id = slugish(el.newId.value.trim() || el.newTitle.value.trim());
+            title = el.newTitle.value.trim();
+            category = el.newCategory.value;
+            doc = slugish(el.newDoc.value.trim());
+            if (!title) {
+                throw new Error("A new catalog item needs a card title.");
+            }
+            if (!id) {
+                throw new Error("A new catalog item needs an id (lowercase letters, numbers and hyphens).");
+            }
+            if (!Object.prototype.hasOwnProperty.call(CATEGORIES, category)) {
+                throw new Error("Choose a category.");
+            }
+            if (id !== editingId && (savedItem(id) || catalogItem(id))) {
+                throw new Error("The id \"" + id + "\" is already in use by another catalog item.");
+            }
+        } else {
+            const saved = savedItem(value);
+            const known = catalogItem(value);
+            const source = known || saved;
+            id = source.id;
+            title = TB.desanitize(source.title);
+            category = source.category;
+            doc = source.doc || "";
+        }
+
+        const folder = String(el.folder.value || "").trim().replace(/^\/+|\/+$/g, "");
+        if (!/^[a-z0-9][a-z0-9/-]*$/.test(folder)) {
+            throw new Error("The destination folder may only contain lowercase letters, numbers, hyphens and slashes.");
+        }
+
+        if (!draftDefault) {
+            throw new Error("A default thumbnail is required. The hover thumbnail is optional.");
+        }
+
+        return {
+            id: id,
+            title: TB.sanitize(title),
+            category: category,
+            doc: doc || null,
+            folder: folder,
+            defaultImage: draftDefault,
+            hoverImage: draftHover,
+            updated: todayIso()
+        };
+    }
+
+    form.addEventListener("submit", (evt) => {
+        evt.preventDefault();
+        setText(el.error, "");
+        let record;
+        try {
+            record = collectRecord();
+        } catch (err) {
+            setText(el.error, err.message);
+            return;
+        }
+
+        const idx = items.findIndex((entry) => entry.id === (editingId || record.id));
+        if (idx >= 0) {
+            items[idx] = record;
+        } else {
+            items.push(record);
+        }
+        editingId = record.id;
+
+        if (save()) {
+            setText(el.formStatus, "Saved to the local workspace. Download the images and copy the markup from the list above when ready.");
+        }
+        buildItemOptions();
+        el.item.value = record.id;
+        el.newFields.hidden = true;
+        renderPreview();
+    });
+
+    el.item.addEventListener("change", syncFormToSelection);
+    el.newCategory.addEventListener("change", () => {
+        if (isNewSelected()) {
+            el.folder.value = CATEGORIES[el.newCategory.value].folder;
+        }
+    });
+    el.clear.addEventListener("click", () => {
+        form.reset();
+        editingId = null;
+        clearImages();
+        el.newFields.hidden = true;
+        setText(el.error, "");
+        setText(el.formStatus, "");
+        renderPreview();
+    });
+
+    /* ----------------------------------------------------------------------
+       Preview. Sources are set as properties on the two <img> elements that
+       ship in the panel's markup; nothing is built from a string.
+       ---------------------------------------------------------------------- */
+    function renderPreview() {
+        el.defaultRemove.hidden = !draftDefault;
+        el.hoverRemove.hidden = !draftHover;
+
+        if (!draftDefault) {
+            el.preview.hidden = true;
+            el.previewDefault.removeAttribute("src");
+            el.previewHover.removeAttribute("src");
+            el.previewHover.hidden = true;
+            return;
+        }
+
+        el.previewDefault.src = draftDefault.data;
+        if (draftHover) {
+            el.previewHover.src = draftHover.data;
+            el.previewHover.hidden = false;
+        } else {
+            el.previewHover.removeAttribute("src");
+            el.previewHover.hidden = true;
+        }
+
+        let label = "";
+        let title = "";
+        if (isNewSelected()) {
+            label = CATEGORIES[el.newCategory.value].label;
+            title = el.newTitle.value.trim();
+        } else {
+            const source = catalogItem(el.item.value) || savedItem(el.item.value);
+            if (source) {
+                label = CATEGORIES[source.category].label;
+                title = TB.desanitize(source.title);
+            }
+        }
+        el.previewLabel.textContent = label;
+        el.previewTitle.textContent = title;
+        el.preview.hidden = false;
+    }
+
+    /* ----------------------------------------------------------------------
+       Markup generation.
+
+       Every element carrying operator-supplied text or a generated path is
+       built with createElement/textContent/setAttribute and then serialized,
+       so escaping is the serializer's job rather than a hand-rolled escaper.
+       The surrounding wrapper lines are literal constants containing no
+       variable at all. Indentation matches index.html so the block pastes in
+       without reformatting.
+       ---------------------------------------------------------------------- */
+    /* Markup elements are built in an inert document, never in this one. An
+       <img> created here and given a src fetches it immediately even while
+       detached from the tree, and the src being generated is a file that by
+       definition does not exist yet -- so every Copy Markup logged a 404 for
+       the thumbnail it was describing. The inert document loads nothing. */
+    const MARKUP_DOC = document.implementation.createHTMLDocument("");
+
+    /* The opening tag of an element, taken from the serializer rather than
+       assembled by hand so attribute escaping stays the serializer's job.
+       Slicing to the first ">" would be shorter and wrong: nothing in the
+       HTML serialization rules escapes ">" inside an attribute value. */
+    function openTag(node) {
+        const html = node.outerHTML;
+        const close = "</" + node.tagName.toLowerCase() + ">";
+        return html.slice(-close.length) === close
+            ? html.slice(0, html.length - close.length)
+            : html;
+    }
+
+    function imgMarkup(record, which) {
+        const shot = which === "hover" ? record.hoverImage : record.defaultImage;
+        const img = MARKUP_DOC.createElement("img");
+        img.className = which === "hover"
+            ? "card-thumb card-thumb-hover"
+            : "card-thumb card-thumb-blank";
+        img.setAttribute("src", thumbPath(record, which));
+        img.setAttribute("alt", "");
+        img.setAttribute("width", String(shot.w));
+        img.setAttribute("height", String(shot.h));
+        img.setAttribute("loading", "lazy");
+        return img.outerHTML;
+    }
+
+    /* The .card-preview block, which is what replaces an existing card's
+       preview. `pad` is the indentation of its opening tag in index.html. */
+    function previewMarkup(record, pad) {
+        const lines = [
+            pad + '<div class="card-preview photo" aria-hidden="true">',
+            pad + '    <div class="card-media">',
+            pad + '        ' + imgMarkup(record, "default")
+        ];
+        if (record.hoverImage) {
+            lines.push(pad + '        ' + imgMarkup(record, "hover"));
+        }
+        lines.push(pad + '    </div>');
+        lines.push(pad + '</div>');
+        return lines.join("\n");
+    }
+
+    /* The whole card, for an item not on the homepage yet. */
+    function articleMarkup(record) {
+        const category = CATEGORIES[record.category];
+
+        const link = MARKUP_DOC.createElement("a");
+        link.className = "card-link";
+        link.setAttribute("href", category.page);
+        link.setAttribute("data-target", category.target);
+        if (record.doc) {
+            link.setAttribute("data-doc", record.doc);
+        }
+        link.textContent = TB.desanitize(record.title);
+
+        const label = MARKUP_DOC.createElement("p");
+        label.className = "card-category";
+        label.textContent = category.label;
+
+        const article = MARKUP_DOC.createElement("article");
+        article.className = "template-card";
+        article.setAttribute("data-category", record.category);
+
+        return [
+            '                ' + openTag(article),
+            previewMarkup(record, "                    "),
+            '                    <div class="card-body">',
+            '                        ' + label.outerHTML,
+            '                        <h3 class="card-title">' + link.outerHTML + '</h3>',
+            '                    </div>',
+            '                </article>'
+        ].join("\n");
+    }
+
+    function markupFor(record) {
+        return catalogItem(record.id)
+            ? previewMarkup(record, "                    ")
+            : articleMarkup(record);
+    }
+
+    function copyMarkup(record) {
+        const text = markupFor(record) + "\n";
+        const isKnown = Boolean(catalogItem(record.id));
+        const note = isKnown
+            ? "Copied. In index.html, replace the <div class=\"card-preview\"> block inside the \"" +
+                TB.desanitize(record.title) + "\" card with this."
+            : "Copied. In index.html, paste this as a new <article> inside <div class=\"catalog-grid\">, then update the card count in the catalog-empty message.";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(
+                () => setText(el.status, note),
+                () => setText(el.status, "Copy failed in this browser.")
+            );
+        } else {
+            setText(el.status, "Clipboard unavailable in this browser.");
+        }
+    }
+
+    /* ----------------------------------------------------------------------
+       Downloads. Same spacing as the post-page export: browsers throttle
+       rapid sequential downloads, and a zip library would mean a CDN
+       dependency for a handful of files.
+       ---------------------------------------------------------------------- */
+    /* Data URI back to bytes. The stored image could be handed straight to
+       a download link, but browsers cap or block data: URLs in that position
+       at sizes well under this cap; a Blob URL is what the post-page export
+       already uses and has no such limit. */
+    function dataUriToBlob(data) {
+        const comma = data.indexOf(",");
+        const type = (data.slice(0, comma).match(/:([^;,]+)/) || [])[1] || "application/octet-stream";
+        const binary = window.atob(data.slice(comma + 1));
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new Blob([bytes], { type: type });
+    }
+
+    function downloadShot(record, which, delay) {
+        const shot = which === "hover" ? record.hoverImage : record.defaultImage;
+        if (!shot) {
+            return 0;
+        }
+        window.setTimeout(() => {
+            const url = URL.createObjectURL(dataUriToBlob(shot.data));
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fileName(record, which);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }, delay);
+        return 1;
+    }
+
+    function downloadRecord(record) {
+        let count = downloadShot(record, "default", 0);
+        count += downloadShot(record, "hover", 350);
+        setText(el.status, "Downloading " + count + " file(s). Put them in site/" +
+            record.folder + "/ and keep the names unchanged.");
+    }
+
+    function downloadAll() {
+        if (!items.length) {
+            setText(el.status, "No catalog thumbnails saved yet.");
+            return;
+        }
+        let slot = 0;
+        const folders = new Set();
+        items.forEach((record) => {
+            slot += downloadShot(record, "default", slot * 350);
+            slot += downloadShot(record, "hover", slot * 350);
+            folders.add(record.folder);
+        });
+        setText(el.status, "Downloading " + slot + " file(s) across " + folders.size +
+            " folder(s). Each row above shows where its files belong.");
+    }
+
+    /* ----------------------------------------------------------------------
+       Saved item list
+       ---------------------------------------------------------------------- */
+    function renderList() {
+        el.list.textContent = "";
+
+        if (!items.length) {
+            const empty = document.createElement("p");
+            empty.className = "admin-empty";
+            empty.textContent = "No catalog thumbnails yet. Pick an item below and upload a default image to start.";
+            el.list.appendChild(empty);
+            return;
+        }
+
+        items.forEach((record) => {
+            const row = document.createElement("div");
+            row.className = "admin-row";
+
+            const info = document.createElement("div");
+            info.className = "admin-row-info";
+
+            const title = document.createElement("p");
+            title.className = "admin-row-title";
+            title.textContent = TB.desanitize(record.title);
+            info.appendChild(title);
+
+            const meta = document.createElement("p");
+            meta.className = "admin-row-meta";
+            meta.textContent = [
+                CATEGORIES[record.category].label,
+                record.hoverImage ? "Default and hover" : "Default only",
+                catalogItem(record.id) ? "On the homepage" : "New card",
+                "Last edited: " + record.updated
+            ].join(" — ");
+            info.appendChild(meta);
+
+            const paths = document.createElement("p");
+            paths.className = "admin-thumb-paths";
+            paths.textContent = "site/" + thumbPath(record, "default") +
+                (record.hoverImage ? "  |  site/" + thumbPath(record, "hover") : "");
+            info.appendChild(paths);
+
+            row.appendChild(info);
+
+            const actions = document.createElement("div");
+            actions.className = "admin-row-actions";
+
+            const editBtn = document.createElement("button");
+            editBtn.className = "btn btn-secondary btn-small";
+            editBtn.type = "button";
+            editBtn.textContent = "Edit";
+            editBtn.addEventListener("click", () => {
+                el.item.value = record.id;
+                syncFormToSelection();
+                form.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+            actions.appendChild(editBtn);
+
+            const dlBtn = document.createElement("button");
+            dlBtn.className = "btn btn-secondary btn-small";
+            dlBtn.type = "button";
+            dlBtn.textContent = "Download";
+            dlBtn.addEventListener("click", () => downloadRecord(record));
+            actions.appendChild(dlBtn);
+
+            const copyBtn = document.createElement("button");
+            copyBtn.className = "btn btn-secondary btn-small";
+            copyBtn.type = "button";
+            copyBtn.textContent = "Copy Markup";
+            copyBtn.addEventListener("click", () => copyMarkup(record));
+            actions.appendChild(copyBtn);
+
+            const delBtn = document.createElement("button");
+            delBtn.className = "entry-remove";
+            delBtn.type = "button";
+            delBtn.textContent = "Delete";
+            delBtn.addEventListener("click", () => {
+                const name = TB.desanitize(record.title);
+                if (window.confirm("Remove the thumbnails for \"" + name + "\" from this workspace? Files already placed in the project are not affected.")) {
+                    items = items.filter((entry) => entry.id !== record.id);
+                    if (editingId === record.id) {
+                        editingId = null;
+                        el.item.value = "";
+                        clearImages();
+                        renderPreview();
+                    }
+                    save();
+                    buildItemOptions();
+                }
+            });
+            actions.appendChild(delBtn);
+
+            row.appendChild(actions);
+            el.list.appendChild(row);
+        });
+    }
+
+    function renderSyncState() {
+        const withHover = items.filter((entry) => entry.hoverImage).length;
+        setText(el.sync, items.length
+            ? items.length + " item" + (items.length === 1 ? "" : "s") + " in workspace (" +
+                withHover + " with a hover image). Nothing is live until the files and markup are committed."
+            : "No catalog thumbnails in this browser's workspace.");
+    }
+
+    /* ----------------------------------------------------------------------
+       Bindings + boot
+       ---------------------------------------------------------------------- */
+    el.copy.addEventListener("click", () => {
+        setText(el.error, "");
+        let record;
+        try {
+            record = collectRecord();
+        } catch (err) {
+            setText(el.error, err.message);
+            return;
+        }
+        copyMarkup(record);
+    });
+    el.downloadAll.addEventListener("click", downloadAll);
+
+    buildCategoryOptions();
+    buildItemOptions();
+    renderList();
+    renderSyncState();
+    renderPreview();
+})();
