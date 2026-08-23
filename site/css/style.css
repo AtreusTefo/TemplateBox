@@ -1680,16 +1680,34 @@ body.is-nav-hidden .site-header:focus-within {
     padding: 0;
 }
 
+/* `contain`, not `cover` (August 23, 2026). A catalog thumbnail depicts a
+   finished design, and a design carries content to its edges -- a printed
+   border, a caption near the foot. `cover` fills the tile by cropping
+   whatever does not fit the 4:5 window, which takes exactly those edges: a
+   707x1000 poster loses 11.5% of its height. Letterboxing instead leaves a
+   little of the card's own ground either side, which reads as a mat.
+
+   This is deliberately the SHARED rule rather than a class on the one card
+   that needed it. A bespoke class would be dropped the next time that card
+   was published from admin.html, whose generator emits a fixed
+   `card-preview photo` block -- the same silent loss the removed `framed`
+   machinery existed to prevent.
+
+   It changes nothing on disk today: every shipped thumbnail is exactly 4:5
+   (800x1000 and 600x750), where the two keywords are identical. It only
+   decides what happens to an off-ratio upload, and showing the whole design
+   is the right answer for a catalog. */
 .card-preview.photo .card-thumb {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
 }
 
 /* Bare-product default, styled-demo on hover (August 18, 2026) -- the same
-   "default is the plain product" rule .mk-art and the framed poster scene
-   below already follow, extended to these two real photo thumbnails.
+   "default is the plain product" rule .mk-art already follows, extended to
+   these two real photo thumbnails. (The poster cards followed it too, via a
+   wood-frame hover composite, until that was removed on August 23, 2026.)
    card-thumb-blank lays out the box normally and IS the permanent state on
    touch, since it is never gated behind (hover: hover). card-thumb-hover
    stacks on top absolutely -- .card-media is already position:relative for
@@ -2338,88 +2356,6 @@ body.is-nav-hidden .site-header:focus-within {
     .catalog-grid .template-card:hover .mk-art,
     .catalog-grid .template-card:focus-within .mk-art {
         opacity: 1;
-    }
-}
-
-/* Posters and prints: the poster mocked into the real wood-a4 frame.
-
-   No canvas and no glfx.js: the warpZone in js/mockup-templates.js is an
-   axis-aligned rectangle (x 655-1461, y 224-1583 of a 2000x2000 base), so it
-   needs no perspective transform and can be expressed as flat percentages.
-
-   The scene is a square the height of the preview, centred and clipped, so
-   the base image is never distorted whatever ratio the card carries:
-
-       height: 100%; aspect-ratio: 1; left: 50%; translateX(-50%)
-
-   Expressing the window against that square is what makes the numbers
-   independent of the card's own ratio. Vertical is direct (top and height are
-   percentages of the containing block's height, which is the square's side).
-   Horizontal uses the element's own width: the window centre sits at 52.9% of
-   the square rather than 50%, and that 2.9% offset is 7.196% of the window's
-   own width (40.3%), hence translateX(-42.804%) instead of -50%.
-
-   Compositing follows the template's declared mode "window": design first,
-   then the base whose transparent print opening reveals it, then the overlay
-   multiplied on top. The overlay is a baked luminance map -- at the default
-   source-over it would paint over the artwork and wash it out entirely (see
-   docs/error-fixes/PHOTO_MOCKUP_OVERLAY_WASHES_OUT_DESIGN.md). */
-@media (hover: hover) {
-    .card-preview.framed .card-media::before,
-    .card-preview.framed .card-media::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        height: 100%;
-        aspect-ratio: 1;
-        left: 50%;
-        transform: translateX(-50%);
-        background-size: 100% 100%;
-        background-repeat: no-repeat;
-        opacity: 0;
-        /* Never intercept the click: the card surface is the target. */
-        pointer-events: none;
-        transition: opacity var(--motion-base) var(--ease);
-    }
-
-    .card-preview.framed .card-media::before {
-        background-image: url("../assets/mockups/wood-a4-base.png");
-        z-index: 2;
-    }
-
-    .card-preview.framed .card-media::after {
-        background-image: url("../assets/mockups/wood-a4-overlay.png");
-        mix-blend-mode: multiply;
-        z-index: 3;
-    }
-
-    .template-card:hover .card-preview.framed .card-media::before,
-    .template-card:hover .card-preview.framed .card-media::after,
-    .template-card:focus-within .card-preview.framed .card-media::before,
-    .template-card:focus-within .card-preview.framed .card-media::after {
-        opacity: 1;
-    }
-
-    /* The miniature drops its drawn frame and caption and becomes just the
-       artwork, sized into the print opening. */
-    .template-card:hover .card-preview.framed .mock-doc.poster,
-    .template-card:focus-within .card-preview.framed .mock-doc.poster {
-        position: absolute;
-        top: 11.2%;
-        height: 67.95%;
-        aspect-ratio: 806 / 1359;
-        left: 50%;
-        transform: translateX(-42.804%);
-        width: auto;
-        border: 0;
-        padding: 0;
-        gap: 0;
-        z-index: 1;
-    }
-
-    .template-card:hover .card-preview.framed .mk-caption,
-    .template-card:focus-within .card-preview.framed .mk-caption {
-        display: none;
     }
 }
 

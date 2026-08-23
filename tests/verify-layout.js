@@ -348,6 +348,187 @@ function staticChecks() {
     check("the print block resets the palette to the light aliases",
         /:root\[data-theme="dark"\][\s\S]{0,400}--color-text:\s*var\(--l-text\)/.test(printBlock),
         "print output would inherit the dark palette");
+
+    /* 1j. admin.html's Catalog Thumbnails picker holds a hardcoded copy of the
+           homepage catalog: CATALOG_ITEMS in js/admin.js. It exists because the
+           feed has no data file to read -- the cards are hand-written markup,
+           deliberately, so the card titles stay crawlable links to the editors
+           -- which makes this the same duplication shape as the route
+           whitelist above and the footer constant that already drifted once.
+
+           A card added to index.html alone is not offered as an existing item,
+           so attaching a thumbnail to it generates a whole new <article>
+           instead of the .card-preview block the card actually needs, and the
+           operator finds out by pasting the wrong thing into the homepage. A
+           card removed or renamed leaves a picker entry that writes a file
+           path nothing references. Nothing fails at runtime in either case:
+           both halves keep working perfectly on their own, which is exactly
+           why this is asserted rather than trusted.
+
+           The id rule mirrors js/admin.js: data-doc where a card carries one,
+           otherwise the title slugified. Titles are compared literally, so an
+           entity in the markup that is a bare character in the JS would read
+           as drift -- correctly, since the generated markup would then differ
+           from the card it replaces. */
+    const adminJs = fs.readFileSync(path.join(SITE, "js", "admin.js"), "utf8");
+    const indexHtml = fs.readFileSync(path.join(SITE, "index.html"), "utf8");
+
+    const blockOf = (src, opener, closer) => {
+        const start = src.indexOf(opener);
+        if (start === -1) { return null; }
+        const end = src.indexOf(closer, start);
+        return end === -1 ? null : src.slice(start + opener.length, end);
+    };
+    const quoted = (text, name) =>
+        (text.match(new RegExp("\\b" + name + ':\\s*"([^"]*)"')) || [])[1] || "";
+    const slugish = (value) => String(value || "").toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+    const catBlock = blockOf(adminJs, "const CATEGORIES = {", "\n    };");
+    const itemBlock = blockOf(adminJs, "const CATALOG_ITEMS = [", "\n    ];");
+
+    const adminCats = {};
+    [...(catBlock || "").matchAll(/([A-Za-z][A-Za-z0-9_]*):\s*\{([^}]*)\}/g)]
+        .forEach(([, key, body]) => {
+            adminCats[key] = {
+                label: quoted(body, "label"),
+                page: quoted(body, "page"),
+                target: quoted(body, "target")
+            };
+        });
+
+    /* Entries carry no nested object, so a brace pair is exactly one entry. */
+    const adminItems = [...(itemBlock || "").matchAll(/\{[^{}]*\}/g)].map(([entry]) => ({
+        id: quoted(entry, "id"),
+        title: quoted(entry, "title"),
+        category: quoted(entry, "category"),
+        doc: quoted(entry, "doc")
+    }));
+
+    const cards = indexHtml.split('<article class="template-card"').slice(1).map((chunk) => {
+        const body = chunk.slice(0, chunk.indexOf("</article>"));
+        const anchor = body.match(/<a class="card-link"([^>]*)>([^<]*)<\/a>/);
+        const attrs = anchor ? anchor[1] : "";
+        const attr = (name) => (attrs.match(new RegExp(name + '="([^"]*)"')) || [])[1] || "";
+        return {
+            category: (body.match(/^\s*data-category="([^"]+)"/) || [])[1] || "",
+            title: anchor ? anchor[2].trim() : "",
+            doc: attr("data-doc"),
+            target: attr("data-target"),
+            page: attr("href"),
+            label: (body.match(/<p class="card-category">([^<]*)<\/p>/) || [])[1] || ""
+        };
+    });
+
+    check("js/admin.js declares CATALOG_ITEMS and CATEGORIES",
+        adminItems.length > 0 && Object.keys(adminCats).length > 0,
+        `parsed ${adminItems.length} item(s) and ${Object.keys(adminCats).length} category(ies); ` +
+        "the picker cannot be checked against index.html if either block was renamed or restructured");
+
+    const cardById = new Map();
+    cards.forEach((card) => cardById.set(card.doc || slugish(card.title), card));
+    const adminById = new Map(adminItems.map((item) => [item.id, item]));
+
+    const absent = [...cardById.keys()].filter((id) => !adminById.has(id));
+    check(`admin.html's catalog picker lists every homepage card (${cards.length} cards)`,
+        absent.length === 0,
+        `on index.html but missing from CATALOG_ITEMS: ${absent.join(", ")}`);
+
+    const orphaned = [...adminById.keys()].filter((id) => !cardById.has(id));
+    check("admin.html's catalog picker lists no card index.html does not have",
+        orphaned.length === 0,
+        `in CATALOG_ITEMS but not on index.html: ${orphaned.join(", ")}`);
+
+    const drifted = [];
+    cardById.forEach((card, id) => {
+        const entry = adminById.get(id);
+        if (!entry) { return; }
+        if (entry.title !== card.title) {
+            drifted.push(`${id}: title "${entry.title}" vs index.html "${card.title}"`);
+        }
+        if (entry.category !== card.category) {
+            drifted.push(`${id}: category "${entry.category}" vs index.html "${card.category}"`);
+        }
+        if (entry.doc !== card.doc) {
+            drifted.push(`${id}: data-doc "${entry.doc}" vs index.html "${card.doc}"`);
+        }
+    });
+    check("every CATALOG_ITEMS entry matches its card's title, category and variant",
+        drifted.length === 0, drifted.join("\n      "));
+
+    /* CATEGORIES supplies the label, editor page and data-target the generated
+       markup writes for a NEW card. If a category's cards disagree with it,
+       every card generated for that category is wrong in the same way. */
+    const catDrift = new Set();
+    cards.forEach((card) => {
+        const cat = adminCats[card.category];
+        if (!cat) {
+            catDrift.add(`"${card.category}" is used on index.html but not declared in CATEGORIES`);
+            return;
+        }
+        if (cat.label !== card.label) {
+            catDrift.add(`${card.category}: label "${cat.label}" vs index.html "${card.label}"`);
+        }
+        if (cat.page !== card.page) {
+            catDrift.add(`${card.category}: page "${cat.page}" vs index.html "${card.page}"`);
+        }
+        if (cat.target !== card.target) {
+            catDrift.add(`${card.category}: target "${cat.target}" vs index.html "${card.target}"`);
+        }
+    });
+    check("every CATEGORIES record matches the cards it describes",
+        catDrift.size === 0, [...catDrift].join("\n      "));
+
+    /* 1k. Every local image a page references must exist on disk.
+
+           This is the August 24, 2026 breakage: admin.html's publish deleted
+           the superseded thumbnails before rewriting index.html, the rewrite
+           then failed, and the homepage was left pointing at two files that
+           had just been removed. The card rendered as a broken-image icon and
+           nothing anywhere failed -- the suite passed, because every check it
+           had asked whether the markup was well formed, never whether the
+           files it names are actually there.
+
+           Deliberately broader than that one bug: it also catches a thumbnail
+           downloaded but never placed, a typo in a hand-pasted path, and a
+           file renamed without its reference. Cheap, since it is one stat per
+           src. Only local paths are checked; anything absolute or protocol-
+           relative belongs to a third party this suite cannot vouch for. */
+    pages.forEach((file) => {
+        const rel = path.relative(ROOT, file);
+        const html = fs.readFileSync(file, "utf8");
+        const withoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
+        const dir = path.dirname(file);
+        const broken = [];
+        const seen = new Set();
+
+        [...withoutComments.matchAll(/<img\b[^>]*?\ssrc="([^"]+)"/g)]
+            .map((m) => m[1])
+            .filter((src) => src && !/^(https?:)?\/\//.test(src) && !src.startsWith("data:"))
+            .forEach((src) => {
+                if (seen.has(src)) { return; }
+                seen.add(src);
+                /* Query strings and fragments are not part of the file name. */
+                const clean = decodeURI(src.split("?")[0].split("#")[0]);
+                const target = clean.startsWith("/")
+                    ? path.join(SITE, clean)
+                    : path.join(dir, clean);
+                if (!fs.existsSync(target)) { broken.push(src); }
+            });
+
+        if (!seen.size) { return; }
+        check(`${rel}: every local <img> src exists on disk (${seen.size} checked)`,
+            broken.length === 0, `missing file(s): ${broken.join(", ")}`);
+    });
+
+    /* The catalog-empty message names the card count. It said 17 against
+       eighteen cards until August 22, 2026, because adding a card does not
+       force anyone to touch that sentence. */
+    const stated = indexHtml.match(/class="catalog-empty"[\s\S]{0,300}?see all (\d+)/);
+    check(`index.html's catalog-empty message states the real card count (${cards.length})`,
+        stated !== null && Number(stated[1]) === cards.length,
+        stated ? `message says ${stated[1]}, index.html has ${cards.length} cards`
+            : "no \"see all N\" count found in the catalog-empty message");
 }
 
 /* ==========================================================================

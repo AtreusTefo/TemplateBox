@@ -224,8 +224,18 @@
                 <p class="admin-sync" data-thumb-sync></p>
             </div>
 
+            <!-- Project folder connection. A page cannot reach the file
+                 system on its own; this is the File System Access API, where
+                 the operator grants one folder in a native dialog and the
+                 grant covers that folder alone. Chromium only, so every
+                 control below stays available and the download/copy path
+                 remains the whole workflow on Firefox and Safari. -->
+            <p class="admin-status" data-thumb-fs-state></p>
             <div class="admin-actions">
-                <button class="btn" type="button" data-thumb-download-all>Download All Images</button>
+                <button class="btn" type="button" data-thumb-fs-connect hidden>Connect Project Folder</button>
+                <button class="btn" type="button" data-thumb-publish-all hidden>Publish All</button>
+                <button class="btn btn-secondary" type="button" data-thumb-fs-disconnect hidden>Disconnect</button>
+                <button class="btn btn-secondary" type="button" data-thumb-download-all>Download All Images</button>
             </div>
             <p class="admin-status" data-thumb-status aria-live="polite"></p>
 
@@ -236,15 +246,31 @@
                     <li>Upload the default thumbnail. This is what the card shows at rest, and it is required.</li>
                     <li>Optionally upload a hover thumbnail. Leave it empty and the card simply has no hover state, which is a valid card.</li>
                     <li>Save. The item joins the list above, stored in this browser only.</li>
-                    <li>Click Download on the item (or Download All Images) and put the downloaded files in the folder shown on the row. Both files are already named to the project convention.</li>
-                    <li>Click Copy Markup and paste it into <span class="mono">index.html</span>: over the item's existing <span class="mono">&lt;div class="card-preview"&gt;</span> block for an existing card, or as a new <span class="mono">&lt;article&gt;</span> inside <span class="mono">&lt;div class="catalog-grid"&gt;</span> for a new one.</li>
-                    <li>Commit and push to <span class="mono">main</span> (Netlify auto-deploys), or drag the <span class="mono">site</span> folder into Netlify.</li>
+                    <li>Click Publish on the item, or Publish All. The images are written into the right folder and <span class="mono">index.html</span> is edited for you. Steps 6 and 7 are then already done.</li>
+                    <li>Without a connected folder: click Download and put the files in the folder shown on the row. Both are already named to the project convention.</li>
+                    <li>Without a connected folder: click Copy Markup and paste it into <span class="mono">index.html</span>, over the item's existing <span class="mono">&lt;div class="card-preview"&gt;</span> block for an existing card, or as a new <span class="mono">&lt;article&gt;</span> inside <span class="mono">&lt;div class="catalog-grid"&gt;</span> for a new one.</li>
+                    <li>Review the change with <span class="mono">git diff</span>, then commit and push to <span class="mono">main</span> (Netlify auto-deploys), or drag the <span class="mono">site</span> folder into Netlify. Deploying is always yours to do: no page can push to your repository on your behalf.</li>
                 </ol>
+            </details>
+            <details class="admin-help">
+                <summary>What Publish changes, and what it will not touch</summary>
+                <p>Publish writes the image files into the folder named on the row, removes any older file for the same card left behind under a different extension, and then edits <span class="mono">index.html</span>.</p>
+                <p>That edit is a byte-level splice of one element, not a rewrite of the file. Every other byte stays identical, so <span class="mono">git diff</span> shows only the card you changed.</p>
+                <p>Before the edited file is written it is parsed and checked: the markup must parse, the card count must be what was expected, every other card's category, link, variant and title must be unchanged, and the new image paths must actually appear. If any check fails, <span class="mono">index.html</span> is left exactly as it was and the panel says so.</p>
+                <p>Images are written before the markup on purpose. If a publish fails midway, the worst case is an image file nothing references yet, which is harmless. The other order would leave the homepage pointing at a file that was never written.</p>
+                <p>Only the site folder is reachable, and only after you pick it. The panel refuses any folder without an <span class="mono">index.html</span> and an <span class="mono">assets</span> directory, so pointing it at the wrong place fails immediately rather than scattering files.</p>
             </details>
             <details class="admin-help">
                 <summary>Why images are downloaded instead of saved</summary>
                 <p>TemplateBox has no server and no build step, so a browser page cannot write into the project's <span class="mono">assets/</span> folder. Thumbnails are held here as data URIs in this browser's storage purely so the form survives a refresh; the published copies are the real files you place in the repository, exactly as post pages work.</p>
-                <p>That is also why the size cap is low. Storage is a few megabytes in total and is shared with the blog workspace, and the thumbnails already shipping are around 60 KB each.</p>
+                <p>That is also why the compression budget is tight. Storage is a few megabytes in total and is shared with the blog workspace, and the thumbnails already shipping are 46 to 83 KB each.</p>
+            </details>
+            <details class="admin-help">
+                <summary>What compression does to your image</summary>
+                <p>Uploads are resized to a 1000px long edge and re-encoded until they fit in 60 KB, entirely in this browser. Nothing is uploaded anywhere.</p>
+                <p>This is lossy, and it has to be: that is what takes a multi-megabyte photograph down to tens of kilobytes. What it protects is how the image looks where it is actually used. A catalog card renders roughly 240px wide, so a 1000px thumbnail still carries four times the detail the card can show, and the compression is spent on detail no visitor sees.</p>
+                <p>The encoder keeps the highest quality that fits rather than a fixed setting, and prefers WebP where the browser can write it, because WebP reaches the same appearance in roughly a third fewer bytes than JPEG. It only gives up pixels when quality alone cannot reach the budget. An image that already fits is kept exactly as uploaded and never re-encoded.</p>
+                <p>For the sharpest result, upload the largest clean copy you have and let this do the resizing. Compressing it yourself first and then uploading means the image is compressed twice, which is what actually produces visible artefacts.</p>
             </details>
 
             <div class="admin-list" data-thumb-list></div>
@@ -293,10 +319,12 @@
 
                 <fieldset>
                     <legend>Thumbnails</legend>
+                    <p class="upload-hint">Upload at any size. Images are resized to a 1000px long edge and re-encoded to 60 KB or less in your browser, matching the thumbnails already on the site. Only the compressed copy is kept.</p>
                     <div class="field">
                         <label for="f-thumb-default">Default thumbnail (required)</label>
                         <input id="f-thumb-default" type="file" accept="image/*" data-thumb-default-file>
-                        <p class="upload-hint">Shown at rest and on touch devices. JPEG, PNG or WebP, 4:5 to match the other cards, under 500 KB. Non-image files are rejected.</p>
+                        <p class="upload-hint">Shown at rest and on touch devices. Any format your browser can open, at any shape: 4:5 fills the card exactly, and anything else is shown whole against the card's own ground rather than cropped. Non-image files are rejected.</p>
+                        <p class="admin-status" data-thumb-default-note aria-live="polite"></p>
                         <p class="form-error" data-thumb-default-error></p>
                         <button class="entry-remove" type="button" data-thumb-default-remove hidden>Remove Default Image</button>
                     </div>
@@ -304,6 +332,7 @@
                         <label for="f-thumb-hover">Hover thumbnail (optional)</label>
                         <input id="f-thumb-hover" type="file" accept="image/*" data-thumb-hover-file>
                         <p class="upload-hint">Crossfades in on hover and keyboard focus. Skip it and the card has no hover state; add it later and only this field changes.</p>
+                        <p class="admin-status" data-thumb-hover-note aria-live="polite"></p>
                         <p class="form-error" data-thumb-hover-error></p>
                         <button class="entry-remove" type="button" data-thumb-hover-remove hidden>Remove Hover Image</button>
                     </div>
@@ -352,6 +381,9 @@
     <script src="js/blog-data.js"></script>
     <script src="js/ads.js"></script>
     <script src="js/blog.js"></script>
+    <!-- Must load before admin.js, which reads window.TBProjectFolder at
+         mount to decide whether the Publish controls can appear at all. -->
+    <script src="js/admin-fs.js"></script>
     <script src="js/admin.js"></script>
 </body>
 </html>

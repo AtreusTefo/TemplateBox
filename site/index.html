@@ -493,13 +493,15 @@
                     </div>
                 </article>
 
+                <!-- A real poster image in place of the drawn miniature. This
+                     card sat inside .card-preview.framed until August 23, 2026,
+                     which composited a photographed wood frame around the
+                     design on hover; the effect was removed at the owner's
+                     request and the card is now an ordinary photo card. -->
                 <article class="template-card" data-category="canvas">
-                    <div class="card-preview framed" aria-hidden="true">
+                    <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc poster">
-                                <div class="mk-plate"></div>
-                                <p class="mk-caption">Coastline, 2026</p>
-                            </div>
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/posters/framed-photo-poster-thumb-blank.webp" alt="" width="707" height="1000" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -509,7 +511,7 @@
                 </article>
 
                 <article class="template-card" data-category="canvas">
-                    <div class="card-preview framed" aria-hidden="true">
+                    <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
                             <div class="mock-doc poster wood">
                                 <div class="mk-plate"></div>
@@ -524,7 +526,7 @@
                 </article>
 
                 <article class="template-card" data-category="canvas">
-                    <div class="card-preview framed" aria-hidden="true">
+                    <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
                             <div class="mock-doc poster gold">
                                 <div class="mk-plate"></div>
@@ -625,17 +627,19 @@
                     </div>
                 </article>
 
-                <!-- Bare product by default, the styled demo on hover -- same
-                     "default is the plain product" convention as .mk-art and
-                     the framed poster cards below, extended to real photo
-                     thumbnails. card-thumb-blank is the base photo/scene with
+                <!-- Bare product by default, the styled demo on hover -- the
+                     same "default is the plain product" convention as .mk-art,
+                     extended to real photo thumbnails. (The poster cards above
+                     followed it too until their wood-frame hover composite was
+                     removed on August 23, 2026.) card-thumb-blank is the base
+                     photo/scene with
                      no design in it; card-thumb-hover is the existing demo
                      render, unchanged, now shown only on hover/focus. -->
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb-blank.jpg" alt="" width="800" height="1000" loading="lazy">
-                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.jpg" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb-blank.webp" alt="" width="1000" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.webp" alt="" width="1000" height="1000" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">

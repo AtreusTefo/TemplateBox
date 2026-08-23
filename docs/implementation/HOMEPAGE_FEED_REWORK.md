@@ -113,7 +113,7 @@ is `opacity: 0` by default and `1` on hover with a `--motion-base` fade. The glo
 t-shirt, mug and box cards; the fourth mockup card is the photographic wood-a4 thumbnail, which
 has no `.mk-art` and is unaffected.
 
-**Posters and prints.** The poster miniature composites into the real wood-a4 frame. No canvas,
+**Posters and prints.** (REMOVED August 23, 2026 at the owner's request -- the three poster cards are ordinary cards now. Kept as the record of what was built; see CATALOG_THUMBNAIL_ADMIN.md.) The poster miniature composites into the real wood-a4 frame. No canvas,
 no glfx.js, no new assets — the `warpZone` is an axis-aligned rectangle (x 655-1461, y 224-1583
 of a 2000x2000 base), so it needs no perspective transform.
 

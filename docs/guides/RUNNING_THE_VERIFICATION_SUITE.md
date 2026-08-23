@@ -46,6 +46,10 @@ under test is the layout a real visitor gets.
 | Every selector hook `js/app.js` and `js/ads.js` look up exists in the served markup | Renaming a `data-` attribute or class on one side kills a feature with no error at all |
 | The homepage rail's `display: none` gate is declared after the shared rule | Media queries carry no specificity; written above the shared rule the gate loses and the rail shows on viewports it must skip |
 | `loading.html`'s inline route whitelist matches `EDITOR_ROUTES` | The two copies drifting sends the fallback path to the wrong editor |
+| `CATALOG_ITEMS` in `js/admin.js` lists exactly the cards `index.html` ships, with matching title, category and `data-doc` | The homepage feed has no data file, so admin.html's thumbnail picker holds a hardcoded copy of it. A card added to `index.html` alone is not offered as an existing item, and attaching a thumbnail to it then generates a whole new `<article>` instead of the `.card-preview` block the card needs. Both halves keep working perfectly on their own, which is why nothing fails without this |
+| Every `CATEGORIES` record in `js/admin.js` matches the cards it describes | That record supplies the label, editor page and `data-target` written into a generated card. If it disagrees with the category's existing cards, every new card in that category is wrong the same way |
+| Every local `<img src>` in every page exists on disk | A card rendered a broken-image icon after a publish deleted its old thumbnails and then failed to rewrite `index.html`. 988 checks passed while the homepage was visibly broken, because none of them asked whether a referenced file is actually there. Also catches a thumbnail downloaded but never placed, and a path typed by hand |
+| `index.html`'s catalog-empty message states the real card count | It said "all 17" against eighteen cards; adding a card does not force anyone to touch that sentence |
 
 ### 2. Layout (5 pages x 10 widths)
 
