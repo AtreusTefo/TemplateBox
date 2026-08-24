@@ -62,7 +62,12 @@ const PAGES = [
     ["about", "/about.html"],
     ["rent-receipt", "/rent-receipt-template.html"],
     ["blog", "/blog.html"],
-    ["post", "/post.html"]
+    ["post", "/post.html"],
+    /* search.html joined the content-rail family on August 24, 2026. It is
+       the page the phone and tablet search control opens, so it is a mobile
+       surface first -- which makes the anchor band, not the rail, the one
+       that matters most here. */
+    ["search", "/search.html"]
 ];
 const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 768, 320];
 
@@ -130,6 +135,7 @@ function staticChecks() {
     const pages = htmlFiles();
     const adsJs = fs.readFileSync(path.join(SITE, "js", "ads.js"), "utf8");
     const appJs = fs.readFileSync(path.join(SITE, "js", "app.js"), "utf8");
+    const searchJs = fs.readFileSync(path.join(SITE, "js", "search.js"), "utf8");
 
     /* 1a. A page carrying an ad host must load the script that fills it.
            This is the three-days-of-zero-impressions bug. The guard is
@@ -197,7 +203,11 @@ function staticChecks() {
            scanned, so hooks the scripts create rather than look up are not
            flagged. */
     const allHtml = pages.map((f) => fs.readFileSync(f, "utf8")).join("\n");
-    const sources = { "js/app.js": appJs, "js/ads.js": adsJs };
+    /* js/search.js joined this scan on August 24, 2026. It builds the search
+       page out of hooks in search.html and out of the real catalog markup in
+       index.html, so it has MORE ways to be silently wrong than app.js does:
+       a renamed hook leaves it rendering an empty page with no error. */
+    const sources = { "js/app.js": appJs, "js/ads.js": adsJs, "js/search.js": searchJs };
 
     Object.keys(sources).forEach((label) => {
         const tokens = new Set();
@@ -1055,6 +1065,34 @@ async function layoutChecks(page) {
             JSON.stringify({ hiddenTabsTop: r.hiddenTabsTop, navHidden: r.navHidden }));
     }
 
+    /* The search page's field is sticky under the header for the same reason
+       and by the same mechanism, so it inherits the same failure mode: a
+       literal offset would be calibrated on desktop and put the field inside
+       the header's box on a phone, where the header is 145px rather than
+       85px -- and the header paints over it (z-index 20 against 15). This is
+       the page whose entire purpose is that field. Mutation-tested by
+       replacing var(--header-h) with the 5.25rem literal: fails at 320, 360,
+       390 and 414. */
+    for (const width of [320, 360, 390, 414, 768, 1024, 1366, 1920]) {
+        await page.navigate(`http://localhost:${PORT}/search.html`, width);
+        const r = await page.evaluate(`(async () => {
+            window.scrollTo(0, 400);
+            await new Promise(r => setTimeout(r, 150));
+            const h = document.querySelector('.site-header').getBoundingClientRect();
+            const bar = document.querySelector('.search-page-bar');
+            if (!bar) { return { missing: true }; }
+            const b = bar.getBoundingClientRect();
+            const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+            const field = document.querySelector('[data-search-page-input]');
+            return { overlap: +Math.max(0, h.bottom - b.top).toFixed(1),
+                     coveredByHeader: hit ? document.querySelector('.site-header').contains(hit) : null,
+                     fieldVisible: !!field && field.getBoundingClientRect().width > 0 };
+        })()`);
+        check(`search field @${width}: sticks clear of the header, not under it`,
+            !r.missing && r.overlap <= 0.5 && r.coveredByHeader === false && r.fieldVisible,
+            JSON.stringify(r));
+    }
+
     /* ----------------------------------------------------------------------
        2e. No text field under 16px on a phone.
 
@@ -1158,6 +1196,148 @@ async function launchChecks(page) {
             `opened [${fresh.map((t) => t.url).join(", ") || "nothing"}], opener at ${stayed}`);
         for (const t of fresh) { await page.call("Target.closeTarget", { targetId: t.targetId }); }
     }
+
+    /* ----------------------------------------------------------------------
+       3b. The header search control must actually produce a search surface.
+
+       This is the August 24, 2026 bug, and it is stated as an OUTCOME on
+       purpose. The control was a button toggling a `search-open` class, and
+       the one rule that turned the hidden field back on lived inside
+       `@media (max-width: 22.5rem)` while the display:none it was undoing was
+       scoped to 62rem. So from 361px to 992px -- every phone wider than an
+       iPhone SE and every tablet below 992px -- tapping search set a class
+       and changed nothing on the screen. Nothing errored, and at 360px, the
+       width anyone testing a phone reaches for first, it worked perfectly.
+
+       Asserting "the control is a link to search.html" would pass a page
+       where search.html renders nothing, so this follows the click and
+       requires a focused, usable field at the other end. Mutation-tested by
+       putting the old button and its 22.5rem reveal rule back: fails at 390,
+       414 and 768, and passes at 320 and 360, which is exactly the shape of
+       the original bug.
+
+       The widths stop at 768 because 62rem (992px) is where the header's own
+       inline field appears and the control is deliberately hidden -- two
+       search affordances in one bar is the thing that gate exists to
+       prevent. The band from there to the rail's floor is covered by the
+       second loop below, which requires the field itself to be there and to
+       work, so no width between 320 and 1200 is left unasserted.
+       ---------------------------------------------------------------------- */
+    section("3b. Search entry point (trusted input)");
+    for (const width of [320, 360, 390, 414, 768]) {
+        await page.navigate(`http://localhost:${PORT}/`, width);
+        const control = await page.evaluate(`(() => {
+            const el = document.querySelector('.site-header .search-toggle');
+            if (!el) { return { missing: true }; }
+            const cs = getComputedStyle(el);
+            if (cs.display === 'none' || cs.visibility === 'hidden') { return { hidden: true }; }
+            el.scrollIntoView({ block: 'center' });
+            const b = el.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+        })()`);
+
+        if (control.missing || control.hidden) {
+            check(`search control @${width}: present and visible in the header`,
+                false, JSON.stringify(control));
+            continue;
+        }
+
+        await clickAt(control, "left");
+        const after = await page.evaluate(`(() => {
+            const field = document.querySelector('[data-search-page-input]');
+            const usable = !!field && getComputedStyle(field).display !== 'none' &&
+                field.getBoundingClientRect().width > 0;
+            return { path: location.pathname, usable: usable,
+                     focused: !!field && document.activeElement === field };
+        })()`);
+
+        check(`search control @${width}: opens a usable, focused search field`,
+            after.path === "/search.html" && after.usable && after.focused,
+            JSON.stringify(after));
+    }
+
+    /* From 62rem up the header carries the field itself and filters the
+       catalog in place, which is the right behaviour on the page that IS the
+       catalog. What must not happen is the band being served by neither: the
+       control hidden because the field is "there", and the field
+       display:none because the viewport is "small". That is precisely the
+       shape of the bug above, one band over. */
+    for (const width of [1024, 1200, 1440]) {
+        await page.navigate(`http://localhost:${PORT}/`, width);
+        const r = await page.evaluate(`(() => {
+            const field = document.querySelector('[data-search-input]');
+            if (!field) { return { missing: true }; }
+            field.value = 'rent';
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            const cards = [...document.querySelectorAll('.catalog-grid .template-card')];
+            return {
+                visible: getComputedStyle(field).display !== 'none' &&
+                         field.getBoundingClientRect().width > 0,
+                shown: cards.filter(c => !c.classList.contains('is-hidden')).length,
+                total: cards.length
+            };
+        })()`);
+        check(`inline search field @${width}: present and filtering in place`,
+            !r.missing && r.visible && r.shown > 0 && r.shown < r.total,
+            JSON.stringify(r));
+    }
+
+    /* ----------------------------------------------------------------------
+       3c. Cards on the search page must stay inside the monetized flow.
+
+       js/app.js binds [data-target] once, at DOMContentLoaded, inside
+       initCatalog. Every card on search.html is imported from index.html
+       AFTER that pass has run, so it is bound only because js/search.js asks
+       for it explicitly. Get that wrong and the cards look perfect and go
+       straight to the editor, skipping the interstitial the site is funded
+       by -- with nothing anywhere to say so.
+
+       Found exactly that way during the build: the first version guarded the
+       call with `window.TB`, which is always false because js/app.js declares
+       TB as a top-level const (a lexical global, not a window property), and
+       a result card navigated straight to docs.html.
+       ---------------------------------------------------------------------- */
+    section("3c. Search page cards route through the interstitial");
+    for (const [label, pageUrl, selector] of [
+        /* Both states, because they are populated by different code paths:
+           the results list is built once and filtered, the browse rows are
+           built per category. Binding one and not the other is a live
+           possibility, and the query string is what decides which of the two
+           is on screen -- a browse row is display:none while a query is
+           present, and a click on a hidden element goes nowhere. */
+        ["results", "/search.html?q=rent",
+            "[data-search-page-templates] .template-card:not(.is-hidden) .card-link"],
+        ["browse row", "/search.html", ".browse-row .template-card .card-link"]
+    ]) {
+        await page.navigate(`http://localhost:${PORT}${pageUrl}`, 1024);
+        /* The catalog arrives by fetch, so the cards are not in the document
+           at load. Poll rather than sleep. */
+        const box = await page.evaluate(`(async () => {
+            for (let i = 0; i < 60; i += 1) {
+                const a = document.querySelector(${JSON.stringify(selector)});
+                if (a) {
+                    a.scrollIntoView({ block: 'center' });
+                    const b = a.getBoundingClientRect();
+                    return { x: b.x + b.width / 2, y: b.y + b.height / 2,
+                             target: a.getAttribute('data-target') };
+                }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            return { missing: true };
+        })()`);
+
+        if (box.missing) {
+            check(`search page ${label}: a card is present to click`, false,
+                `no card matched ${selector}`);
+            continue;
+        }
+
+        await clickAt(box, "left");
+        const url = await page.evaluate("location.pathname + location.search");
+        check(`search page ${label} click routes through the interstitial`,
+            url === "/loading.html?target=" + box.target,
+            "landed on " + url);
+    }
 }
 
 /* ==========================================================================
@@ -1223,6 +1403,26 @@ async function parityChecks(browserPath) {
     let comparisons = 0;
     let differences = 0;
     for (const [name, urlPath] of PAGES) {
+        /* A page added since the last commit has no baseline to be identical
+           to, and comparing it against the baseline server's 404 would report
+           every one of its measurements as a difference -- noise that says
+           nothing about whether ads reserve space they have not filled. Skip
+           it, loudly, rather than letting a new page turn this section red
+           until it is committed. It stops being skipped on the next run after
+           the commit, with no edit here. */
+        const inHead = await (async () => {
+            try {
+                const res = await fetch(`http://localhost:${BASELINE_PORT}${urlPath}`,
+                    { method: "HEAD" });
+                return res.ok;
+            } catch (e) {
+                return false;
+            }
+        })();
+        if (!inHead) {
+            console.log(`      SKIP  ${name}: not in HEAD yet, no baseline to compare against`);
+            continue;
+        }
         for (const width of WIDTHS) {
             await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
             const now = await page.evaluate(PARITY_SNAPSHOT);

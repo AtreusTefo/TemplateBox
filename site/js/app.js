@@ -429,6 +429,51 @@ const TB = (() => {
        ---------------------------------------------------------------------- */
     const GUIDES_ON_HOME = 3;
 
+    /* One guide card. Extracted from initGuidesStrip when search.html needed
+       the same card: the search page lists guides beside templates, and a
+       second renderer would be a second place for the URL shape, the date
+       format and the description field to be got wrong. Returns null for a
+       post with no slug, which has nowhere to link to. */
+    function buildGuideCard(post) {
+        const slug = String((post && post.slug) || "");
+        if (!slug) {
+            return null;
+        }
+
+        const card = document.createElement("article");
+        card.className = "guide-card";
+
+        if (post.date) {
+            const meta = document.createElement("p");
+            meta.className = "card-category";
+            meta.textContent = formatPostDate(post.date);
+            card.appendChild(meta);
+        }
+
+        const heading = document.createElement("h3");
+        heading.className = "card-title";
+
+        const link = document.createElement("a");
+        /* Static post page, not the post.html fallback route: see the
+           postUrlFor comment in js/blog.js for why. */
+        link.href = "blog/" + encodeURIComponent(slug) + ".html";
+        link.textContent = desanitize(String(post.title || "Untitled"));
+        heading.appendChild(link);
+        card.appendChild(heading);
+
+        /* Field is `description` (see js/blog-data.js and the blog card
+           renderer in js/blog.js); there is no `standfirst` on a post,
+           so reading one silently dropped every excerpt. */
+        if (post.description) {
+            const desc = document.createElement("p");
+            desc.className = "card-desc";
+            desc.textContent = desanitize(String(post.description));
+            card.appendChild(desc);
+        }
+
+        return card;
+    }
+
     function initGuidesStrip() {
         const section = document.querySelector("[data-guides-section]");
         const grid = document.querySelector("[data-guides-grid]");
@@ -447,43 +492,10 @@ const TB = (() => {
             .slice(0, GUIDES_ON_HOME);
 
         newest.forEach((post) => {
-            const slug = String(post.slug || "");
-            if (!slug) {
-                return;
+            const card = buildGuideCard(post);
+            if (card) {
+                grid.appendChild(card);
             }
-
-            const card = document.createElement("article");
-            card.className = "guide-card";
-
-            if (post.date) {
-                const meta = document.createElement("p");
-                meta.className = "card-category";
-                meta.textContent = formatPostDate(post.date);
-                card.appendChild(meta);
-            }
-
-            const heading = document.createElement("h3");
-            heading.className = "card-title";
-
-            const link = document.createElement("a");
-            /* Static post page, not the post.html fallback route: see the
-               postUrlFor comment in js/blog.js for why. */
-            link.href = "blog/" + encodeURIComponent(slug) + ".html";
-            link.textContent = desanitize(String(post.title || "Untitled"));
-            heading.appendChild(link);
-            card.appendChild(heading);
-
-            /* Field is `description` (see js/blog-data.js and the blog card
-               renderer in js/blog.js); there is no `standfirst` on a post,
-               so reading one silently dropped every excerpt. */
-            if (post.description) {
-                const desc = document.createElement("p");
-                desc.className = "card-desc";
-                desc.textContent = desanitize(String(post.description));
-                card.appendChild(desc);
-            }
-
-            grid.appendChild(card);
         });
 
         if (grid.childElementCount) {
@@ -897,21 +909,30 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
-       Header hamburger and search toggle (August 18, 2026).
+       Header hamburger (August 18, 2026; the search half was removed on
+       August 24, 2026).
 
        Five controls in the bar wrapped onto a second row on a phone, making
        the sticky header tall enough to cost a real share of a small
        viewport. Below 74.9375rem -- every width under the ad rail's floor,
        so phones and tablets alike -- the primary links collapse behind a
-       hamburger sitting beside the wordmark. The search field is
-       display:none under 62rem, i.e. simply unavailable on a phone, so
-       there it also gets a button that reveals it as its own row; on a
-       tablet the field still fits and stays inline.
+       hamburger sitting beside the wordmark.
+
+       This function used to own a second toggle as well: below 62rem, where
+       the search field is display:none, a button set a `search-open` class
+       that was supposed to reveal the field as its own row. It only ever
+       worked at 360px and below, because the one rule that undid the
+       display:none was scoped to a 22.5rem media query -- so from 361px to
+       992px the button toggled a class that changed nothing at all. The
+       button is a link to search.html now, which is a page rather than a
+       reveal, and every trace of the class it toggled is gone from here and
+       from the stylesheet. See
+       docs/error-fixes/HEADER_SEARCH_BUTTON_DEAD_ON_PHONES_AND_TABLETS.md.
 
        Everything about the collapsed/expanded LAYOUT is CSS. This only owns
        the open/closed state and the accessibility plumbing, so a page whose
-       header does not carry the buttons (the four editor pages, whose
-       .site-nav is empty) needs no special case: the queries simply miss.
+       header does not carry the button (the editor pages, whose .site-nav is
+       empty) needs no special case: the query simply misses.
        ---------------------------------------------------------------------- */
     function initHeaderToggles() {
         const header = document.querySelector(".site-header");
@@ -919,7 +940,6 @@ const TB = (() => {
             return;
         }
         const navToggle = header.querySelector("[data-nav-toggle]");
-        const searchToggle = header.querySelector("[data-search-toggle]");
         const nav = document.getElementById("site-nav");
 
         /* Mirrors the stylesheet's collapse range exactly, so the two cannot
@@ -954,28 +974,9 @@ const TB = (() => {
             }
         }
 
-        function setSearch(open) {
-            header.classList.toggle("search-open", open);
-            if (searchToggle) {
-                searchToggle.setAttribute("aria-expanded", String(open));
-            }
-            if (open) {
-                const input = document.querySelector("[data-search-input]");
-                if (input) {
-                    input.focus();
-                }
-            }
-        }
-
         if (navToggle && nav) {
             navToggle.addEventListener("click", () => {
-                const open = !header.classList.contains("nav-open");
-                setNav(open);
-                /* Both rows open at once would put the bar back to the
-                   height this exists to avoid. */
-                if (open) {
-                    setSearch(false);
-                }
+                setNav(!header.classList.contains("nav-open"));
             });
 
             /* A tap on any link navigates, but an in-page hash link does
@@ -991,18 +992,8 @@ const TB = (() => {
             });
         }
 
-        if (searchToggle) {
-            searchToggle.addEventListener("click", () => {
-                const open = !header.classList.contains("search-open");
-                setSearch(open);
-                if (open) {
-                    setNav(false);
-                }
-            });
-        }
-
-        /* Escape closes whichever is open and returns focus to its trigger,
-           or a keyboard user who opened one has no way back out. */
+        /* Escape closes the menu and returns focus to its trigger, or a
+           keyboard user who opened it has no way back out. */
         header.addEventListener("keydown", (event) => {
             if (event.key !== "Escape") {
                 return;
@@ -1011,11 +1002,6 @@ const TB = (() => {
                 setNav(false);
                 if (navToggle) {
                     navToggle.focus();
-                }
-            } else if (header.classList.contains("search-open")) {
-                setSearch(false);
-                if (searchToggle) {
-                    searchToggle.focus();
                 }
             }
         });
@@ -1026,7 +1012,6 @@ const TB = (() => {
         function onBreakpoint(event) {
             if (!event.matches) {
                 setNav(false);
-                setSearch(false);
             }
         }
         if (typeof collapsed.addEventListener === "function") {
@@ -1329,6 +1314,13 @@ const TB = (() => {
         storageGet,
         takePreset,
         launchTemplate,
+        /* search.html inserts real catalog cards long after initCatalog has
+           run its one binding pass, so it has to bind its own subtree or
+           every card it shows would bypass loading.html. */
+        bindLaunchControls,
+        /* Same card, two pages: the homepage guides strip and the search
+           page's guide results. */
+        buildGuideCard,
         markSaved,
         /* docs.html changes which fieldsets are visible with the document
            type, so it rebuilds the nav after a type change */

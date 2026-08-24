@@ -422,11 +422,17 @@ button {
    tall enough to eat a real share of a small viewport. Below 48rem the
    primary links collapse behind the hamburger and the bar keeps one row.
 
-   Both buttons are display:none above the breakpoint, so on a desktop this
+   Both controls are display:none above the breakpoint, so on a desktop this
    whole section is inert and the header is byte-for-byte the layout it was.
    They are NOT rendered at all on the four editor pages, whose .site-nav is
    empty -- a control that opens nothing is worse than no control.
-   -------------------------------------------------------------------------- */
+
+   .search-toggle is an ANCHOR to search.html, not a button (August 24,
+   2026). It was a button toggling a `search-open` class that revealed the
+   header field, and that reveal only existed below 22.5rem, so on every
+   width from 361px to 992px it was a control that did nothing. Everything
+   below is written to suit either element: no button-only properties, and
+   text-decoration reset for the link. -------------------------------------- */
 .nav-toggle,
 .search-toggle {
     display: none;
@@ -440,14 +446,15 @@ button {
     border-radius: var(--radius-sm);
     background: none;
     color: var(--color-text);
+    text-decoration: none;
     cursor: pointer;
     transition: background-color var(--motion-fast) var(--ease);
 }
 
 .nav-toggle:hover,
 .search-toggle:hover,
-.nav-toggle[aria-expanded="true"],
-.search-toggle[aria-expanded="true"] {
+.search-toggle:focus-visible,
+.nav-toggle[aria-expanded="true"] {
     background-color: var(--color-surface);
 }
 
@@ -575,18 +582,16 @@ button {
     }
 }
 
-/* Phones only: the search FIELD is display:none under 62rem, so search would
-   otherwise be unreachable there. Above 62rem the field is inline and a
-   button as well would be two search affordances in one bar. */
+/* Phones and small tablets: the search FIELD is display:none under 62rem, so
+   search would otherwise be unreachable there. Above 62rem the field is
+   inline and a link as well would be two search affordances in one bar.
+
+   The `search-open` ordering rule that stood here went with the reveal it
+   served (August 24, 2026): the control opens search.html now. */
 @media (max-width: 62rem) {
     .search-toggle {
         display: inline-flex;
         order: 4;
-    }
-
-    /* Last, so the revealed field forms the final row under everything. */
-    .site-header.search-open .site-search {
-        order: 6;
     }
 }
 
@@ -609,16 +614,6 @@ button {
         clip: rect(0, 0, 0, 0);
         white-space: nowrap;
         border: 0;
-    }
-
-    /* The search field, revealed on demand as its own row. Beats the
-       display:none at 62rem below on specificity (0,2,1 against 0,1,0), so
-       source order between the two blocks does not matter. */
-    .site-header.search-open .site-search {
-        display: flex;
-        flex: 0 0 100%;
-        max-width: none;
-        margin-top: var(--space-2xs);
     }
 }
 
@@ -5563,6 +5558,197 @@ legend {
     content: "";
     position: absolute;
     inset: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Search page (search.html) -- August 24, 2026.
+
+   The site's only search RESULTS surface, and what the phone and tablet
+   search control opens now that it is a link rather than a dead reveal.
+
+   Almost nothing here styles a card: the templates are the real
+   <article class="template-card"> nodes imported out of index.html, so they
+   arrive with their own styling as long as they sit inside something
+   carrying .catalog-grid. That is why the horizontal browse rows below keep
+   that class and only override its `display`.
+   -------------------------------------------------------------------------- */
+
+/* Pinned under the site header, the way the reference mobile surface pins
+   its field: on a long results list the field never scrolls away.
+
+   --header-h is the header's REAL rendered height, published onto <html> by
+   initHeaderHeight() in js/app.js and kept current by a ResizeObserver. A
+   literal cannot work: .site-header is flex-wrap: wrap, so its height is a
+   function of how its contents wrap, not of the viewport width -- 85px from
+   600px up but 145px at 390px and more at 320px. The fallback is the desktop
+   literal, so if js/app.js fails to load this degrades to being slightly too
+   high on a phone rather than to being broken. Same mechanism, and the same
+   reasoning, as .feed-tabs on the homepage.
+
+   The header does NOT hide on scroll here: that behaviour is scoped to
+   `body:has(.home-layout)`, so there is no is-nav-hidden partner rule to
+   write for this bar. */
+.search-page-bar {
+    position: sticky;
+    top: var(--header-h, 5.25rem);
+    z-index: 15;
+    /* Bleeds to the padding edges of main, so the rule under it spans the
+       full column rather than floating inside the gutters. */
+    margin: 0 calc(var(--space-lg) * -1) var(--space-lg);
+    padding: var(--space-sm) var(--space-lg);
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.search-page-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    max-width: 44rem;
+    margin: 0 auto;
+}
+
+.search-page-field input {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0 2.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 1.5rem;
+    background-color: var(--color-card);
+    font-family: var(--font-sans);
+    /* 16px minimum: anything smaller triggers mobile auto-zoom on focus. */
+    font-size: 1rem;
+    color: var(--color-text);
+    transition: border-color var(--motion-fast) var(--ease);
+}
+
+.search-page-field input:focus {
+    outline: 2px solid var(--color-brand);
+    outline-offset: -1px;
+    background-color: var(--color-bg);
+}
+
+.search-page-field > svg {
+    position: absolute;
+    left: 1rem;
+    width: 1.0625rem;
+    height: 1.0625rem;
+    fill: none;
+    stroke: var(--color-muted);
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+/* Revealed by js/search.js only while the field has content, exactly as the
+   header field's own clear button behaves. */
+.search-page-field button {
+    position: absolute;
+    right: 0.5rem;
+    width: 2rem;
+    height: 2rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--color-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.search-page-field button:hover {
+    color: var(--color-text);
+    background-color: var(--color-border);
+}
+
+.search-page-field.has-value button {
+    display: inline-flex;
+}
+
+/* Results ------------------------------------------------------------- */
+
+.search-results > section + section {
+    margin-top: var(--space-2xl);
+}
+
+.search-results > section[hidden] {
+    display: none;
+}
+
+.section-count {
+    font-size: 0.875rem;
+    color: var(--color-muted);
+}
+
+/* The filtered-out state. `.catalog-grid > .is-hidden` already covers the
+   template grid; the guides grid needs its own, and a card in a browse row
+   is never filtered at all. */
+.guides-grid > .is-hidden {
+    display: none;
+}
+
+.search-fallback {
+    margin-top: var(--space-xl);
+    color: var(--color-muted);
+}
+
+.search-fallback strong {
+    display: block;
+    color: var(--color-text);
+}
+
+/* Browse rows ----------------------------------------------------------
+
+   One row per category, scrolled sideways rather than wrapped: the point of
+   the browse state is to show that there is more in each category than fits,
+   which a wrapped grid of everything cannot say.
+
+   .browse-scroll is declared AFTER .catalog-grid deliberately. The two carry
+   the same (0,1,0) specificity, so source order is the whole contest, and
+   this has to win the `display` while leaving every `.catalog-grid .card-*`
+   descendant rule to keep applying to the cards inside it. */
+.browse-row + .browse-row {
+    margin-top: var(--space-2xl);
+}
+
+.browse-row .section-head {
+    margin-bottom: var(--space-md);
+}
+
+.browse-scroll {
+    display: flex;
+    gap: var(--space-md);
+    overflow-x: auto;
+    /* The scrollbar is suppressed the same way the category tabs and the ad
+       rails suppress theirs: the row is obviously scrollable from the card
+       clipped at its edge. */
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    /* Room for the hover lift, which would otherwise be clipped by the
+       scroll container. */
+    padding-bottom: var(--space-2xs);
+}
+
+.browse-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* Sized so a card is cut off at the right edge at every width, which is what
+   says "this row scrolls" without a control that says it. */
+.browse-scroll > * {
+    flex: 0 0 clamp(9rem, 42vw, 13rem);
+}
+
+.browse-scroll > .guide-card {
+    flex-basis: clamp(15rem, 70vw, 20rem);
+}
+
+@media (min-width: 48rem) {
+    .browse-scroll > * {
+        flex-basis: 13rem;
+    }
 }
 
 /* --------------------------------------------------------------------------

@@ -63,3 +63,16 @@
   for = "/tools/*"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
+
+# Search results. noindex but FOLLOW, unlike the two above: every template
+# this page can list is already on index.html, so an indexable copy is a thin
+# duplicate of the most-indexed page on the site and a ?q= URL is exactly the
+# "substantially similar" page Search Central asks not to be given -- but the
+# links out of it are real internal links and should still pass. The page
+# carries the same meta tag; this header is what makes it authoritative for
+# crawlers that skip meta parsing. Deliberately not a robots.txt Disallow: a
+# Disallow prevents the crawler ever reading the page's own noindex.
+[[headers]]
+  for = "/search.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, follow"
