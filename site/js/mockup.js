@@ -633,6 +633,24 @@
     const inB = document.getElementById("m-color-in-b");
     const presetGrid = document.getElementById("m-color-presets");
 
+    /* The background picker: the same component again, driven by the same
+       factory. See the Background section further down. */
+    const bgField = document.getElementById("m-bg-field");
+    const bgRow = document.getElementById("m-bg-row");
+    const bgTrigger = document.getElementById("m-bg-trigger");
+    const bgPopover = document.getElementById("m-bg-popover");
+    const bgDot = document.getElementById("m-bg-dot");
+    const bgHexLabel = document.getElementById("m-bg-hex");
+    const bgSvArea = document.getElementById("m-bg-sv");
+    const bgSvThumb = document.getElementById("m-bg-sv-thumb");
+    const bgHueArea = document.getElementById("m-bg-hue");
+    const bgHueThumb = document.getElementById("m-bg-hue-thumb");
+    const bgInHex = document.getElementById("m-bg-in-hex");
+    const bgInR = document.getElementById("m-bg-in-r");
+    const bgInG = document.getElementById("m-bg-in-g");
+    const bgInB = document.getElementById("m-bg-in-b");
+    const bgPresetGrid = document.getElementById("m-bg-presets");
+
     const fileInput = document.getElementById("m-design");
     const fileError = document.getElementById("m-design-error");
     const layerList = document.getElementById("m-layer-list");
@@ -683,7 +701,10 @@
     let currentProduct = "tshirt";
     let currentColor = "black";
     let customHex = "#FFFFFF";
-    let pickerHue = 0;
+    /* The canvas background, or null for transparent -- which is the default
+       and what every export produced before this existed. `pickerHue` used to
+       live here; it belongs to a picker instance now that there are two. */
+    let bgHex = null;
 
     let layers = [];
     let selectedId = null;
@@ -799,6 +820,27 @@
         ctx.restore();
     }
 
+    /* The chosen background, painted before anything else so it sits behind
+       the product, the artwork and any overlay. On the canvas rather than in
+       CSS deliberately: the PNG export and the tray thumbnails both read
+       #mockup-canvas, so a background painted here is in both of them for
+       free, and a background painted in CSS would be in neither.
+
+       Called after clearRect in both render paths. A null background paints
+       nothing at all, which leaves the export transparent exactly as it was
+       before this existed. */
+    function paintBackground() {
+        const hex = activeBackground();
+        if (!hex) {
+            return;
+        }
+        ctx.save();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = hex;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
+
     function paint() {
         const product = PRODUCTS[currentProduct] ? currentProduct : "tshirt";
         currentProduct = product;
@@ -817,6 +859,7 @@
         const color = activeColor(config);
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        paintBackground();
         config.drawBase(ctx, color.hex, color.outline);
         drawLayersInArea(config.printArea, 16);
     }
@@ -962,6 +1005,11 @@
             canvas.height = h;
         }
         ctx.clearRect(0, 0, w, h);
+        /* Behind the photograph, so it shows only where the base is actually
+           transparent -- which is why a template has to opt in: on a scene
+           with an opaque backdrop this would be invisible, and on one with a
+           transparent print window it would land behind the artwork. */
+        paintBackground();
 
         const tpl = config.template;
         const rectZone = zoneIsRect(tpl.warpZone);
@@ -1575,155 +1623,34 @@
         });
     }
 
-    function buildColorPresets() {
-        if (!presetGrid) {
-            return;
-        }
-        while (presetGrid.firstChild) {
-            presetGrid.removeChild(presetGrid.firstChild);
-        }
+    /* ----------------------------------------------------------------------
+       The colour picker component.
 
-        /* Native colour sampling where the browser offers it (Chromium's
-           EyeDropper). No polyfill and no button at all elsewhere: a control
-           that silently does nothing is worse than one that is absent. */
-        if (window.EyeDropper) {
-            const drop = document.createElement("button");
-            drop.type = "button";
-            drop.className = "color-eyedropper";
-            drop.setAttribute("aria-label", "Pick a colour from the screen");
-            drop.setAttribute("title", "Pick a colour from the screen");
-            drop.appendChild(icon([
-                "m2 22 4-1 11-11-3-3L3 18l-1 4Z",
-                "m15 5 4-4 4 4-4 4",
-                "m13 7 4 4"
-            ]));
-            drop.addEventListener("click", () => {
-                new window.EyeDropper().open().then((result) => {
-                    setCustomColor(result.sRGBHex);
-                }, () => {
-                    /* Dismissed with Escape: nothing to do. */
-                });
-            });
-            presetGrid.appendChild(drop);
-        }
+       ONE implementation, two instances (August 24, 2026): the product's
+       colourway picker, and the background picker added alongside it. It was
+       a single hard-wired picker reading module state directly until the
+       background needed the same control; generalising it was preferred to a
+       second copy of 150 lines of gradient tracks, hex/RGB plumbing and
+       popover lifecycle.
 
-        COLOR_PRESETS.forEach((hex) => {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "color-preset";
-            btn.style.backgroundColor = hex;
-            btn.setAttribute("aria-label", hex);
-            btn.setAttribute("title", hex);
-            btn.addEventListener("click", () => setCustomColor(hex));
-            presetGrid.appendChild(btn);
-        });
-    }
+       What is NOT in here is as deliberate as what is. The product's swatch
+       row and the canvas's accessible label are specific to the colourway
+       path, and the two instances hold genuinely different state -- a
+       colourway key plus a custom hex on one side, a hex or null on the
+       other. Pushing those through the factory would have meant more
+       injection points than shared code, which is a worse abstraction than
+       two small call sites. The factory owns exactly the parts that are
+       identical: the popover, the saturation/value square, the hue strip,
+       the hex and RGB fields, the presets and the eyedropper.
 
-    /* Repaints every part of the colour UI from the active hex. `skip` names
-       an input the visitor is currently typing in, which must not be
-       rewritten underneath the caret. */
-    function syncColorUI(skip) {
-        /* Every route that changes the colourway lands here -- swatch, hex
-           field, RGB fields, picker, eyedropper -- so it is the one place the
-           canvas label needs re-deriving. */
-        syncCanvasLabel();
-        const hex = activeHex();
-        const rgb = hexToRgb(hex) || { r: 255, g: 255, b: 255 };
-        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+       Each instance keeps its own `hue`. It was module-level state when there
+       was one picker; shared between two it would make the background's hue
+       strip jump whenever the garment colour changed.
 
-        /* A greyscale colour carries no meaningful hue, so the strip keeps
-           its last position instead of snapping to red. */
-        if (hsv.s > 0.001 && hsv.v > 0.001) {
-            pickerHue = hsv.h;
-        }
-
-        if (colorDot) {
-            colorDot.style.backgroundColor = hex;
-        }
-        if (colorHexLabel) {
-            colorHexLabel.textContent = hex;
-        }
-        if (svArea) {
-            svArea.style.setProperty("--picker-hue", String(Math.round(pickerHue)));
-        }
-        if (svThumb) {
-            svThumb.style.left = (hsv.s * 100) + "%";
-            svThumb.style.top = ((1 - hsv.v) * 100) + "%";
-            svThumb.style.backgroundColor = hex;
-        }
-        if (hueThumb) {
-            hueThumb.style.left = ((pickerHue / 360) * 100) + "%";
-        }
-
-        if (inHex && skip !== inHex) { inHex.value = hex; }
-        if (inR && skip !== inR) { inR.value = String(rgb.r); }
-        if (inG && skip !== inG) { inG.value = String(rgb.g); }
-        if (inB && skip !== inB) { inB.value = String(rgb.b); }
-
-        /* Highlight whichever quick pick matches, whether it was reached by
-           its own button or by landing on that exact value in the picker. */
-        colorRow.querySelectorAll(".swatch").forEach((sw) => {
-            const on = sw.getAttribute("data-hex") === hex.toUpperCase();
-            sw.classList.toggle("is-active", on);
-            sw.setAttribute("aria-checked", String(on));
-        });
-    }
-
-    function setCustomColor(hex, skip) {
-        const rgb = hexToRgb(hex);
-        if (!rgb) {
-            return false;
-        }
-        customHex = rgbToHex(rgb.r, rgb.g, rgb.b);
-        currentColor = CUSTOM_COLOR;
-        syncColorUI(skip);
-        persist();
-        draw();
-        return true;
-    }
-
-    /* --- popover open/close --- */
-
-    function onPickerOutside(evt) {
-        if (colorPopover.contains(evt.target) || colorTrigger.contains(evt.target)) {
-            return;
-        }
-        closePicker();
-    }
-
-    function onPickerKey(evt) {
-        if (evt.key === "Escape") {
-            closePicker();
-            colorTrigger.focus();
-        }
-    }
-
-    function openPicker() {
-        colorPopover.hidden = false;
-        colorTrigger.setAttribute("aria-expanded", "true");
-        syncColorUI();
-        document.addEventListener("pointerdown", onPickerOutside, true);
-        document.addEventListener("keydown", onPickerKey, true);
-    }
-
-    function closePicker() {
-        colorPopover.hidden = true;
-        colorTrigger.setAttribute("aria-expanded", "false");
-        document.removeEventListener("pointerdown", onPickerOutside, true);
-        document.removeEventListener("keydown", onPickerKey, true);
-    }
-
-    if (colorTrigger && colorPopover) {
-        colorTrigger.addEventListener("click", () => {
-            if (colorPopover.hidden) {
-                openPicker();
-            } else {
-                closePicker();
-            }
-        });
-    }
-
-    /* --- gradient tracks --- */
+       nodes    the elements this instance drives.
+       options  getHex()            the colour to display, or null
+                setHex(hex, skip)   commit a colour; returns truthy on success
+       ---------------------------------------------------------------------- */
 
     function trackRatio(el, evt) {
         const rect = el.getBoundingClientRect();
@@ -1754,49 +1681,355 @@
         el.addEventListener("pointercancel", stop);
     }
 
-    bindTrack(svArea, (evt) => {
-        const r = trackRatio(svArea, evt);
-        const rgb = hsvToRgb(pickerHue, r.x, 1 - r.y);
-        setCustomColor(rgbToHex(rgb.r, rgb.g, rgb.b));
-    });
+    function createColorPicker(nodes, options) {
+        let hue = 0;
 
-    bindTrack(hueArea, (evt) => {
-        const r = trackRatio(hueArea, evt);
-        pickerHue = r.x * 360;
-        const current = hexToRgb(activeHex()) || { r: 255, g: 255, b: 255 };
-        const hsv = rgbToHsv(current.r, current.g, current.b);
-        /* A pure white or black start has no saturation to rotate, so the new
-           hue would produce the same greyscale colour and the strip would
-           look broken. Fall back to a fully saturated sample instead. */
-        const s = hsv.s > 0.001 ? hsv.s : 1;
-        const v = hsv.v > 0.001 ? hsv.v : 1;
-        const rgb = hsvToRgb(pickerHue, s, v);
-        setCustomColor(rgbToHex(rgb.r, rgb.g, rgb.b));
-    });
+        function commit(hex, skip) {
+            return options.setHex(hex, skip);
+        }
 
-    /* --- hex / R / G / B --- */
+        /* Repaints every part of this picker from its current colour. `skip`
+           names an input the visitor is currently typing in, which must not be
+           rewritten underneath the caret. */
+        function sync(skip) {
+            const hex = options.getHex();
+            /* No colour at all (the background's Transparent state): the
+               gradients keep their last position rather than snapping, and
+               the fields empty. Painting white here would say the background
+               IS white, which is a different export. */
+            const rgb = hexToRgb(hex) || { r: 255, g: 255, b: 255 };
+            const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
 
-    if (inHex) {
-        inHex.addEventListener("input", () => {
-            if (hexToRgb(inHex.value)) {
-                setCustomColor(inHex.value, inHex);
+            /* A greyscale colour carries no meaningful hue, so the strip keeps
+               its last position instead of snapping to red. */
+            if (hsv.s > 0.001 && hsv.v > 0.001) {
+                hue = hsv.h;
             }
+
+            if (nodes.sv) {
+                nodes.sv.style.setProperty("--picker-hue", String(Math.round(hue)));
+            }
+            if (nodes.svThumb) {
+                nodes.svThumb.style.left = (hsv.s * 100) + "%";
+                nodes.svThumb.style.top = ((1 - hsv.v) * 100) + "%";
+                nodes.svThumb.style.backgroundColor = hex || "transparent";
+            }
+            if (nodes.hueThumb) {
+                nodes.hueThumb.style.left = ((hue / 360) * 100) + "%";
+            }
+
+            const fields = hex ? { hex: hex, r: rgb.r, g: rgb.g, b: rgb.b }
+                : { hex: "", r: "", g: "", b: "" };
+            if (nodes.inHex && skip !== nodes.inHex) { nodes.inHex.value = fields.hex; }
+            if (nodes.inR && skip !== nodes.inR) { nodes.inR.value = String(fields.r); }
+            if (nodes.inG && skip !== nodes.inG) { nodes.inG.value = String(fields.g); }
+            if (nodes.inB && skip !== nodes.inB) { nodes.inB.value = String(fields.b); }
+        }
+
+        function buildPresets() {
+            if (!nodes.presets) {
+                return;
+            }
+            while (nodes.presets.firstChild) {
+                nodes.presets.removeChild(nodes.presets.firstChild);
+            }
+
+            /* Native colour sampling where the browser offers it (Chromium's
+               EyeDropper). No polyfill and no button at all elsewhere: a
+               control that silently does nothing is worse than one that is
+               absent. */
+            if (window.EyeDropper) {
+                const drop = document.createElement("button");
+                drop.type = "button";
+                drop.className = "color-eyedropper";
+                drop.setAttribute("aria-label", "Pick a colour from the screen");
+                drop.setAttribute("title", "Pick a colour from the screen");
+                drop.appendChild(icon([
+                    "m2 22 4-1 11-11-3-3L3 18l-1 4Z",
+                    "m15 5 4-4 4 4-4 4",
+                    "m13 7 4 4"
+                ]));
+                drop.addEventListener("click", () => {
+                    new window.EyeDropper().open().then((result) => {
+                        commit(result.sRGBHex);
+                    }, () => {
+                        /* Dismissed with Escape: nothing to do. */
+                    });
+                });
+                nodes.presets.appendChild(drop);
+            }
+
+            COLOR_PRESETS.forEach((hex) => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "color-preset";
+                btn.style.backgroundColor = hex;
+                btn.setAttribute("aria-label", hex);
+                btn.setAttribute("title", hex);
+                btn.addEventListener("click", () => commit(hex));
+                nodes.presets.appendChild(btn);
+            });
+        }
+
+        /* --- popover open/close --- */
+
+        function onOutside(evt) {
+            if (nodes.popover.contains(evt.target) || nodes.trigger.contains(evt.target)) {
+                return;
+            }
+            close();
+        }
+
+        function onKey(evt) {
+            if (evt.key === "Escape") {
+                close();
+                nodes.trigger.focus();
+            }
+        }
+
+        function open() {
+            nodes.popover.hidden = false;
+            nodes.trigger.setAttribute("aria-expanded", "true");
+            sync();
+            document.addEventListener("pointerdown", onOutside, true);
+            document.addEventListener("keydown", onKey, true);
+        }
+
+        function close() {
+            nodes.popover.hidden = true;
+            nodes.trigger.setAttribute("aria-expanded", "false");
+            document.removeEventListener("pointerdown", onOutside, true);
+            document.removeEventListener("keydown", onKey, true);
+        }
+
+        if (nodes.trigger && nodes.popover) {
+            nodes.trigger.addEventListener("click", () => {
+                if (nodes.popover.hidden) {
+                    open();
+                } else {
+                    close();
+                }
+            });
+        }
+
+        /* --- gradient tracks --- */
+
+        bindTrack(nodes.sv, (evt) => {
+            const r = trackRatio(nodes.sv, evt);
+            const rgb = hsvToRgb(hue, r.x, 1 - r.y);
+            commit(rgbToHex(rgb.r, rgb.g, rgb.b));
         });
-        inHex.addEventListener("blur", () => syncColorUI());
+
+        bindTrack(nodes.hue, (evt) => {
+            const r = trackRatio(nodes.hue, evt);
+            hue = r.x * 360;
+            const current = hexToRgb(options.getHex()) || { r: 255, g: 255, b: 255 };
+            const hsv = rgbToHsv(current.r, current.g, current.b);
+            /* A pure white or black start has no saturation to rotate, so the
+               new hue would produce the same greyscale colour and the strip
+               would look broken. Fall back to a fully saturated sample. */
+            const s = hsv.s > 0.001 ? hsv.s : 1;
+            const v = hsv.v > 0.001 ? hsv.v : 1;
+            const rgb = hsvToRgb(hue, s, v);
+            commit(rgbToHex(rgb.r, rgb.g, rgb.b));
+        });
+
+        /* --- hex / R / G / B --- */
+
+        if (nodes.inHex) {
+            nodes.inHex.addEventListener("input", () => {
+                if (hexToRgb(nodes.inHex.value)) {
+                    commit(nodes.inHex.value, nodes.inHex);
+                }
+            });
+            nodes.inHex.addEventListener("blur", () => sync());
+        }
+
+        [nodes.inR, nodes.inG, nodes.inB].forEach((input) => {
+            if (!input) {
+                return;
+            }
+            input.addEventListener("input", () => {
+                const r = clamp(parseInt(nodes.inR.value, 10) || 0, 0, 255);
+                const g = clamp(parseInt(nodes.inG.value, 10) || 0, 0, 255);
+                const b = clamp(parseInt(nodes.inB.value, 10) || 0, 0, 255);
+                commit(rgbToHex(r, g, b), input);
+            });
+            input.addEventListener("blur", () => sync());
+        });
+
+        return { sync: sync, buildPresets: buildPresets, close: close };
     }
 
-    [inR, inG, inB].forEach((input) => {
-        if (!input) {
+    const productPicker = createColorPicker({
+        trigger: colorTrigger, popover: colorPopover,
+        sv: svArea, svThumb: svThumb, hue: hueArea, hueThumb: hueThumb,
+        inHex: inHex, inR: inR, inG: inG, inB: inB, presets: presetGrid
+    }, {
+        getHex: () => activeHex(),
+        setHex: (hex, skip) => setCustomColor(hex, skip)
+    });
+
+    /* Repaints the whole colourway UI: the picker's own nodes, plus the two
+       things outside it that track the same value. */
+    function syncColorUI(skip) {
+        /* Every route that changes the colourway lands here -- swatch, hex
+           field, RGB fields, picker, eyedropper -- so it is the one place the
+           canvas label needs re-deriving. */
+        syncCanvasLabel();
+        productPicker.sync(skip);
+
+        const hex = activeHex();
+        if (colorDot) {
+            colorDot.style.backgroundColor = hex;
+        }
+        if (colorHexLabel) {
+            colorHexLabel.textContent = hex;
+        }
+
+        /* Highlight whichever quick pick matches, whether it was reached by
+           its own button or by landing on that exact value in the picker. */
+        colorRow.querySelectorAll(".swatch").forEach((sw) => {
+            const on = sw.getAttribute("data-hex") === hex.toUpperCase();
+            sw.classList.toggle("is-active", on);
+            sw.setAttribute("aria-checked", String(on));
+        });
+    }
+
+    function setCustomColor(hex, skip) {
+        const rgb = hexToRgb(hex);
+        if (!rgb) {
+            return false;
+        }
+        customHex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        currentColor = CUSTOM_COLOR;
+        syncColorUI(skip);
+        persist();
+        draw();
+        return true;
+    }
+
+    /* ----------------------------------------------------------------------
+       Background colour (August 24, 2026).
+
+       Only offered where the mockup HAS a blank background:
+
+         - the four drawn products, which paint onto a cleared canvas, so
+           everything around the garment is transparent and exports that way;
+         - a photographic template that declares `background: true`.
+
+       Eligibility is declared, never inferred. wood-a4's base photograph is
+       transparent inside its print window -- that transparency IS the mask
+       the design shows through -- so an alpha test would qualify it and paint
+       the chosen colour behind the poster.
+
+       Distinct from `backing` in drawPhoto(), the white paper sheet behind
+       artwork that does not fill a frame's window. That stays white whatever
+       is chosen here.
+
+       null is Transparent and is the default. Choosing nothing must leave the
+       exported PNG byte-identical to what it was before this existed.
+       ---------------------------------------------------------------------- */
+
+    /* Transparent first: it is the default and the state people come back to.
+       The rest are studio backdrops rather than brand colours -- the free
+       picker covers those. */
+    const BG_QUICK_PICKS = [
+        { hex: null, name: "Transparent" },
+        { hex: "#FFFFFF", name: "White" },
+        { hex: "#F4F3EF", name: "Cream" },
+        { hex: "#E5E5E2", name: "Light Grey" },
+        { hex: "#2A2A28", name: "Charcoal" }
+    ];
+
+    function backgroundEligible(config) {
+        if (!config) {
+            return false;
+        }
+        return config.type === "photo"
+            ? !!(config.template && config.template.background === true)
+            : true;
+    }
+
+    const backgroundPicker = createColorPicker({
+        trigger: bgTrigger, popover: bgPopover,
+        sv: bgSvArea, svThumb: bgSvThumb, hue: bgHueArea, hueThumb: bgHueThumb,
+        inHex: bgInHex, inR: bgInR, inG: bgInG, inB: bgInB, presets: bgPresetGrid
+    }, {
+        getHex: () => bgHex,
+        setHex: (hex, skip) => setBackground(hex, skip)
+    });
+
+    function setBackground(hex, skip) {
+        if (hex === null) {
+            bgHex = null;
+        } else {
+            const rgb = hexToRgb(hex);
+            if (!rgb) {
+                return false;
+            }
+            bgHex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        }
+        syncBackgroundUI(skip);
+        persist();
+        draw();
+        return true;
+    }
+
+    function renderBackgroundSwatches() {
+        if (!bgRow) {
             return;
         }
-        input.addEventListener("input", () => {
-            const r = clamp(parseInt(inR.value, 10) || 0, 0, 255);
-            const g = clamp(parseInt(inG.value, 10) || 0, 0, 255);
-            const b = clamp(parseInt(inB.value, 10) || 0, 0, 255);
-            setCustomColor(rgbToHex(r, g, b), input);
+        while (bgRow.firstChild) {
+            bgRow.removeChild(bgRow.firstChild);
+        }
+        BG_QUICK_PICKS.forEach((pick) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = pick.hex ? "swatch" : "swatch swatch-transparent";
+            if (pick.hex) {
+                btn.style.backgroundColor = pick.hex;
+            }
+            btn.setAttribute("role", "radio");
+            btn.setAttribute("aria-checked", "false");
+            btn.setAttribute("aria-label", pick.name);
+            btn.setAttribute("data-hex", pick.hex ? pick.hex.toUpperCase() : "none");
+            btn.addEventListener("click", () => setBackground(pick.hex));
+            bgRow.appendChild(btn);
         });
-        input.addEventListener("blur", () => syncColorUI());
-    });
+    }
+
+    function syncBackgroundUI(skip) {
+        /* The whole panel disappears for a product with a background of its
+           own, rather than offering a control that would do nothing. */
+        if (bgField) {
+            bgField.hidden = !backgroundEligible(PRODUCTS[currentProduct]);
+        }
+        backgroundPicker.sync(skip);
+
+        if (bgDot) {
+            bgDot.classList.toggle("is-transparent", !bgHex);
+            bgDot.style.backgroundColor = bgHex || "";
+        }
+        if (bgHexLabel) {
+            bgHexLabel.textContent = bgHex || "Transparent";
+        }
+        if (bgRow) {
+            bgRow.querySelectorAll(".swatch").forEach((sw) => {
+                const on = sw.getAttribute("data-hex") ===
+                    (bgHex ? bgHex.toUpperCase() : "none");
+                sw.classList.toggle("is-active", on);
+                sw.setAttribute("aria-checked", String(on));
+            });
+        }
+    }
+
+    /* The colour actually painted behind everything, or null. Read by both
+       render paths, so an ineligible product can never pick up a background
+       left over from an eligible one. */
+    function activeBackground() {
+        return backgroundEligible(PRODUCTS[currentProduct]) ? bgHex : null;
+    }
 
     /* ----------------------------------------------------------------------
        Design size. The slider, the numeric field and the corner handles all
@@ -2000,6 +2233,9 @@
             product: currentProduct,
             color: currentColor,
             customHex: customHex,
+            /* null for transparent. Validated on the way back in, never
+               trusted as a fill style. */
+            bg: bgHex,
             layers: layers.map((layer) => ({
                 name: layer.name,
                 scale: layer.scale,
@@ -2199,6 +2435,14 @@
             const c = hexToRgb(saved.customHex);
             customHex = rgbToHex(c.r, c.g, c.b);
         }
+        /* Anything that is not a six-digit hex is treated as transparent.
+           localStorage is editable by the visitor, and this value reaches
+           ctx.fillStyle -- which accepts far more than colours -- so it is
+           re-derived from parsed components rather than passed through. */
+        if (typeof saved.bg === "string") {
+            const bg = hexToRgb(saved.bg);
+            bgHex = bg ? rgbToHex(bg.r, bg.g, bg.b) : null;
+        }
         if (saved.color === CUSTOM_COLOR) {
             currentColor = CUSTOM_COLOR;
         } else if (PRODUCTS[currentProduct].colors && PRODUCTS[currentProduct].colors[saved.color]) {
@@ -2254,9 +2498,12 @@
 
     selectedId = layers.length ? layers[layers.length - 1].id : null;
 
-    buildColorPresets();
+    productPicker.buildPresets();
     renderColorSwatches();
     syncColorUI();
+    backgroundPicker.buildPresets();
+    renderBackgroundSwatches();
+    syncBackgroundUI();
     renderLayerList();
     syncScaleControls();
     syncLayerActions();

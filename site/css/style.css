@@ -4284,6 +4284,26 @@ legend {
     outline-offset: 2px;
 }
 
+/* Transparency, drawn the way every image editor draws it: a grey chequer.
+   Used by the mockup editor's background quick picks and by its trigger dot,
+   where "no colour" is a real, choosable state rather than an empty control.
+   Two 45-degree gradients offset by half a tile make the chequer, so it costs
+   no asset and follows the theme's own border colour. */
+.swatch-transparent,
+.color-trigger-dot.is-transparent {
+    background-color: var(--color-bg);
+    background-image:
+        linear-gradient(45deg, var(--color-border) 25%, transparent 25%, transparent 75%, var(--color-border) 75%),
+        linear-gradient(45deg, var(--color-border) 25%, transparent 25%, transparent 75%, var(--color-border) 75%);
+    background-size: 0.625rem 0.625rem;
+    background-position: 0 0, 0.3125rem 0.3125rem;
+}
+
+.color-trigger-dot.is-transparent {
+    background-size: 0.4375rem 0.4375rem;
+    background-position: 0 0, 0.21875rem 0.21875rem;
+}
+
 /* --------------------------------------------------------------------------
    Resume document preview (the html2pdf.js capture target)
    -------------------------------------------------------------------------- */

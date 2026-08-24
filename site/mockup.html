@@ -262,6 +262,79 @@
                         <div class="color-row" id="m-color-row" role="radiogroup" aria-labelledby="m-color-label"></div>
                     </div>
 
+                    <!-- BACKGROUND (August 24, 2026). Only for mockups whose
+                         background is blank: the four drawn products, which
+                         are painted onto a cleared canvas and export with a
+                         transparent surround, plus any photographic template
+                         that opts in with `background: true` in
+                         js/mockup-templates.js. A photographed scene has its
+                         own backdrop and is NOT eligible by default.
+
+                         Not to be confused with the white paper `backing`
+                         behind artwork inside a frame's window -- that stays
+                         white whatever is chosen here.
+
+                         Hidden outright when the active product is not
+                         eligible, the same way #m-color-field disappears for
+                         a template with no colorways. -->
+                    <div class="field panel-block" id="m-bg-field">
+                        <div class="panel-head">
+                            <span class="panel-title" id="m-bg-label">Background</span>
+                        </div>
+
+                        <div class="color-control">
+                            <button type="button" class="color-trigger" id="m-bg-trigger" aria-haspopup="dialog" aria-expanded="false">
+                                <span class="color-trigger-dot is-transparent" id="m-bg-dot"></span>
+                                <span class="color-trigger-hex" id="m-bg-hex">Transparent</span>
+                                <svg class="color-trigger-caret" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 10 5 5 5-5"/></svg>
+                                <span class="sr-only">Open the background colour picker</span>
+                            </button>
+
+                            <!-- Same component as the product picker above,
+                                 driven by the same createColorPicker factory
+                                 in js/mockup.js: one implementation, two
+                                 instances, each with its own state. -->
+                            <div class="color-popover" id="m-bg-popover" role="dialog" aria-label="Choose a background colour" hidden>
+                                <div class="color-sv" id="m-bg-sv" aria-hidden="true">
+                                    <span class="color-sv-thumb" id="m-bg-sv-thumb"></span>
+                                </div>
+
+                                <div class="color-hue" id="m-bg-hue" aria-hidden="true">
+                                    <span class="color-hue-thumb" id="m-bg-hue-thumb"></span>
+                                </div>
+
+                                <div class="color-inputs">
+                                    <p class="color-input-cell">
+                                        <input type="text" id="m-bg-in-hex" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Background hex value">
+                                        <span class="color-input-tag">Hex</span>
+                                    </p>
+                                    <p class="color-input-cell">
+                                        <input type="number" id="m-bg-in-r" min="0" max="255" step="1" aria-label="Background red">
+                                        <span class="color-input-tag">R</span>
+                                    </p>
+                                    <p class="color-input-cell">
+                                        <input type="number" id="m-bg-in-g" min="0" max="255" step="1" aria-label="Background green">
+                                        <span class="color-input-tag">G</span>
+                                    </p>
+                                    <p class="color-input-cell">
+                                        <input type="number" id="m-bg-in-b" min="0" max="255" step="1" aria-label="Background blue">
+                                        <span class="color-input-tag">B</span>
+                                    </p>
+                                </div>
+
+                                <div class="color-presets" id="m-bg-presets" role="group" aria-label="Preset colours"></div>
+                            </div>
+                        </div>
+
+                        <!-- Quick picks, Transparent first: it is the default
+                             and the one people come back to, so it is a
+                             one-click return rather than a state reachable
+                             only by clearing a hex field. -->
+                        <div class="color-row" id="m-bg-row" role="radiogroup" aria-labelledby="m-bg-label"></div>
+
+                        <p class="upload-hint">Transparent exports a PNG with no background, ready to drop onto any listing.</p>
+                    </div>
+
                     <div class="field panel-block">
                         <div class="panel-head">
                             <label class="panel-title" for="m-scale">Design Size</label>

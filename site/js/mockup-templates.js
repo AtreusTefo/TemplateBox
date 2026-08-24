@@ -86,6 +86,18 @@
                TL, TR, BR, BL. Axis-aligned rectangles render with the fast
                2D path; non-rectangular quads trigger the perspective warp
                (js/vendor/glfx.js, lazy-loaded only when needed).
+     background
+               Optional. `true` turns the editor's Background colour panel on
+               for this template, which paints the chosen colour behind the
+               base photograph. Only for a base whose SCENE is transparent --
+               a cut-out product on nothing. A photographed scene has its own
+               backdrop and must leave this off, which is why it is declared
+               rather than detected: wood-a4's base is transparent inside its
+               print window (that transparency IS the mask the artwork shows
+               through), so an alpha test would qualify it and paint the
+               chosen colour behind the poster. The four drawn products are
+               always eligible and need no flag. Not related to `backing`,
+               the white paper behind artwork inside a frame's window.
 
    Adding a template: tools/mockup-admin.html does the whole job. Load the
    base photograph and it will suggest a chest print zone from the garment's

@@ -1341,6 +1341,146 @@ async function launchChecks(page) {
 }
 
 /* ==========================================================================
+   5. Mockup editor: the background colour (August 24, 2026).
+
+   Asserted against the CANVAS, not against the controls. The whole value of
+   this feature is what comes out of the export, and every route to a wrong
+   export is silent: a background painted in CSS would look right on screen
+   and be absent from the PNG; a background applied to a photographic
+   template would paint behind a scene that already has a backdrop, or -- for
+   a "window" template like wood-a4, whose base is transparent inside its
+   print opening -- behind the artwork itself.
+
+   Pixel (2, 2) is the corner of the canvas, which is outside every product's
+   own drawing and outside every photograph's print window, so it reads the
+   background and nothing else.
+   ========================================================================== */
+
+async function mockupChecks(page) {
+    section("5. Mockup editor: background colour");
+
+    const CORNER = `(() => {
+        const c = document.getElementById('mockup-canvas');
+        return [...c.getContext('2d').getImageData(2, 2, 1, 1).data].join(',');
+    })()`;
+
+    /* A drawn product: eligible, because everything around the garment is
+       transparent and exports that way. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const vector = await page.evaluate(`(async () => {
+        const field = document.getElementById('m-bg-field');
+        const row = document.getElementById('m-bg-row');
+        if (!field || !row) { return { missing: true }; }
+        const corner = () => ${CORNER};
+        const before = corner();
+        const exportBefore = document.getElementById('mockup-canvas').toDataURL('image/png');
+        /* Index 3 is Light Grey; index 0 is Transparent. */
+        row.querySelectorAll('.swatch')[3].click();
+        await new Promise(r => setTimeout(r, 250));
+        const after = corner();
+        const exportAfter = document.getElementById('mockup-canvas').toDataURL('image/png');
+        const stored = (JSON.parse(localStorage.getItem('tb_mockup_v1') || '{}')).bg;
+        row.querySelectorAll('.swatch')[0].click();
+        await new Promise(r => setTimeout(r, 250));
+        return {
+            hidden: field.hidden, before: before, after: after,
+            exportChanged: exportBefore !== exportAfter, stored: stored,
+            cleared: corner(),
+            clearedStore: (JSON.parse(localStorage.getItem('tb_mockup_v1') || '{}')).bg
+        };
+    })()`);
+
+    check("mockup: background panel offered on a drawn product",
+        !vector.missing && vector.hidden === false, JSON.stringify(vector));
+    check("mockup: no background by default, so the export stays transparent",
+        vector.before === "0,0,0,0", `corner ${vector.before}`);
+    check("mockup: a chosen background reaches the canvas and the export",
+        vector.after === "229,229,226,255" && vector.exportChanged &&
+        vector.stored === "#E5E5E2",
+        JSON.stringify(vector));
+    check("mockup: Transparent returns the canvas to no background at all",
+        vector.cleared === "0,0,0,0" && vector.clearedStore === null,
+        JSON.stringify({ cleared: vector.cleared, stored: vector.clearedStore }));
+
+    /* A photographic template: NOT eligible unless it declares
+       `background: true`. Seeded with a stored background from an eligible
+       product, which must not reach this canvas -- the storage is shared
+       across products. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const photo = await page.evaluate(`(async () => {
+        localStorage.setItem('tb_editor_preset', JSON.stringify('wood-a4'));
+        localStorage.setItem('tb_mockup_v1', JSON.stringify({ product: 'tshirt', bg: '#FF0000' }));
+        return true;
+    })()`);
+    if (photo) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+        const r = await page.evaluate(`(async () => {
+            for (let i = 0; i < 60; i += 1) {
+                const label = document.getElementById('mockup-canvas').getAttribute('aria-label');
+                if (label && label.indexOf('Leaning Wood Frame') === 0) { break; }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            return { label: document.getElementById('mockup-canvas').getAttribute('aria-label'),
+                     hidden: document.getElementById('m-bg-field').hidden,
+                     corner: ${CORNER} };
+        })()`);
+        /* The panel being hidden is the whole assertion here, and that is a
+           deliberate limit rather than a thin test. A companion pixel check
+           ("the stored red never reaches this canvas") was written first and
+           then removed: mutating backgroundEligible to return true for every
+           template did NOT make it fail. On a "window" template the base
+           photograph is opaque everywhere except its print opening, and the
+           opening is covered by the white paper backing, so a background
+           painted behind it is invisible at every pixel. An assertion that
+           cannot fail is not evidence, so the honest contract to assert is
+           the one that can: the control is not offered. */
+        check("mockup: background panel absent on a photographic template",
+            r.hidden === true, JSON.stringify(r));
+    }
+
+    /* The refactor that made one picker into two must not have cost the
+       product colourway path anything. Pixel (500, 300) is garment fabric on
+       the drawn t-shirt, above the print area.
+
+       Storage is cleared first, and that is not housekeeping: the block above
+       seeds a red background to prove it cannot reach a photographic
+       template, and a drawn product IS eligible for it, so without this the
+       corner assertion below would read that red and fail for the wrong
+       reason. It did, on the first run. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    await page.evaluate("localStorage.clear(), true");
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const colorway = await page.evaluate(`(async () => {
+        const fabric = () => {
+            const c = document.getElementById('mockup-canvas');
+            return [...c.getContext('2d').getImageData(500, 300, 1, 1).data].join(',');
+        };
+        const before = fabric();
+        document.getElementById('m-color-trigger').click();
+        const opened = !document.getElementById('m-color-popover').hidden;
+        const hex = document.getElementById('m-color-in-hex');
+        hex.value = '#123456';
+        hex.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 250));
+        const typed = fabric();
+        const swatches = document.querySelectorAll('#m-color-row .swatch');
+        swatches[3].click();
+        await new Promise(r => setTimeout(r, 250));
+        return { opened: opened, before: before, typed: typed, swatched: fabric(),
+                 swatchHex: swatches[3].getAttribute('data-hex'),
+                 active: document.querySelectorAll('#m-color-row .swatch.is-active').length,
+                 corner: ${CORNER} };
+    })()`);
+
+    check("mockup: the colourway picker still drives the garment",
+        colorway.opened && colorway.typed === "18,52,86,255" &&
+        colorway.swatched === "31,42,68,255" && colorway.active === 1,
+        JSON.stringify(colorway));
+    check("mockup: a garment colour is not a background",
+        colorway.corner === "0,0,0,0", `corner ${colorway.corner}`);
+}
+
+/* ==========================================================================
    4. Ads-blocked parity against the last commit.
 
    The rail, the anchors and the leaderboard all reserve space only once a
@@ -1465,6 +1605,7 @@ async function main() {
             try {
                 await layoutChecks(page);
                 await launchChecks(page);
+                await mockupChecks(page);
             } finally {
                 page.close();
             }
