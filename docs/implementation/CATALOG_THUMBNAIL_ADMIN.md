@@ -353,6 +353,10 @@ for real, against a genuine copy of `index.html`.
 | Preview block closed early, swallowing four cards | `verifyPatch` fired: "card count became 14, expected 18". File unchanged |
 | Publish All across three items | 4 files, 2 replaced, 1 inserted, 19 cards, parses |
 | A folder that is not the site directory | Refused at connect |
+| Selecting a card with two shipped thumbnails | Both load from the project, folder resolved from the real `src` path (August 24, 2026) |
+| Replacing only the default | Hover image survives in the markup and on disk; only the superseded default is removed |
+| Remove Hover Image, then publish | Hover `<img>` dropped and its file deleted — removal still works when asked for |
+| A record with no hover and no explicit removal | Refused by name; markup and files untouched |
 | Publish refused after the images were written | `index.html` byte-identical, and the superseded files it still references **survive** (August 24, 2026 regression test) |
 | Publish succeeded | Superseded files removed, and every path the page references confirmed present on disk |
 
@@ -488,6 +492,47 @@ showing the whole design is the right answer for a catalog.
 
 The mat colour is the card's own background token, so it follows the theme
 (white in light, `rgb(29, 28, 23)` in dark) rather than showing as a grey band.
+
+## Hydration: The Panel Reads Before It Writes (August 24, 2026)
+
+With a project folder connected, selecting a card that has no saved workspace
+record loads that card's **current** thumbnails out of the project: the panel
+reads `index.html`, locates the card with the same locator the patcher uses,
+takes the `<img>` sources from its preview block, reads those files off disk,
+and fills the form with them.
+
+**Why it had to exist.** The workspace was write-only. A card shipping two
+thumbnails presented an empty form, so uploading a replacement default produced
+a record with `hoverImage: null` — and every downstream step honoured that:
+single-image markup, hover `<img>` dropped, hover file deleted by the cleanup.
+Each step was correct; the record simply described an intention nobody had
+expressed. On the mockup cards, whose whole design is the bare-product/
+styled-demo pair, a successful publish destroyed the effect the card exists
+for. Full write-up:
+`docs/error-fixes/PUBLISHING_ONE_THUMBNAIL_DELETED_THE_OTHER.md`.
+
+Three consequences worth knowing:
+
+- **A saved workspace record beats hydration**, deliberately. Unsaved work is
+  never overwritten by a background read. Delete the row to hydrate fresh.
+- **The destination folder comes from the real `src` path** when hydrating, so
+  a re-publish writes where the files already live rather than where the
+  category default would put them.
+- **A stale-token guard** discards a slow read whose card is no longer
+  selected, so switching cards quickly cannot leave one card's images sitting
+  in another card's form.
+
+### The explicit-removal flag
+
+Hydration only runs with a folder connected, and a workspace saved before it
+existed still holds `hoverImage: null`. So publishing refuses when the live
+card has a hover thumbnail, the record has none, and Remove Hover Image was
+never pressed.
+
+`hoverCleared` is set only by that button and cleared by uploading a
+replacement. It is what separates "this card should have no hover thumbnail"
+from "one was never loaded", which are otherwise the same absent value — and
+the difference between those two is exactly what the defect turned on.
 
 ## The Drift Guard (August 23, 2026)
 

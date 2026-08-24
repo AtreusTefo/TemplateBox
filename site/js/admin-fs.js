@@ -260,6 +260,20 @@ window.TBProjectFolder = (() => {
         return (await file.getFile()).text();
     }
 
+    /* The file itself, or null when it is not there. Null rather than a throw
+       because the common caller is asking "does the project already have
+       this?", and a missing file is an ordinary answer to that. */
+    async function readFile(relPath) {
+        try {
+            const { dirs, name } = split(relPath);
+            const dir = await resolveDir(dirs, false);
+            const file = await dir.getFileHandle(name, { create: false });
+            return await file.getFile();
+        } catch (err) {
+            return null;
+        }
+    }
+
     async function deleteFile(relPath) {
         const { dirs, name } = split(relPath);
         try {
@@ -297,6 +311,7 @@ window.TBProjectFolder = (() => {
         disconnect,
         writeFile,
         readText,
+        readFile,
         deleteFile,
         listDir
     };

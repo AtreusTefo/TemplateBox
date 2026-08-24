@@ -1076,6 +1076,10 @@ body + '\n' +
     let draftDefault = null;
     let draftHover = null;
     let editingId = null;
+    /* Set only by the hover Remove button: the operator saying the card
+       should have no hover thumbnail, as distinct from one never being
+       loaded. Publishing refuses to delete a live hover file without it. */
+    let hoverCleared = false;
 
     function setText(target, message) {
         if (target) {
@@ -1520,7 +1524,7 @@ body + '\n' +
         return el.fit && el.fit.value === "fit" ? "fit" : "fill";
     }
 
-    function bindUpload(input, errorTarget, noteTarget, removeBtn, assign) {
+    function bindUpload(input, errorTarget, noteTarget, removeBtn, assign, onRemove) {
         input.addEventListener("change", () => {
             setText(errorTarget, "");
             setText(noteTarget, "");
@@ -1554,6 +1558,7 @@ body + '\n' +
             setText(errorTarget, "");
             setText(noteTarget, "");
             assign(null);
+            if (onRemove) { onRemove(); }
             renderPreview();
         });
     }
@@ -1563,6 +1568,14 @@ body + '\n' +
     });
     bindUpload(el.hoverFile, el.hoverError, el.hoverNote, el.hoverRemove, (shot) => {
         draftHover = shot;
+        /* A replacement is not a removal: uploading again un-clears it. */
+        if (shot) { hoverCleared = false; }
+    }, () => {
+        /* Pressing Remove is the only way to say "this card should have no
+           hover thumbnail". Publishing keys on it, so that an absent hover
+           caused by a failed read can never be mistaken for a deliberate
+           one and silently delete a live file. */
+        hoverCleared = true;
     });
 
     /* ----------------------------------------------------------------------
@@ -1628,6 +1641,8 @@ body + '\n' +
         el.newFields.hidden = value !== NEW_ITEM;
         setText(el.error, "");
         setText(el.formStatus, "");
+        /* Any hydration still in flight is for the previous selection now. */
+        hydrateToken += 1;
 
         if (!value) {
             clearImages();
@@ -1658,6 +1673,9 @@ body + '\n' +
             setText(el.hoverNote, draftHover ? draftHover.note || "" : "");
         } else if (known) {
             el.folder.value = defaultFolder(known);
+            /* Nothing saved for this card yet, so show what the site has
+               rather than an empty form that invites overwriting it. */
+            hydrateFromProject(known, hydrateToken);
         }
         renderPreview();
     }
@@ -1673,6 +1691,7 @@ body + '\n' +
         setText(el.hoverError, "");
         setText(el.defaultNote, "");
         setText(el.hoverNote, "");
+        hoverCleared = false;
     }
 
     /* The record the form currently describes, or an Error message. Used by
@@ -1733,6 +1752,7 @@ body + '\n' +
             folder: folder,
             defaultImage: draftDefault,
             hoverImage: draftHover,
+            hoverCleared: hoverCleared,
             updated: todayIso()
         };
     }
@@ -2244,6 +2264,117 @@ body + '\n' +
     }
 
     /* ----------------------------------------------------------------------
+       Hydration: loading a card's CURRENT thumbnails out of the project.
+
+       Why this exists. Until August 24, 2026 this workspace was write-only --
+       it knew what you had uploaded and nothing about what the card already
+       had. Selecting a card that ships two thumbnails showed an empty form,
+       so uploading one image and publishing emitted a single-image block:
+       the hover <img> was stripped from index.html and its file deleted by
+       the cleanup, with no warning, because nothing here had ever seen it.
+       On the mockup cards, whose whole design is the bare-product/styled-demo
+       pair, that quietly destroyed the effect the card existed for.
+
+       Reading the current state first is what makes "replace only the
+       default" mean what it says: the hover shot is already in the record, so
+       the generated markup keeps it. Removing one is still possible, but only
+       by asking for it with the Remove button.
+       ---------------------------------------------------------------------- */
+
+    /* Guards against a slow read landing after the operator has moved on to
+       another card. Bumped on every selection change; a hydration whose token
+       is stale throws its result away. */
+    let hydrateToken = 0;
+
+    function extOfPath(path) {
+        const dot = path.lastIndexOf(".");
+        const ext = dot === -1 ? "" : path.slice(dot + 1).toLowerCase();
+        return ext === "jpeg" ? "jpg" : ext;
+    }
+
+    async function shotFromFile(file, srcPath) {
+        const data = await blobToDataUri(file);
+        const img = await decode(data);
+        return {
+            data: data,
+            ext: extOfPath(srcPath) || EXT_BY_TYPE[file.type] || "jpg",
+            w: img.naturalWidth,
+            h: img.naturalHeight,
+            note: "Already on the site: " + kb(file.size) + ", " +
+                img.naturalWidth + "x" + img.naturalHeight +
+                ". Replace it, or leave it and it publishes back unchanged."
+        };
+    }
+
+    /* The <img> sources inside one card's preview, in markup order, plus the
+       folder they live in. Reuses the same locator the patcher uses, so the
+       card this reads is by construction the card a publish would rewrite. */
+    function currentThumbsOf(html, item) {
+        const masked = maskComments(html);
+        const articles = findArticles(masked);
+        const record = { doc: item.doc || "", title: TB.sanitize(item.title) };
+        const matches = articles.filter((a) => articleMatches(html, a, record));
+        if (matches.length !== 1) {
+            return null;
+        }
+        const block = findPreviewBlock(masked, matches[0]);
+        if (!block) {
+            return null;
+        }
+        const found = { blank: null, hover: null, folder: null };
+        [...html.slice(block.start, block.end)
+            .matchAll(/<img\b[^>]*class="card-thumb ([^"]*)"[^>]*\ssrc="([^"]+)"/g)]
+            .forEach(([, classes, src]) => {
+                const slot = classes.indexOf("card-thumb-hover") >= 0 ? "hover" : "blank";
+                found[slot] = src;
+                found.folder = src.slice(0, src.lastIndexOf("/"));
+            });
+        return found.blank || found.hover ? found : null;
+    }
+
+    async function hydrateFromProject(item, token) {
+        if (!FS || !FS.isConnected() || !item) {
+            return false;
+        }
+        let html;
+        try {
+            html = await FS.readText(INDEX_PATH);
+        } catch (err) {
+            return false;
+        }
+        if (token !== hydrateToken) { return false; }
+
+        const current = currentThumbsOf(html, item);
+        if (!current) {
+            return false;
+        }
+
+        const loaded = {};
+        for (const slot of ["blank", "hover"]) {
+            if (!current[slot]) { continue; }
+            const file = await FS.readFile(current[slot]);
+            if (!file) { continue; }
+            loaded[slot] = await shotFromFile(file, current[slot]);
+        }
+        if (token !== hydrateToken) { return false; }
+        if (!loaded.blank && !loaded.hover) {
+            return false;
+        }
+
+        draftDefault = loaded.blank || null;
+        draftHover = loaded.hover || null;
+        if (current.folder) {
+            el.folder.value = current.folder;
+        }
+        setText(el.defaultNote, draftDefault ? draftDefault.note : "");
+        setText(el.hoverNote, draftHover ? draftHover.note : "");
+        renderPreview();
+        setText(el.formStatus, "Loaded this card's current thumbnails from the project. " +
+            "Replace either one; whatever you leave alone stays exactly as it is.");
+        return true;
+    }
+
+    /* ----------------------------------------------------------------------
        Publishing straight into the working copy.
 
        The download-and-paste path above still exists and is still the only
@@ -2310,6 +2441,24 @@ body + '\n' +
         }
 
         const before = await FS.readText(INDEX_PATH);
+
+        /* Last line of defence against the August 24, 2026 defect: a record
+           carrying no hover shot produces a single-image block, which strips
+           the card's hover <img> and lets the cleanup delete its file. That
+           is correct when the operator asked for it and destructive when the
+           hover simply was not loaded -- a failed read, or a workspace saved
+           before hydration existed. Only an explicit Remove authorises it. */
+        const known = catalogItem(record.id);
+        if (known && !record.hoverImage && !record.hoverCleared) {
+            const live = currentThumbsOf(before, known);
+            if (live && live.hover) {
+                throw new Error("this card already has a hover thumbnail (" +
+                    live.hover.split("/").pop() + ") and this upload has none, so publishing " +
+                    "would delete it. Re-select the card to load what is already there, " +
+                    "or press Remove Hover Image to drop it deliberately.");
+            }
+        }
+
         const patch = patchIndexHtml(before, record);
         const problem = verifyPatch(before, patch.html, record, patch);
         if (problem) {
