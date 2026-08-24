@@ -670,8 +670,10 @@
     const downloadBtn = document.getElementById("download-mockup-png");
     const trayGrid = document.getElementById("tray-grid");
     const trayEmpty = document.getElementById("tray-empty");
-    const docNameInput = document.getElementById("doc-name");
-    const DEFAULT_DOC_NAME = "Untitled mockup";
+    /* No #doc-name here (August 24, 2026). The bar's document-name input was
+       removed when the bar gained navigation and a search field; #m-label,
+       "Mockup Label" in the controls, is what names a mockup now. A stale
+       `docName` in a returning visitor's storage is simply not read. */
 
     /* ----------------------------------------------------------------------
        State. Design bitmaps live only in memory: neither a layer's source
@@ -2244,14 +2246,9 @@
                 rotation: layer.rotation,
                 visible: layer.visible
             })),
-            label: TB.sanitize(labelInput.value),
-            docName: TB.sanitize(docNameInput ? docNameInput.value : DEFAULT_DOC_NAME)
+            label: TB.sanitize(labelInput.value)
         });
         TB.markSaved();
-    }
-
-    if (docNameInput) {
-        docNameInput.addEventListener("input", persist);
     }
 
     labelInput.addEventListener("input", persist);
@@ -2452,9 +2449,6 @@
             labelInput.value = TB.desanitize(saved.label);
         }
         restoreLayers(saved);
-    }
-    if (docNameInput) {
-        docNameInput.value = TB.desanitize((saved && saved.docName) || DEFAULT_DOC_NAME);
     }
 
     /* The catalog card that opened this editor decides which mockup loads

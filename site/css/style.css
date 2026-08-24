@@ -734,7 +734,11 @@ button {
     align-items: center;
 }
 
-.site-search input {
+/* Shared with the mockup editor bar's field (.editor-search), which differs
+   only in where it lives and when it is shown -- one appearance, two
+   placements, rather than a second copy of the styling. */
+.site-search input,
+.editor-search input {
     width: 100%;
     min-height: 2.75rem;
     padding: 0 2.5rem 0 2.5rem;
@@ -749,13 +753,15 @@ button {
         background-color var(--motion-fast) var(--ease);
 }
 
-.site-search input:focus {
+.site-search input:focus,
+.editor-search input:focus {
     outline: 2px solid var(--color-brand);
     outline-offset: -1px;
     background-color: var(--color-card);
 }
 
-.site-search svg {
+.site-search svg,
+.editor-search > svg {
     position: absolute;
     left: 0.875rem;
     width: 1.0625rem;
@@ -3621,6 +3627,158 @@ body.has-site-anchor {
 
 .editor-bar {
     gap: var(--space-sm);
+}
+
+/* --------------------------------------------------------------------------
+   The mockup editor's bar (August 24, 2026).
+
+   mockup.html only. resume.html, docs.html and poster.html keep the bar they
+   had -- every rule in this block is scoped to a class or an element that
+   only mockup.html carries, and the three of them are verified byte-identical
+   against HEAD by section 4 of the suite.
+
+   ONE boundary governs the whole bar: 75rem. It is the width js/app.js
+   already collapses .site-nav at (its matchMedia reads 74.9375rem, the pixel
+   below), and the same seam where the ad anchor ends and the ad rail begins.
+   Inventing a second boundary here would put the CSS and the JS into
+   disagreement about when the bar is collapsed, which is how the header
+   ended up with a control that toggled nothing.
+
+   Nothing here sets a width, a margin or a transform on the header itself.
+   The fixed ad rail insets the whole page with one padding-right on <body>
+   and the header inherits it by staying in normal flow; a rule of its own
+   would break exactly the mechanism FIXED_FULL_HEIGHT_AD_RAIL.md warns
+   about. Explicit `order` values only, which move paint order within the
+   flex line and reserve nothing.
+   -------------------------------------------------------------------------- */
+
+/* Left edge, desktop: the wordmark, matching the site header's own. */
+.editor-brand {
+    display: none;
+    align-items: center;
+    gap: var(--space-2xs);
+    flex-shrink: 0;
+    font-family: var(--font-serif);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--color-text);
+    order: 1;
+}
+
+.editor-brand svg {
+    width: 1.5rem;
+    height: 1.6875rem;
+    flex-shrink: 0;
+}
+
+.editor-brand:hover {
+    color: var(--color-brand);
+}
+
+.editor-bar .editor-home { order: 1; }
+.editor-bar .nav-toggle { order: 2; }
+.editor-bar .site-nav { order: 3; }
+.editor-bar .editor-search { order: 4; }
+.editor-bar .editor-actions { order: 5; }
+.editor-bar .search-toggle { order: 6; }
+
+/* The bar's search field. Shares the site header field's appearance through
+   the .site-search rules further up (declared as a two-selector list there),
+   and only its display gate differs: this one runs to 75rem rather than
+   62rem, because the whole bar switches at one boundary. */
+.editor-search {
+    display: none;
+    flex: 0 1 18rem;
+    min-width: 0;
+    margin-left: auto;
+    position: relative;
+    align-items: center;
+}
+
+/* From 75rem: wordmark, inline links, inline field. */
+@media (min-width: 75rem) {
+    .editor-bar .editor-home {
+        display: none;
+    }
+
+    .editor-brand {
+        display: inline-flex;
+    }
+
+    .editor-search {
+        display: flex;
+    }
+
+    /* The links sit next to the brand, not out by the actions. */
+    .editor-bar .site-nav {
+        margin-right: var(--space-sm);
+    }
+
+    /* .editor-actions carries margin-left:auto for the bars that have no
+       search field. Here the FIELD takes that job, or the two autos would
+       split the free space between them and leave the field floating in the
+       middle of the bar. */
+    .editor-bar .editor-actions {
+        margin-left: 0;
+    }
+}
+
+/* Below 75rem: the icon, the hamburger and search as a button. The generic
+   rule reveals .search-toggle only under 62rem, because that is where the
+   site header's own field disappears; this bar's field is gated at 75rem, so
+   its button has to appear at the same width or the band between the two
+   would offer neither. */
+@media (max-width: 74.9375rem) {
+    .editor-bar .search-toggle {
+        display: inline-flex;
+    }
+
+    /* The nav becomes the header's full-width second row when open, exactly
+       as it does on every other page. */
+    .editor-bar .site-nav {
+        order: 7;
+    }
+
+    /* This bar has no theme toggle in its nav, so there is no control in the
+       top-right corner for the search button to step aside from. */
+    .editor-bar.nav-open .search-toggle {
+        margin-right: 0;
+    }
+}
+
+/* Phones: the download button keeps its icon and gives up its label.
+
+   Measured at 390px: with the label, the bar wrapped to a second row and the
+   sticky header went from 85px to 141px -- 56px of a small viewport, taken
+   permanently from a workspace, which is the exact cost the header collapse
+   exists to avoid. Without it the row fits at 320px with room to spare.
+
+   Visually hidden rather than removed: the text is still the button's
+   accessible name, so a screen reader still announces "Download PNG" and no
+   aria-label has to be maintained in parallel with it.
+
+   `.dl-label` exists only in mockup.html, so this cannot reach the download
+   buttons on resume, docs or poster even though it is written against the
+   shared .editor-bar class. */
+@media (max-width: 48rem) {
+    .editor-bar .dl-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .editor-bar .dl-toggle {
+        gap: 0;
+        padding-left: var(--space-sm);
+        padding-right: var(--space-sm);
+    }
 }
 
 .editor-home {

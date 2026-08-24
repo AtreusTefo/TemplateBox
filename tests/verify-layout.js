@@ -921,28 +921,39 @@ async function layoutChecks(page) {
         }
     }
 
-    /* Mega-menu opened, and the sticky furniture after a real scroll. */
+    /* Mega-menu opened, and the sticky furniture after a real scroll.
+
+       The mockup editor joined this loop on August 24, 2026, when its bar
+       gained a Mockups dropdown built from the same .nav-more component. It
+       is the harder case of the two: the editor's rail is up at every width
+       here, and the panel is anchored to a header that is itself inset by
+       the body padding the rail reserves. */
     section("2b. Layout: mega-menu open and scrolled state");
-    for (const width of [1920, 1440, 1366, 1200]) {
-        await page.navigate(`http://localhost:${PORT}/`, width);
-        const r = await page.evaluate(`(() => {
-            const toggle = document.querySelector('[data-nav-more-toggle]');
-            if (!toggle) return { skipped: true };
-            toggle.click();
-            const p = document.querySelector('[data-nav-more-panel]');
-            const b = p.getBoundingClientRect();
-            const rail = document.querySelector('.home-rail');
-            const up = rail && getComputedStyle(rail).display !== 'none' && rail.querySelector('.ad-slot');
-            const mid = document.elementFromPoint(b.x + b.width / 2, b.y + 12);
-            return { hidden: p.hasAttribute('hidden'), left: +b.x.toFixed(1), right: +b.right.toFixed(1),
-                     railLeft: up ? +rail.getBoundingClientRect().x.toFixed(1) : null,
-                     reachable: !!(mid && p.contains(mid)) };
-        })()`);
-        if (r.skipped) { continue; }
-        check(`mega-menu @${width}: opens on screen, clear of the column, clickable`,
-            !r.hidden && r.left >= 0 && r.reachable &&
-            (r.railLeft === null || r.right <= r.railLeft + 0.5),
-            JSON.stringify(r));
+    for (const [label, urlPath, railSelector] of [
+        ["homepage", "/", ".home-rail"],
+        ["mockup editor", "/mockup.html", ".editor-rail"]
+    ]) {
+        for (const width of [1920, 1440, 1366, 1200]) {
+            await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
+            const r = await page.evaluate(`(() => {
+                const toggle = document.querySelector('[data-nav-more-toggle]');
+                if (!toggle) return { skipped: true };
+                toggle.click();
+                const p = document.querySelector('[data-nav-more-panel]');
+                const b = p.getBoundingClientRect();
+                const rail = document.querySelector(${JSON.stringify(railSelector)});
+                const up = rail && getComputedStyle(rail).display !== 'none' && rail.querySelector('.ad-slot');
+                const mid = document.elementFromPoint(b.x + b.width / 2, b.y + 12);
+                return { hidden: p.hasAttribute('hidden'), left: +b.x.toFixed(1), right: +b.right.toFixed(1),
+                         railLeft: up ? +rail.getBoundingClientRect().x.toFixed(1) : null,
+                         reachable: !!(mid && p.contains(mid)) };
+            })()`);
+            if (r.skipped) { continue; }
+            check(`${label} mega-menu @${width}: opens on screen, clear of the column, clickable`,
+                !r.hidden && r.left >= 0 && r.reachable &&
+                (r.railLeft === null || r.right <= r.railLeft + 0.5),
+                JSON.stringify(r));
+        }
     }
 
     for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/docs.html", 1366],
@@ -1338,6 +1349,52 @@ async function launchChecks(page) {
             url === "/loading.html?target=" + box.target,
             "landed on " + url);
     }
+
+    /* ----------------------------------------------------------------------
+       3d. The mockup editor's own Mockups dropdown.
+
+       Its items are plain anchors carrying data-target and data-doc, bound by
+       the same bindLaunchControls pass every other launch control on the site
+       goes through. Nothing about that is special-cased for this bar, which
+       is exactly why it is worth asserting: the href points at mockup.html,
+       so a binding that failed to attach would look like a working link that
+       reloads the editor -- losing the interstitial AND the chosen mockup,
+       silently, since the preset is written by the same handler.
+
+       Run at both states of the bar: at 1440 the dropdown is inline, at 768
+       it is inside the hamburger, and they are different paint paths.
+       ---------------------------------------------------------------------- */
+    section("3d. Mockup dropdown routes through the interstitial");
+    for (const [label, width, collapsed] of [["desktop", 1440, false], ["collapsed", 768, true]]) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, width);
+        const box = await page.evaluate(`(async () => {
+            ${collapsed ? "document.querySelector('[data-nav-toggle]').click();" : ""}
+            await new Promise(r => setTimeout(r, 150));
+            document.querySelector('[data-nav-more-toggle]').click();
+            await new Promise(r => setTimeout(r, 200));
+            const a = document.querySelector('[data-nav-more-panel] a[data-doc="wood-a4"]');
+            if (!a) { return { missing: true }; }
+            a.scrollIntoView({ block: 'center' });
+            const b = a.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2,
+                     target: a.getAttribute('data-target'), doc: a.getAttribute('data-doc') };
+        })()`);
+
+        if (box.missing) {
+            check(`mockup dropdown (${label}): the item is present`, false, "no wood-a4 item");
+            continue;
+        }
+
+        await clickAt(box, "left");
+        const landed = await page.evaluate(`(() => ({
+            url: location.pathname + location.search,
+            preset: localStorage.getItem('tb_editor_preset')
+        }))()`);
+        check(`mockup dropdown (${label}): routes through the interstitial with the preset`,
+            landed.url === "/loading.html?target=" + box.target &&
+            landed.preset === JSON.stringify(box.doc),
+            JSON.stringify(landed));
+    }
 }
 
 /* ==========================================================================
@@ -1363,6 +1420,15 @@ async function mockupChecks(page) {
         const c = document.getElementById('mockup-canvas');
         return [...c.getContext('2d').getImageData(2, 2, 1, 1).data].join(',');
     })()`;
+
+    /* Start from a clean profile, and not as a formality: section 3d clicks a
+       Mockups dropdown item, which WRITES tb_editor_preset and then navigates
+       to the interstitial, where the run stops. The preset is consumed by the
+       next mockup.html load, so without this the checks below would open the
+       wood frame template instead of the default drawn t-shirt and report
+       "no background panel" as a product failure. They did, once. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    await page.evaluate("localStorage.clear(), true");
 
     /* A drawn product: eligible, because everything around the garment is
        transparent and exports that way. */
@@ -1478,6 +1544,72 @@ async function mockupChecks(page) {
         JSON.stringify(colorway));
     check("mockup: a garment colour is not a background",
         colorway.corner === "0,0,0,0", `corner ${colorway.corner}`);
+
+    /* ----------------------------------------------------------------------
+       5b. The editor bar's two states.
+
+       ONE boundary, 75rem, and every control belongs to exactly one side of
+       it. The failure this guards against is the one the header search
+       control already produced once: a band where a control is hidden
+       because "the other one is there" and the other one is hidden too, so
+       the band is served by neither.
+
+       The single-row assertion is not cosmetic. This is a sticky header on a
+       workspace: measured at 390px, the bar wrapped to a second row and went
+       from 85px to 141px as soon as it carried the label on the download
+       button, which is 56px taken permanently out of a phone viewport.
+       ---------------------------------------------------------------------- */
+    section("5b. Mockup editor: bar composition at both states");
+
+    const BAR = `(() => {
+        const vis = (sel) => {
+            const el = document.querySelector(sel);
+            return !!el && getComputedStyle(el).display !== 'none' &&
+                   el.getBoundingClientRect().width > 0;
+        };
+        return {
+            brand: vis('.editor-brand'), home: vis('.editor-home'),
+            hamburger: vis('.nav-toggle'), searchButton: vis('.search-toggle'),
+            field: vis('.editor-search'), dropdown: !!document.querySelector('[data-nav-more-toggle]'),
+            docName: !!document.getElementById('doc-name'),
+            label: !!document.getElementById('m-label'),
+            headerHeight: Math.round(document.querySelector('.site-header').getBoundingClientRect().height),
+            downloadName: (document.getElementById('download-mockup-png') || {}).textContent
+        };
+    })()`;
+
+    for (const width of [1920, 1440, 1280, 1200]) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, width);
+        const b = await page.evaluate(BAR);
+        check(`mockup bar @${width}: wordmark, dropdown and field, one row`,
+            b.brand && !b.home && b.field && !b.hamburger && !b.searchButton &&
+            b.dropdown && b.headerHeight <= 100,
+            JSON.stringify(b));
+    }
+
+    for (const width of [1199, 1024, 768, 414, 390, 320]) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, width);
+        const b = await page.evaluate(BAR);
+        check(`mockup bar @${width}: home icon, hamburger and search button, one row`,
+            !b.brand && b.home && !b.field && b.hamburger && b.searchButton &&
+            b.dropdown && b.headerHeight <= 100,
+            JSON.stringify(b));
+        /* The label is hidden visually on phones but must still name the
+           button, or the only download control on the page is an unlabelled
+           icon to a screen reader. */
+        check(`mockup bar @${width}: the download button keeps its name`,
+            (b.downloadName || "").indexOf("Download PNG") !== -1,
+            JSON.stringify({ name: b.downloadName }));
+    }
+
+    /* The bar's name field is gone and the controls' one is what replaced
+       it. Asserted together: removing the first without the second would
+       leave the editor with no way to name a mockup at all. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const naming = await page.evaluate(BAR);
+    check("mockup: no name input in the bar, and the controls still have one",
+        naming.docName === false && naming.label === true,
+        JSON.stringify({ docName: naming.docName, mLabel: naming.label }));
 }
 
 /* ==========================================================================

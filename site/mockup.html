@@ -92,11 +92,43 @@
 
     <a class="skip-link" href="#editor-layout">Skip to main content</a>
 
-    <header class="site-header editor-bar">
-        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+    <!-- Rebuilt August 24, 2026 (mockup editor only; the other three editors
+         are unchanged). One boundary governs the whole bar: 75rem, the same
+         seam js/app.js collapses .site-nav at and the same one the ad anchor
+         and the ad rail meet on. Above it, the wordmark, the Mockups
+         dropdown and a search field; below it, the all-templates icon, a
+         hamburger holding the same links, and search as a button.
 
-        <label class="sr-only" for="doc-name">Mockup name</label>
-        <input type="text" class="doc-name" id="doc-name" maxlength="80" value="Untitled mockup" aria-label="Mockup name">
+         The document-name input that stood between the icon and the actions
+         is gone. #m-label ("Mockup Label") in the controls names a mockup
+         now, and the bar had no room for both once it carried navigation. -->
+    <header class="site-header editor-bar">
+        <!-- Two left-hand identities, one visible at a time. The icon is the
+             narrow-screen one and keeps its "All templates" name; the
+             wordmark replaces it from 75rem, where there is room for a word
+             and where a brand mark is what the reference bar has. Deliberately
+             a new class rather than a change to .editor-home, which resume,
+             docs and poster share and which must stay byte-identical. -->
+        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+        <a class="editor-brand" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
+
+        <!-- Collapses the links below 75rem. Same control, same class and the
+             same js/app.js handler as every other page. -->
+        <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+
+        <!-- Search as a link below 75rem, where the field is hidden. Same
+             control the homepage header carries. -->
+        <a class="search-toggle" href="search.html" aria-label="Search templates and guides"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg></a>
+
+        <!-- A real GET form, so this needs no JavaScript at all: there is
+             nothing on this page to filter, so the only correct behaviour is
+             to navigate, and the browser does that itself. -->
+        <form class="editor-search" role="search" action="search.html" method="get">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg>
+            <label class="sr-only" for="editor-search-input">Search templates and guides</label>
+            <input type="search" id="editor-search-input" name="q" placeholder="Search mockups and templates"
+                   autocomplete="off" spellcheck="false" maxlength="80">
+        </form>
 
         <div class="editor-actions">
             <span class="save-cloud" id="save-state" role="status" aria-live="polite" title="Saves automatically">
@@ -104,10 +136,73 @@
                 <span class="sr-only" data-save-label>Saves automatically</span>
             </span>
 
-            <button type="button" class="btn dl-toggle" id="download-mockup-png"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>Download PNG</button>
+            <!-- The label is in a span so it can be hidden VISUALLY on
+                 phones, where the bar has no room for it beside the
+                 hamburger and the search button. It stays in the document,
+                 so it is still the button's accessible name. -->
+            <button type="button" class="btn dl-toggle" id="download-mockup-png"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg><span class="dl-label">Download PNG</span></button>
         </div>
 
-        <nav class="site-nav" aria-label="Primary">
+        <nav class="site-nav" id="site-nav" aria-label="Primary">
+            <!-- Every mockup in the catalog, reachable from inside the
+                 editor. These are the .nav-more disclosure component the rest
+                 of the site uses, not a second dropdown pattern.
+
+                 Real anchors carrying data-target and data-doc: js/app.js's
+                 bindLaunchControls already binds every [data-target] on every
+                 page, so each of these routes through
+                 loading.html?target=mockup with the variant preset written,
+                 and a crawler still follows the href to a real page. Do not
+                 hand-roll navigation here, and do not call launchTemplate
+                 directly.
+
+                 Consequence, accepted: switching mockups from inside the
+                 editor costs the 10-second interstitial, exactly as every
+                 other launch on the site does. An in-place swap would be a
+                 different decision and would need a rule for the layers the
+                 visitor already has on the canvas. -->
+            <div class="nav-more" data-nav-more>
+                <button type="button" aria-expanded="false" aria-controls="nav-more-panel" data-nav-more-toggle>
+                    Mockups
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg>
+                </button>
+                <div class="nav-more-panel" id="nav-more-panel" hidden data-nav-more-panel>
+                    <div>
+                        <h2>Apparel</h2>
+                        <ul>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt on Model</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt">Classic T-Shirt</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie">Pullover Hoodie</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Print and Packaging</h2>
+                        <ul>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="wood-a4">Leaning Wood Frame Poster</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="mug">Ceramic Mug</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="box">Packaging Box</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Other Editors</h2>
+                        <ul>
+                            <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
+                            <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
+                            <li><a href="poster.html" data-target="poster">Poster Creator</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Browse</h2>
+                        <ul>
+                            <li><a href="index.html#templates">All Templates</a></li>
+                            <li><a href="search.html">Search</a></li>
+                            <li><a href="blog.html">Guides and Articles</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <a href="index.html">Templates</a>
+            <a href="blog.html">Guides</a>
         </nav>
     </header>
 
