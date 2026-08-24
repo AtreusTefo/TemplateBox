@@ -1694,7 +1694,23 @@ body.is-nav-hidden .site-header:focus-within {
    `card-preview photo` block -- the same silent loss the removed `framed`
    machinery existed to prevent.
 
-   It changes nothing on disk today: every shipped thumbnail is exactly 4:5
+   **The paragraph below was wrong when it was written (corrected August 24,
+   2026).** It claimed every shipped thumbnail was already 4:5, and two were
+   not: the Leaning Wood Frame pair was 1000x1000 and the framed photo poster
+   was 707x1000. So this keyword was not academic at all -- it was letterboxing
+   about a fifth of the wood frame card, on the live homepage, while the
+   comment said it could not be. A claim that "this changes nothing today" is
+   worth checking against the files rather than asserting.
+
+   Fixed at the source rather than by changing the keyword: admin.html's
+   intake now reshapes every upload to the card's ratio, and the three
+   off-ratio files were re-run through it. With a 4:5 file `contain` and
+   `cover` are identical, so the reasoning above stands and no longer decides
+   anything on its own. tests/verify-layout.js section 2f measures the painted
+   image against its card, and section 6 covers the intake.
+
+   The original note follows, kept because its reasoning is still why this is
+   `contain`: every shipped thumbnail is exactly 4:5
    (800x1000 and 600x750), where the two keywords are identical. It only
    decides what happens to an off-ratio upload, and showing the whole design
    is the right answer for a catalog. */

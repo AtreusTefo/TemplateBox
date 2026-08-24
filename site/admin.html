@@ -319,11 +319,30 @@
 
                 <fieldset>
                     <legend>Thumbnails</legend>
-                    <p class="upload-hint">Upload at any size. Images are resized to a 1000px long edge and re-encoded to 60 KB or less in your browser, matching the thumbnails already on the site. Only the compressed copy is kept.</p>
+                    <p class="upload-hint">Upload at any size. Images are reshaped to the card's 4:5 window, resized to a 1000px long edge and re-encoded to 60 KB or less in your browser, matching the thumbnails already on the site. Only the compressed copy is kept.</p>
+
+                    <!-- The card window is 4:5 and the stylesheet shows a
+                         thumbnail with object-fit: contain, so an off-ratio
+                         file letterboxes -- the Leaning Wood Frame pair
+                         shipped square and lost a fifth of its card to empty
+                         ground. Both options below write a 4:5 FILE, so the
+                         card is filled either way and the CSS has nothing
+                         left to decide; they differ only in what happens to
+                         the pixels that do not fit. Applies to the next
+                         upload, so set it before choosing a file. -->
+                    <div class="field">
+                        <label for="f-thumb-fit">How should the image sit in the card?</label>
+                        <select id="f-thumb-fit" data-thumb-fit>
+                            <option value="fill" selected>Fill the card (crop to 4:5)</option>
+                            <option value="fit">Fit the whole design (pad to 4:5)</option>
+                        </select>
+                        <p class="upload-hint">Fill centre-crops to the card's shape: right for a photograph or a scene. Fit keeps every edge and pads to 4:5 with transparency, so the card's own background shows through in either theme: right for a design that carries a printed border or a caption to its edges. An upload that is already 4:5 is untouched by either.</p>
+                    </div>
+
                     <div class="field">
                         <label for="f-thumb-default">Default thumbnail (required)</label>
                         <input id="f-thumb-default" type="file" accept="image/*" data-thumb-default-file>
-                        <p class="upload-hint">Shown at rest and on touch devices. Any format your browser can open, at any shape: 4:5 fills the card exactly, and anything else is shown whole against the card's own ground rather than cropped. Non-image files are rejected.</p>
+                        <p class="upload-hint">Shown at rest and on touch devices. Any format your browser can open, at any shape. Non-image files are rejected.</p>
                         <p class="admin-status" data-thumb-default-note aria-live="polite"></p>
                         <p class="form-error" data-thumb-default-error></p>
                         <button class="entry-remove" type="button" data-thumb-default-remove hidden>Remove Default Image</button>

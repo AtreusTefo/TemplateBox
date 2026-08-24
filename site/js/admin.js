@@ -1035,6 +1035,7 @@ body + '\n' +
         newCategory: document.querySelector("[data-thumb-category]"),
         newDoc: document.getElementById("f-thumb-doc"),
         folder: document.getElementById("f-thumb-folder"),
+        fit: document.querySelector("[data-thumb-fit]"),
         defaultFile: document.querySelector("[data-thumb-default-file]"),
         defaultError: document.querySelector("[data-thumb-default-error]"),
         defaultNote: document.querySelector("[data-thumb-default-note]"),
@@ -1190,6 +1191,106 @@ body + '\n' +
         return canvas;
     }
 
+    /* An <img> reports naturalWidth; a <canvas> reports width. Both are valid
+       drawImage sources and both now flow through this pipeline, since the
+       card-ratio pass below hands a canvas to the scaler. */
+    function srcW(source) { return source.naturalWidth || source.width; }
+    function srcH(source) { return source.naturalHeight || source.height; }
+
+    /* ----------------------------------------------------------------------
+       The card's aspect ratio (August 24, 2026).
+
+       .card-preview in css/style.css is `aspect-ratio: 4 / 5` and
+       `.card-preview.photo .card-thumb` is `object-fit: contain`. Change one
+       of those and this constant has to move with it, or thumbnails start
+       being letterboxed again -- which is exactly the defect this exists to
+       stop. The Leaning Wood Frame pair shipped at 1000x1000, square, and
+       lost about a fifth of its card to empty ground.
+
+       `contain` is deliberate and stays: a catalog thumbnail depicts a
+       finished design, designs carry content to their edges, and `cover`
+       would crop exactly those edges on every future upload with no warning.
+       The fix is to make the FILE the right shape, at which point `contain`
+       and `cover` are identical and the CSS stops mattering. That also keeps
+       the generated markup a fixed block with no per-card class to be
+       dropped the next time the card is published.
+       ---------------------------------------------------------------------- */
+    const CARD_ASPECT = 4 / 5;
+
+    /* One pixel of slack per thousand: a 800x1000 upload must not be
+       re-drawn just because floating point disagrees with itself. */
+    const ASPECT_TOLERANCE = 0.001;
+
+    function isCardRatio(source) {
+        return Math.abs((srcW(source) / srcH(source)) - CARD_ASPECT) <= ASPECT_TOLERANCE;
+    }
+
+    /* Reshapes an upload to the card's ratio. Two modes, and both produce a
+       4:5 file -- they differ only in what happens to the pixels that do not
+       fit:
+
+         fill  centre-crop. The card is filled edge to edge. Default, and what
+               a mockup or a photograph wants.
+         fit   pad with the card's own ground colour. The whole design is
+               visible, letterboxed inside a file that is still 4:5.
+
+       Padding rather than passing the image through is the point: either way
+       what lands on disk is 4:5, so `object-fit` has nothing left to decide
+       and no per-card class is needed.
+
+       An upload that is already 4:5 is returned untouched, so the common case
+       costs no re-draw at all. */
+    function fitToCard(img, mode) {
+        if (isCardRatio(img)) {
+            return img;
+        }
+
+        const w = srcW(img);
+        const h = srcH(img);
+
+        if (mode === "fit") {
+            /* Grow the short side to the ratio rather than shrinking the long
+               one: nothing is thrown away and no resolution is lost. */
+            const outW = Math.max(w, Math.round(h * CARD_ASPECT));
+            const outH = Math.max(h, Math.round(w / CARD_ASPECT));
+            const canvas = document.createElement("canvas");
+            canvas.width = outW;
+            canvas.height = outH;
+            const ctx = canvas.getContext("2d");
+            /* The padding is left TRANSPARENT rather than filled with the
+               card's ground colour, and that is a dark-mode decision. A baked
+               light pad is a pale band down each side of the card for every
+               visitor on the dark theme, permanently, because a file cannot
+               respond to a media query. Transparent padding lets
+               .card-preview's own background show through, so the card looks
+               the same in both themes -- exactly as an unpadded letterboxed
+               image does today.
+
+               The cost is the format: JPEG has no alpha channel, so a padded
+               thumbnail can only be encoded as WebP or PNG. compress() below
+               already detects transparency and drops JPEG from its format
+               list for exactly this reason, and WebP with alpha is well
+               inside the byte budget at these dimensions. */
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, Math.round((outW - w) / 2), Math.round((outH - h) / 2), w, h);
+            return canvas;
+        }
+
+        /* fill: take the largest 4:5 window the source contains, centred. */
+        const cropW = Math.min(w, Math.round(h * CARD_ASPECT));
+        const cropH = Math.min(h, Math.round(w / CARD_ASPECT));
+        const canvas = document.createElement("canvas");
+        canvas.width = cropW;
+        canvas.height = cropH;
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, Math.round((w - cropW) / 2), Math.round((h - cropH) / 2),
+            cropW, cropH, 0, 0, cropW, cropH);
+        return canvas;
+    }
+
     /* Downscale in halving steps rather than one jump. Every browser's
        one-shot drawImage undersamples heavily on a large reduction -- a
        3000px photograph drawn straight to 800px samples a fraction of the
@@ -1198,14 +1299,14 @@ body + '\n' +
        pixels that are being discarded, and it is the difference between a
        thumbnail that looks resized and one that looks sharp. */
     function scaleTo(img, maxEdge) {
-        const longest = Math.max(img.naturalWidth, img.naturalHeight);
+        const longest = Math.max(srcW(img), srcH(img));
         const ratio = Math.min(1, maxEdge / longest);
-        const targetW = Math.max(1, Math.round(img.naturalWidth * ratio));
-        const targetH = Math.max(1, Math.round(img.naturalHeight * ratio));
+        const targetW = Math.max(1, Math.round(srcW(img) * ratio));
+        const targetH = Math.max(1, Math.round(srcH(img) * ratio));
 
         let source = img;
-        let w = img.naturalWidth;
-        let h = img.naturalHeight;
+        let w = srcW(img);
+        let h = srcH(img);
         while (w > targetW * 2 && h > targetH * 2) {
             w = Math.max(targetW, Math.round(w / 2));
             h = Math.max(targetH, Math.round(h / 2));
@@ -1279,8 +1380,12 @@ body + '\n' +
        the full size first and only gives up pixels when quality alone cannot
        get there, because dropping resolution is the more visible of the two
        losses at the size a card renders. */
-    async function compress(img, targetBytes) {
-        const full = scaleTo(img, OUTPUT_MAX_EDGE);
+    async function compress(img, targetBytes, mode) {
+        /* Reshape BEFORE scaling, so the long edge that OUTPUT_MAX_EDGE caps
+           is the one that survives into the file. Cropping after the scale
+           would leave a 1000px source producing an 800px-tall thumbnail. */
+        const source = fitToCard(img, mode);
+        const full = scaleTo(source, OUTPUT_MAX_EDGE);
         const transparent = hasTransparency(full);
         const webp = await supportsWebp();
 
@@ -1314,7 +1419,9 @@ body + '\n' +
             }
             const nextEdge = Math.round(Math.max(canvas.width, canvas.height) * 0.75);
             if (nextEdge < 200) { break; }
-            canvas = scaleTo(img, nextEdge);
+            /* From the reshaped source, not the original: dropping back to
+               `img` here would undo the crop on every retry. */
+            canvas = scaleTo(source, nextEdge);
         }
         return null;
     }
@@ -1329,7 +1436,7 @@ body + '\n' +
        byte for byte. Re-encoding it would only throw away quality to reach a
        size it had already reached.
        ---------------------------------------------------------------------- */
-    async function readImage(file, onOk, onFail, onProgress) {
+    async function readImage(file, onOk, onFail, onProgress, mode) {
         if (!file.type.startsWith("image/")) {
             onFail("Rejected: the selected file is not an image.");
             return;
@@ -1343,8 +1450,15 @@ body + '\n' +
             const original = await readFileAsDataUri(file);
             const img = await decode(original);
 
+            /* The ratio test is not decoration. Without it a square upload
+               already under the budget is kept byte for byte and walks
+               straight past the card-ratio pass -- which is precisely how the
+               1000x1000 pair that letterboxed its card got onto disk. An
+               upload has to be the right SHAPE as well as the right size to
+               skip re-encoding. */
             const alreadyFits = file.size <= TARGET_BYTES &&
                 Math.max(img.naturalWidth, img.naturalHeight) <= OUTPUT_MAX_EDGE &&
+                isCardRatio(img) &&
                 Object.prototype.hasOwnProperty.call(EXT_BY_TYPE, file.type);
             if (alreadyFits) {
                 onOk({
@@ -1354,7 +1468,7 @@ body + '\n' +
                     h: img.naturalHeight,
                     note: "Kept as uploaded: " + kb(file.size) + ", " +
                         img.naturalWidth + "x" + img.naturalHeight +
-                        ". Already within budget, so it was not re-encoded."
+                        ". Already 4:5 and within budget, so it was not re-encoded."
                 });
                 return;
             }
@@ -1366,7 +1480,7 @@ body + '\n' +
                the main thread. */
             await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-            const result = await compress(img, TARGET_BYTES);
+            const result = await compress(img, TARGET_BYTES, mode);
             if (!result) {
                 onFail("Could not get this image under " + kb(TARGET_BYTES) +
                     " without destroying it. Crop or flatten it and try again.");
@@ -1375,6 +1489,7 @@ body + '\n' +
 
             const data = await blobToDataUri(result.blob);
             const resized = result.w !== img.naturalWidth || result.h !== img.naturalHeight;
+            const reshaped = !isCardRatio(img);
             onOk({
                 data: data,
                 ext: EXT_BY_TYPE[result.mime],
@@ -1383,6 +1498,7 @@ body + '\n' +
                 note: "Compressed " + kb(file.size) + " to " + kb(result.blob.size) +
                     " " + EXT_BY_TYPE[result.mime].toUpperCase() + ", " +
                     result.w + "x" + result.h +
+                    (reshaped ? (mode === "fit" ? " (padded to 4:5)" : " (cropped to 4:5)") : "") +
                     (resized ? " (resized from " + img.naturalWidth + "x" + img.naturalHeight + ")" : "") + "."
             });
         } catch (err) {
@@ -1394,6 +1510,14 @@ body + '\n' +
         return bytes >= 1024 * 1024
             ? (bytes / (1024 * 1024)).toFixed(1) + " MB"
             : Math.round(bytes / 1024) + " KB";
+    }
+
+    /* Read at upload time rather than stored: the control applies to the
+       NEXT file chosen, and an operator who changes it and re-picks the same
+       file expects the new answer. "fill" whenever the control is missing,
+       which is also what an older saved draft implies. */
+    function cardFitMode() {
+        return el.fit && el.fit.value === "fit" ? "fit" : "fill";
     }
 
     function bindUpload(input, errorTarget, noteTarget, removeBtn, assign) {
@@ -1422,7 +1546,7 @@ body + '\n' +
                 renderPreview();
             }, (progress) => {
                 setText(noteTarget, progress);
-            });
+            }, cardFitMode());
         });
 
         removeBtn.addEventListener("click", () => {

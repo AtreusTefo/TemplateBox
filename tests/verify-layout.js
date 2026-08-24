@@ -1137,6 +1137,80 @@ async function layoutChecks(page) {
             small.length === 0, small.join(", "));
     }
 
+    /* ----------------------------------------------------------------------
+       2f. Catalog thumbnails fill their card.
+
+       .card-preview is a 4:5 window and .card-preview.photo .card-thumb is
+       object-fit: contain, so an off-ratio file letterboxes. The Leaning Wood
+       Frame pair shipped at 1000x1000 and left about a fifth of its card as
+       empty ground -- visible on the page, invisible to every check, because
+       nothing measured the image against the card it sits in.
+
+       `contain` is deliberate and is not what this asserts against. The fix
+       was to make the FILE 4:5, at which point contain and cover are
+       identical. So the contract is: the thumbnail files are the card's
+       shape. admin.html's intake enforces it for every future upload; this
+       is what catches one that got on disk another way.
+
+       The attribute check is the second half of the same defect. width and
+       height on the <img> are what reserve the box before the image arrives,
+       so a file re-cropped without updating them trades a visible gap for a
+       layout shift -- quieter, and worse.
+       ---------------------------------------------------------------------- */
+    section("2f. Layout: catalog thumbnails fill their card");
+    await page.navigate(`http://localhost:${PORT}/`, 1440);
+    const thumbs = await page.evaluate(`(async () => {
+        const out = [];
+        const imgs = [...document.querySelectorAll('.card-preview.photo .card-thumb')];
+        for (const img of imgs) {
+            /* They are loading="lazy", so an offscreen one never decodes and
+               would report 0x0 naturals. */
+            img.loading = 'eager';
+            img.scrollIntoView({ block: 'center' });
+            if (!img.complete || !img.naturalWidth) {
+                await new Promise(r => { img.onload = r; img.onerror = r; setTimeout(r, 3000); });
+            }
+            await new Promise(r => requestAnimationFrame(r));
+            const box = img.getBoundingClientRect();
+            const card = img.closest('.card-preview').getBoundingClientRect();
+
+            /* getBoundingClientRect on an <img> returns the ELEMENT box, and
+               the element is width:100%/height:100%, so it always equals the
+               card whatever the image inside it is doing. Measuring that and
+               calling it "fills the card" is a check that cannot fail -- it
+               reported the letterboxed 707x1000 poster as filling. The
+               PAINTED box has to be derived from object-fit: contain, which
+               scales to whichever axis runs out first. */
+            const natRatio = img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0;
+            const boxRatio = box.height ? box.width / box.height : 0;
+            const paintedW = natRatio > boxRatio ? box.width : box.height * natRatio;
+            const paintedH = natRatio > boxRatio ? box.width / natRatio : box.height;
+
+            out.push({
+                file: (img.getAttribute('src') || '').split('/').pop(),
+                ratio: img.naturalHeight ? +(natRatio).toFixed(4) : null,
+                gapW: +(card.width - paintedW).toFixed(1),
+                gapH: +(card.height - paintedH).toFixed(1),
+                attr: img.getAttribute('width') + 'x' + img.getAttribute('height'),
+                natural: img.naturalWidth + 'x' + img.naturalHeight
+            });
+        }
+        return out;
+    })()`);
+
+    check("catalog: photo thumbnails found on the homepage",
+        thumbs.length > 0, "no .card-preview.photo .card-thumb elements");
+
+    thumbs.forEach((t) => {
+        /* 2.5px of slack: .card-preview carries a 1px border on each side. */
+        check(`thumbnail ${t.file}: 4:5 and fills its card`,
+            t.ratio !== null && Math.abs(t.ratio - 0.8) <= 0.001 &&
+            t.gapW <= 2.5 && t.gapH <= 2.5,
+            JSON.stringify(t));
+        check(`thumbnail ${t.file}: declared size matches the file`,
+            t.attr === t.natural, JSON.stringify(t));
+    });
+
     /* Print must carry neither the column nor the width it reserved. */
     section("2c. Layout: print output");
     for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/resume.html", 1366],
@@ -1613,6 +1687,96 @@ async function mockupChecks(page) {
 }
 
 /* ==========================================================================
+   6. admin.html's thumbnail intake reshapes uploads to the card (August 24,
+   2026).
+
+   Section 2f asserts that what is ON DISK fills its card. This asserts that
+   what the tool PRODUCES will, which is the half that stops the defect coming
+   back: the card window is 4:5, the stylesheet shows a thumbnail with
+   object-fit: contain, and an off-ratio file therefore letterboxes. Making
+   the file the card's shape is what retires the question.
+
+   The small-square case is the original bug, not a hypothetical. An upload
+   already under the byte budget and under the maximum edge is kept byte for
+   byte -- and before this, shape was not part of that test, so a square file
+   went straight to disk untouched. That is how a 1000x1000 pair came to lose
+   a fifth of its card.
+   ========================================================================== */
+
+async function adminThumbnailChecks(page) {
+    section("6. Admin: thumbnail intake reshapes uploads to the card");
+
+    await page.navigate(`http://localhost:${PORT}/admin.html`, 1440);
+
+    const feed = async (w, h, mode, small) => page.evaluate(`(async () => {
+        const c = document.createElement('canvas');
+        c.width = ${w}; c.height = ${h};
+        const x = c.getContext('2d');
+        const g = x.createLinearGradient(0, 0, ${w}, ${h});
+        g.addColorStop(0, '#2F4FCD'); g.addColorStop(1, '#E9A13B');
+        x.fillStyle = g; x.fillRect(0, 0, ${w}, ${h});
+
+        /* A small, in-budget, allowed-type upload is the one that can skip
+           re-encoding entirely, so it has to be encoded as such. */
+        const blob = ${small}
+            ? await new Promise(r => c.toBlob(r, 'image/webp', 0.5))
+            : await new Promise(r => c.toBlob(r, 'image/png'));
+        const file = new File([blob], ${small} ? 'probe.webp' : 'probe.png',
+            { type: ${small} ? 'image/webp' : 'image/png' });
+
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        const fit = document.querySelector('[data-thumb-fit]');
+        if (!fit) { return { missing: 'the fit control' }; }
+        fit.value = ${JSON.stringify(mode)};
+        const input = document.querySelector('[data-thumb-default-file]');
+        input.value = '';
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        for (let i = 0; i < 200; i += 1) {
+            await new Promise(r => setTimeout(r, 100));
+            const err = document.querySelector('[data-thumb-default-error]').textContent;
+            if (err) { return { error: err }; }
+            const note = document.querySelector('[data-thumb-default-note]').textContent;
+            if (note && (note.indexOf('Compressed') === 0 || note.indexOf('Kept') === 0)) {
+                const img = document.querySelector('[data-thumb-preview-default]');
+                if (img && !img.complete) {
+                    await new Promise(r => { img.onload = r; img.onerror = r; setTimeout(r, 3000); });
+                }
+                return { note: note, w: img.naturalWidth, h: img.naturalHeight,
+                         ratio: img.naturalHeight ? +(img.naturalWidth / img.naturalHeight).toFixed(4) : null };
+            }
+        }
+        return { error: 'timed out waiting for the intake' };
+    })()`);
+
+    for (const [label, w, h, mode, small] of [
+        ["square 1000x1000, fill", 1000, 1000, "fill", false],
+        ["square 1000x1000, fit", 1000, 1000, "fit", false],
+        ["wide 1600x900, fill", 1600, 900, "fill", false],
+        ["wide 1600x900, fit", 1600, 900, "fit", false],
+        /* The alreadyFits path: small enough and few enough pixels to be kept
+           byte for byte, so only the ratio test can send it to the reshaper. */
+        ["small square webp, in budget", 500, 500, "fill", true]
+    ]) {
+        const r = await feed(w, h, mode, small);
+        check(`admin intake: ${label} comes out 4:5`,
+            !r.error && !r.missing && r.ratio !== null &&
+            Math.abs(r.ratio - 0.8) <= 0.001,
+            JSON.stringify(r));
+    }
+
+    /* The preview is the operator's only view of what will be written, so it
+       has to show the PROCESSED image rather than the file they picked. */
+    const last = await feed(1000, 1000, "fill", false);
+    check("admin intake: the preview shows the processed image",
+        !last.error && last.w === 800 && last.h === 1000 &&
+        /cropped to 4:5/.test(last.note || ""),
+        JSON.stringify(last));
+}
+
+/* ==========================================================================
    4. Ads-blocked parity against the last commit.
 
    The rail, the anchors and the leaderboard all reserve space only once a
@@ -1738,6 +1902,7 @@ async function main() {
                 await layoutChecks(page);
                 await launchChecks(page);
                 await mockupChecks(page);
+                await adminThumbnailChecks(page);
             } finally {
                 page.close();
             }
