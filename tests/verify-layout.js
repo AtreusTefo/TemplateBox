@@ -619,7 +619,7 @@ async function connect(browserPath, cdpPort, options) {
 
        So: drain stale events first, then wait for readiness by polling the
        page itself rather than trusting a single event. */
-    const navigate = async (url, width, height) => {
+    const attemptNavigate = async (url, width, height) => {
         await call("Emulation.setDeviceMetricsOverride",
             { width, height: height || 900, deviceScaleFactor: 1, mobile: false }, sessionId);
 
@@ -646,9 +646,34 @@ async function connect(browserPath, cdpPort, options) {
                 continue;
             }
             await new Promise((r) => setTimeout(r, 250));
+            return true;
+        }
+        return false;
+    };
+
+    /* One retry, announced.
+
+       A navigation occasionally fails to settle here for reasons that have
+       nothing to do with the page: `npx serve` stalls a request under load and
+       js/ads.js never evaluates, so the readiness poll waits for a TBAds that
+       is not coming. It is intermittent, it lands on a different page every
+       time, and it kills the whole run -- an expensive way to learn nothing,
+       on a suite that takes minutes and that nothing runs automatically.
+
+       Retried ONCE and printed when it happens, rather than silently or by
+       raising the deadline. A page that genuinely cannot load fails on the
+       second attempt exactly as it did before, and a RETRY line in the output
+       is a signal worth seeing: if one starts appearing on the same page every
+       run, that is a real defect and not this. */
+    const navigate = async (url, width, height) => {
+        if (await attemptNavigate(url, width, height)) {
             return;
         }
-        throw new Error("navigation to " + url + " did not settle within 20s");
+        console.log(`      RETRY ${url} @${width} did not settle in 20s`);
+        if (await attemptNavigate(url, width, height)) {
+            return;
+        }
+        throw new Error("navigation to " + url + " did not settle within 20s, twice");
     };
 
     return {
