@@ -119,6 +119,18 @@ in-budget WebP — and requires 4:5 out of each. The small case is the original 
 upload already under the byte budget was kept byte for byte, and shape was not part of that
 test.
 
+### 7. The typed name names the file
+
+Each editor is exercised twice: untouched, to prove the fallback filename still
+holds, and after typing a name. Asserted against the filename the browser is
+GIVEN — a field feeding a variable nobody reads is the defect this exists for,
+and it looks correct at every other layer.
+
+Note the two interception points. jsPDF's `save` is not an own property of
+`jsPDF.prototype` and does not download through an anchor, so patching either
+captures nothing and reads as "no export happened"; the constructor has to be
+wrapped. Canvas exports do use an `<a download>` click.
+
 ### 4. Ads blocked, compared against the last commit
 
 The rail, the anchors and the leaderboard all reserve space only once a banner has actually

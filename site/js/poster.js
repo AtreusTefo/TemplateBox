@@ -134,8 +134,13 @@
         };
     }
 
+    /* Mirrors the value attribute on #doc-name in poster.html. An untouched
+       field falls back to the brand filename rather than exporting
+       "untitled-poster.png". */
+    const DEFAULT_POSTER_NAME = "Untitled poster";
+
     let state = {
-        name: "Untitled poster",
+        name: DEFAULT_POSTER_NAME,
         size: "A3",
         frame: "black",
         texts: [defaultText("t1", "")],
@@ -896,9 +901,18 @@
         return off;
     }
 
+    /* The poster editor was the ONE editor whose name field already reached
+       its export; the other three ignored theirs entirely. It uses the shared
+       slug now so a file downloaded here is named the same way as one from
+       any other editor (August 24, 2026), and it treats the untouched default
+       the way they do -- "untitled-poster.png" tells the visitor nothing they
+       did not already know, so an untouched field falls back to the brand
+       name instead. */
     function fileName(ext) {
-        const base = (state.name || "poster").replace(/[^\w\d -]+/g, "").trim().replace(/\s+/g, "-").toLowerCase();
-        return (base || "templatebox-poster") + "." + ext;
+        const named = String(state.name || "").trim() === DEFAULT_POSTER_NAME
+            ? ""
+            : TB.fileSlug(state.name);
+        return (named || "templatebox-poster") + "." + ext;
     }
 
     function downloadBlob(blob, name) {

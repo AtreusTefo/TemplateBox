@@ -1802,6 +1802,129 @@ async function adminThumbnailChecks(page) {
 }
 
 /* ==========================================================================
+   7. The name a visitor types actually names the file (August 24, 2026).
+
+   Reported as "naming your template is not working", and it was true on three
+   of the four editors. The resume exported from the person's name field, the
+   business document from its type and recipient, and the mockup from a
+   hard-coded literal, so the name input in the bar was typed, persisted,
+   restored on the next visit -- and never used for anything. Only the poster
+   had ever wired its field to its export.
+
+   This is asserted against the FILENAME THE BROWSER IS GIVEN, not against the
+   state or the input, because a field that feeds a variable nobody reads is
+   exactly the defect: everything looks correct at every layer except the one
+   the visitor sees.
+
+   Two interception points, because the two export engines differ. jsPDF's
+   save() is not an own property of jsPDF.prototype and does not download
+   through an anchor, so patching either of those captures nothing -- the
+   constructor is what has to be wrapped. Canvas exports do use an anchor.
+   Both were found the hard way while confirming the defect.
+   ========================================================================== */
+
+async function exportNameChecks(page) {
+    section("7. Editors: the typed name names the downloaded file");
+
+    /* jsPDF editors: wrap the constructor and read what save() is called
+       with, once before touching the field and once after. */
+    for (const [label, urlPath, fallback] of [
+        ["resume", "/resume.html", "adaeze-nwosu-templatebox.pdf"],
+        ["docs", "/docs.html", "rent-receipt-nova-interiors-ltd-templatebox.pdf"]
+    ]) {
+        await page.navigate(`http://localhost:${PORT}${urlPath}`, 1440);
+        const r = await page.evaluate(`(async () => {
+            for (let i = 0; i < 100; i += 1) {
+                if (window.jspdf && window.jspdf.jsPDF) { break; }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            if (!window.jspdf || !window.jspdf.jsPDF) { return { error: 'jsPDF never loaded' }; }
+
+            const out = {};
+            const Real = window.jspdf.jsPDF;
+            const wrap = (key) => {
+                const F = function (...a) {
+                    const inst = new Real(...a);
+                    inst.save = (fn) => { out[key] = fn; return inst; };
+                    return inst;
+                };
+                F.prototype = Real.prototype;
+                return F;
+            };
+
+            window.jspdf.jsPDF = wrap('untouched');
+            document.getElementById('download-pdf').click();
+            await new Promise(r => setTimeout(r, 1200));
+
+            /* An apostrophe and punctuation on purpose: the name reaches this
+               through sanitize(), so "Ada's" is "Ada&#39;s" by then and a slug
+               that strips punctuation without decoding first leaves the digits
+               behind as "ada39s". */
+            const field = document.getElementById('doc-name');
+            field.value = "Ada's Big Project 2026!";
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            await new Promise(r => setTimeout(r, 400));
+
+            window.jspdf.jsPDF = wrap('typed');
+            document.getElementById('download-pdf').click();
+            await new Promise(r => setTimeout(r, 1200));
+            return out;
+        })()`);
+
+        check(`${label}: an untouched name field keeps the composed filename`,
+            r.untouched === fallback, JSON.stringify(r));
+        check(`${label}: a typed name is the filename`,
+            r.typed === "adas-big-project-2026-templatebox.pdf", JSON.stringify(r));
+    }
+
+    /* Canvas editors: the anchor's download attribute is the filename. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const mockup = await page.evaluate(`(async () => {
+        const seen = [];
+        HTMLAnchorElement.prototype.click = function () { seen.push(this.download); };
+        document.getElementById('download-mockup-png').click();
+        await new Promise(r => setTimeout(r, 250));
+        const label = document.getElementById('m-label');
+        label.value = 'Front chest print, navy tee';
+        label.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 300));
+        document.getElementById('download-mockup-png').click();
+        await new Promise(r => setTimeout(r, 250));
+        return { untouched: seen[0], typed: seen[1] };
+    })()`);
+
+    check("mockup: an empty Mockup Label keeps the default filename",
+        mockup.untouched === "templatebox-mockup.png", JSON.stringify(mockup));
+    check("mockup: the Mockup Label is the filename",
+        mockup.typed === "front-chest-print-navy-tee.png", JSON.stringify(mockup));
+
+    await page.navigate(`http://localhost:${PORT}/poster.html`, 1440);
+    const poster = await page.evaluate(`(async () => {
+        const seen = [];
+        HTMLAnchorElement.prototype.click = function () { seen.push(this.download); };
+        document.getElementById('dl-toggle').click();
+        await new Promise(r => setTimeout(r, 300));
+        const btn = [...document.querySelectorAll('#dl-panel button')]
+            .find(b => b.textContent.trim() === 'Download');
+        if (!btn) { return { error: 'no Download button in the panel' }; }
+        btn.click();
+        await new Promise(r => setTimeout(r, 700));
+        const field = document.getElementById('doc-name');
+        field.value = 'Summer Gig Poster';
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 300));
+        btn.click();
+        await new Promise(r => setTimeout(r, 700));
+        return { untouched: seen[0], typed: seen[1] };
+    })()`);
+
+    check("poster: an untouched name field keeps the default filename",
+        poster.untouched === "templatebox-poster.png", JSON.stringify(poster));
+    check("poster: a typed name is the filename",
+        poster.typed === "summer-gig-poster.png", JSON.stringify(poster));
+}
+
+/* ==========================================================================
    4. Ads-blocked parity against the last commit.
 
    The rail, the anchors and the leaderboard all reserve space only once a
@@ -1928,6 +2051,7 @@ async function main() {
                 await launchChecks(page);
                 await mockupChecks(page);
                 await adminThumbnailChecks(page);
+                await exportNameChecks(page);
             } finally {
                 page.close();
             }

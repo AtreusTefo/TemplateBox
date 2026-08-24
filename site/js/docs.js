@@ -1311,12 +1311,24 @@
         }
         const state = collectState();
         const config = DOC_TYPES[state.docType];
-        const party = TB.desanitize(state.fields.recipientName)
-            .trim()
-            .replace(/[^A-Za-z0-9 _-]/g, "")
-            .replace(/\s+/g, "-")
-            .toLowerCase();
 
+        /* The name in the bar is what names the file (August 24, 2026).
+           Before this it named nothing: the export was always
+           "<type>-<recipient>-templatebox.pdf", so renaming the document in
+           the header was typed, saved and silently unused.
+
+           It only wins when the visitor actually changed it. Left at the
+           default, the composed name is more useful than "untitled-document"
+           and stays the fallback. */
+        const named = TB.desanitize(state.docName).trim() === DEFAULT_DOC_NAME
+            ? ""
+            : TB.fileSlug(state.docName);
+        if (named) {
+            buildPdf(state).save(named + "-templatebox.pdf");
+            return;
+        }
+
+        const party = TB.fileSlug(state.fields.recipientName);
         buildPdf(state).save([config.file, party, "templatebox"].filter(Boolean).join("-") + ".pdf");
     });
 

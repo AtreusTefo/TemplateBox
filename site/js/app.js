@@ -90,6 +90,37 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Export file names (August 24, 2026).
+
+       Every editor names its download from something the visitor typed, and
+       every one of them carried its own copy of this regex chain. Three of
+       the four then ignored the name field entirely: typing a document name
+       in the bar changed nothing, because the resume exported from the
+       person's name field, the business document from its type and
+       recipient, and the mockup from a hard-coded literal. Only the poster
+       ever used what was typed. One implementation, used by all four.
+
+       desanitize FIRST. The name arrives from state that has been through
+       sanitize(), so an apostrophe is "&#39;" by the time it gets here -- and
+       stripping punctuation from that leaves the digits behind. "Ada's CV"
+       would have exported as "ada39s-cv.pdf".
+       ---------------------------------------------------------------------- */
+    const MAX_FILE_SLUG = 60;
+
+    function fileSlug(value) {
+        return desanitize(String(value || ""))
+            .replace(/[^A-Za-z0-9 _-]/g, "")
+            .trim()
+            .replace(/\s+/g, "-")
+            .replace(/-+/g, "-")
+            .toLowerCase()
+            .slice(0, MAX_FILE_SLUG)
+            /* Trimmed again after the cap, or a name cut mid-word at the
+               limit can end on a hyphen. */
+            .replace(/^-+|-+$/g, "");
+    }
+
+    /* ----------------------------------------------------------------------
        Safe localStorage wrappers. Private browsing modes and full quotas
        throw synchronously; the app must keep working without persistence.
        ---------------------------------------------------------------------- */
@@ -1310,6 +1341,9 @@ const TB = (() => {
     return {
         sanitize,
         desanitize,
+        /* Shared by all four editors so a downloaded file is named the same
+           way wherever it came from. */
+        fileSlug,
         storageSet,
         storageGet,
         takePreset,

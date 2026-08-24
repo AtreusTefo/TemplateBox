@@ -2294,7 +2294,11 @@
             dlBtn.addEventListener("click", () => {
                 const link = document.createElement("a");
                 link.href = item.thumb;
-                link.download = "templatebox-mockup-" + item.id + ".png";
+                /* The label the visitor gave this one, which is already
+                   either what they typed or the generated fallback. The id is
+                   a timestamp and names nothing to a human. */
+                link.download = (TB.fileSlug(item.label) ||
+                    "templatebox-mockup-" + item.id) + ".png";
                 link.click();
             });
 
@@ -2345,7 +2349,13 @@
     downloadBtn.addEventListener("click", () => {
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
-        link.download = "templatebox-mockup.png";
+        /* Mockup Label names the download (August 24, 2026). It named only
+           the tray caption before, so a visitor who filled it in and pressed
+           Download got "templatebox-mockup.png" regardless -- and since the
+           bar's own name input was removed when the bar gained navigation,
+           this field is the only place left to name the work. Empty, it falls
+           back to what the file has always been called. */
+        link.download = (TB.fileSlug(labelInput.value) || "templatebox-mockup") + ".png";
         link.click();
     });
 
