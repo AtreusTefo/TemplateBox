@@ -1,0 +1,39 @@
+1. Act as a professional full stack developer and analyze all errors, make plans to fix them then implement the plan:
+
+2. Commit and push new local code changes except anything unnecessary 
+directly into dev2 branch in my github repository:
+
+3. Act as a professional full stack developer and analyze all errors, make plans to fix them then implement the plan:
+improve Referential integrity and data consistency on this web app by doing the following:
+
+4. Update documentation so that it reflects current codebase in the web app
+
+5. Act as a professional full stack developer and analyze all errors, make plans to fix them then implement the plan:
+how can we improve Data integrity, Referential integrity and Data Consistency on this web app
+
+6. Update error documentation so that we can know how to fix the errors if they occur again in future
+
+7. Create a daily report that says:
+What I did today
+What was completed
+Challenges faced and how they were resolved
+
+8. Initialize using AGENTS.md. Confirm you have read the project context, Clean Architecture layers, 
+and the 'No Emojis' rule in any output or documentation. Please stick to the .NET Framework and Angular  (Zoneless) patterns defined there.
+
+9. Act as a professional full stack developer and analyze all errors, make plans to fix them then implement the plan
+and make sure improve Data integrity, Referential integrity and Data Consistency on this web app:
+
+10. based on what was commited and pushed to github create a detailed report that says:
+What I did today
+What was completed
+Challenges faced and how they were resolved
+
+11. Act as a professional full stack developer improve Data integrity, Referential integrity and Data Consistency 
+on this web app and analyze all errors, make plans to fix them then implement the plan:
+
+12. Act as a professional full stack developer and carry out the following:
+
+13. explain like you are explaining to a on technical personal so that its easier to understand
+
+14. create a good prompt for me, this is what i want: 
