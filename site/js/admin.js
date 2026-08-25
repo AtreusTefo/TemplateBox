@@ -355,7 +355,8 @@
 '    <a class="skip-link" href="#main">Skip to main content</a>\n\n' +
 '    <header class="site-header">\n' +
 '        <a class="wordmark" href="../index.html">TemplateBox</a>\n' +
-'        <nav class="site-nav" aria-label="Primary">\n' +
+'        <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>\n' +
+'        <nav class="site-nav" id="site-nav" aria-label="Primary">\n' +
 '            <a href="../index.html">Templates</a>\n' +
 '            <a href="../blog.html" aria-current="page">Guides</a>\n' +
 '            <a href="../about.html">About</a>\n' +
@@ -864,4 +865,1873 @@ body + '\n' +
 
     renderList();
     renderSyncState();
+})();
+
+/* ==========================================================================
+   TemplateBox - Catalog Thumbnail Workspace (admin.html)
+   Scope: attaching a default thumbnail (required) and an optional hover
+   thumbnail to a homepage catalog card, previewing the pair in the
+   production markup, and exporting the two renamed image files plus the
+   markup block that references them.
+   Depends on: js/app.js (TB) only.
+
+   Why this is artifact-based rather than data-driven: the homepage catalog
+   has no data file. The 18 cards in index.html are hand-written markup, so
+   there is nothing here to generate the way js/blog-data.js is generated for
+   the blog, and inventing a catalog registry would mean rewriting index.html
+   to render from it -- a much larger change than "let me attach two images".
+   What this exports instead is what the workflow actually needs: the images,
+   named to the convention, and the block to paste.
+
+   The two-image convention it targets already exists in index.html: an
+   .card-thumb-blank image is the card at rest, and a .card-thumb-hover image
+   stacked on top of it crossfades in on hover and focus. A card with no
+   hover image is a complete card -- 16 of the 18 are exactly that today --
+   which is why the hover slot is optional here and never blocks a save.
+
+   Kept as its own IIFE, sharing nothing with the blog workspace above: the
+   two workflows have separate storage, separate exports and separate
+   failure modes, and either half can be absent from the page.
+   ========================================================================== */
+
+(() => {
+
+    const form = document.getElementById("thumb-form");
+    if (!form) {
+        return;
+    }
+
+    const STORAGE_KEY = "tb_admin_catalog_thumbs";
+
+    /* ----------------------------------------------------------------------
+       Compression budget.
+
+       Uploads are re-encoded to hit TARGET_BYTES rather than being rejected
+       for exceeding it. Calibrated against the four thumbnails already on
+       disk, which run 46-83 KB at 600x750 and 800x1000 -- about 0.8 bits per
+       pixel. OUTPUT_MAX_EDGE keeps that convention: 1000 is the long edge of
+       the largest shipped thumbnail, and it is already far more pixels than
+       the card needs, since a catalog card renders roughly 240 CSS px wide.
+
+       Be precise about what this does and does not promise. Re-encoding a
+       photograph to a byte budget is lossy by construction -- that is what
+       takes a multi-megabyte PNG to tens of kilobytes. What it preserves is
+       the appearance at the size the thumbnail is actually displayed, where
+       the source carries three to four times the pixels the card can show.
+       An image that ALREADY fits the budget is passed through untouched
+       rather than re-encoded, which is the one genuinely lossless path.
+       ---------------------------------------------------------------------- */
+    const TARGET_BYTES = 60 * 1024;
+    const OUTPUT_MAX_EDGE = 1000;
+
+    /* Decode guard, not a quality rule. A 50-megapixel photograph is several
+       hundred megabytes once decoded into a canvas, and the tab dies before
+       any of the code below runs. Nothing legitimate for a catalog thumbnail
+       comes near this. */
+    const MAX_INPUT_BYTES = 24 * 1024 * 1024;
+
+    /* Quality floor for the search. Below this the artefacts are visible in
+       the card itself, not merely on close inspection, and shipping a
+       visibly broken thumbnail to hit a byte count is the wrong trade -- the
+       encoder downscales instead. */
+    const MIN_QUALITY = 0.45;
+    const MAX_QUALITY = 0.92;
+
+    /* Mime type to file extension. This now names the OUTPUT format, which
+       the encoder below chooses -- it is no longer a gate on what may be
+       uploaded, because anything the browser can decode is re-encoded into
+       one of these. Deriving the extension from file.name would take it from
+       a user-controlled string: a file called "art.jpg" that is really a PNG
+       would be downloaded as .jpg and the generated markup would point at a
+       file the deploy does not contain. */
+    const EXT_BY_TYPE = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp"
+    };
+
+    /* One record per catalog category: the filter value on the card's
+       data-category, the visible label above the title, the editor the card
+       opens, and the folder new thumbnails default into. */
+    const CATEGORIES = {
+        documents: {
+            label: "Receipts and Invoices",
+            page: "docs.html",
+            target: "docs",
+            folder: "assets/thumbnails/documents"
+        },
+        resumes: {
+            label: "Resumes",
+            page: "resume.html",
+            target: "resume",
+            folder: "assets/thumbnails/resumes"
+        },
+        canvas: {
+            label: "Posters and Prints",
+            page: "poster.html",
+            target: "poster",
+            folder: "assets/thumbnails/posters"
+        },
+        mockups: {
+            label: "Product Mockups",
+            page: "mockup.html",
+            target: "mockup",
+            folder: "assets/thumbnails/product-mockups"
+        }
+    };
+
+    /* The catalog as index.html ships it, in source order. This is a picker,
+       not a database: nothing reads it at runtime on the public site, and a
+       card added to index.html without being added here still works -- it
+       just has to be re-entered as a new item to get thumbnails.
+
+       `id` is the file-name stem. Where a card carries data-doc it is that
+       value, so the file name matches the variant the card already names.
+       The three resume cards and the three poster cards carry no data-doc
+       (they all open the same editor with no preset), so their ids are
+       derived from their titles and `doc` is null -- the generated markup
+       omits the attribute rather than inventing one, which would send a
+       preset to an editor with no variant table to match it against.
+
+       `folder` is present only where a card already has thumbnails on disk,
+       so re-exporting one regenerates its existing path rather than moving
+       the file. Everything else falls back to the category default. */
+    const CATALOG_ITEMS = [
+        { id: "rent-receipt", title: "Rent Receipt", category: "documents", doc: "rent-receipt" },
+        { id: "payment-receipt", title: "Cash Payment Receipt", category: "documents", doc: "payment-receipt" },
+        { id: "business-receipt", title: "Itemized Business Receipt", category: "documents", doc: "business-receipt" },
+        { id: "sales-receipt", title: "Sales and Cash Receipt Form", category: "documents", doc: "sales-receipt" },
+        { id: "invoice", title: "Professional Invoice", category: "documents", doc: "invoice" },
+        { id: "warning-notice", title: "Employee Warning Notice", category: "documents", doc: "warning-notice" },
+        { id: "executive-resume", title: "Executive Resume", category: "resumes", doc: null },
+        { id: "modern-professional-cv", title: "Modern Professional CV", category: "resumes", doc: null },
+        { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: null },
+        /* These three carried a `framed: true` flag until August 23, 2026,
+           when the wood-a4 hover composite was removed at the owner's
+           request. They are ordinary photo cards now: two thumbnails, the
+           second optional, exactly like every other entry here. */
+        { id: "framed-photo-poster", title: "Framed Photo Poster", category: "canvas", doc: null },
+        { id: "matte-wood-canvas", title: "Matte Wood Canvas", category: "canvas", doc: null },
+        { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: null },
+        { id: "tshirt", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt" },
+        { id: "hoodie", title: "Hoodie Mockup", category: "mockups", doc: "hoodie" },
+        { id: "mug", title: "Mug Mockup", category: "mockups", doc: "mug" },
+        { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },
+        {
+            id: "wood-a4", title: "Leaning Wood Frame Poster Mockup", category: "mockups", doc: "wood-a4",
+            folder: "assets/thumbnails/product-mockups/posters-frames-canvas-billboards"
+        },
+        {
+            id: "tshirt-model-white", title: "White T-Shirt on Model Mockup", category: "mockups", doc: "tshirt-model-white",
+            folder: "assets/thumbnails/product-mockups/apparel"
+        }
+    ];
+
+    const el = {
+        item: document.querySelector("[data-thumb-item]"),
+        newFields: document.querySelector("[data-thumb-new-fields]"),
+        newId: document.getElementById("f-thumb-id"),
+        newTitle: document.getElementById("f-thumb-title"),
+        newCategory: document.querySelector("[data-thumb-category]"),
+        newDoc: document.getElementById("f-thumb-doc"),
+        folder: document.getElementById("f-thumb-folder"),
+        fit: document.querySelector("[data-thumb-fit]"),
+        defaultFile: document.querySelector("[data-thumb-default-file]"),
+        defaultError: document.querySelector("[data-thumb-default-error]"),
+        defaultNote: document.querySelector("[data-thumb-default-note]"),
+        defaultRemove: document.querySelector("[data-thumb-default-remove]"),
+        hoverFile: document.querySelector("[data-thumb-hover-file]"),
+        hoverError: document.querySelector("[data-thumb-hover-error]"),
+        hoverNote: document.querySelector("[data-thumb-hover-note]"),
+        hoverRemove: document.querySelector("[data-thumb-hover-remove]"),
+        preview: document.querySelector("[data-thumb-preview]"),
+        previewDefault: document.querySelector("[data-thumb-preview-default]"),
+        previewHover: document.querySelector("[data-thumb-preview-hover]"),
+        previewLabel: document.querySelector("[data-thumb-preview-label]"),
+        previewTitle: document.querySelector("[data-thumb-preview-title]"),
+        error: document.querySelector("[data-thumb-error]"),
+        formStatus: document.querySelector("[data-thumb-form-status]"),
+        copy: document.querySelector("[data-thumb-copy]"),
+        clear: document.querySelector("[data-thumb-clear]"),
+        list: document.querySelector("[data-thumb-list]"),
+        sync: document.querySelector("[data-thumb-sync]"),
+        status: document.querySelector("[data-thumb-status]"),
+        downloadAll: document.querySelector("[data-thumb-download-all]"),
+        fsState: document.querySelector("[data-thumb-fs-state]"),
+        fsConnect: document.querySelector("[data-thumb-fs-connect]"),
+        fsDisconnect: document.querySelector("[data-thumb-fs-disconnect]"),
+        fsPublishAll: document.querySelector("[data-thumb-publish-all]")
+    };
+
+    const NEW_ITEM = "__new__";
+
+    /* Saved records, keyed by id. Shape:
+       { id, title, category, doc, folder,
+         defaultImage: { data, ext, w, h }, hoverImage: null | same, updated } */
+    const restored = TB.storageGet(STORAGE_KEY);
+    let items = Array.isArray(restored) ? restored : [];
+
+    /* The record being edited, or null. Images live here until saved so that
+       an abandoned edit never touches the stored workspace. */
+    let draftDefault = null;
+    let draftHover = null;
+    let editingId = null;
+    /* Set only by the hover Remove button: the operator saying the card
+       should have no hover thumbnail, as distinct from one never being
+       loaded. Publishing refuses to delete a live hover file without it. */
+    let hoverCleared = false;
+
+    function setText(target, message) {
+        if (target) {
+            target.textContent = message || "";
+        }
+    }
+
+    function todayIso() {
+        const d = new Date();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return d.getFullYear() + "-" + mm + "-" + dd;
+    }
+
+    function slugish(value) {
+        return String(value || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+    }
+
+    function catalogItem(id) {
+        return CATALOG_ITEMS.find((entry) => entry.id === id) || null;
+    }
+
+    function savedItem(id) {
+        return items.find((entry) => entry.id === id) || null;
+    }
+
+    function defaultFolder(item) {
+        return item.folder || CATEGORIES[item.category].folder;
+    }
+
+    /* Both file names in one place. -thumb-blank is the resting state and
+       -thumb is the hover state, matching the two pairs already on disk. */
+    function thumbPath(record, which) {
+        const shot = which === "hover" ? record.hoverImage : record.defaultImage;
+        const suffix = which === "hover" ? "-thumb." : "-thumb-blank.";
+        return record.folder + "/" + record.id + suffix + shot.ext;
+    }
+
+    function fileName(record, which) {
+        const path = thumbPath(record, which);
+        return path.slice(path.lastIndexOf("/") + 1);
+    }
+
+    /* ----------------------------------------------------------------------
+       Persistence. TB.storageSet swallows quota and private-mode failures by
+       design, so the write is read back: a workspace holding several images
+       is exactly the case that fills the quota, and silently losing an
+       upload the operator believes is saved is the failure worth catching.
+       ---------------------------------------------------------------------- */
+    function save() {
+        TB.storageSet(STORAGE_KEY, items);
+        const stored = TB.storageGet(STORAGE_KEY);
+        const persisted = Array.isArray(stored) && stored.length === items.length;
+        renderList();
+        renderSyncState();
+        if (!persisted) {
+            setText(el.status, "Warning: this browser did not store the workspace, most likely because the images filled its quota. Download the images now; deleting exported items frees space.");
+        }
+        return persisted;
+    }
+
+    /* ----------------------------------------------------------------------
+       Encoder.
+
+       Everything below runs on the client, in a canvas, with no library and
+       no upload. Nothing here talks to a server, per Rule 1.
+       ---------------------------------------------------------------------- */
+    function readFileAsDataUri(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error("The file could not be read."));
+            reader.onload = () => resolve(String(reader.result || ""));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function decode(dataUri) {
+        return new Promise((resolve, reject) => {
+            const probe = new Image();
+            probe.onerror = () => reject(
+                new Error("The file claims to be an image but could not be decoded."));
+            probe.onload = () => resolve(probe);
+            probe.src = dataUri;
+        });
+    }
+
+    function encode(canvas, mime, quality) {
+        return new Promise((resolve) => {
+            canvas.toBlob((blob) => resolve(blob), mime, quality);
+        });
+    }
+
+    function blobToDataUri(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error("The encoded image could not be read back."));
+            reader.onload = () => resolve(String(reader.result || ""));
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    function paint(source, w, h) {
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(source, 0, 0, w, h);
+        return canvas;
+    }
+
+    /* An <img> reports naturalWidth; a <canvas> reports width. Both are valid
+       drawImage sources and both now flow through this pipeline, since the
+       card-ratio pass below hands a canvas to the scaler. */
+    function srcW(source) { return source.naturalWidth || source.width; }
+    function srcH(source) { return source.naturalHeight || source.height; }
+
+    /* ----------------------------------------------------------------------
+       The card's aspect ratio (August 24, 2026).
+
+       .card-preview in css/style.css is `aspect-ratio: 4 / 5` and
+       `.card-preview.photo .card-thumb` is `object-fit: contain`. Change one
+       of those and this constant has to move with it, or thumbnails start
+       being letterboxed again -- which is exactly the defect this exists to
+       stop. The Leaning Wood Frame pair shipped at 1000x1000, square, and
+       lost about a fifth of its card to empty ground.
+
+       `contain` is deliberate and stays: a catalog thumbnail depicts a
+       finished design, designs carry content to their edges, and `cover`
+       would crop exactly those edges on every future upload with no warning.
+       The fix is to make the FILE the right shape, at which point `contain`
+       and `cover` are identical and the CSS stops mattering. That also keeps
+       the generated markup a fixed block with no per-card class to be
+       dropped the next time the card is published.
+       ---------------------------------------------------------------------- */
+    const CARD_ASPECT = 4 / 5;
+
+    /* One pixel of slack per thousand: a 800x1000 upload must not be
+       re-drawn just because floating point disagrees with itself. */
+    const ASPECT_TOLERANCE = 0.001;
+
+    function isCardRatio(source) {
+        return Math.abs((srcW(source) / srcH(source)) - CARD_ASPECT) <= ASPECT_TOLERANCE;
+    }
+
+    /* Reshapes an upload to the card's ratio. Two modes, and both produce a
+       4:5 file -- they differ only in what happens to the pixels that do not
+       fit:
+
+         fill  centre-crop. The card is filled edge to edge. Default, and what
+               a mockup or a photograph wants.
+         fit   pad with the card's own ground colour. The whole design is
+               visible, letterboxed inside a file that is still 4:5.
+
+       Padding rather than passing the image through is the point: either way
+       what lands on disk is 4:5, so `object-fit` has nothing left to decide
+       and no per-card class is needed.
+
+       An upload that is already 4:5 is returned untouched, so the common case
+       costs no re-draw at all. */
+    function fitToCard(img, mode) {
+        if (isCardRatio(img)) {
+            return img;
+        }
+
+        const w = srcW(img);
+        const h = srcH(img);
+
+        if (mode === "fit") {
+            /* Grow the short side to the ratio rather than shrinking the long
+               one: nothing is thrown away and no resolution is lost. */
+            const outW = Math.max(w, Math.round(h * CARD_ASPECT));
+            const outH = Math.max(h, Math.round(w / CARD_ASPECT));
+            const canvas = document.createElement("canvas");
+            canvas.width = outW;
+            canvas.height = outH;
+            const ctx = canvas.getContext("2d");
+            /* The padding is left TRANSPARENT rather than filled with the
+               card's ground colour, and that is a dark-mode decision. A baked
+               light pad is a pale band down each side of the card for every
+               visitor on the dark theme, permanently, because a file cannot
+               respond to a media query. Transparent padding lets
+               .card-preview's own background show through, so the card looks
+               the same in both themes -- exactly as an unpadded letterboxed
+               image does today.
+
+               The cost is the format: JPEG has no alpha channel, so a padded
+               thumbnail can only be encoded as WebP or PNG. compress() below
+               already detects transparency and drops JPEG from its format
+               list for exactly this reason, and WebP with alpha is well
+               inside the byte budget at these dimensions. */
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, Math.round((outW - w) / 2), Math.round((outH - h) / 2), w, h);
+            return canvas;
+        }
+
+        /* fill: take the largest 4:5 window the source contains, centred. */
+        const cropW = Math.min(w, Math.round(h * CARD_ASPECT));
+        const cropH = Math.min(h, Math.round(w / CARD_ASPECT));
+        const canvas = document.createElement("canvas");
+        canvas.width = cropW;
+        canvas.height = cropH;
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, Math.round((w - cropW) / 2), Math.round((h - cropH) / 2),
+            cropW, cropH, 0, 0, cropW, cropH);
+        return canvas;
+    }
+
+    /* Downscale in halving steps rather than one jump. Every browser's
+       one-shot drawImage undersamples heavily on a large reduction -- a
+       3000px photograph drawn straight to 800px samples a fraction of the
+       pixels it skips, which reads as aliasing on any fine detail such as
+       fabric weave or text on a mockup. Halving repeatedly averages the
+       pixels that are being discarded, and it is the difference between a
+       thumbnail that looks resized and one that looks sharp. */
+    function scaleTo(img, maxEdge) {
+        const longest = Math.max(srcW(img), srcH(img));
+        const ratio = Math.min(1, maxEdge / longest);
+        const targetW = Math.max(1, Math.round(srcW(img) * ratio));
+        const targetH = Math.max(1, Math.round(srcH(img) * ratio));
+
+        let source = img;
+        let w = srcW(img);
+        let h = srcH(img);
+        while (w > targetW * 2 && h > targetH * 2) {
+            w = Math.max(targetW, Math.round(w / 2));
+            h = Math.max(targetH, Math.round(h / 2));
+            source = paint(source, w, h);
+        }
+        return paint(source, targetW, targetH);
+    }
+
+    /* JPEG cannot carry an alpha channel: flattening a transparent thumbnail
+       into it paints the transparent region solid black. Only PNG and WebP
+       survive it, so transparency decides the format list. The source is a
+       data URI, so the canvas is never tainted and getImageData is allowed.
+       Every pixel is scanned rather than sampled -- a sampled scan misses a
+       one-pixel transparent border, which is exactly the case that would
+       come back as a black outline in the card. */
+    function hasTransparency(canvas) {
+        const pixels = canvas.getContext("2d")
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+        for (let i = 3; i < pixels.length; i += 4) {
+            if (pixels[i] < 255) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    let webpSupport = null;
+    async function supportsWebp() {
+        if (webpSupport === null) {
+            const probe = document.createElement("canvas");
+            probe.width = 1;
+            probe.height = 1;
+            const blob = await encode(probe, "image/webp", 0.8);
+            /* A browser that cannot encode WebP silently returns PNG rather
+               than failing, so the type is the only honest test. */
+            webpSupport = Boolean(blob) && blob.type === "image/webp";
+        }
+        return webpSupport;
+    }
+
+    /* Highest quality that fits the budget, by binary search. Six probes
+       land within about one part in seventy of the true threshold, which is
+       finer than the encoder's own quality granularity, and costs six
+       encodes instead of the dozen a linear walk down would take. */
+    async function bestQualityUnder(canvas, mime, targetBytes) {
+        const top = await encode(canvas, mime, MAX_QUALITY);
+        if (!top || top.type !== mime) {
+            return null;
+        }
+        if (top.size <= targetBytes) {
+            return { blob: top, quality: MAX_QUALITY };
+        }
+
+        let low = MIN_QUALITY;
+        let high = MAX_QUALITY;
+        let best = null;
+        for (let i = 0; i < 6; i += 1) {
+            const mid = (low + high) / 2;
+            const blob = await encode(canvas, mime, mid);
+            if (blob && blob.type === mime && blob.size <= targetBytes) {
+                best = { blob: blob, quality: mid };
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        return best;
+    }
+
+    /* Format, dimensions and quality that together meet the budget. Tries
+       the full size first and only gives up pixels when quality alone cannot
+       get there, because dropping resolution is the more visible of the two
+       losses at the size a card renders. */
+    async function compress(img, targetBytes, mode) {
+        /* Reshape BEFORE scaling, so the long edge that OUTPUT_MAX_EDGE caps
+           is the one that survives into the file. Cropping after the scale
+           would leave a 1000px source producing an 800px-tall thumbnail. */
+        const source = fitToCard(img, mode);
+        const full = scaleTo(source, OUTPUT_MAX_EDGE);
+        const transparent = hasTransparency(full);
+        const webp = await supportsWebp();
+
+        /* WebP first wherever it exists: at equal perceived quality it is
+           reliably a quarter to a third smaller than JPEG, which is the
+           whole reason a 60 KB budget is reachable at these dimensions. */
+        const formats = [];
+        if (webp) { formats.push("image/webp"); }
+        if (!transparent) { formats.push("image/jpeg"); }
+        if (transparent && !webp) { formats.push("image/png"); }
+
+        let canvas = full;
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+            for (const mime of formats) {
+                if (mime === "image/png") {
+                    /* PNG ignores the quality argument; it either fits at
+                       this size or it does not. */
+                    const blob = await encode(canvas, "image/png");
+                    if (blob && blob.size <= targetBytes) {
+                        return { blob: blob, mime: mime, w: canvas.width, h: canvas.height };
+                    }
+                    continue;
+                }
+                const found = await bestQualityUnder(canvas, mime, targetBytes);
+                if (found) {
+                    return {
+                        blob: found.blob, mime: mime,
+                        w: canvas.width, h: canvas.height
+                    };
+                }
+            }
+            const nextEdge = Math.round(Math.max(canvas.width, canvas.height) * 0.75);
+            if (nextEdge < 200) { break; }
+            /* From the reshaped source, not the original: dropping back to
+               `img` here would undo the crop on every retry. */
+            canvas = scaleTo(source, nextEdge);
+        }
+        return null;
+    }
+
+    /* ----------------------------------------------------------------------
+       Image intake. Mime-type gate per the project standard: file.type must
+       be an image type, otherwise processing terminates immediately and the
+       input is cleared. The decode is a second gate -- a file can carry an
+       image mime type and still not be an image.
+
+       An upload that already fits the budget at sensible dimensions is kept
+       byte for byte. Re-encoding it would only throw away quality to reach a
+       size it had already reached.
+       ---------------------------------------------------------------------- */
+    async function readImage(file, onOk, onFail, onProgress, mode) {
+        if (!file.type.startsWith("image/")) {
+            onFail("Rejected: the selected file is not an image.");
+            return;
+        }
+        if (file.size > MAX_INPUT_BYTES) {
+            onFail("Rejected: file is over 24 MB. That is a full-resolution photograph, not a thumbnail; export a smaller copy first.");
+            return;
+        }
+
+        try {
+            const original = await readFileAsDataUri(file);
+            const img = await decode(original);
+
+            /* The ratio test is not decoration. Without it a square upload
+               already under the budget is kept byte for byte and walks
+               straight past the card-ratio pass -- which is precisely how the
+               1000x1000 pair that letterboxed its card got onto disk. An
+               upload has to be the right SHAPE as well as the right size to
+               skip re-encoding. */
+            const alreadyFits = file.size <= TARGET_BYTES &&
+                Math.max(img.naturalWidth, img.naturalHeight) <= OUTPUT_MAX_EDGE &&
+                isCardRatio(img) &&
+                Object.prototype.hasOwnProperty.call(EXT_BY_TYPE, file.type);
+            if (alreadyFits) {
+                onOk({
+                    data: original,
+                    ext: EXT_BY_TYPE[file.type],
+                    w: img.naturalWidth,
+                    h: img.naturalHeight,
+                    note: "Kept as uploaded: " + kb(file.size) + ", " +
+                        img.naturalWidth + "x" + img.naturalHeight +
+                        ". Already 4:5 and within budget, so it was not re-encoded."
+                });
+                return;
+            }
+
+            if (onProgress) {
+                onProgress("Compressing " + kb(file.size) + " image...");
+            }
+            /* Yields a frame so the message paints before the encoder locks
+               the main thread. */
+            await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+            const result = await compress(img, TARGET_BYTES, mode);
+            if (!result) {
+                onFail("Could not get this image under " + kb(TARGET_BYTES) +
+                    " without destroying it. Crop or flatten it and try again.");
+                return;
+            }
+
+            const data = await blobToDataUri(result.blob);
+            const resized = result.w !== img.naturalWidth || result.h !== img.naturalHeight;
+            const reshaped = !isCardRatio(img);
+            onOk({
+                data: data,
+                ext: EXT_BY_TYPE[result.mime],
+                w: result.w,
+                h: result.h,
+                note: "Compressed " + kb(file.size) + " to " + kb(result.blob.size) +
+                    " " + EXT_BY_TYPE[result.mime].toUpperCase() + ", " +
+                    result.w + "x" + result.h +
+                    (reshaped ? (mode === "fit" ? " (padded to 4:5)" : " (cropped to 4:5)") : "") +
+                    (resized ? " (resized from " + img.naturalWidth + "x" + img.naturalHeight + ")" : "") + "."
+            });
+        } catch (err) {
+            onFail("Rejected: " + err.message);
+        }
+    }
+
+    function kb(bytes) {
+        return bytes >= 1024 * 1024
+            ? (bytes / (1024 * 1024)).toFixed(1) + " MB"
+            : Math.round(bytes / 1024) + " KB";
+    }
+
+    /* Read at upload time rather than stored: the control applies to the
+       NEXT file chosen, and an operator who changes it and re-picks the same
+       file expects the new answer. "fill" whenever the control is missing,
+       which is also what an older saved draft implies. */
+    function cardFitMode() {
+        return el.fit && el.fit.value === "fit" ? "fit" : "fill";
+    }
+
+    function bindUpload(input, errorTarget, noteTarget, removeBtn, assign, onRemove) {
+        input.addEventListener("change", () => {
+            setText(errorTarget, "");
+            setText(noteTarget, "");
+            const file = input.files && input.files[0];
+            if (!file) {
+                return;
+            }
+            /* Encoding a large photograph blocks the main thread for a
+               moment, so the control is disabled while it runs rather than
+               left looking idle and clickable. */
+            input.disabled = true;
+            readImage(file, (shot) => {
+                input.disabled = false;
+                assign(shot);
+                setText(noteTarget, shot.note || "");
+                renderPreview();
+            }, (message) => {
+                input.disabled = false;
+                input.value = "";
+                assign(null);
+                setText(errorTarget, message);
+                setText(noteTarget, "");
+                renderPreview();
+            }, (progress) => {
+                setText(noteTarget, progress);
+            }, cardFitMode());
+        });
+
+        removeBtn.addEventListener("click", () => {
+            input.value = "";
+            setText(errorTarget, "");
+            setText(noteTarget, "");
+            assign(null);
+            if (onRemove) { onRemove(); }
+            renderPreview();
+        });
+    }
+
+    bindUpload(el.defaultFile, el.defaultError, el.defaultNote, el.defaultRemove, (shot) => {
+        draftDefault = shot;
+    });
+    bindUpload(el.hoverFile, el.hoverError, el.hoverNote, el.hoverRemove, (shot) => {
+        draftHover = shot;
+        /* A replacement is not a removal: uploading again un-clears it. */
+        if (shot) { hoverCleared = false; }
+    }, () => {
+        /* Pressing Remove is the only way to say "this card should have no
+           hover thumbnail". Publishing keys on it, so that an absent hover
+           caused by a failed read can never be mistaken for a deliberate
+           one and silently delete a live file. */
+        hoverCleared = true;
+    });
+
+    /* ----------------------------------------------------------------------
+       Form
+       ---------------------------------------------------------------------- */
+    function buildItemOptions() {
+        el.item.textContent = "";
+
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = "Select a catalog item";
+        el.item.appendChild(blank);
+
+        Object.keys(CATEGORIES).forEach((key) => {
+            const group = document.createElement("optgroup");
+            group.label = CATEGORIES[key].label;
+            CATALOG_ITEMS.filter((entry) => entry.category === key).forEach((entry) => {
+                const option = document.createElement("option");
+                option.value = entry.id;
+                option.textContent = entry.title + (savedItem(entry.id) ? " (has thumbnails)" : "");
+                group.appendChild(option);
+            });
+            el.item.appendChild(group);
+        });
+
+        /* Items saved here that are not in CATALOG_ITEMS: cards added to
+           index.html after this list was written, or ones not pasted in yet. */
+        const extra = items.filter((entry) => !catalogItem(entry.id));
+        if (extra.length) {
+            const group = document.createElement("optgroup");
+            group.label = "Added here";
+            extra.forEach((entry) => {
+                const option = document.createElement("option");
+                option.value = entry.id;
+                option.textContent = TB.desanitize(entry.title);
+                group.appendChild(option);
+            });
+            el.item.appendChild(group);
+        }
+
+        const addNew = document.createElement("option");
+        addNew.value = NEW_ITEM;
+        addNew.textContent = "Add a new catalog item";
+        el.item.appendChild(addNew);
+    }
+
+    function buildCategoryOptions() {
+        el.newCategory.textContent = "";
+        Object.keys(CATEGORIES).forEach((key) => {
+            const option = document.createElement("option");
+            option.value = key;
+            option.textContent = CATEGORIES[key].label;
+            el.newCategory.appendChild(option);
+        });
+    }
+
+    function isNewSelected() {
+        return el.item.value === NEW_ITEM;
+    }
+
+    function syncFormToSelection() {
+        const value = el.item.value;
+        el.newFields.hidden = value !== NEW_ITEM;
+        setText(el.error, "");
+        setText(el.formStatus, "");
+        /* Any hydration still in flight is for the previous selection now. */
+        hydrateToken += 1;
+
+        if (!value) {
+            clearImages();
+            el.folder.value = "";
+            editingId = null;
+            renderPreview();
+            return;
+        }
+
+        if (value === NEW_ITEM) {
+            clearImages();
+            editingId = null;
+            el.folder.value = CATEGORIES[el.newCategory.value].folder;
+            renderPreview();
+            return;
+        }
+
+        const saved = savedItem(value);
+        const known = catalogItem(value);
+        editingId = value;
+        clearImages();
+
+        if (saved) {
+            draftDefault = saved.defaultImage;
+            draftHover = saved.hoverImage;
+            el.folder.value = saved.folder;
+            setText(el.defaultNote, draftDefault ? draftDefault.note || "" : "");
+            setText(el.hoverNote, draftHover ? draftHover.note || "" : "");
+        } else if (known) {
+            el.folder.value = defaultFolder(known);
+            /* Nothing saved for this card yet, so show what the site has
+               rather than an empty form that invites overwriting it. */
+            hydrateFromProject(known, hydrateToken);
+        }
+        renderPreview();
+    }
+
+    function clearImages() {
+        draftDefault = null;
+        draftHover = null;
+        el.defaultFile.value = "";
+        el.hoverFile.value = "";
+        el.defaultFile.disabled = false;
+        el.hoverFile.disabled = false;
+        setText(el.defaultError, "");
+        setText(el.hoverError, "");
+        setText(el.defaultNote, "");
+        setText(el.hoverNote, "");
+        hoverCleared = false;
+    }
+
+    /* The record the form currently describes, or an Error message. Used by
+       both save and Copy Markup, so the two can never disagree about what is
+       valid. */
+    function collectRecord() {
+        const value = el.item.value;
+        if (!value) {
+            throw new Error("Choose a catalog item first.");
+        }
+
+        let id;
+        let title;
+        let category;
+        let doc;
+
+        if (value === NEW_ITEM) {
+            id = slugish(el.newId.value.trim() || el.newTitle.value.trim());
+            title = el.newTitle.value.trim();
+            category = el.newCategory.value;
+            doc = slugish(el.newDoc.value.trim());
+            if (!title) {
+                throw new Error("A new catalog item needs a card title.");
+            }
+            if (!id) {
+                throw new Error("A new catalog item needs an id (lowercase letters, numbers and hyphens).");
+            }
+            if (!Object.prototype.hasOwnProperty.call(CATEGORIES, category)) {
+                throw new Error("Choose a category.");
+            }
+            if (id !== editingId && (savedItem(id) || catalogItem(id))) {
+                throw new Error("The id \"" + id + "\" is already in use by another catalog item.");
+            }
+        } else {
+            const saved = savedItem(value);
+            const known = catalogItem(value);
+            const source = known || saved;
+            id = source.id;
+            title = TB.desanitize(source.title);
+            category = source.category;
+            doc = source.doc || "";
+        }
+
+        const folder = String(el.folder.value || "").trim().replace(/^\/+|\/+$/g, "");
+        if (!/^[a-z0-9][a-z0-9/-]*$/.test(folder)) {
+            throw new Error("The destination folder may only contain lowercase letters, numbers, hyphens and slashes.");
+        }
+
+        if (!draftDefault) {
+            throw new Error("A default thumbnail is required. The hover thumbnail is optional.");
+        }
+
+        return {
+            id: id,
+            title: TB.sanitize(title),
+            category: category,
+            doc: doc || null,
+            folder: folder,
+            defaultImage: draftDefault,
+            hoverImage: draftHover,
+            hoverCleared: hoverCleared,
+            updated: todayIso()
+        };
+    }
+
+    form.addEventListener("submit", (evt) => {
+        evt.preventDefault();
+        setText(el.error, "");
+        let record;
+        try {
+            record = collectRecord();
+        } catch (err) {
+            setText(el.error, err.message);
+            return;
+        }
+
+        const idx = items.findIndex((entry) => entry.id === (editingId || record.id));
+        if (idx >= 0) {
+            items[idx] = record;
+        } else {
+            items.push(record);
+        }
+        editingId = record.id;
+
+        if (save()) {
+            setText(el.formStatus, "Saved to the local workspace. Download the images and copy the markup from the list above when ready.");
+        }
+        buildItemOptions();
+        el.item.value = record.id;
+        el.newFields.hidden = true;
+        renderPreview();
+    });
+
+    el.item.addEventListener("change", syncFormToSelection);
+    el.newCategory.addEventListener("change", () => {
+        if (isNewSelected()) {
+            el.folder.value = CATEGORIES[el.newCategory.value].folder;
+        }
+    });
+    el.clear.addEventListener("click", () => {
+        form.reset();
+        editingId = null;
+        clearImages();
+        el.newFields.hidden = true;
+        setText(el.error, "");
+        setText(el.formStatus, "");
+        renderPreview();
+    });
+
+    /* ----------------------------------------------------------------------
+       Preview. Sources are set as properties on the two <img> elements that
+       ship in the panel's markup; nothing is built from a string.
+       ---------------------------------------------------------------------- */
+    function renderPreview() {
+        el.defaultRemove.hidden = !draftDefault;
+        el.hoverRemove.hidden = !draftHover;
+
+        if (!draftDefault) {
+            el.preview.hidden = true;
+            el.previewDefault.removeAttribute("src");
+            el.previewHover.removeAttribute("src");
+            el.previewHover.hidden = true;
+            return;
+        }
+
+        el.previewDefault.src = draftDefault.data;
+        if (draftHover) {
+            el.previewHover.src = draftHover.data;
+            el.previewHover.hidden = false;
+        } else {
+            el.previewHover.removeAttribute("src");
+            el.previewHover.hidden = true;
+        }
+
+        let label = "";
+        let title = "";
+        if (isNewSelected()) {
+            label = CATEGORIES[el.newCategory.value].label;
+            title = el.newTitle.value.trim();
+        } else {
+            const source = catalogItem(el.item.value) || savedItem(el.item.value);
+            if (source) {
+                label = CATEGORIES[source.category].label;
+                title = TB.desanitize(source.title);
+            }
+        }
+        el.previewLabel.textContent = label;
+        el.previewTitle.textContent = title;
+        el.preview.hidden = false;
+    }
+
+    /* ----------------------------------------------------------------------
+       Markup generation.
+
+       Every element carrying operator-supplied text or a generated path is
+       built with createElement/textContent/setAttribute and then serialized,
+       so escaping is the serializer's job rather than a hand-rolled escaper.
+       The surrounding wrapper lines are literal constants containing no
+       variable at all. Indentation matches index.html so the block pastes in
+       without reformatting.
+       ---------------------------------------------------------------------- */
+    /* Markup elements are built in an inert document, never in this one. An
+       <img> created here and given a src fetches it immediately even while
+       detached from the tree, and the src being generated is a file that by
+       definition does not exist yet -- so every Copy Markup logged a 404 for
+       the thumbnail it was describing. The inert document loads nothing. */
+    const MARKUP_DOC = document.implementation.createHTMLDocument("");
+
+    /* The opening tag of an element, taken from the serializer rather than
+       assembled by hand so attribute escaping stays the serializer's job.
+       Slicing to the first ">" would be shorter and wrong: nothing in the
+       HTML serialization rules escapes ">" inside an attribute value. */
+    function openTag(node) {
+        const html = node.outerHTML;
+        const close = "</" + node.tagName.toLowerCase() + ">";
+        return html.slice(-close.length) === close
+            ? html.slice(0, html.length - close.length)
+            : html;
+    }
+
+    function imgMarkup(record, which) {
+        const shot = which === "hover" ? record.hoverImage : record.defaultImage;
+        const img = MARKUP_DOC.createElement("img");
+        img.className = which === "hover"
+            ? "card-thumb card-thumb-hover"
+            : "card-thumb card-thumb-blank";
+        img.setAttribute("src", thumbPath(record, which));
+        img.setAttribute("alt", "");
+        img.setAttribute("width", String(shot.w));
+        img.setAttribute("height", String(shot.h));
+        img.setAttribute("loading", "lazy");
+        return img.outerHTML;
+    }
+
+    /* The .card-preview block, which is what replaces an existing card's
+       preview. `pad` is the indentation of its opening tag in index.html. */
+    function previewMarkup(record, pad) {
+        const lines = [
+            pad + '<div class="card-preview photo" aria-hidden="true">',
+            pad + '    <div class="card-media">',
+            pad + '        ' + imgMarkup(record, "default")
+        ];
+        if (record.hoverImage) {
+            lines.push(pad + '        ' + imgMarkup(record, "hover"));
+        }
+        lines.push(pad + '    </div>');
+        lines.push(pad + '</div>');
+        return lines.join("\n");
+    }
+
+    /* The whole card, for an item not on the homepage yet. */
+    function articleMarkup(record) {
+        const category = CATEGORIES[record.category];
+
+        const link = MARKUP_DOC.createElement("a");
+        link.className = "card-link";
+        link.setAttribute("href", category.page);
+        link.setAttribute("data-target", category.target);
+        if (record.doc) {
+            link.setAttribute("data-doc", record.doc);
+        }
+        link.textContent = TB.desanitize(record.title);
+
+        const label = MARKUP_DOC.createElement("p");
+        label.className = "card-category";
+        label.textContent = category.label;
+
+        const article = MARKUP_DOC.createElement("article");
+        article.className = "template-card";
+        article.setAttribute("data-category", record.category);
+
+        return [
+            '                ' + openTag(article),
+            previewMarkup(record, "                    "),
+            '                    <div class="card-body">',
+            '                        ' + label.outerHTML,
+            '                        <h3 class="card-title">' + link.outerHTML + '</h3>',
+            '                    </div>',
+            '                </article>'
+        ].join("\n");
+    }
+
+    function markupFor(record) {
+        return catalogItem(record.id)
+            ? previewMarkup(record, "                    ")
+            : articleMarkup(record);
+    }
+
+    /* ----------------------------------------------------------------------
+       Patching index.html.
+
+       This edits a 47 KB hand-maintained file that is the site's most
+       important page, so the whole design here is about being surgical and
+       being verifiable.
+
+       It is a byte splice, NOT a parse-and-reserialize. Running index.html
+       through DOMParser and writing documentElement.outerHTML back would
+       normalize whitespace, entities and void tags across the entire file,
+       turning a two-line change into an unreviewable diff and quietly
+       rewriting markup nobody asked to touch. Instead the exact byte range
+       of one element is located and replaced, leaving every other byte
+       identical. DOMParser is still used, but only afterwards, to check the
+       result -- see verifyPatch.
+       ---------------------------------------------------------------------- */
+
+    /* Blanks comment bodies while preserving length, so every offset found
+       in the masked copy is valid in the original. Searching the raw text
+       would let a commented-out card or a stray "</div>" inside a comment
+       steer the splice -- index.html carries several explanatory comments
+       between cards, including one that describes this very markup. */
+    function maskComments(html) {
+        return html.replace(/<!--[\s\S]*?-->/g, (match) => " ".repeat(match.length));
+    }
+
+    function newlineOf(html) {
+        return html.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
+    }
+
+    function withNewline(block, nl) {
+        return nl === "\n" ? block : block.split("\n").join(nl);
+    }
+
+    function findArticles(masked) {
+        const found = [];
+        const open = /<article class="template-card"[^>]*>/g;
+        let match;
+        while ((match = open.exec(masked)) !== null) {
+            const close = masked.indexOf("</article>", match.index);
+            if (close === -1) {
+                throw new Error("index.html has a <article class=\"template-card\"> that is never closed.");
+            }
+            const innerStart = match.index + match[0].length;
+            /* Articles are not nested in this markup, and the flat
+               indexOf above is only correct while that holds. */
+            if (masked.slice(innerStart, close).indexOf("<article") >= 0) {
+                throw new Error("index.html has nested <article> elements, which this patcher cannot edit safely.");
+            }
+            found.push({
+                start: match.index,
+                innerStart: innerStart,
+                innerEnd: close,
+                end: close + "</article>".length
+            });
+        }
+        return found;
+    }
+
+    /* Balanced scan rather than a lazy match to the first "</div>": a
+       card-preview contains nested divs, so a non-greedy match would close
+       the block three levels too early and leave orphan closing tags behind. */
+    function findBalancedDiv(masked, from, limit) {
+        const opening = /<div\b[^>]*>/g;
+        opening.lastIndex = from;
+        const first = opening.exec(masked);
+        if (!first || first.index >= limit) {
+            return null;
+        }
+        const tags = /<div\b[^>]*>|<\/div\s*>/g;
+        tags.lastIndex = first.index + first[0].length;
+        let depth = 1;
+        let tag;
+        while ((tag = tags.exec(masked)) !== null && tag.index < limit) {
+            depth += tag[0].charAt(1) === "/" ? -1 : 1;
+            if (depth === 0) {
+                return { start: first.index, end: tag.index + tag[0].length };
+            }
+        }
+        return null;
+    }
+
+    function findPreviewBlock(masked, article) {
+        const marker = /<div class="card-preview[^"]*"[^>]*>/g;
+        marker.lastIndex = article.innerStart;
+        const match = marker.exec(masked);
+        if (!match || match.index >= article.innerEnd) {
+            return null;
+        }
+        return findBalancedDiv(masked, match.index, article.innerEnd);
+    }
+
+    /* Extends a range backwards over the indentation on its own line, so the
+       replacement supplies its own leading whitespace and the result cannot
+       end up double-indented or flush-left. */
+    function withIndent(html, start) {
+        let i = start;
+        while (i > 0 && (html.charAt(i - 1) === " " || html.charAt(i - 1) === "\t")) {
+            i -= 1;
+        }
+        return i;
+    }
+
+    function anchorOf(html, article) {
+        const match = html.slice(article.innerStart, article.innerEnd)
+            .match(/<a class="card-link"([^>]*)>([\s\S]*?)<\/a>/);
+        if (!match) {
+            return null;
+        }
+        return {
+            doc: (match[1].match(/data-doc="([^"]*)"/) || [])[1] || "",
+            href: (match[1].match(/href="([^"]*)"/) || [])[1] || "",
+            title: TB.desanitize(match[2].trim())
+        };
+    }
+
+    /* data-doc where the card has one, otherwise the title -- the same
+       identity rule the picker and the drift test use. */
+    function articleMatches(html, article, record) {
+        const anchor = anchorOf(html, article);
+        if (!anchor) {
+            return false;
+        }
+        return record.doc
+            ? anchor.doc === record.doc
+            : anchor.doc === "" && anchor.title === TB.desanitize(record.title);
+    }
+
+    function patchIndexHtml(html, record) {
+        const masked = maskComments(html);
+        const nl = newlineOf(html);
+        const articles = findArticles(masked);
+        if (!articles.length) {
+            throw new Error("index.html contains no template cards. Is the connected folder the right one?");
+        }
+
+        const matches = articles.filter((article) => articleMatches(html, article, record));
+        if (matches.length > 1) {
+            throw new Error("index.html has " + matches.length + " cards matching \"" +
+                TB.desanitize(record.title) + "\". Fix the duplicate before publishing.");
+        }
+
+        if (matches.length === 1) {
+            const block = findPreviewBlock(masked, matches[0]);
+            if (!block) {
+                throw new Error("The card for \"" + TB.desanitize(record.title) +
+                    "\" has no <div class=\"card-preview\"> to replace. Paste the markup by hand.");
+            }
+            const from = withIndent(html, block.start);
+            const replacement = withNewline(previewMarkup(record, "                    "), nl);
+            return {
+                html: html.slice(0, from) + replacement + html.slice(block.end),
+                action: "replaced",
+                cards: articles.length
+            };
+        }
+
+        /* Not on the page yet: append to the grid and correct the count. */
+        const gridMarker = /<div class="catalog-grid"[^>]*>/.exec(masked);
+        if (!gridMarker) {
+            throw new Error("index.html has no <div class=\"catalog-grid\">, so there is nowhere to add a card.");
+        }
+        const grid = findBalancedDiv(masked, gridMarker.index, masked.length);
+        if (!grid) {
+            throw new Error("index.html's catalog grid is not balanced, so a card cannot be added safely.");
+        }
+        const closeStart = withIndent(html, grid.end - "</div>".length);
+        const article = withNewline(articleMarkup(record), nl);
+        let patched = html.slice(0, closeStart) + article + nl + nl + html.slice(closeStart);
+
+        const count = articles.length + 1;
+        patched = patched.replace(/(clear the search to see all )\d+/, "$1" + count);
+        return { html: patched, action: "inserted", cards: count };
+    }
+
+    /* ----------------------------------------------------------------------
+       Verification. The splice above is string surgery on the homepage, so
+       nothing is written until the result has been parsed and checked
+       against what it was supposed to change -- and, just as importantly,
+       against everything it was supposed to leave alone.
+       ---------------------------------------------------------------------- */
+    function cardSignatures(doc) {
+        return Array.from(doc.querySelectorAll(".catalog-grid .template-card")).map((card) => {
+            const link = card.querySelector(".card-link");
+            return [
+                card.getAttribute("data-category") || "",
+                link ? link.getAttribute("href") || "" : "",
+                link ? link.getAttribute("data-doc") || "" : "",
+                link ? link.textContent.trim() : ""
+            ].join("|");
+        });
+    }
+
+    function verifyPatch(before, after, record, expected) {
+        if (after.length < before.length * 0.75) {
+            return "the patched file lost a quarter of its content";
+        }
+        const parser = new DOMParser();
+        const afterDoc = parser.parseFromString(after, "text/html");
+        if (afterDoc.querySelector("parsererror")) {
+            return "the patched markup does not parse";
+        }
+        const beforeSigs = cardSignatures(parser.parseFromString(before, "text/html"));
+        const afterSigs = cardSignatures(afterDoc);
+
+        if (afterSigs.length !== expected.cards) {
+            return "card count became " + afterSigs.length + ", expected " + expected.cards;
+        }
+        /* Replacing a preview must not touch any card's identity; inserting
+           one must add exactly one and leave the rest in order. */
+        const carried = expected.action === "inserted"
+            ? afterSigs.slice(0, beforeSigs.length)
+            : afterSigs;
+        for (let i = 0; i < beforeSigs.length; i += 1) {
+            if (carried[i] !== beforeSigs[i]) {
+                return "card " + (i + 1) + " changed identity: " + beforeSigs[i] + " -> " + carried[i];
+            }
+        }
+
+        /* The images the patch exists to add must actually be referenced. */
+        const wanted = [thumbPath(record, "default")]
+            .concat(record.hoverImage ? [thumbPath(record, "hover")] : []);
+        const sources = Array.from(afterDoc.querySelectorAll(".catalog-grid .card-thumb"))
+            .map((img) => img.getAttribute("src"));
+        for (const src of wanted) {
+            if (sources.indexOf(src) === -1) {
+                return "the patched markup does not reference " + src;
+            }
+        }
+        return null;
+    }
+
+    function copyMarkup(record) {
+        const text = markupFor(record) + "\n";
+        const isKnown = Boolean(catalogItem(record.id));
+        const note = isKnown
+            ? "Copied. In index.html, replace the <div class=\"card-preview\"> block inside the \"" +
+                TB.desanitize(record.title) + "\" card with this."
+            : "Copied. In index.html, paste this as a new <article> inside <div class=\"catalog-grid\">, then update the card count in the catalog-empty message.";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(
+                () => setText(el.status, note),
+                () => setText(el.status, "Copy failed in this browser.")
+            );
+        } else {
+            setText(el.status, "Clipboard unavailable in this browser.");
+        }
+    }
+
+    /* ----------------------------------------------------------------------
+       Downloads. Same spacing as the post-page export: browsers throttle
+       rapid sequential downloads, and a zip library would mean a CDN
+       dependency for a handful of files.
+       ---------------------------------------------------------------------- */
+    /* Data URI back to bytes. The stored image could be handed straight to
+       a download link, but browsers cap or block data: URLs in that position
+       at sizes well under this cap; a Blob URL is what the post-page export
+       already uses and has no such limit. */
+    function dataUriToBlob(data) {
+        const comma = data.indexOf(",");
+        const type = (data.slice(0, comma).match(/:([^;,]+)/) || [])[1] || "application/octet-stream";
+        const binary = window.atob(data.slice(comma + 1));
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new Blob([bytes], { type: type });
+    }
+
+    function downloadShot(record, which, delay) {
+        const shot = which === "hover" ? record.hoverImage : record.defaultImage;
+        if (!shot) {
+            return 0;
+        }
+        window.setTimeout(() => {
+            const url = URL.createObjectURL(dataUriToBlob(shot.data));
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fileName(record, which);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }, delay);
+        return 1;
+    }
+
+    /* The encoder picks the output format, so re-exporting a card whose
+       thumbnail is already on disk in another format writes a new file
+       beside the old one rather than over it, and the stale one keeps being
+       deployed while nothing references it. Nothing in a browser can see the
+       repository to check, so this says so every time rather than guessing. */
+    function replacementNote(record) {
+        const exts = new Set([record.defaultImage.ext]);
+        if (record.hoverImage) { exts.add(record.hoverImage.ext); }
+        return " Delete any older " + record.id + "-thumb* file in that folder" +
+            " with a different extension: a re-encode writes ." +
+            [...exts].join("/.") + " beside the previous file, not over it.";
+    }
+
+    function downloadRecord(record) {
+        let count = downloadShot(record, "default", 0);
+        count += downloadShot(record, "hover", 350);
+        setText(el.status, "Downloading " + count + " file(s). Put them in site/" +
+            record.folder + "/ and keep the names unchanged." + replacementNote(record));
+    }
+
+    function downloadAll() {
+        if (!items.length) {
+            setText(el.status, "No catalog thumbnails saved yet.");
+            return;
+        }
+        let slot = 0;
+        const folders = new Set();
+        items.forEach((record) => {
+            slot += downloadShot(record, "default", slot * 350);
+            slot += downloadShot(record, "hover", slot * 350);
+            folders.add(record.folder);
+        });
+        setText(el.status, "Downloading " + slot + " file(s) across " + folders.size +
+            " folder(s). Each row above shows where its files belong.");
+    }
+
+    /* ----------------------------------------------------------------------
+       Hydration: loading a card's CURRENT thumbnails out of the project.
+
+       Why this exists. Until August 24, 2026 this workspace was write-only --
+       it knew what you had uploaded and nothing about what the card already
+       had. Selecting a card that ships two thumbnails showed an empty form,
+       so uploading one image and publishing emitted a single-image block:
+       the hover <img> was stripped from index.html and its file deleted by
+       the cleanup, with no warning, because nothing here had ever seen it.
+       On the mockup cards, whose whole design is the bare-product/styled-demo
+       pair, that quietly destroyed the effect the card existed for.
+
+       Reading the current state first is what makes "replace only the
+       default" mean what it says: the hover shot is already in the record, so
+       the generated markup keeps it. Removing one is still possible, but only
+       by asking for it with the Remove button.
+       ---------------------------------------------------------------------- */
+
+    /* Guards against a slow read landing after the operator has moved on to
+       another card. Bumped on every selection change; a hydration whose token
+       is stale throws its result away. */
+    let hydrateToken = 0;
+
+    function extOfPath(path) {
+        const dot = path.lastIndexOf(".");
+        const ext = dot === -1 ? "" : path.slice(dot + 1).toLowerCase();
+        return ext === "jpeg" ? "jpg" : ext;
+    }
+
+    async function shotFromFile(file, srcPath) {
+        const data = await blobToDataUri(file);
+        const img = await decode(data);
+        return {
+            data: data,
+            ext: extOfPath(srcPath) || EXT_BY_TYPE[file.type] || "jpg",
+            w: img.naturalWidth,
+            h: img.naturalHeight,
+            note: "Already on the site: " + kb(file.size) + ", " +
+                img.naturalWidth + "x" + img.naturalHeight +
+                ". Replace it, or leave it and it publishes back unchanged."
+        };
+    }
+
+    /* The <img> sources inside one card's preview, in markup order, plus the
+       folder they live in. Reuses the same locator the patcher uses, so the
+       card this reads is by construction the card a publish would rewrite. */
+    function currentThumbsOf(html, item) {
+        const masked = maskComments(html);
+        const articles = findArticles(masked);
+        const record = { doc: item.doc || "", title: TB.sanitize(item.title) };
+        const matches = articles.filter((a) => articleMatches(html, a, record));
+        if (matches.length !== 1) {
+            return null;
+        }
+        const block = findPreviewBlock(masked, matches[0]);
+        if (!block) {
+            return null;
+        }
+        const found = { blank: null, hover: null, folder: null };
+        [...html.slice(block.start, block.end)
+            .matchAll(/<img\b[^>]*class="card-thumb ([^"]*)"[^>]*\ssrc="([^"]+)"/g)]
+            .forEach(([, classes, src]) => {
+                const slot = classes.indexOf("card-thumb-hover") >= 0 ? "hover" : "blank";
+                found[slot] = src;
+                found.folder = src.slice(0, src.lastIndexOf("/"));
+            });
+        return found.blank || found.hover ? found : null;
+    }
+
+    async function hydrateFromProject(item, token) {
+        if (!FS || !FS.isConnected() || !item) {
+            return false;
+        }
+        let html;
+        try {
+            html = await FS.readText(INDEX_PATH);
+        } catch (err) {
+            return false;
+        }
+        if (token !== hydrateToken) { return false; }
+
+        const current = currentThumbsOf(html, item);
+        if (!current) {
+            return false;
+        }
+
+        const loaded = {};
+        for (const slot of ["blank", "hover"]) {
+            if (!current[slot]) { continue; }
+            const file = await FS.readFile(current[slot]);
+            if (!file) { continue; }
+            loaded[slot] = await shotFromFile(file, current[slot]);
+        }
+        if (token !== hydrateToken) { return false; }
+        if (!loaded.blank && !loaded.hover) {
+            return false;
+        }
+
+        draftDefault = loaded.blank || null;
+        draftHover = loaded.hover || null;
+        if (current.folder) {
+            el.folder.value = current.folder;
+        }
+        setText(el.defaultNote, draftDefault ? draftDefault.note : "");
+        setText(el.hoverNote, draftHover ? draftHover.note : "");
+        renderPreview();
+        setText(el.formStatus, "Loaded this card's current thumbnails from the project. " +
+            "Replace either one; whatever you leave alone stays exactly as it is.");
+        return true;
+    }
+
+    /* ----------------------------------------------------------------------
+       Publishing straight into the working copy.
+
+       The download-and-paste path above still exists and is still the only
+       path on Firefox and Safari. This one removes the two manual steps
+       where a mistake is silent: putting the file in the wrong folder, and
+       pasting the markup over the wrong block.
+
+       Order is deliberate and load-bearing, and there are THREE steps to it,
+       not two: write the new images, rewrite the markup, then delete the
+       superseded files. Every failure point must leave the page working.
+
+       Write-then-rewrite is the easy half: a run that dies after writing an
+       image leaves a file nothing references, which is inert, whereas the
+       reverse would leave index.html pointing at a file that was never
+       written.
+
+       The delete is the half that was got wrong. It ran in the first phase
+       until August 24, 2026, so a failed markup edit left the page
+       referencing files that had just been removed -- a broken image on the
+       live card, which is precisely the outcome the ordering exists to
+       prevent. Anything destructive belongs after the markup that stops
+       referencing it is safely on disk.
+       ---------------------------------------------------------------------- */
+    const FS = window.TBProjectFolder;
+    const INDEX_PATH = "index.html";
+    const KNOWN_EXTS = ["jpg", "jpeg", "png", "webp"];
+
+    /* The encoder picks the output format, so publishing can leave the
+       previous file behind under a different extension -- still deployed,
+       referenced by nothing. Anything matching this card's two names in any
+       known image extension other than the one just written is removed. */
+    async function removeStaleSiblings(record, written) {
+        const names = await FS.listDir(record.folder);
+        const stems = [
+            { stem: record.id + "-thumb-blank", keep: written.blank },
+            { stem: record.id + "-thumb", keep: written.hover }
+        ];
+        const removed = [];
+        for (const { stem, keep } of stems) {
+            for (const name of names) {
+                const matches = KNOWN_EXTS.some((ext) => name === stem + "." + ext);
+                /* Exact-name matching, never a prefix test: "<id>-thumb" is
+                   a prefix of "<id>-thumb-blank", so a startsWith check here
+                   would delete the default thumbnail while cleaning up after
+                   the hover one. */
+                if (matches && name !== keep) {
+                    if (await FS.deleteFile(record.folder + "/" + name)) {
+                        removed.push(name);
+                    }
+                }
+            }
+        }
+        return removed;
+    }
+
+    async function publishRecord(record) {
+        const written = { blank: fileName(record, "default"), hover: null };
+        await FS.writeFile(record.folder + "/" + written.blank,
+            dataUriToBlob(record.defaultImage.data));
+        if (record.hoverImage) {
+            written.hover = fileName(record, "hover");
+            await FS.writeFile(record.folder + "/" + written.hover,
+                dataUriToBlob(record.hoverImage.data));
+        }
+
+        const before = await FS.readText(INDEX_PATH);
+
+        /* Last line of defence against the August 24, 2026 defect: a record
+           carrying no hover shot produces a single-image block, which strips
+           the card's hover <img> and lets the cleanup delete its file. That
+           is correct when the operator asked for it and destructive when the
+           hover simply was not loaded -- a failed read, or a workspace saved
+           before hydration existed. Only an explicit Remove authorises it. */
+        const known = catalogItem(record.id);
+        if (known && !record.hoverImage && !record.hoverCleared) {
+            const live = currentThumbsOf(before, known);
+            if (live && live.hover) {
+                throw new Error("this card already has a hover thumbnail (" +
+                    live.hover.split("/").pop() + ") and this upload has none, so publishing " +
+                    "would delete it. Re-select the card to load what is already there, " +
+                    "or press Remove Hover Image to drop it deliberately.");
+            }
+        }
+
+        const patch = patchIndexHtml(before, record);
+        const problem = verifyPatch(before, patch.html, record, patch);
+        if (problem) {
+            throw new Error("index.html was left untouched: " + problem +
+                ". The new image files were written but nothing references them yet, " +
+                "and the card still shows its previous thumbnail. Paste the markup by hand.");
+        }
+        await FS.writeFile(INDEX_PATH, patch.html);
+
+        /* ONLY after index.html has been rewritten. Deleting earlier is what
+           broke the homepage on August 24, 2026: the superseded .jpg files
+           were removed, the markup edit then failed, and index.html was left
+           pointing at files that no longer existed -- a broken image on the
+           live card. Written-then-unreferenced is inert; referenced-then-
+           deleted is a visible defect, so the destructive step has to be the
+           last one, after the markup that stops referencing them is safely on
+           disk. */
+        const removed = await removeStaleSiblings(record, written);
+
+        record.publishedAt = todayIso();
+        return {
+            action: patch.action,
+            files: written.hover ? 2 : 1,
+            removed: removed
+        };
+    }
+
+    async function publish(records) {
+        if (!FS || !FS.isConnected()) {
+            setText(el.status, "Connect the project folder first, or use Download and Copy Markup.");
+            return;
+        }
+        const ready = records.filter((record) => record && record.defaultImage);
+        if (!ready.length) {
+            setText(el.status, "Nothing to publish yet.");
+            return;
+        }
+
+        setText(el.status, "Publishing " + ready.length + " item(s)...");
+        let files = 0;
+        let inserted = 0;
+        let replaced = 0;
+        const removed = [];
+        for (const record of ready) {
+            try {
+                const result = await publishRecord(record);
+                files += result.files;
+                if (result.action === "inserted") { inserted += 1; } else { replaced += 1; }
+                result.removed.forEach((name) => removed.push(name));
+            } catch (err) {
+                save();
+                setText(el.status, "Stopped at \"" + TB.desanitize(record.title) + "\": " +
+                    err.message);
+                return;
+            }
+        }
+        save();
+
+        setText(el.status, "Published " + files + " image file(s) into " +
+            FS.folderName() + "/. " +
+            (replaced ? replaced + " card preview(s) replaced. " : "") +
+            (inserted ? inserted + " card(s) added to the grid. " : "") +
+            (removed.length ? "Removed " + removed.length + " superseded file(s): " +
+                removed.join(", ") + ". " : "") +
+            "Review with git diff, then commit and push to deploy.");
+    }
+
+    /* ----------------------------------------------------------------------
+       Project folder connection UI
+       ---------------------------------------------------------------------- */
+    function renderFsState(state, detail) {
+        if (!el.fsState) {
+            return;
+        }
+        const messages = {
+            unsupported: "This browser cannot write to the project folder. Chrome and Edge can; Firefox and Safari cannot. Use Download and Copy Markup instead.",
+            disconnected: "Not connected. Publishing writes the images and edits index.html for you; without it, use Download and Copy Markup.",
+            "needs-permission": "A project folder is remembered but the browser dropped its permission on restart. Reconnect to publish.",
+            connected: "Connected to " + (detail || "the project folder") +
+                ". Publish writes images into assets/ and edits index.html directly."
+        };
+        setText(el.fsState, messages[state] || messages.disconnected);
+
+        const supported = state !== "unsupported";
+        el.fsConnect.hidden = !supported || state === "connected";
+        el.fsConnect.textContent = state === "needs-permission"
+            ? "Reconnect Project Folder"
+            : "Connect Project Folder";
+        el.fsDisconnect.hidden = state !== "connected";
+        el.fsPublishAll.hidden = state !== "connected";
+        renderList();
+    }
+
+    async function refreshFsState() {
+        if (!FS || !FS.supported()) {
+            renderFsState("unsupported");
+            return;
+        }
+        const state = await FS.restore();
+        renderFsState(state, FS.folderName());
+    }
+
+    /* ----------------------------------------------------------------------
+       Saved item list
+       ---------------------------------------------------------------------- */
+    function renderList() {
+        el.list.textContent = "";
+
+        if (!items.length) {
+            const empty = document.createElement("p");
+            empty.className = "admin-empty";
+            empty.textContent = "No catalog thumbnails yet. Pick an item below and upload a default image to start.";
+            el.list.appendChild(empty);
+            return;
+        }
+
+        items.forEach((record) => {
+            const row = document.createElement("div");
+            row.className = "admin-row";
+
+            const info = document.createElement("div");
+            info.className = "admin-row-info";
+
+            const title = document.createElement("p");
+            title.className = "admin-row-title";
+            title.textContent = TB.desanitize(record.title);
+            info.appendChild(title);
+
+            const meta = document.createElement("p");
+            meta.className = "admin-row-meta";
+            meta.textContent = [
+                CATEGORIES[record.category].label,
+                record.hoverImage ? "Default and hover" : "Default only",
+                catalogItem(record.id) ? "On the homepage" : "New card",
+                "Last edited: " + record.updated,
+                record.publishedAt
+                    ? "Published to the project " + record.publishedAt
+                    : "Not published"
+            ].join(" — ");
+            info.appendChild(meta);
+
+            const paths = document.createElement("p");
+            paths.className = "admin-thumb-paths";
+            paths.textContent = "site/" + thumbPath(record, "default") +
+                (record.hoverImage ? "  |  site/" + thumbPath(record, "hover") : "");
+            info.appendChild(paths);
+
+            row.appendChild(info);
+
+            const actions = document.createElement("div");
+            actions.className = "admin-row-actions";
+
+            const editBtn = document.createElement("button");
+            editBtn.className = "btn btn-secondary btn-small";
+            editBtn.type = "button";
+            editBtn.textContent = "Edit";
+            editBtn.addEventListener("click", () => {
+                el.item.value = record.id;
+                syncFormToSelection();
+                form.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+            actions.appendChild(editBtn);
+
+            /* Only offered where it can actually work. An always-visible
+               Publish that errors on click would read as a broken feature
+               rather than an unavailable one. */
+            if (FS && FS.isConnected()) {
+                const pubBtn = document.createElement("button");
+                pubBtn.className = "btn btn-small";
+                pubBtn.type = "button";
+                pubBtn.textContent = "Publish";
+                pubBtn.addEventListener("click", () => publish([record]));
+                actions.appendChild(pubBtn);
+            }
+
+            const dlBtn = document.createElement("button");
+            dlBtn.className = "btn btn-secondary btn-small";
+            dlBtn.type = "button";
+            dlBtn.textContent = "Download";
+            dlBtn.addEventListener("click", () => downloadRecord(record));
+            actions.appendChild(dlBtn);
+
+            const copyBtn = document.createElement("button");
+            copyBtn.className = "btn btn-secondary btn-small";
+            copyBtn.type = "button";
+            copyBtn.textContent = "Copy Markup";
+            copyBtn.addEventListener("click", () => copyMarkup(record));
+            actions.appendChild(copyBtn);
+
+            const delBtn = document.createElement("button");
+            delBtn.className = "entry-remove";
+            delBtn.type = "button";
+            delBtn.textContent = "Delete";
+            delBtn.addEventListener("click", () => {
+                const name = TB.desanitize(record.title);
+                if (window.confirm("Remove the thumbnails for \"" + name + "\" from this workspace? Files already placed in the project are not affected.")) {
+                    items = items.filter((entry) => entry.id !== record.id);
+                    if (editingId === record.id) {
+                        editingId = null;
+                        el.item.value = "";
+                        clearImages();
+                        renderPreview();
+                    }
+                    save();
+                    buildItemOptions();
+                }
+            });
+            actions.appendChild(delBtn);
+
+            row.appendChild(actions);
+            el.list.appendChild(row);
+        });
+    }
+
+    function renderSyncState() {
+        const withHover = items.filter((entry) => entry.hoverImage).length;
+        setText(el.sync, items.length
+            ? items.length + " item" + (items.length === 1 ? "" : "s") + " in workspace (" +
+                withHover + " with a hover image). Nothing is live until the files and markup are committed."
+            : "No catalog thumbnails in this browser's workspace.");
+    }
+
+    /* ----------------------------------------------------------------------
+       Bindings + boot
+       ---------------------------------------------------------------------- */
+    el.copy.addEventListener("click", () => {
+        setText(el.error, "");
+        let record;
+        try {
+            record = collectRecord();
+        } catch (err) {
+            setText(el.error, err.message);
+            return;
+        }
+        copyMarkup(record);
+    });
+    el.downloadAll.addEventListener("click", downloadAll);
+
+    if (FS && el.fsConnect) {
+        el.fsConnect.addEventListener("click", async () => {
+            setText(el.status, "");
+            try {
+                /* A remembered folder only needs its permission re-granted;
+                   asking for the picker again would make the operator
+                   re-find the same directory for no reason. */
+                const name = el.fsConnect.textContent.indexOf("Reconnect") === 0
+                    ? await FS.reconnect()
+                    : await FS.connect();
+                renderFsState("connected", name);
+                setText(el.status, "Connected to " + name + "/. Publish now writes into it.");
+            } catch (err) {
+                /* Dismissing the native picker throws AbortError; that is a
+                   choice, not a failure worth reporting as one. */
+                if (err && err.name === "AbortError") {
+                    return;
+                }
+                setText(el.status, err.message);
+            }
+        });
+
+        el.fsDisconnect.addEventListener("click", async () => {
+            await FS.disconnect();
+            renderFsState("disconnected");
+            setText(el.status, "Disconnected. Nothing was changed in the project.");
+        });
+
+        el.fsPublishAll.addEventListener("click", () => publish(items));
+    }
+
+    buildCategoryOptions();
+    buildItemOptions();
+    renderList();
+    renderSyncState();
+    renderPreview();
+    refreshFsState();
 })();

@@ -62,23 +62,37 @@ const PAGES = [
     ["about", "/about.html"],
     ["rent-receipt", "/rent-receipt-template.html"],
     ["blog", "/blog.html"],
-    ["post", "/post.html"]
+    ["post", "/post.html"],
+    /* search.html joined the content-rail family on August 24, 2026. It is
+       the page the phone and tablet search control opens, so it is a mobile
+       surface first -- which makes the anchor band, not the rail, the one
+       that matters most here. */
+    ["search", "/search.html"]
 ];
 const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 768, 320];
 
-/* Pages whose rail floor sits above the mobile anchor's own ceiling (48rem)
-   show neither band in between -- home's rail starts at 75rem, the
-   content-rail family's at 83.5rem, and both leave a genuine gap rather than
-   falling back to a leaderboard the way the editors do. Keyed by page name,
-   [minPxExclusive, maxPxExclusive) mirrors the CSS floor exactly so a floor
-   changed in one place cannot quietly disagree with the other. */
-const RAIL_GAP = {
-    index: [768, 1200],
-    about: [768, 1200],
-    "rent-receipt": [768, 1200],
-    blog: [768, 1200],
-    post: [768, 1200]
-};
+/* Pages that show NO band in some width range, keyed by page name, as
+   [minPxExclusive, maxPxExclusive).
+
+   This table used to carry index, about, rent-receipt, blog and post, all at
+   [768, 1200]: the anchor stopped at 48rem, the rail did not start until
+   75rem, and everything in between showed nothing. That band is every tablet
+   in portrait and most in landscape, so the whole class of device was served
+   no advertising at all -- and because this table said so, the suite asserted
+   the hole was correct and defended it.
+
+   Closed on August 20, 2026 by extending the anchor's ceiling to the rail's
+   own floor (SITE_ANCHOR_MAX and HOME_ANCHOR_MAX in js/ads.js). Those pages
+   now mount exactly one band at every width, like everything else, so they
+   are gone from here rather than being given a new range.
+
+   `post` is the one page that still has a genuine gap -- it carries no
+   [data-ad-anchor] host at all -- but it is in MULTI_UNIT_PAGES below and so
+   is skipped by the count assertion regardless, which is why it is not
+   listed. Left as an empty table rather than deleted: a page that legitimately
+   shows nothing in a range is a thing this suite should still be able to
+   express. */
+const RAIL_GAP = {};
 
 /* Pages that deliberately run a top leaderboard alongside the side rail
    rather than treating them as alternatives for one slot -- see the comment
@@ -121,6 +135,7 @@ function staticChecks() {
     const pages = htmlFiles();
     const adsJs = fs.readFileSync(path.join(SITE, "js", "ads.js"), "utf8");
     const appJs = fs.readFileSync(path.join(SITE, "js", "app.js"), "utf8");
+    const searchJs = fs.readFileSync(path.join(SITE, "js", "search.js"), "utf8");
 
     /* 1a. A page carrying an ad host must load the script that fills it.
            This is the three-days-of-zero-impressions bug. The guard is
@@ -188,7 +203,11 @@ function staticChecks() {
            scanned, so hooks the scripts create rather than look up are not
            flagged. */
     const allHtml = pages.map((f) => fs.readFileSync(f, "utf8")).join("\n");
-    const sources = { "js/app.js": appJs, "js/ads.js": adsJs };
+    /* js/search.js joined this scan on August 24, 2026. It builds the search
+       page out of hooks in search.html and out of the real catalog markup in
+       index.html, so it has MORE ways to be silently wrong than app.js does:
+       a renamed hook leaves it rendering an empty page with no error. */
+    const sources = { "js/app.js": appJs, "js/ads.js": adsJs, "js/search.js": searchJs };
 
     Object.keys(sources).forEach((label) => {
         const tokens = new Set();
@@ -339,6 +358,187 @@ function staticChecks() {
     check("the print block resets the palette to the light aliases",
         /:root\[data-theme="dark"\][\s\S]{0,400}--color-text:\s*var\(--l-text\)/.test(printBlock),
         "print output would inherit the dark palette");
+
+    /* 1j. admin.html's Catalog Thumbnails picker holds a hardcoded copy of the
+           homepage catalog: CATALOG_ITEMS in js/admin.js. It exists because the
+           feed has no data file to read -- the cards are hand-written markup,
+           deliberately, so the card titles stay crawlable links to the editors
+           -- which makes this the same duplication shape as the route
+           whitelist above and the footer constant that already drifted once.
+
+           A card added to index.html alone is not offered as an existing item,
+           so attaching a thumbnail to it generates a whole new <article>
+           instead of the .card-preview block the card actually needs, and the
+           operator finds out by pasting the wrong thing into the homepage. A
+           card removed or renamed leaves a picker entry that writes a file
+           path nothing references. Nothing fails at runtime in either case:
+           both halves keep working perfectly on their own, which is exactly
+           why this is asserted rather than trusted.
+
+           The id rule mirrors js/admin.js: data-doc where a card carries one,
+           otherwise the title slugified. Titles are compared literally, so an
+           entity in the markup that is a bare character in the JS would read
+           as drift -- correctly, since the generated markup would then differ
+           from the card it replaces. */
+    const adminJs = fs.readFileSync(path.join(SITE, "js", "admin.js"), "utf8");
+    const indexHtml = fs.readFileSync(path.join(SITE, "index.html"), "utf8");
+
+    const blockOf = (src, opener, closer) => {
+        const start = src.indexOf(opener);
+        if (start === -1) { return null; }
+        const end = src.indexOf(closer, start);
+        return end === -1 ? null : src.slice(start + opener.length, end);
+    };
+    const quoted = (text, name) =>
+        (text.match(new RegExp("\\b" + name + ':\\s*"([^"]*)"')) || [])[1] || "";
+    const slugish = (value) => String(value || "").toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+    const catBlock = blockOf(adminJs, "const CATEGORIES = {", "\n    };");
+    const itemBlock = blockOf(adminJs, "const CATALOG_ITEMS = [", "\n    ];");
+
+    const adminCats = {};
+    [...(catBlock || "").matchAll(/([A-Za-z][A-Za-z0-9_]*):\s*\{([^}]*)\}/g)]
+        .forEach(([, key, body]) => {
+            adminCats[key] = {
+                label: quoted(body, "label"),
+                page: quoted(body, "page"),
+                target: quoted(body, "target")
+            };
+        });
+
+    /* Entries carry no nested object, so a brace pair is exactly one entry. */
+    const adminItems = [...(itemBlock || "").matchAll(/\{[^{}]*\}/g)].map(([entry]) => ({
+        id: quoted(entry, "id"),
+        title: quoted(entry, "title"),
+        category: quoted(entry, "category"),
+        doc: quoted(entry, "doc")
+    }));
+
+    const cards = indexHtml.split('<article class="template-card"').slice(1).map((chunk) => {
+        const body = chunk.slice(0, chunk.indexOf("</article>"));
+        const anchor = body.match(/<a class="card-link"([^>]*)>([^<]*)<\/a>/);
+        const attrs = anchor ? anchor[1] : "";
+        const attr = (name) => (attrs.match(new RegExp(name + '="([^"]*)"')) || [])[1] || "";
+        return {
+            category: (body.match(/^\s*data-category="([^"]+)"/) || [])[1] || "",
+            title: anchor ? anchor[2].trim() : "",
+            doc: attr("data-doc"),
+            target: attr("data-target"),
+            page: attr("href"),
+            label: (body.match(/<p class="card-category">([^<]*)<\/p>/) || [])[1] || ""
+        };
+    });
+
+    check("js/admin.js declares CATALOG_ITEMS and CATEGORIES",
+        adminItems.length > 0 && Object.keys(adminCats).length > 0,
+        `parsed ${adminItems.length} item(s) and ${Object.keys(adminCats).length} category(ies); ` +
+        "the picker cannot be checked against index.html if either block was renamed or restructured");
+
+    const cardById = new Map();
+    cards.forEach((card) => cardById.set(card.doc || slugish(card.title), card));
+    const adminById = new Map(adminItems.map((item) => [item.id, item]));
+
+    const absent = [...cardById.keys()].filter((id) => !adminById.has(id));
+    check(`admin.html's catalog picker lists every homepage card (${cards.length} cards)`,
+        absent.length === 0,
+        `on index.html but missing from CATALOG_ITEMS: ${absent.join(", ")}`);
+
+    const orphaned = [...adminById.keys()].filter((id) => !cardById.has(id));
+    check("admin.html's catalog picker lists no card index.html does not have",
+        orphaned.length === 0,
+        `in CATALOG_ITEMS but not on index.html: ${orphaned.join(", ")}`);
+
+    const drifted = [];
+    cardById.forEach((card, id) => {
+        const entry = adminById.get(id);
+        if (!entry) { return; }
+        if (entry.title !== card.title) {
+            drifted.push(`${id}: title "${entry.title}" vs index.html "${card.title}"`);
+        }
+        if (entry.category !== card.category) {
+            drifted.push(`${id}: category "${entry.category}" vs index.html "${card.category}"`);
+        }
+        if (entry.doc !== card.doc) {
+            drifted.push(`${id}: data-doc "${entry.doc}" vs index.html "${card.doc}"`);
+        }
+    });
+    check("every CATALOG_ITEMS entry matches its card's title, category and variant",
+        drifted.length === 0, drifted.join("\n      "));
+
+    /* CATEGORIES supplies the label, editor page and data-target the generated
+       markup writes for a NEW card. If a category's cards disagree with it,
+       every card generated for that category is wrong in the same way. */
+    const catDrift = new Set();
+    cards.forEach((card) => {
+        const cat = adminCats[card.category];
+        if (!cat) {
+            catDrift.add(`"${card.category}" is used on index.html but not declared in CATEGORIES`);
+            return;
+        }
+        if (cat.label !== card.label) {
+            catDrift.add(`${card.category}: label "${cat.label}" vs index.html "${card.label}"`);
+        }
+        if (cat.page !== card.page) {
+            catDrift.add(`${card.category}: page "${cat.page}" vs index.html "${card.page}"`);
+        }
+        if (cat.target !== card.target) {
+            catDrift.add(`${card.category}: target "${cat.target}" vs index.html "${card.target}"`);
+        }
+    });
+    check("every CATEGORIES record matches the cards it describes",
+        catDrift.size === 0, [...catDrift].join("\n      "));
+
+    /* 1k. Every local image a page references must exist on disk.
+
+           This is the August 24, 2026 breakage: admin.html's publish deleted
+           the superseded thumbnails before rewriting index.html, the rewrite
+           then failed, and the homepage was left pointing at two files that
+           had just been removed. The card rendered as a broken-image icon and
+           nothing anywhere failed -- the suite passed, because every check it
+           had asked whether the markup was well formed, never whether the
+           files it names are actually there.
+
+           Deliberately broader than that one bug: it also catches a thumbnail
+           downloaded but never placed, a typo in a hand-pasted path, and a
+           file renamed without its reference. Cheap, since it is one stat per
+           src. Only local paths are checked; anything absolute or protocol-
+           relative belongs to a third party this suite cannot vouch for. */
+    pages.forEach((file) => {
+        const rel = path.relative(ROOT, file);
+        const html = fs.readFileSync(file, "utf8");
+        const withoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
+        const dir = path.dirname(file);
+        const broken = [];
+        const seen = new Set();
+
+        [...withoutComments.matchAll(/<img\b[^>]*?\ssrc="([^"]+)"/g)]
+            .map((m) => m[1])
+            .filter((src) => src && !/^(https?:)?\/\//.test(src) && !src.startsWith("data:"))
+            .forEach((src) => {
+                if (seen.has(src)) { return; }
+                seen.add(src);
+                /* Query strings and fragments are not part of the file name. */
+                const clean = decodeURI(src.split("?")[0].split("#")[0]);
+                const target = clean.startsWith("/")
+                    ? path.join(SITE, clean)
+                    : path.join(dir, clean);
+                if (!fs.existsSync(target)) { broken.push(src); }
+            });
+
+        if (!seen.size) { return; }
+        check(`${rel}: every local <img> src exists on disk (${seen.size} checked)`,
+            broken.length === 0, `missing file(s): ${broken.join(", ")}`);
+    });
+
+    /* The catalog-empty message names the card count. It said 17 against
+       eighteen cards until August 22, 2026, because adding a card does not
+       force anyone to touch that sentence. */
+    const stated = indexHtml.match(/class="catalog-empty"[\s\S]{0,300}?see all (\d+)/);
+    check(`index.html's catalog-empty message states the real card count (${cards.length})`,
+        stated !== null && Number(stated[1]) === cards.length,
+        stated ? `message says ${stated[1]}, index.html has ${cards.length} cards`
+            : "no \"see all N\" count found in the catalog-empty message");
 }
 
 /* ==========================================================================
@@ -419,7 +619,7 @@ async function connect(browserPath, cdpPort, options) {
 
        So: drain stale events first, then wait for readiness by polling the
        page itself rather than trusting a single event. */
-    const navigate = async (url, width, height) => {
+    const attemptNavigate = async (url, width, height) => {
         await call("Emulation.setDeviceMetricsOverride",
             { width, height: height || 900, deviceScaleFactor: 1, mobile: false }, sessionId);
 
@@ -446,9 +646,34 @@ async function connect(browserPath, cdpPort, options) {
                 continue;
             }
             await new Promise((r) => setTimeout(r, 250));
+            return true;
+        }
+        return false;
+    };
+
+    /* One retry, announced.
+
+       A navigation occasionally fails to settle here for reasons that have
+       nothing to do with the page: `npx serve` stalls a request under load and
+       js/ads.js never evaluates, so the readiness poll waits for a TBAds that
+       is not coming. It is intermittent, it lands on a different page every
+       time, and it kills the whole run -- an expensive way to learn nothing,
+       on a suite that takes minutes and that nothing runs automatically.
+
+       Retried ONCE and printed when it happens, rather than silently or by
+       raising the deadline. A page that genuinely cannot load fails on the
+       second attempt exactly as it did before, and a RETRY line in the output
+       is a signal worth seeing: if one starts appearing on the same page every
+       run, that is a real defect and not this. */
+    const navigate = async (url, width, height) => {
+        if (await attemptNavigate(url, width, height)) {
             return;
         }
-        throw new Error("navigation to " + url + " did not settle within 20s");
+        console.log(`      RETRY ${url} @${width} did not settle in 20s`);
+        if (await attemptNavigate(url, width, height)) {
+            return;
+        }
+        throw new Error("navigation to " + url + " did not settle within 20s, twice");
     };
 
     return {
@@ -520,6 +745,7 @@ const SNAPSHOT = `(() => {
     innerWidth: window.innerWidth, innerHeight: window.innerHeight,
     clientWidth: de.clientWidth, scrollWidth: de.scrollWidth,
     bodyPadRight: parseFloat(getComputedStyle(document.body).paddingRight),
+    bodyPadBottom: parseFloat(getComputedStyle(document.body).paddingBottom),
     hasRailClass: document.body.classList.contains('has-ad-rail'),
     hasAnchorClass: document.body.classList.contains('has-ad-anchor') ||
                     document.body.classList.contains('has-site-anchor'),
@@ -572,10 +798,12 @@ async function layoutChecks(page) {
                a renamed host attribute leaves the page looking perfect and
                earning nothing.
 
-               The documented exceptions are RAIL_GAP above: the homepage
-               between 48rem and 75rem, and the content-rail family between
-               48rem and 83.5rem, both of which show nothing by design --
-               too narrow for the rail, too wide for the phone anchor.
+               RAIL_GAP above is the exception table, and it is empty now: the
+               homepage and the content-rail family used to show nothing
+               between the anchor's old 48rem ceiling and the rail's 75rem
+               floor, and since August 20, 2026 the anchor covers that band
+               instead, so every non-editor page mounts exactly one unit at
+               every width.
 
                This invariant is about one slot alternating between mutually
                exclusive units, which is not what blog/post are: their
@@ -680,32 +908,77 @@ async function layoutChecks(page) {
                     !railUp && s.bodyPadRight === 0 &&
                     Math.abs(s.anchor.rect.w - s.clientWidth) < 1,
                     `anchor width ${s.anchor.rect.w} vs ${s.clientWidth}, railUp=${railUp}`);
+
+                /* The reservation has to match the unit actually mounted, not
+                   a unit that used to be mounted. body.has-site-anchor
+                   reserved 7.25rem (116px) for a 728x90 that was retired on
+                   August 13, 2026; the branch was unreachable while the anchor
+                   was phone-only, and came back to life the moment the anchor
+                   was extended to tablets on August 20 -- 116px of padding
+                   under a 50px bar, on every tablet page, with nothing
+                   failing. Under-reserving strands the foot of the document
+                   beneath a fixed bar; over-reserving leaves dead space. Both
+                   are silent, so both are asserted here. */
+                /* CLAUDE.md's own requirement: "the banner never overlaps the
+                   sticky export bar". The anchor is z-index 30 against the
+                   bar's 5, so an overlap paints over the control that
+                   completes the task. This went wrong the moment the editors'
+                   anchor was extended to tablets on August 20, 2026, because
+                   .preview-pane is position:sticky only above 48.0625rem and
+                   a sticky pane puts the bar's stuck position 12px below what
+                   its `bottom` asks for -- so the phone tier's arithmetic,
+                   which is exact, did not carry over. Asserted rather than
+                   reasoned about, since the two tiers now legitimately differ.
+                   A hidden bar measures as a zero rect and passes trivially,
+                   which is correct: there is nothing to overlap. */
+                check(`${tag}: export bar clears the anchor`,
+                    !s.exportBar || s.exportBar.h === 0 ||
+                    s.exportBar.bottom <= s.anchor.rect.y + 0.5,
+                    `export bar bottom ${s.exportBar && s.exportBar.bottom} vs anchor top ${s.anchor.rect.y}`);
+
+                check(`${tag}: anchor reservation matches the mounted unit`,
+                    s.hasAnchorClass
+                        ? s.bodyPadBottom >= s.anchor.rect.h - 1 &&
+                          s.bodyPadBottom <= s.anchor.rect.h + 12
+                        : true,
+                    `padding-bottom ${s.bodyPadBottom} vs anchor height ${s.anchor.rect.h}`);
             }
         }
     }
 
-    /* Mega-menu opened, and the sticky furniture after a real scroll. */
+    /* Mega-menu opened, and the sticky furniture after a real scroll.
+
+       The mockup editor joined this loop on August 24, 2026, when its bar
+       gained a Mockups dropdown built from the same .nav-more component. It
+       is the harder case of the two: the editor's rail is up at every width
+       here, and the panel is anchored to a header that is itself inset by
+       the body padding the rail reserves. */
     section("2b. Layout: mega-menu open and scrolled state");
-    for (const width of [1920, 1440, 1366, 1200]) {
-        await page.navigate(`http://localhost:${PORT}/`, width);
-        const r = await page.evaluate(`(() => {
-            const toggle = document.querySelector('[data-nav-more-toggle]');
-            if (!toggle) return { skipped: true };
-            toggle.click();
-            const p = document.querySelector('[data-nav-more-panel]');
-            const b = p.getBoundingClientRect();
-            const rail = document.querySelector('.home-rail');
-            const up = rail && getComputedStyle(rail).display !== 'none' && rail.querySelector('.ad-slot');
-            const mid = document.elementFromPoint(b.x + b.width / 2, b.y + 12);
-            return { hidden: p.hasAttribute('hidden'), left: +b.x.toFixed(1), right: +b.right.toFixed(1),
-                     railLeft: up ? +rail.getBoundingClientRect().x.toFixed(1) : null,
-                     reachable: !!(mid && p.contains(mid)) };
-        })()`);
-        if (r.skipped) { continue; }
-        check(`mega-menu @${width}: opens on screen, clear of the column, clickable`,
-            !r.hidden && r.left >= 0 && r.reachable &&
-            (r.railLeft === null || r.right <= r.railLeft + 0.5),
-            JSON.stringify(r));
+    for (const [label, urlPath, railSelector] of [
+        ["homepage", "/", ".home-rail"],
+        ["mockup editor", "/mockup.html", ".editor-rail"]
+    ]) {
+        for (const width of [1920, 1440, 1366, 1200]) {
+            await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
+            const r = await page.evaluate(`(() => {
+                const toggle = document.querySelector('[data-nav-more-toggle]');
+                if (!toggle) return { skipped: true };
+                toggle.click();
+                const p = document.querySelector('[data-nav-more-panel]');
+                const b = p.getBoundingClientRect();
+                const rail = document.querySelector(${JSON.stringify(railSelector)});
+                const up = rail && getComputedStyle(rail).display !== 'none' && rail.querySelector('.ad-slot');
+                const mid = document.elementFromPoint(b.x + b.width / 2, b.y + 12);
+                return { hidden: p.hasAttribute('hidden'), left: +b.x.toFixed(1), right: +b.right.toFixed(1),
+                         railLeft: up ? +rail.getBoundingClientRect().x.toFixed(1) : null,
+                         reachable: !!(mid && p.contains(mid)) };
+            })()`);
+            if (r.skipped) { continue; }
+            check(`${label} mega-menu @${width}: opens on screen, clear of the column, clickable`,
+                !r.hidden && r.left >= 0 && r.reachable &&
+                (r.railLeft === null || r.right <= r.railLeft + 0.5),
+                JSON.stringify(r));
+        }
     }
 
     for (const [label, urlPath, width] of [["homepage", "/", 1920], ["editor", "/docs.html", 1366],
@@ -750,6 +1023,218 @@ async function layoutChecks(page) {
             r.headerRight <= r.railLeft + 0.5,
             JSON.stringify(r));
     }
+
+    /* ----------------------------------------------------------------------
+       2d. The category tabs must sit BELOW the header, not inside it.
+
+       .site-header is flex-wrap: wrap and its height is a function of how its
+       contents wrap, not of the viewport width: 85px from 600px up, but 145px
+       from 360px to 480px and 201px at 320px. Every sticky offset written as a
+       literal was therefore calibrated on desktop and wrong on phones. The
+       tabs' 76px put the whole 45px tab row inside the header's box, and the
+       header (z-index 20, against the tabs' 15) painted straight over it -- so
+       on every phone width the category filter was invisible and untappable
+       whenever the header was showing and the page was scrolled.
+
+       Nothing errored and nothing looked broken on a desktop, which is the
+       exact failure profile this suite exists for. The offset is a measured
+       --header-h now; these two checks are what stop it going back to a
+       literal. Both were mutation-tested by restoring the 4.75rem/5.25rem
+       literals: the overlap check failed at 320/360/390/414/768, and the
+       flush check failed at every width.
+       ---------------------------------------------------------------------- */
+    section("2d. Layout: sticky offsets track the header's real height");
+    for (const width of [320, 360, 390, 414, 768, 1024, 1366, 1920]) {
+        await page.navigate(`http://localhost:${PORT}/`, width);
+        const r = await page.evaluate(`(async () => {
+            const settle = async () => {
+                const hdr = document.querySelector('.site-header');
+                let last = null;
+                for (let i = 0; i < 60; i += 1) {
+                    await new Promise(r => requestAnimationFrame(r));
+                    const y = +hdr.getBoundingClientRect().y.toFixed(1);
+                    if (last !== null && y === last) { break; }
+                    last = y;
+                }
+            };
+            const fire = async (from, to, step) => {
+                for (let y = from; step > 0 ? y <= to : y >= to; y += step) {
+                    window.scrollTo(0, y);
+                    window.dispatchEvent(new Event('scroll'));
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                await settle();
+            };
+            const h = document.querySelector('.site-header');
+            const t = document.querySelector('.feed-tabs');
+            if (!h || !t) { return { skipped: true }; }
+
+            /* Scrolled down far enough to hide the header, then part-way back
+               up so it is revealed WHILE the page is still scrolled -- the
+               state in which a too-small offset hides the tabs. */
+            await fire(0, 600, 120);
+            await fire(600, 480, -60);
+            const hr = h.getBoundingClientRect(), tr = t.getBoundingClientRect();
+            const hit = document.elementFromPoint(tr.left + Math.min(60, tr.width / 2),
+                                                  tr.top + tr.height / 2);
+            const revealed = {
+                headerBottom: +hr.bottom.toFixed(1), tabsTop: +tr.top.toFixed(1),
+                overlap: +Math.max(0, hr.bottom - tr.top).toFixed(1),
+                coveredByHeader: hit ? h.contains(hit) : null
+            };
+
+            /* And scrolled down again, where the header is gone and the tabs
+               must close the gap it leaves rather than parking below it. */
+            await fire(480, 900, 120);
+            const t2 = t.getBoundingClientRect();
+            return { revealed, hiddenTabsTop: +t2.top.toFixed(1),
+                     navHidden: document.body.classList.contains('is-nav-hidden') };
+        })()`);
+        if (r.skipped) { continue; }
+
+        check(`category tabs @${width}: clear of the header, not painted over by it`,
+            r.revealed.overlap <= 0.5 && r.revealed.coveredByHeader === false,
+            JSON.stringify(r.revealed));
+
+        check(`category tabs @${width}: land flush at the viewport top when the header hides`,
+            !r.navHidden || Math.abs(r.hiddenTabsTop) <= 0.5,
+            JSON.stringify({ hiddenTabsTop: r.hiddenTabsTop, navHidden: r.navHidden }));
+    }
+
+    /* The search page's field is sticky under the header for the same reason
+       and by the same mechanism, so it inherits the same failure mode: a
+       literal offset would be calibrated on desktop and put the field inside
+       the header's box on a phone, where the header is 145px rather than
+       85px -- and the header paints over it (z-index 20 against 15). This is
+       the page whose entire purpose is that field. Mutation-tested by
+       replacing var(--header-h) with the 5.25rem literal: fails at 320, 360,
+       390 and 414. */
+    for (const width of [320, 360, 390, 414, 768, 1024, 1366, 1920]) {
+        await page.navigate(`http://localhost:${PORT}/search.html`, width);
+        const r = await page.evaluate(`(async () => {
+            window.scrollTo(0, 400);
+            await new Promise(r => setTimeout(r, 150));
+            const h = document.querySelector('.site-header').getBoundingClientRect();
+            const bar = document.querySelector('.search-page-bar');
+            if (!bar) { return { missing: true }; }
+            const b = bar.getBoundingClientRect();
+            const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+            const field = document.querySelector('[data-search-page-input]');
+            return { overlap: +Math.max(0, h.bottom - b.top).toFixed(1),
+                     coveredByHeader: hit ? document.querySelector('.site-header').contains(hit) : null,
+                     fieldVisible: !!field && field.getBoundingClientRect().width > 0 };
+        })()`);
+        check(`search field @${width}: sticks clear of the header, not under it`,
+            !r.missing && r.overlap <= 0.5 && r.coveredByHeader === false && r.fieldVisible,
+            JSON.stringify(r));
+    }
+
+    /* ----------------------------------------------------------------------
+       2e. No text field under 16px on a phone.
+
+       iOS Safari zooms the page in when a text-entry field smaller than that
+       takes focus, and does not zoom back out on blur -- once per field, on
+       pages whose whole purpose is filling fields in. It is a device
+       behaviour with a hard threshold, so this is a real contract and not a
+       taste question. Colour and range inputs are excluded because neither is
+       a text-entry field and neither triggers the zoom.
+
+       Mutation-tested by putting .doc-name back to 0.9375rem: fails on all
+       four editors.
+       ---------------------------------------------------------------------- */
+    section("2e. Layout: no phone text field small enough to trigger iOS zoom");
+    for (const [label, urlPath] of [["resume", "/resume.html"], ["docs", "/docs.html"],
+            ["poster", "/poster.html"], ["mockup", "/mockup.html"], ["homepage", "/"]]) {
+        await page.navigate(`http://localhost:${PORT}${urlPath}`, 390);
+        const small = await page.evaluate(`(() => {
+            const zoomy = new Set(['text','search','password','email','number','tel','url',
+                                   'date','datetime-local','month','week','time']);
+            const out = [];
+            document.querySelectorAll('input,select,textarea').forEach((el) => {
+                const t = (el.type || '').toLowerCase();
+                if (el.tagName === 'INPUT' && !zoomy.has(t)) { return; }
+                const fs = parseFloat(getComputedStyle(el).fontSize);
+                if (fs < 16) { out.push((el.id || el.className || el.tagName) + '@' + fs + 'px'); }
+            });
+            return out;
+        })()`);
+        check(`${label} @390: every text field is at least 16px`,
+            small.length === 0, small.join(", "));
+    }
+
+    /* ----------------------------------------------------------------------
+       2f. Catalog thumbnails fill their card.
+
+       .card-preview is a 4:5 window and .card-preview.photo .card-thumb is
+       object-fit: contain, so an off-ratio file letterboxes. The Leaning Wood
+       Frame pair shipped at 1000x1000 and left about a fifth of its card as
+       empty ground -- visible on the page, invisible to every check, because
+       nothing measured the image against the card it sits in.
+
+       `contain` is deliberate and is not what this asserts against. The fix
+       was to make the FILE 4:5, at which point contain and cover are
+       identical. So the contract is: the thumbnail files are the card's
+       shape. admin.html's intake enforces it for every future upload; this
+       is what catches one that got on disk another way.
+
+       The attribute check is the second half of the same defect. width and
+       height on the <img> are what reserve the box before the image arrives,
+       so a file re-cropped without updating them trades a visible gap for a
+       layout shift -- quieter, and worse.
+       ---------------------------------------------------------------------- */
+    section("2f. Layout: catalog thumbnails fill their card");
+    await page.navigate(`http://localhost:${PORT}/`, 1440);
+    const thumbs = await page.evaluate(`(async () => {
+        const out = [];
+        const imgs = [...document.querySelectorAll('.card-preview.photo .card-thumb')];
+        for (const img of imgs) {
+            /* They are loading="lazy", so an offscreen one never decodes and
+               would report 0x0 naturals. */
+            img.loading = 'eager';
+            img.scrollIntoView({ block: 'center' });
+            if (!img.complete || !img.naturalWidth) {
+                await new Promise(r => { img.onload = r; img.onerror = r; setTimeout(r, 3000); });
+            }
+            await new Promise(r => requestAnimationFrame(r));
+            const box = img.getBoundingClientRect();
+            const card = img.closest('.card-preview').getBoundingClientRect();
+
+            /* getBoundingClientRect on an <img> returns the ELEMENT box, and
+               the element is width:100%/height:100%, so it always equals the
+               card whatever the image inside it is doing. Measuring that and
+               calling it "fills the card" is a check that cannot fail -- it
+               reported the letterboxed 707x1000 poster as filling. The
+               PAINTED box has to be derived from object-fit: contain, which
+               scales to whichever axis runs out first. */
+            const natRatio = img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0;
+            const boxRatio = box.height ? box.width / box.height : 0;
+            const paintedW = natRatio > boxRatio ? box.width : box.height * natRatio;
+            const paintedH = natRatio > boxRatio ? box.width / natRatio : box.height;
+
+            out.push({
+                file: (img.getAttribute('src') || '').split('/').pop(),
+                ratio: img.naturalHeight ? +(natRatio).toFixed(4) : null,
+                gapW: +(card.width - paintedW).toFixed(1),
+                gapH: +(card.height - paintedH).toFixed(1),
+                attr: img.getAttribute('width') + 'x' + img.getAttribute('height'),
+                natural: img.naturalWidth + 'x' + img.naturalHeight
+            });
+        }
+        return out;
+    })()`);
+
+    check("catalog: photo thumbnails found on the homepage",
+        thumbs.length > 0, "no .card-preview.photo .card-thumb elements");
+
+    thumbs.forEach((t) => {
+        /* 2.5px of slack: .card-preview carries a 1px border on each side. */
+        check(`thumbnail ${t.file}: 4:5 and fills its card`,
+            t.ratio !== null && Math.abs(t.ratio - 0.8) <= 0.001 &&
+            t.gapW <= 2.5 && t.gapH <= 2.5,
+            JSON.stringify(t));
+        check(`thumbnail ${t.file}: declared size matches the file`,
+            t.attr === t.natural, JSON.stringify(t));
+    });
 
     /* Print must carry neither the column nor the width it reserved. */
     section("2c. Layout: print output");
@@ -821,6 +1306,622 @@ async function launchChecks(page) {
             `opened [${fresh.map((t) => t.url).join(", ") || "nothing"}], opener at ${stayed}`);
         for (const t of fresh) { await page.call("Target.closeTarget", { targetId: t.targetId }); }
     }
+
+    /* ----------------------------------------------------------------------
+       3b. The header search control must actually produce a search surface.
+
+       This is the August 24, 2026 bug, and it is stated as an OUTCOME on
+       purpose. The control was a button toggling a `search-open` class, and
+       the one rule that turned the hidden field back on lived inside
+       `@media (max-width: 22.5rem)` while the display:none it was undoing was
+       scoped to 62rem. So from 361px to 992px -- every phone wider than an
+       iPhone SE and every tablet below 992px -- tapping search set a class
+       and changed nothing on the screen. Nothing errored, and at 360px, the
+       width anyone testing a phone reaches for first, it worked perfectly.
+
+       Asserting "the control is a link to search.html" would pass a page
+       where search.html renders nothing, so this follows the click and
+       requires a focused, usable field at the other end. Mutation-tested by
+       putting the old button and its 22.5rem reveal rule back: fails at 390,
+       414 and 768, and passes at 320 and 360, which is exactly the shape of
+       the original bug.
+
+       The widths stop at 768 because 62rem (992px) is where the header's own
+       inline field appears and the control is deliberately hidden -- two
+       search affordances in one bar is the thing that gate exists to
+       prevent. The band from there to the rail's floor is covered by the
+       second loop below, which requires the field itself to be there and to
+       work, so no width between 320 and 1200 is left unasserted.
+       ---------------------------------------------------------------------- */
+    section("3b. Search entry point (trusted input)");
+    for (const width of [320, 360, 390, 414, 768]) {
+        await page.navigate(`http://localhost:${PORT}/`, width);
+        const control = await page.evaluate(`(() => {
+            const el = document.querySelector('.site-header .search-toggle');
+            if (!el) { return { missing: true }; }
+            const cs = getComputedStyle(el);
+            if (cs.display === 'none' || cs.visibility === 'hidden') { return { hidden: true }; }
+            el.scrollIntoView({ block: 'center' });
+            const b = el.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+        })()`);
+
+        if (control.missing || control.hidden) {
+            check(`search control @${width}: present and visible in the header`,
+                false, JSON.stringify(control));
+            continue;
+        }
+
+        await clickAt(control, "left");
+        const after = await page.evaluate(`(() => {
+            const field = document.querySelector('[data-search-page-input]');
+            const usable = !!field && getComputedStyle(field).display !== 'none' &&
+                field.getBoundingClientRect().width > 0;
+            return { path: location.pathname, usable: usable,
+                     focused: !!field && document.activeElement === field };
+        })()`);
+
+        check(`search control @${width}: opens a usable, focused search field`,
+            after.path === "/search.html" && after.usable && after.focused,
+            JSON.stringify(after));
+    }
+
+    /* From 62rem up the header carries the field itself and filters the
+       catalog in place, which is the right behaviour on the page that IS the
+       catalog. What must not happen is the band being served by neither: the
+       control hidden because the field is "there", and the field
+       display:none because the viewport is "small". That is precisely the
+       shape of the bug above, one band over. */
+    for (const width of [1024, 1200, 1440]) {
+        await page.navigate(`http://localhost:${PORT}/`, width);
+        const r = await page.evaluate(`(() => {
+            const field = document.querySelector('[data-search-input]');
+            if (!field) { return { missing: true }; }
+            field.value = 'rent';
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            const cards = [...document.querySelectorAll('.catalog-grid .template-card')];
+            return {
+                visible: getComputedStyle(field).display !== 'none' &&
+                         field.getBoundingClientRect().width > 0,
+                shown: cards.filter(c => !c.classList.contains('is-hidden')).length,
+                total: cards.length
+            };
+        })()`);
+        check(`inline search field @${width}: present and filtering in place`,
+            !r.missing && r.visible && r.shown > 0 && r.shown < r.total,
+            JSON.stringify(r));
+    }
+
+    /* ----------------------------------------------------------------------
+       3c. Cards on the search page must stay inside the monetized flow.
+
+       js/app.js binds [data-target] once, at DOMContentLoaded, inside
+       initCatalog. Every card on search.html is imported from index.html
+       AFTER that pass has run, so it is bound only because js/search.js asks
+       for it explicitly. Get that wrong and the cards look perfect and go
+       straight to the editor, skipping the interstitial the site is funded
+       by -- with nothing anywhere to say so.
+
+       Found exactly that way during the build: the first version guarded the
+       call with `window.TB`, which is always false because js/app.js declares
+       TB as a top-level const (a lexical global, not a window property), and
+       a result card navigated straight to docs.html.
+       ---------------------------------------------------------------------- */
+    section("3c. Search page cards route through the interstitial");
+    for (const [label, pageUrl, selector] of [
+        /* Both states, because they are populated by different code paths:
+           the results list is built once and filtered, the browse rows are
+           built per category. Binding one and not the other is a live
+           possibility, and the query string is what decides which of the two
+           is on screen -- a browse row is display:none while a query is
+           present, and a click on a hidden element goes nowhere. */
+        ["results", "/search.html?q=rent",
+            "[data-search-page-templates] .template-card:not(.is-hidden) .card-link"],
+        ["browse row", "/search.html", ".browse-row .template-card .card-link"]
+    ]) {
+        await page.navigate(`http://localhost:${PORT}${pageUrl}`, 1024);
+        /* The catalog arrives by fetch, so the cards are not in the document
+           at load. Poll rather than sleep. */
+        const box = await page.evaluate(`(async () => {
+            for (let i = 0; i < 60; i += 1) {
+                const a = document.querySelector(${JSON.stringify(selector)});
+                if (a) {
+                    a.scrollIntoView({ block: 'center' });
+                    const b = a.getBoundingClientRect();
+                    return { x: b.x + b.width / 2, y: b.y + b.height / 2,
+                             target: a.getAttribute('data-target') };
+                }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            return { missing: true };
+        })()`);
+
+        if (box.missing) {
+            check(`search page ${label}: a card is present to click`, false,
+                `no card matched ${selector}`);
+            continue;
+        }
+
+        await clickAt(box, "left");
+        const url = await page.evaluate("location.pathname + location.search");
+        check(`search page ${label} click routes through the interstitial`,
+            url === "/loading.html?target=" + box.target,
+            "landed on " + url);
+    }
+
+    /* ----------------------------------------------------------------------
+       3d. The mockup editor's own Mockups dropdown.
+
+       Its items are plain anchors carrying data-target and data-doc, bound by
+       the same bindLaunchControls pass every other launch control on the site
+       goes through. Nothing about that is special-cased for this bar, which
+       is exactly why it is worth asserting: the href points at mockup.html,
+       so a binding that failed to attach would look like a working link that
+       reloads the editor -- losing the interstitial AND the chosen mockup,
+       silently, since the preset is written by the same handler.
+
+       Run at both states of the bar: at 1440 the dropdown is inline, at 768
+       it is inside the hamburger, and they are different paint paths.
+       ---------------------------------------------------------------------- */
+    section("3d. Mockup dropdown routes through the interstitial");
+    for (const [label, width, collapsed] of [["desktop", 1440, false], ["collapsed", 768, true]]) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, width);
+        const box = await page.evaluate(`(async () => {
+            ${collapsed ? "document.querySelector('[data-nav-toggle]').click();" : ""}
+            await new Promise(r => setTimeout(r, 150));
+            document.querySelector('[data-nav-more-toggle]').click();
+            await new Promise(r => setTimeout(r, 200));
+            const a = document.querySelector('[data-nav-more-panel] a[data-doc="wood-a4"]');
+            if (!a) { return { missing: true }; }
+            a.scrollIntoView({ block: 'center' });
+            const b = a.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2,
+                     target: a.getAttribute('data-target'), doc: a.getAttribute('data-doc') };
+        })()`);
+
+        if (box.missing) {
+            check(`mockup dropdown (${label}): the item is present`, false, "no wood-a4 item");
+            continue;
+        }
+
+        await clickAt(box, "left");
+        const landed = await page.evaluate(`(() => ({
+            url: location.pathname + location.search,
+            preset: localStorage.getItem('tb_editor_preset')
+        }))()`);
+        check(`mockup dropdown (${label}): routes through the interstitial with the preset`,
+            landed.url === "/loading.html?target=" + box.target &&
+            landed.preset === JSON.stringify(box.doc),
+            JSON.stringify(landed));
+    }
+}
+
+/* ==========================================================================
+   5. Mockup editor: the background colour (August 24, 2026).
+
+   Asserted against the CANVAS, not against the controls. The whole value of
+   this feature is what comes out of the export, and every route to a wrong
+   export is silent: a background painted in CSS would look right on screen
+   and be absent from the PNG; a background applied to a photographic
+   template would paint behind a scene that already has a backdrop, or -- for
+   a "window" template like wood-a4, whose base is transparent inside its
+   print opening -- behind the artwork itself.
+
+   Pixel (2, 2) is the corner of the canvas, which is outside every product's
+   own drawing and outside every photograph's print window, so it reads the
+   background and nothing else.
+   ========================================================================== */
+
+async function mockupChecks(page) {
+    section("5. Mockup editor: background colour");
+
+    const CORNER = `(() => {
+        const c = document.getElementById('mockup-canvas');
+        return [...c.getContext('2d').getImageData(2, 2, 1, 1).data].join(',');
+    })()`;
+
+    /* Start from a clean profile, and not as a formality: section 3d clicks a
+       Mockups dropdown item, which WRITES tb_editor_preset and then navigates
+       to the interstitial, where the run stops. The preset is consumed by the
+       next mockup.html load, so without this the checks below would open the
+       wood frame template instead of the default drawn t-shirt and report
+       "no background panel" as a product failure. They did, once. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    await page.evaluate("localStorage.clear(), true");
+
+    /* A drawn product: eligible, because everything around the garment is
+       transparent and exports that way. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const vector = await page.evaluate(`(async () => {
+        const field = document.getElementById('m-bg-field');
+        const row = document.getElementById('m-bg-row');
+        if (!field || !row) { return { missing: true }; }
+        const corner = () => ${CORNER};
+        const before = corner();
+        const exportBefore = document.getElementById('mockup-canvas').toDataURL('image/png');
+        /* Index 3 is Light Grey; index 0 is Transparent. */
+        row.querySelectorAll('.swatch')[3].click();
+        await new Promise(r => setTimeout(r, 250));
+        const after = corner();
+        const exportAfter = document.getElementById('mockup-canvas').toDataURL('image/png');
+        const stored = (JSON.parse(localStorage.getItem('tb_mockup_v1') || '{}')).bg;
+        row.querySelectorAll('.swatch')[0].click();
+        await new Promise(r => setTimeout(r, 250));
+        return {
+            hidden: field.hidden, before: before, after: after,
+            exportChanged: exportBefore !== exportAfter, stored: stored,
+            cleared: corner(),
+            clearedStore: (JSON.parse(localStorage.getItem('tb_mockup_v1') || '{}')).bg
+        };
+    })()`);
+
+    check("mockup: background panel offered on a drawn product",
+        !vector.missing && vector.hidden === false, JSON.stringify(vector));
+    check("mockup: no background by default, so the export stays transparent",
+        vector.before === "0,0,0,0", `corner ${vector.before}`);
+    check("mockup: a chosen background reaches the canvas and the export",
+        vector.after === "229,229,226,255" && vector.exportChanged &&
+        vector.stored === "#E5E5E2",
+        JSON.stringify(vector));
+    check("mockup: Transparent returns the canvas to no background at all",
+        vector.cleared === "0,0,0,0" && vector.clearedStore === null,
+        JSON.stringify({ cleared: vector.cleared, stored: vector.clearedStore }));
+
+    /* A photographic template: NOT eligible unless it declares
+       `background: true`. Seeded with a stored background from an eligible
+       product, which must not reach this canvas -- the storage is shared
+       across products. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const photo = await page.evaluate(`(async () => {
+        localStorage.setItem('tb_editor_preset', JSON.stringify('wood-a4'));
+        localStorage.setItem('tb_mockup_v1', JSON.stringify({ product: 'tshirt', bg: '#FF0000' }));
+        return true;
+    })()`);
+    if (photo) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+        const r = await page.evaluate(`(async () => {
+            for (let i = 0; i < 60; i += 1) {
+                const label = document.getElementById('mockup-canvas').getAttribute('aria-label');
+                if (label && label.indexOf('Leaning Wood Frame') === 0) { break; }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            return { label: document.getElementById('mockup-canvas').getAttribute('aria-label'),
+                     hidden: document.getElementById('m-bg-field').hidden,
+                     corner: ${CORNER} };
+        })()`);
+        /* The panel being hidden is the whole assertion here, and that is a
+           deliberate limit rather than a thin test. A companion pixel check
+           ("the stored red never reaches this canvas") was written first and
+           then removed: mutating backgroundEligible to return true for every
+           template did NOT make it fail. On a "window" template the base
+           photograph is opaque everywhere except its print opening, and the
+           opening is covered by the white paper backing, so a background
+           painted behind it is invisible at every pixel. An assertion that
+           cannot fail is not evidence, so the honest contract to assert is
+           the one that can: the control is not offered. */
+        check("mockup: background panel absent on a photographic template",
+            r.hidden === true, JSON.stringify(r));
+    }
+
+    /* The refactor that made one picker into two must not have cost the
+       product colourway path anything. Pixel (500, 300) is garment fabric on
+       the drawn t-shirt, above the print area.
+
+       Storage is cleared first, and that is not housekeeping: the block above
+       seeds a red background to prove it cannot reach a photographic
+       template, and a drawn product IS eligible for it, so without this the
+       corner assertion below would read that red and fail for the wrong
+       reason. It did, on the first run. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    await page.evaluate("localStorage.clear(), true");
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const colorway = await page.evaluate(`(async () => {
+        const fabric = () => {
+            const c = document.getElementById('mockup-canvas');
+            return [...c.getContext('2d').getImageData(500, 300, 1, 1).data].join(',');
+        };
+        const before = fabric();
+        document.getElementById('m-color-trigger').click();
+        const opened = !document.getElementById('m-color-popover').hidden;
+        const hex = document.getElementById('m-color-in-hex');
+        hex.value = '#123456';
+        hex.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 250));
+        const typed = fabric();
+        const swatches = document.querySelectorAll('#m-color-row .swatch');
+        swatches[3].click();
+        await new Promise(r => setTimeout(r, 250));
+        return { opened: opened, before: before, typed: typed, swatched: fabric(),
+                 swatchHex: swatches[3].getAttribute('data-hex'),
+                 active: document.querySelectorAll('#m-color-row .swatch.is-active').length,
+                 corner: ${CORNER} };
+    })()`);
+
+    check("mockup: the colourway picker still drives the garment",
+        colorway.opened && colorway.typed === "18,52,86,255" &&
+        colorway.swatched === "31,42,68,255" && colorway.active === 1,
+        JSON.stringify(colorway));
+    check("mockup: a garment colour is not a background",
+        colorway.corner === "0,0,0,0", `corner ${colorway.corner}`);
+
+    /* ----------------------------------------------------------------------
+       5b. The editor bar's two states.
+
+       ONE boundary, 75rem, and every control belongs to exactly one side of
+       it. The failure this guards against is the one the header search
+       control already produced once: a band where a control is hidden
+       because "the other one is there" and the other one is hidden too, so
+       the band is served by neither.
+
+       The single-row assertion is not cosmetic. This is a sticky header on a
+       workspace: measured at 390px, the bar wrapped to a second row and went
+       from 85px to 141px as soon as it carried the label on the download
+       button, which is 56px taken permanently out of a phone viewport.
+       ---------------------------------------------------------------------- */
+    section("5b. Mockup editor: bar composition at both states");
+
+    const BAR = `(() => {
+        const vis = (sel) => {
+            const el = document.querySelector(sel);
+            return !!el && getComputedStyle(el).display !== 'none' &&
+                   el.getBoundingClientRect().width > 0;
+        };
+        return {
+            brand: vis('.editor-brand'), home: vis('.editor-home'),
+            hamburger: vis('.nav-toggle'), searchButton: vis('.search-toggle'),
+            field: vis('.editor-search'), dropdown: !!document.querySelector('[data-nav-more-toggle]'),
+            docName: !!document.getElementById('doc-name'),
+            label: !!document.getElementById('m-label'),
+            headerHeight: Math.round(document.querySelector('.site-header').getBoundingClientRect().height),
+            downloadName: (document.getElementById('download-mockup-png') || {}).textContent
+        };
+    })()`;
+
+    for (const width of [1920, 1440, 1280, 1200]) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, width);
+        const b = await page.evaluate(BAR);
+        check(`mockup bar @${width}: wordmark, dropdown and field, one row`,
+            b.brand && !b.home && b.field && !b.hamburger && !b.searchButton &&
+            b.dropdown && b.headerHeight <= 100,
+            JSON.stringify(b));
+    }
+
+    for (const width of [1199, 1024, 768, 414, 390, 320]) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, width);
+        const b = await page.evaluate(BAR);
+        check(`mockup bar @${width}: home icon, hamburger and search button, one row`,
+            !b.brand && b.home && !b.field && b.hamburger && b.searchButton &&
+            b.dropdown && b.headerHeight <= 100,
+            JSON.stringify(b));
+        /* The label is hidden visually on phones but must still name the
+           button, or the only download control on the page is an unlabelled
+           icon to a screen reader. */
+        check(`mockup bar @${width}: the download button keeps its name`,
+            (b.downloadName || "").indexOf("Download PNG") !== -1,
+            JSON.stringify({ name: b.downloadName }));
+    }
+
+    /* The bar's name field is gone and the controls' one is what replaced
+       it. Asserted together: removing the first without the second would
+       leave the editor with no way to name a mockup at all. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const naming = await page.evaluate(BAR);
+    check("mockup: no name input in the bar, and the controls still have one",
+        naming.docName === false && naming.label === true,
+        JSON.stringify({ docName: naming.docName, mLabel: naming.label }));
+}
+
+/* ==========================================================================
+   6. admin.html's thumbnail intake reshapes uploads to the card (August 24,
+   2026).
+
+   Section 2f asserts that what is ON DISK fills its card. This asserts that
+   what the tool PRODUCES will, which is the half that stops the defect coming
+   back: the card window is 4:5, the stylesheet shows a thumbnail with
+   object-fit: contain, and an off-ratio file therefore letterboxes. Making
+   the file the card's shape is what retires the question.
+
+   The small-square case is the original bug, not a hypothetical. An upload
+   already under the byte budget and under the maximum edge is kept byte for
+   byte -- and before this, shape was not part of that test, so a square file
+   went straight to disk untouched. That is how a 1000x1000 pair came to lose
+   a fifth of its card.
+   ========================================================================== */
+
+async function adminThumbnailChecks(page) {
+    section("6. Admin: thumbnail intake reshapes uploads to the card");
+
+    await page.navigate(`http://localhost:${PORT}/admin.html`, 1440);
+
+    const feed = async (w, h, mode, small) => page.evaluate(`(async () => {
+        const c = document.createElement('canvas');
+        c.width = ${w}; c.height = ${h};
+        const x = c.getContext('2d');
+        const g = x.createLinearGradient(0, 0, ${w}, ${h});
+        g.addColorStop(0, '#2F4FCD'); g.addColorStop(1, '#E9A13B');
+        x.fillStyle = g; x.fillRect(0, 0, ${w}, ${h});
+
+        /* A small, in-budget, allowed-type upload is the one that can skip
+           re-encoding entirely, so it has to be encoded as such. */
+        const blob = ${small}
+            ? await new Promise(r => c.toBlob(r, 'image/webp', 0.5))
+            : await new Promise(r => c.toBlob(r, 'image/png'));
+        const file = new File([blob], ${small} ? 'probe.webp' : 'probe.png',
+            { type: ${small} ? 'image/webp' : 'image/png' });
+
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        const fit = document.querySelector('[data-thumb-fit]');
+        if (!fit) { return { missing: 'the fit control' }; }
+        fit.value = ${JSON.stringify(mode)};
+        const input = document.querySelector('[data-thumb-default-file]');
+        input.value = '';
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        for (let i = 0; i < 200; i += 1) {
+            await new Promise(r => setTimeout(r, 100));
+            const err = document.querySelector('[data-thumb-default-error]').textContent;
+            if (err) { return { error: err }; }
+            const note = document.querySelector('[data-thumb-default-note]').textContent;
+            if (note && (note.indexOf('Compressed') === 0 || note.indexOf('Kept') === 0)) {
+                const img = document.querySelector('[data-thumb-preview-default]');
+                if (img && !img.complete) {
+                    await new Promise(r => { img.onload = r; img.onerror = r; setTimeout(r, 3000); });
+                }
+                return { note: note, w: img.naturalWidth, h: img.naturalHeight,
+                         ratio: img.naturalHeight ? +(img.naturalWidth / img.naturalHeight).toFixed(4) : null };
+            }
+        }
+        return { error: 'timed out waiting for the intake' };
+    })()`);
+
+    for (const [label, w, h, mode, small] of [
+        ["square 1000x1000, fill", 1000, 1000, "fill", false],
+        ["square 1000x1000, fit", 1000, 1000, "fit", false],
+        ["wide 1600x900, fill", 1600, 900, "fill", false],
+        ["wide 1600x900, fit", 1600, 900, "fit", false],
+        /* The alreadyFits path: small enough and few enough pixels to be kept
+           byte for byte, so only the ratio test can send it to the reshaper. */
+        ["small square webp, in budget", 500, 500, "fill", true]
+    ]) {
+        const r = await feed(w, h, mode, small);
+        check(`admin intake: ${label} comes out 4:5`,
+            !r.error && !r.missing && r.ratio !== null &&
+            Math.abs(r.ratio - 0.8) <= 0.001,
+            JSON.stringify(r));
+    }
+
+    /* The preview is the operator's only view of what will be written, so it
+       has to show the PROCESSED image rather than the file they picked. */
+    const last = await feed(1000, 1000, "fill", false);
+    check("admin intake: the preview shows the processed image",
+        !last.error && last.w === 800 && last.h === 1000 &&
+        /cropped to 4:5/.test(last.note || ""),
+        JSON.stringify(last));
+}
+
+/* ==========================================================================
+   7. The name a visitor types actually names the file (August 24, 2026).
+
+   Reported as "naming your template is not working", and it was true on three
+   of the four editors. The resume exported from the person's name field, the
+   business document from its type and recipient, and the mockup from a
+   hard-coded literal, so the name input in the bar was typed, persisted,
+   restored on the next visit -- and never used for anything. Only the poster
+   had ever wired its field to its export.
+
+   This is asserted against the FILENAME THE BROWSER IS GIVEN, not against the
+   state or the input, because a field that feeds a variable nobody reads is
+   exactly the defect: everything looks correct at every layer except the one
+   the visitor sees.
+
+   Two interception points, because the two export engines differ. jsPDF's
+   save() is not an own property of jsPDF.prototype and does not download
+   through an anchor, so patching either of those captures nothing -- the
+   constructor is what has to be wrapped. Canvas exports do use an anchor.
+   Both were found the hard way while confirming the defect.
+   ========================================================================== */
+
+async function exportNameChecks(page) {
+    section("7. Editors: the typed name names the downloaded file");
+
+    /* jsPDF editors: wrap the constructor and read what save() is called
+       with, once before touching the field and once after. */
+    for (const [label, urlPath, fallback] of [
+        ["resume", "/resume.html", "adaeze-nwosu-templatebox.pdf"],
+        ["docs", "/docs.html", "rent-receipt-nova-interiors-ltd-templatebox.pdf"]
+    ]) {
+        await page.navigate(`http://localhost:${PORT}${urlPath}`, 1440);
+        const r = await page.evaluate(`(async () => {
+            for (let i = 0; i < 100; i += 1) {
+                if (window.jspdf && window.jspdf.jsPDF) { break; }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            if (!window.jspdf || !window.jspdf.jsPDF) { return { error: 'jsPDF never loaded' }; }
+
+            const out = {};
+            const Real = window.jspdf.jsPDF;
+            const wrap = (key) => {
+                const F = function (...a) {
+                    const inst = new Real(...a);
+                    inst.save = (fn) => { out[key] = fn; return inst; };
+                    return inst;
+                };
+                F.prototype = Real.prototype;
+                return F;
+            };
+
+            window.jspdf.jsPDF = wrap('untouched');
+            document.getElementById('download-pdf').click();
+            await new Promise(r => setTimeout(r, 1200));
+
+            /* An apostrophe and punctuation on purpose: the name reaches this
+               through sanitize(), so "Ada's" is "Ada&#39;s" by then and a slug
+               that strips punctuation without decoding first leaves the digits
+               behind as "ada39s". */
+            const field = document.getElementById('doc-name');
+            field.value = "Ada's Big Project 2026!";
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            await new Promise(r => setTimeout(r, 400));
+
+            window.jspdf.jsPDF = wrap('typed');
+            document.getElementById('download-pdf').click();
+            await new Promise(r => setTimeout(r, 1200));
+            return out;
+        })()`);
+
+        check(`${label}: an untouched name field keeps the composed filename`,
+            r.untouched === fallback, JSON.stringify(r));
+        check(`${label}: a typed name is the filename`,
+            r.typed === "adas-big-project-2026-templatebox.pdf", JSON.stringify(r));
+    }
+
+    /* Canvas editors: the anchor's download attribute is the filename. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const mockup = await page.evaluate(`(async () => {
+        const seen = [];
+        HTMLAnchorElement.prototype.click = function () { seen.push(this.download); };
+        document.getElementById('download-mockup-png').click();
+        await new Promise(r => setTimeout(r, 250));
+        const label = document.getElementById('m-label');
+        label.value = 'Front chest print, navy tee';
+        label.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 300));
+        document.getElementById('download-mockup-png').click();
+        await new Promise(r => setTimeout(r, 250));
+        return { untouched: seen[0], typed: seen[1] };
+    })()`);
+
+    check("mockup: an empty Mockup Label keeps the default filename",
+        mockup.untouched === "templatebox-mockup.png", JSON.stringify(mockup));
+    check("mockup: the Mockup Label is the filename",
+        mockup.typed === "front-chest-print-navy-tee.png", JSON.stringify(mockup));
+
+    await page.navigate(`http://localhost:${PORT}/poster.html`, 1440);
+    const poster = await page.evaluate(`(async () => {
+        const seen = [];
+        HTMLAnchorElement.prototype.click = function () { seen.push(this.download); };
+        document.getElementById('dl-toggle').click();
+        await new Promise(r => setTimeout(r, 300));
+        const btn = [...document.querySelectorAll('#dl-panel button')]
+            .find(b => b.textContent.trim() === 'Download');
+        if (!btn) { return { error: 'no Download button in the panel' }; }
+        btn.click();
+        await new Promise(r => setTimeout(r, 700));
+        const field = document.getElementById('doc-name');
+        field.value = 'Summer Gig Poster';
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 300));
+        btn.click();
+        await new Promise(r => setTimeout(r, 700));
+        return { untouched: seen[0], typed: seen[1] };
+    })()`);
+
+    check("poster: an untouched name field keeps the default filename",
+        poster.untouched === "templatebox-poster.png", JSON.stringify(poster));
+    check("poster: a typed name is the filename",
+        poster.typed === "summer-gig-poster.png", JSON.stringify(poster));
 }
 
 /* ==========================================================================
@@ -886,6 +1987,26 @@ async function parityChecks(browserPath) {
     let comparisons = 0;
     let differences = 0;
     for (const [name, urlPath] of PAGES) {
+        /* A page added since the last commit has no baseline to be identical
+           to, and comparing it against the baseline server's 404 would report
+           every one of its measurements as a difference -- noise that says
+           nothing about whether ads reserve space they have not filled. Skip
+           it, loudly, rather than letting a new page turn this section red
+           until it is committed. It stops being skipped on the next run after
+           the commit, with no edit here. */
+        const inHead = await (async () => {
+            try {
+                const res = await fetch(`http://localhost:${BASELINE_PORT}${urlPath}`,
+                    { method: "HEAD" });
+                return res.ok;
+            } catch (e) {
+                return false;
+            }
+        })();
+        if (!inHead) {
+            console.log(`      SKIP  ${name}: not in HEAD yet, no baseline to compare against`);
+            continue;
+        }
         for (const width of WIDTHS) {
             await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
             const now = await page.evaluate(PARITY_SNAPSHOT);
@@ -928,6 +2049,9 @@ async function main() {
             try {
                 await layoutChecks(page);
                 await launchChecks(page);
+                await mockupChecks(page);
+                await adminThumbnailChecks(page);
+                await exportNameChecks(page);
             } finally {
                 page.close();
             }

@@ -169,6 +169,40 @@ const TBAds = (() => {
         return mountPlacement(host, first) || mountPlacement(host, second);
     }
 
+    /* ----------------------------------------------------------------------
+       The fixed bottom anchor's unit, chosen by viewport (August 20, 2026).
+
+       Every anchor on the site -- site-wide, homepage and editor -- mounts
+       through here, so there is exactly one place that decides which creative
+       a given width gets, and exactly one breakpoint for the CSS reservation
+       to mirror. Before this the anchor was a 320x50 everywhere it appeared,
+       which was right while it only ever appeared on phones and became wrong
+       the moment it was extended to tablets: a 320px bar centred in a 1024px
+       window is mostly empty chrome, and the 728x90 zone was already
+       provisioned and sitting unused in that band.
+
+       ANCHOR_PHONE_MAX is the one boundary. `body.has-site-anchor` and
+       `body.has-ad-anchor` tier their padding on this same 48rem line in
+       css/style.css, because the reserved height has to match the unit that
+       actually mounted -- 4.75rem for the 50px bar, 7.25rem for the 90px one.
+       Change the number here and that reservation changes with it or the foot
+       of every page goes wrong silently.
+
+       Deliberately NO fallback to the other size, which is what separates
+       this from mountLeaderboard above. That helper falls back so a dormant
+       zone still fills the slot with whatever is available; here a fallback
+       would mount a size the CSS has not reserved for, so it is better to
+       mount nothing and leave the page byte-identical to having no anchor. */
+    const ANCHOR_PHONE_MAX = "(max-width: 48rem)";
+
+    function mountAnchorUnit(host) {
+        if (!host) {
+            return false;
+        }
+        return mountPlacement(host,
+            window.matchMedia(ANCHOR_PHONE_MAX).matches ? "leaderboardMobile" : "leaderboard");
+    }
+
     /* In-article break element, built for a renderer to insert into a flow */
     function buildAdBreak(zoneName) {
         const row = document.createElement("div");
@@ -245,7 +279,12 @@ const TBAds = (() => {
        worth doing if homepage revenue needs measuring separately.
        ---------------------------------------------------------------------- */
     const HOME_RAIL_MIN = "(min-width: 75rem)";
-    const HOME_ANCHOR_MAX = "(max-width: 48rem)";
+    /* 48rem until August 20, 2026, which left every tablet width on the site's
+       most-visited page with no advertising at all -- the same hole the
+       site-wide anchor had, closed the same way and with the same number, so
+       the anchor and the rail meet exactly at the rail's floor with neither a
+       gap nor an overlap between them. See SITE_ANCHOR_MAX above. */
+    const HOME_ANCHOR_MAX = "(max-width: 74.9375rem)";
 
     /* The editor rail, on the homepage. Same markup, same slots, same three
        zones, and the same .editor-rail CSS rule -- not a copy of it, the same
@@ -300,7 +339,7 @@ const TBAds = (() => {
            both. .has-site-anchor reserves the space only on a real fill. */
         if (window.matchMedia(HOME_ANCHOR_MAX).matches) {
             const anchor = root.querySelector("[data-ad-home-anchor]");
-            if (mountPlacement(anchor, "leaderboardMobile")) {
+            if (mountAnchorUnit(anchor)) {
                 document.body.classList.add("has-site-anchor");
             }
         }
@@ -343,14 +382,30 @@ const TBAds = (() => {
        84rem reasoning this reverses, and its "Revised" section for this
        change and the exact numbers.
 
-       Between 48rem and 75rem there is no room beside the panes, so that
-       band gets a leaderboard above the workspace instead. It scrolls away,
-       which is why it is the fallback rather than the primary: the whole
-       argument for advertising on editors is session-long visibility. */
+       Between 48rem and 75rem there is no room beside the panes. That band
+       used to get an in-flow 728x90 above the workspace, and this comment
+       used to concede the flaw in it: "It scrolls away, which is why it is
+       the fallback rather than the primary: the whole argument for
+       advertising on editors is session-long visibility." A unit that
+       scrolls out of a session measured in minutes contradicts the only
+       argument for putting advertising on an editor at all.
+
+       August 20, 2026: that band now gets the FIXED anchor instead, the same
+       one the phone band uses, carrying the same 728x90 creative it always
+       did. The unit is unchanged; what changed is that it stays on screen for
+       the whole session instead of disappearing on the first scroll, which
+       makes the editors consistent with every other page family on a tablet
+       and is strictly better against the dwell-time argument. Asked for
+       directly ("do the same on editor pages of tablet screens").
+
+       So there are three editor bands now, not four -- rail, anchor, and the
+       stack variant of the rail -- and EDITOR_ANCHOR_MAX runs all the way to
+       the rail's floor. [data-ad-editor-leaderboard] is no longer mounted by
+       anything; the host stays in the four editors' markup, empty and
+       collapsed, costing nothing, so that restoring the in-flow band is a
+       one-line change here rather than an edit to four pages. */
     const EDITOR_RAIL_MIN = "(min-width: 75rem)";
-    const EDITOR_LEADERBOARD_BAND =
-        "(min-width: 48.0625rem) and (max-width: 74.9375rem)";
-    const EDITOR_ANCHOR_MAX = "(max-width: 48rem)";
+    const EDITOR_ANCHOR_MAX = "(max-width: 74.9375rem)";
 
     /* A three-slot 300px rail needs 324px including its gap. Holding the
        editing panes at the 540px they had before any rail existed therefore
@@ -379,21 +434,17 @@ const TBAds = (() => {
             reserveRailWidth(mountPlacement(slots[0], "skyscraper"));
         }
 
-        /* mountPlacement directly rather than mountLeaderboard(): the mobile
-           320x50 swap that helper performs is wrong here, because this band
-           starts above the mobile breakpoint. */
-        if (window.matchMedia(EDITOR_LEADERBOARD_BAND).matches) {
-            mountPlacement(root.querySelector("[data-ad-editor-leaderboard]"), "leaderboard");
-        }
-
         /* The anchor is fixed over the foot of the viewport, so the page has
            to make room for it: .has-ad-anchor reserves bottom padding and
            lifts the sticky export bar above it. The class is only added when
            a banner actually filled, so a dormant or blocked zone leaves the
-           layout exactly as it was. */
+           layout exactly as it was. Covers the tablet band too since August
+           20, 2026, where mountAnchorUnit gives it the 728x90 -- so the
+           reservation and the lift are both size-tiered in the CSS on the
+           same 48rem line mountAnchorUnit switches on. */
         if (window.matchMedia(EDITOR_ANCHOR_MAX).matches) {
             const anchor = root.querySelector("[data-ad-editor-anchor]");
-            if (mountPlacement(anchor, "leaderboardMobile")) {
+            if (mountAnchorUnit(anchor)) {
                 document.body.classList.add("has-ad-anchor");
             }
         }
@@ -465,19 +516,42 @@ const TBAds = (() => {
        targeted viewport sizes first, the way loading.html's own
        verification script does, before reusing this reasoning elsewhere.
        ---------------------------------------------------------------------- */
-    const SITE_ANCHOR_MOBILE = "(max-width: 48rem)";
+    /* Extended from 48rem to the rail's own floor on August 20, 2026: tablets
+       carried no advertising at all.
+
+       The August 13 rewrite retired the anchor's desktop half on the reasoning
+       that .content-rail had taken over "once there is room for it", and left
+       the gap between 48rem and the rail's floor deliberately empty to match
+       the shape the homepage already had. What that missed is that the gap is
+       not a sliver: 769px to 1199px is every tablet in portrait AND most in
+       landscape, so the whole class of device was served nothing, on the nine
+       landing pages, the legal pages, the blog index, 404 and the loading
+       interstitial alike. The homepage had the identical hole for the same
+       reason, and closes it with the same number below.
+
+       74.9375rem, not 75rem, so this stops exactly one pixel below where
+       CONTENT_RAIL_MIN starts. The two are mutually exclusive to the pixel and
+       no viewport can ever mount both or neither, which is the invariant the
+       editors' four bands already hold themselves to.
+
+       The unit stays leaderboardMobile (320x50), the same one phones get, as
+       asked. A 728x90 would fill a tablet better and its zone already exists,
+       but that is the format the August 13 change removed from this host and
+       putting it back is a separate decision from closing the hole. */
+    const SITE_ANCHOR_MAX = "(max-width: 74.9375rem)";
 
     function mountSiteAnchor(scope) {
         const root = scope || document;
         const anchor = root.querySelector("[data-ad-anchor]");
-        if (!anchor || !window.matchMedia(SITE_ANCHOR_MOBILE).matches) {
+        if (!anchor || !window.matchMedia(SITE_ANCHOR_MAX).matches) {
             return false;
         }
 
         /* .has-site-anchor reserves the space the fixed bar occupies, and is
            only added when a banner actually filled -- a dormant or blocked
-           zone leaves the layout untouched. */
-        if (mountPlacement(anchor, "leaderboardMobile")) {
+           zone leaves the layout untouched. The unit is 320x50 on a phone and
+           728x90 on a tablet; see mountAnchorUnit. */
+        if (mountAnchorUnit(anchor)) {
             document.body.classList.add("has-site-anchor");
             return true;
         }

@@ -43,14 +43,20 @@ under test is the layout a real visitor gets.
 | Every page with `data-ad-*` hosts loads `js/ads.js` | `index.html` ran ad slots with no ad script for three days. Zero impressions, nothing visibly wrong |
 | Every zone named by a `mountPlacement` call exists in `AD_ZONES` with a non-empty key | A placement pointing at a missing or blank zone renders nothing, forever, silently |
 | `EDITOR_RAIL_STACK` and `HOME_RAIL_STACK` use a distinct key per slot | Three slots sharing one key is one placement counted three times, not three placements |
-| Every selector hook `js/app.js` and `js/ads.js` look up exists in the served markup | Renaming a `data-` attribute or class on one side kills a feature with no error at all |
+| Every selector hook `js/app.js`, `js/ads.js` and `js/search.js` look up exists in the served markup | Renaming a `data-` attribute or class on one side kills a feature with no error at all |
 | The homepage rail's `display: none` gate is declared after the shared rule | Media queries carry no specificity; written above the shared rule the gate loses and the rail shows on viewports it must skip |
 | `loading.html`'s inline route whitelist matches `EDITOR_ROUTES` | The two copies drifting sends the fallback path to the wrong editor |
+| `CATALOG_ITEMS` in `js/admin.js` lists exactly the cards `index.html` ships, with matching title, category and `data-doc` | The homepage feed has no data file, so admin.html's thumbnail picker holds a hardcoded copy of it. A card added to `index.html` alone is not offered as an existing item, and attaching a thumbnail to it then generates a whole new `<article>` instead of the `.card-preview` block the card needs. Both halves keep working perfectly on their own, which is why nothing fails without this |
+| Every `CATEGORIES` record in `js/admin.js` matches the cards it describes | That record supplies the label, editor page and `data-target` written into a generated card. If it disagrees with the category's existing cards, every new card in that category is wrong the same way |
+| Every local `<img src>` in every page exists on disk | A card rendered a broken-image icon after a publish deleted its old thumbnails and then failed to rewrite `index.html`. 988 checks passed while the homepage was visibly broken, because none of them asked whether a referenced file is actually there. Also catches a thumbnail downloaded but never placed, and a path typed by hand |
+| `index.html`'s catalog-empty message states the real card count | It said "all 17" against eighteen cards; adding a card does not force anyone to touch that sentence |
 
-### 2. Layout (5 pages x 10 widths)
+### 2. Layout (10 pages x 14 widths)
 
-Widths are 1920, 1600, 1488, 1440, 1366, 1344, 1200, 1024, 768 and 320 — including 1344 and
-1488, which are the 93rem stack gate and (with 1199/1200) the 75rem rail floor shared by the homepage and, since August 13, 2026, the editors.
+Widths are 1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 768 and
+320 — including 1344 and 1488, which are the 93rem stack gate and (with 1199/1200) the 75rem
+rail floor shared by the homepage and, since August 13, 2026, the editors. `search.html`
+joined the page list on August 24, 2026.
 
 - **Exactly one ad band mounts**, never two and never none. The one documented exception is
   the homepage between 48rem and 75rem, which shows nothing by design.
@@ -69,16 +75,61 @@ Widths are 1920, 1600, 1488, 1440, 1366, 1344, 1200, 1024, 768 and 320 — inclu
 - After a real scroll, the column is still full height and the header still inset.
 - Under print media there is no column and no reserved width.
 
+### 2f. Catalog thumbnails fill their card
+
+Every photo thumbnail's PAINTED image is measured against the card it sits in, and its
+declared `width`/`height` against the file.
+
+The first version of this measured `img.getBoundingClientRect()` and was worthless: the
+element is `width: 100%; height: 100%`, so its box always equals the card whatever the image
+inside it is doing — it reported a letterboxed 707x1000 poster as filling its card. The
+painted box has to be derived from `object-fit: contain`. See
+`docs/implementation/CATALOG_THUMBNAIL_CARD_FIT.md`.
+
 ### 3. Launch flow
 
 A plain click routes the foreground tab to `loading.html?target=...`; ctrl-click and
 middle-click each open that same interstitial in a new tab with the opener unmoved.
+
+**3b** follows the header search control with a real click and requires a focused, usable
+field at the other end — stated as an outcome because asserting "it is a link to search.html"
+would pass a search page that renders nothing. **3c** and **3d** do the same for the cards on
+`search.html` and the mockup editor's Mockups dropdown: both are built or bound after
+`initCatalog` has run its one pass, so both can silently bypass the interstitial the site is
+funded by.
 
 **These must use `Input.dispatchMouseEvent`, not a synthetic `MouseEvent`.** A synthetic event
 is not a user activation, so the `window.open` in `bindLaunchControls` is popup-blocked and
 the modified-click checks fail against perfectly working code. This produced two false
 failures during development before the cause was found. The same trap applies to anything
 gated on user activation — clipboard writes, fullscreen, file pickers, autoplay with sound.
+
+### 5 and 5b. Mockup editor
+
+**5** asserts the background colour against canvas PIXELS rather than against the controls,
+because every route to a wrong export is silent — a background painted in CSS would look
+right on screen and be absent from the PNG. **5b** asserts the editor bar's two states at ten
+widths, including that it stays one row: it is a sticky header on a workspace, and a second
+row costs 56px of a phone viewport permanently.
+
+### 6. Admin thumbnail intake
+
+Drives `admin.html`'s real intake with generated uploads — square, wide, and a small
+in-budget WebP — and requires 4:5 out of each. The small case is the original defect: an
+upload already under the byte budget was kept byte for byte, and shape was not part of that
+test.
+
+### 7. The typed name names the file
+
+Each editor is exercised twice: untouched, to prove the fallback filename still
+holds, and after typing a name. Asserted against the filename the browser is
+GIVEN — a field feeding a variable nobody reads is the defect this exists for,
+and it looks correct at every other layer.
+
+Note the two interception points. jsPDF's `save` is not an own property of
+`jsPDF.prototype` and does not download through an anchor, so patching either
+captures nothing and reads as "no export happened"; the constructor has to be
+wrapped. Canvas exports do use an `<a download>` click.
 
 ### 4. Ads blocked, compared against the last commit
 
@@ -92,7 +143,19 @@ you deliberately changed a layout, the working tree is supposed to differ from H
 reported values before acting: this check is asking "did an ad-related change leak into the
 no-ads layout?", and the answer is only meaningful when you know what you changed.
 
-Skip it with `--no-baseline` when you already know the layout moved.
+Skip it with `--no-baseline` when you already know the layout moved. A page that does not
+exist in HEAD yet is skipped automatically, with a line saying so, rather than being compared
+against the baseline server's 404.
+
+### A RETRY line in the output
+
+A navigation occasionally fails to settle for reasons that have nothing to do with the page:
+`npx serve` stalls a request under load and `js/ads.js` never evaluates, so the readiness poll
+waits for a `TBAds` that is not coming. It lands on a different page every time and used to
+kill the whole run. It is retried once and announced (August 24, 2026).
+
+One RETRY line is noise. The same page retrying every run is a real defect — do not treat the
+retry as having settled the question.
 
 ## Adding a Check
 

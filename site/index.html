@@ -149,7 +149,27 @@
             <button type="button" data-search-clear aria-label="Clear search">&times;</button>
         </div>
 
-        <nav class="site-nav" aria-label="Primary">
+        <!-- Phones and small tablets get the search as a LINK to search.html
+             rather than a permanent field: the field above is display:none
+             under 62rem, so search has to live somewhere else there.
+
+             It was a button that revealed the field as its own row until
+             August 24, 2026, and that only ever worked at 360px and below --
+             the rule undoing the display:none sat inside a 22.5rem media
+             query, so from 361px to 992px the button toggled a class that
+             changed nothing. A page is also the better answer than a reveal:
+             it can search the guides too, and a 320px bar has no room for a
+             field. See
+             docs/error-fixes/HEADER_SEARCH_BUTTON_DEAD_ON_PHONES_AND_TABLETS.md.
+
+             Hidden at widths where the field is already visible, so the bar
+             never carries two search affordances at once. -->
+        <a class="search-toggle" href="search.html" aria-label="Search templates and guides"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg></a>
+
+        <!-- Collapses the primary links on phones so the bar stays one row.
+             Hidden above 48rem, where the links sit inline as before. -->
+        <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <nav class="site-nav" id="site-nav" aria-label="Primary">
             <a href="index.html" aria-current="page">Templates</a>
             <a href="blog.html">Guides</a>
             <a href="about.html">About</a>
@@ -483,13 +503,15 @@
                     </div>
                 </article>
 
+                <!-- A real poster image in place of the drawn miniature. This
+                     card sat inside .card-preview.framed until August 23, 2026,
+                     which composited a photographed wood frame around the
+                     design on hover; the effect was removed at the owner's
+                     request and the card is now an ordinary photo card. -->
                 <article class="template-card" data-category="canvas">
-                    <div class="card-preview framed" aria-hidden="true">
+                    <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc poster">
-                                <div class="mk-plate"></div>
-                                <p class="mk-caption">Coastline, 2026</p>
-                            </div>
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/posters/framed-photo-poster-thumb-blank.webp" alt="" width="800" height="1000" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -499,7 +521,7 @@
                 </article>
 
                 <article class="template-card" data-category="canvas">
-                    <div class="card-preview framed" aria-hidden="true">
+                    <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
                             <div class="mock-doc poster wood">
                                 <div class="mk-plate"></div>
@@ -514,7 +536,7 @@
                 </article>
 
                 <article class="template-card" data-category="canvas">
-                    <div class="card-preview framed" aria-hidden="true">
+                    <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
                             <div class="mock-doc poster gold">
                                 <div class="mk-plate"></div>
@@ -615,10 +637,19 @@
                     </div>
                 </article>
 
+                <!-- Bare product by default, the styled demo on hover -- the
+                     same "default is the plain product" convention as .mk-art,
+                     extended to real photo thumbnails. (The poster cards above
+                     followed it too until their wood-frame hover composite was
+                     removed on August 23, 2026.) card-thumb-blank is the base
+                     photo/scene with
+                     no design in it; card-thumb-hover is the existing demo
+                     render, unchanged, now shown only on hover/focus. -->
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <img class="card-thumb" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.jpg" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb-blank.webp" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.webp" alt="" width="800" height="1000" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -627,12 +658,28 @@
                     </div>
                 </article>
 
+                <!-- First template to use the fabric displacement pass: the
+                     artwork bends around the garment's folds instead of
+                     sitting flat on them. See js/mockup-displace.js. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt on Model Mockup</a></h3>
+                    </div>
+                </article>
+
             </div>
 
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 17.
+                Try a broader term, or clear the search to see all 18.
             </p>
         </section>
 
