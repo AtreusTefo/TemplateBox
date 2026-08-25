@@ -3770,26 +3770,12 @@ body.has-site-anchor {
    permanently from a workspace, which is the exact cost the header collapse
    exists to avoid. Without it the row fits at 320px with room to spare.
 
-   Visually hidden rather than removed: the text is still the button's
-   accessible name, so a screen reader still announces "Download PNG" and no
-   aria-label has to be maintained in parallel with it.
-
-   `.dl-label` exists only in mockup.html, so this cannot reach the download
-   buttons on resume, docs or poster even though it is written against the
-   shared .editor-bar class. */
+   The `.editor-bar .dl-label` rule that hid the mockup bar's own download
+   label on phones was deleted on August 25, 2026 with the button it was
+   sized for: mockup.html exports from the control pane now, and `.dl-label`
+   on that page is a heading inside the export panel, which this rule would
+   have reached for no reason at all. */
 @media (max-width: 48rem) {
-    .editor-bar .dl-label {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-    }
-
     .editor-bar .dl-toggle {
         gap: 0;
         padding-left: var(--space-sm);
@@ -4991,9 +4977,10 @@ legend {
 .mockup-stage {
     background-color: var(--color-bg);
     border: 1px solid var(--color-border);
-    padding: 1.5rem;
+    padding: var(--space-sm);
     display: flex;
     justify-content: center;
+    align-items: center;
 }
 
 /* Stacking context for the selection overlay, and the element that now caps
@@ -5009,6 +4996,94 @@ legend {
     width: 100%;
     height: auto;
     touch-action: none;
+}
+
+/* --------------------------------------------------------------------------
+   Mockup editor: both panes hold the viewport, and the render fits in one
+   (August 25, 2026)
+
+   Reported as: the mockup and the controls should both be fully on screen,
+   without scrolling the live preview to see the rest of the render, and there
+   is too much empty space above them.
+
+   Three separate causes, three fixes:
+
+   1. The chrome above the panes. `.editor-head` is EMPTY on this page -- the
+      h1 inside it is .sr-only and the autosave indicator moved into the bar
+      long ago -- yet it still contributed a 1.5rem bottom margin, and main's
+      2.5rem top padding sat above that. The element is not removed, because
+      it holds the page's only h1; its margin is zeroed and the page's top
+      padding halved. Measured together with the two pane headings becoming
+      .sr-only: 152px of chrome above the canvas, down to 58px.
+
+   2. The control pane scrolled with the page while the preview was already
+      sticky, so reaching the last control pushed the render off screen. It
+      gets the same treatment as the preview: sticky, capped to the viewport,
+      scrolling internally. Two independent columns, which is what a workspace
+      is.
+
+   3. The canvas is width-driven (`width: 100%`), so a tall product overflowed
+      the capped pane and had to be scrolled to. The cap below bounds its
+      WIDTH by the height available and the product's own aspect ratio --
+      js/mockup.js writes `--mockup-aspect` from the canvas's real dimensions
+      -- so height follows arithmetic instead of luck: width <= cap * aspect
+      means height <= cap.
+
+      Deliberately not `object-fit: contain` with a max-height, which is the
+      obvious one-line answer: it letterboxes inside the element's box, and
+      the pointer maths in js/mockup.js maps client coordinates through
+      `canvas.width / rect.width`. Letterboxing makes rect bigger than the
+      pixels it holds, and every drag, resize and rotate lands somewhere other
+      than the pointer. The overlay canvas would drift from the product canvas
+      for the same reason.
+   -------------------------------------------------------------------------- */
+
+main:has(.mockup-layout) {
+    padding-top: var(--space-lg);
+}
+
+main:has(.mockup-layout) .editor-head {
+    margin-bottom: 0;
+}
+
+@media (min-width: 48.0625rem) {
+    /* No bottom padding in the two-column band, and it is doing real work:
+       the header (85px), main's top padding and a column capped at
+       100vh - 7rem come to 3px under an 800px viewport, so any bottom padding
+       at all puts the workspace into page scroll to reveal empty space. Below
+       this width nothing is capped and the page scrolls normally, so the
+       padding stays there. */
+    main:has(.mockup-layout) {
+        padding-bottom: 0;
+    }
+
+    /* The COLUMN holds the viewport height, not the pane: the action row
+       above the pane has to stay put while the controls scroll under it, so
+       the sticky element is the wrapper and the pane inside it takes whatever
+       is left. min-height: 0 is what lets that pane shrink below its content
+       and scroll -- without it a flex item refuses to go under its content
+       height and the whole column grows past the cap. */
+    .mockup-column {
+        position: sticky;
+        top: 5.75rem;
+        align-self: start;
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 7rem);
+    }
+
+    .mockup-column .editor-pane {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    /* 15rem is the chrome this pane carries above and below the render: the
+       sticky offset, the pane's padding, the tab row and the stage's frame.
+       The 32rem ceiling is the old cap and still applies on a tall window. */
+    .mockup-layout .mockup-canvas-wrap {
+        max-width: min(32rem, calc((100vh - 15rem) * var(--mockup-aspect, 1)));
+    }
 }
 
 /* The resting cursor is set from js/mockup.js per hit target -- grab over a
@@ -5439,6 +5514,17 @@ legend {
         #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000);
 }
 
+/* The same track again, standing in the panel under the trigger where the
+   mockup editor's colourway swatches used to be (August 25, 2026). One extra
+   rule rather than a second component: taller, because this one is dragged
+   with a thumb on a phone rather than inside an open popover, and spaced off
+   the trigger the way the swatch row was. */
+.color-hue-inline {
+    height: 1.125rem;
+    margin-top: var(--space-2xs);
+    margin-bottom: 1rem;
+}
+
 .color-hue-thumb {
     position: absolute;
     top: 50%;
@@ -5533,12 +5619,215 @@ legend {
     color: var(--color-text);
 }
 
-.color-row {
+/* --------------------------------------------------------------------------
+   Mockup editor: the control pane's action row (August 25, 2026)
+
+   "Add to My Mockups" was a sticky bar at the FOOT of this pane and Download
+   was over in the editor bar. Both are here now, at the top and sticky to the
+   pane's own scroll, because they are the two halves of one thought -- keep
+   this render, or take it away -- and a visitor should not have to hunt at
+   opposite ends of the page for them.
+
+   `top: -1.5rem` cancels the pane's own padding so the row sits flush against
+   the pane edge when it sticks, and the negative margins let its background
+   span the full pane width rather than leaving 1.5rem of scrolling content
+   visible either side.
+   -------------------------------------------------------------------------- */
+
+.mockup-actions {
+    /* The pair sits together at the left rather than pushed to opposite ends
+       of the column: they are one thought -- keep this render, or take it
+       away -- and a button 250px from the one it belongs with reads as a
+       different control. */
     display: flex;
-    gap: 0.75rem;
-    margin-top: var(--space-xs);
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-sm);
+    position: relative;
+}
+
+/* Outside the control pane (August 25, 2026), so the panel has nothing to be
+   clipped by: it hangs over the pane below. */
+.mockup-actions .dl-panel {
+    max-height: calc(100vh - 12rem);
+}
+
+@media (min-width: 48.0625rem) {
+    /* Anchored to the ROW, not to the toggle. The shared panel is right-
+       aligned to its button, which was right for a button at the bar's right
+       edge; with the toggle moved beside Add at the LEFT, right-aligning it
+       hangs the panel off the left of the page (measured: -130px). Anchoring
+       left to the row lines it up with the column under it instead.
+
+       Below this width the shared phone rule takes over and the panel is a
+       full-width sheet at the foot of the viewport, which is why this is
+       scoped rather than global. */
+    .mockup-actions .dl {
+        position: static;
+    }
+
+    .mockup-actions .dl-panel {
+        left: 0;
+        right: auto;
+        width: min(20rem, 100%);
+    }
+}
+
+.mockup-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3xs);
+    min-height: 2.75rem;
+    padding-left: var(--space-sm);
+    padding-right: var(--space-sm);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+/* Icon only, with its name in the tooltip. Square, so it reads as a tool
+   rather than a truncated button, and the same 2.75rem tap target the rest of
+   the site uses. */
+.mockup-actions .btn-icon {
+    width: 2.75rem;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* The shared tip is right-anchored so it grows inwards from a control on the
+   right. This one sits at the column's LEFT edge, where growing inwards means
+   growing off the screen: measured at 320px the label's left edge lands at
+   -12px. Anchored left, it grows into the column instead. */
+.mockup-actions .btn-icon[data-tip]::after {
+    right: auto;
+    left: 0;
+}
+
+.mockup-actions .btn svg {
+    flex: 0 0 auto;
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* The export panel's own contents. The shell -- .dl, .dl-toggle, .dl-panel --
+   is poster.html's exporter, shared and unchanged; only the two controls
+   inside it are specific to a canvas mockup. */
+
+.dl-caret {
+    width: 1rem;
+    height: 1rem;
+    opacity: 0.8;
+}
+
+.dl-format {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3xs);
+    margin-bottom: var(--space-sm);
+}
+
+.dl-format button {
+    min-height: 2.25rem;
+    padding: 0 var(--space-xs);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dl-format button.is-active {
+    background-color: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-card);
+}
+
+.dl-sizes {
+    display: grid;
+    gap: var(--space-3xs);
+}
+
+.dl-size {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-xs);
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 var(--space-xs);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dl-size:hover {
+    border-color: var(--color-border-strong);
+}
+
+.dl-size-go svg {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--color-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Mockup editor: the preview pane's two tabs (August 25, 2026)
+
+   One pane, two panels: the live canvas, and the saved mockups that used to
+   sit below it in the flow. Same visual language as .mobile-tabs, which does
+   the same job one level up (controls against preview), so the editor has one
+   tab pattern rather than two.
+   -------------------------------------------------------------------------- */
+
+.preview-tabs {
+    display: flex;
+    gap: var(--space-3xs);
+    margin-bottom: var(--space-sm);
+}
+
+.preview-tabs button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3xs);
+    min-height: 2.5rem;
+    padding: 0 var(--space-sm);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.preview-tabs button.is-active {
+    background-color: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-card);
+}
+
+.tab-count {
+    min-width: 1.25rem;
+    padding: 0 0.25rem;
+    background-color: var(--color-brand);
+    color: var(--color-brand-ink);
+    font-size: 0.6875rem;
+    line-height: 1.25rem;
+    text-align: center;
 }
 
 /* --------------------------------------------------------------------------
@@ -5630,21 +5919,11 @@ legend {
     text-align: right;
 }
 
+/* A panel behind a tab since August 25, 2026, not a section under the canvas:
+   no top border and no separating margin, because there is nothing above it in
+   the pane to be separated from. */
 .mockup-tray {
-    margin-top: 1.75rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--color-border);
-}
-
-.mockup-tray h2 {
-    font-size: 1.125rem;
-    margin-bottom: 0.25rem;
-}
-
-.tray-hint {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    margin-bottom: 1rem;
+    margin-top: 0;
 }
 
 .tray-empty {
@@ -5657,45 +5936,84 @@ legend {
 
 .tray-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-    gap: 1rem;
+    /* 7rem rather than 9rem: with the caption and buttons gone the tile is
+       only as tall as the thumbnail, so more of them fit across the pane. */
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    gap: var(--space-xs);
 }
 
+/* The tile is the whole card: thumbnail, a remove control in its corner, and
+   nothing else. The caption and the two buttons that used to sit under every
+   thumbnail are gone (August 25, 2026) -- the label is the button's name and
+   its hover tip, and Download is the panel above, which can write any size or
+   format where the per-item button only ever wrote the thumbnail. */
 .tray-item {
+    position: relative;
     border: 1px solid var(--color-border);
     background-color: var(--color-bg);
 }
 
+/* The one that is loaded in the preview right now. Two signals rather than
+   one, because a border colour alone is easy to miss in a grid of squares and
+   invisible to anyone who cannot separate these two hues. */
+.tray-item.is-active {
+    border-color: var(--color-text);
+    box-shadow: inset 0 0 0 2px var(--color-text);
+}
+
+.tray-open {
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.tray-open:hover .tray-thumb,
+.tray-open:focus-visible .tray-thumb {
+    background-color: var(--color-bg);
+}
+
 .tray-thumb {
+    display: block;
     width: 100%;
     aspect-ratio: 1 / 1;
     object-fit: contain;
     background-color: var(--color-card);
-    border-bottom: 1px solid var(--color-border);
 }
 
-.tray-item-body {
-    padding: 0.625rem;
+/* Always in the layout and the tab order rather than revealed on hover: a
+   control that appears only under a pointer cannot be reached by touch or by
+   keyboard, and removing a mockup is the only management action left. */
+.tray-remove {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    cursor: pointer;
 }
 
-.tray-item-label {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    /* Long labels stay inside the fixed-width thumbnail column */
-    overflow-wrap: break-word;
+.tray-remove:hover {
+    border-color: var(--color-warn);
+    color: var(--color-warn);
 }
 
-.tray-item-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.tray-item-actions button {
-    flex: 1;
-    min-height: 2.25rem;
-    padding: 0 0.5rem;
-    font-size: 0.75rem;
+.tray-remove svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
 }
 
 .form-error {
@@ -6938,6 +7256,12 @@ legend {
     .editor-head,
     .editor-intro,
     .preview-actions,
+    /* Both added August 25, 2026 with the workspace rebuild. The action row
+       moved OUT of the control pane, so `.editor-pane` above no longer hides
+       it, and the preview pane's new tab row is chrome that would otherwise
+       print above the render -- .preview-pane itself DOES print. */
+    .mockup-actions,
+    .preview-tabs,
     .related-tools,
     .save-state,
     .editor-rail,

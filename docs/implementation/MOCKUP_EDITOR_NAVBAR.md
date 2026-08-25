@@ -114,6 +114,13 @@ widths, is `mockup @320`: the header is 85px where it was 133px, because the old
 bar's name input wrapped it to two rows. Everything else on every other page is
 identical to the byte.
 
+> **Correction, August 25, 2026.** The download button left this bar entirely.
+> It is a JPG/PNG export panel in the control column's action row now, so every
+> "save, download" below reads "save" on `mockup.html`; the other three editors
+> are unchanged. The phone rule that hid its label (`.editor-bar .dl-label`) was
+> deleted with it. See `MOCKUP_WORKSPACE_REBUILD.md`.
+
+
 | Width | Left | Middle | Right | Header |
 |-------|------|--------|-------|--------|
 | 1920 | wordmark | Mockups, Templates, Guides | field, save, Download PNG | 85px |

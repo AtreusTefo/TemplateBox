@@ -1532,26 +1532,42 @@ async function mockupChecks(page) {
     /* A drawn product: eligible, because everything around the garment is
        transparent and exports that way. */
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    /* Driven through the picker, not a swatch row: the background's quick
+       picks were replaced by a hue strip on August 25, 2026 and Transparent
+       moved INTO the preset grid, where it is the first button. That move is
+       the load-bearing part of this check -- without it, choosing a colour
+       would be a one-way door, and the editor's default state unreachable. */
     const vector = await page.evaluate(`(async () => {
         const field = document.getElementById('m-bg-field');
-        const row = document.getElementById('m-bg-row');
-        if (!field || !row) { return { missing: true }; }
+        const trigger = document.getElementById('m-bg-trigger');
+        if (!field || !trigger) { return { missing: true }; }
         const corner = () => ${CORNER};
         const before = corner();
         const exportBefore = document.getElementById('mockup-canvas').toDataURL('image/png');
-        /* Index 3 is Light Grey; index 0 is Transparent. */
-        row.querySelectorAll('.swatch')[3].click();
+
+        trigger.click();
+        const hex = document.getElementById('m-bg-in-hex');
+        hex.value = '#E5E5E2';
+        hex.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise(r => setTimeout(r, 250));
         const after = corner();
         const exportAfter = document.getElementById('mockup-canvas').toDataURL('image/png');
         const stored = (JSON.parse(localStorage.getItem('tb_mockup_v1') || '{}')).bg;
-        row.querySelectorAll('.swatch')[0].click();
+
+        const presets = [...document.querySelectorAll('#m-bg-presets button')];
+        const first = presets[0] ? presets[0].getAttribute('aria-label') : null;
+        presets[0].click();
         await new Promise(r => setTimeout(r, 250));
+        const cleared = corner();
+        trigger.click();
         return {
             hidden: field.hidden, before: before, after: after,
             exportChanged: exportBefore !== exportAfter, stored: stored,
-            cleared: corner(),
-            clearedStore: (JSON.parse(localStorage.getItem('tb_mockup_v1') || '{}')).bg
+            firstPreset: first, cleared: cleared,
+            clearedStore: (JSON.parse(localStorage.getItem('tb_mockup_v1') || '{}')).bg,
+            label: document.getElementById('m-bg-hex').textContent.trim(),
+            strip: !!document.getElementById('m-bg-strip'),
+            row: !!document.getElementById('m-bg-row')
         };
     })()`);
 
@@ -1563,9 +1579,13 @@ async function mockupChecks(page) {
         vector.after === "229,229,226,255" && vector.exportChanged &&
         vector.stored === "#E5E5E2",
         JSON.stringify(vector));
-    check("mockup: Transparent returns the canvas to no background at all",
-        vector.cleared === "0,0,0,0" && vector.clearedStore === null,
-        JSON.stringify({ cleared: vector.cleared, stored: vector.clearedStore }));
+    check("mockup: Transparent is the picker's first preset and clears the canvas",
+        vector.firstPreset === "Transparent" && vector.cleared === "0,0,0,0" &&
+        vector.clearedStore === null && vector.label === "Transparent",
+        JSON.stringify(vector));
+    check("mockup: the background panel carries a hue strip, not a swatch row",
+        vector.strip === true && vector.row === false,
+        JSON.stringify({ strip: vector.strip, row: vector.row }));
 
     /* A photographic template: NOT eligible unless it declares
        `background: true`. Seeded with a stored background from an eligible
@@ -1628,21 +1648,356 @@ async function mockupChecks(page) {
         hex.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise(r => setTimeout(r, 250));
         const typed = fabric();
-        const swatches = document.querySelectorAll('#m-color-row .swatch');
-        swatches[3].click();
-        await new Promise(r => setTimeout(r, 250));
-        return { opened: opened, before: before, typed: typed, swatched: fabric(),
-                 swatchHex: swatches[3].getAttribute('data-hex'),
-                 active: document.querySelectorAll('#m-color-row .swatch.is-active').length,
+        /* Shut the popover before the strip check below: it is positioned
+           directly over the strip, so a click there would land on the
+           popover, not the track. */
+        document.getElementById('m-color-trigger').click();
+        return { opened: opened, before: before, typed: typed,
+                 closed: document.getElementById('m-color-popover').hidden,
                  corner: ${CORNER} };
     })()`);
 
     check("mockup: the colourway picker still drives the garment",
-        colorway.opened && colorway.typed === "18,52,86,255" &&
-        colorway.swatched === "31,42,68,255" && colorway.active === 1,
+        colorway.opened && colorway.closed && colorway.typed === "18,52,86,255",
         JSON.stringify(colorway));
     check("mockup: a garment colour is not a background",
         colorway.corner === "0,0,0,0", `corner ${colorway.corner}`);
+
+    /* The panel's hue strip, which replaced the colourway swatch row on
+       August 25, 2026. It is the popover's own track a second time, sharing
+       that picker instance's hue, so the two things that can silently break
+       are the two asserted here: the drag has to reach the garment, and
+       sync() has to move THIS strip's thumb and not only the popover's.
+
+       Trusted input, not a synthetic PointerEvent: bindTrack calls
+       setPointerCapture, which throws on a pointerId with no live pointer
+       behind it, so a dispatched event would abort the handler before it ever
+       read the pointer's position and the strip would look dead against
+       working code.
+
+       The colour is not hardcoded. Pressing at the middle of the track asks
+       for hue 180 at the saturation and value of the #123456 typed above,
+       and what that rounds to is the picker's business; the contract is that
+       the garment, the trigger's label and the thumb all agree on it, and
+       that the hue actually rotated -- a cyan has both green and blue above
+       red, which #123456 does not. */
+    const stripBox = await page.evaluate(`(() => {
+        const el = document.getElementById('m-color-strip');
+        el.scrollIntoView({ block: 'center' });
+        const b = el.getBoundingClientRect();
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2, width: b.width };
+    })()`);
+    for (const type of ["mousePressed", "mouseReleased"]) {
+        await page.call("Input.dispatchMouseEvent", {
+            type: type, x: stripBox.x, y: stripBox.y, button: "left",
+            buttons: type === "mousePressed" ? 1 : 0, clickCount: 1
+        }, page.sessionId);
+    }
+    const strip = await page.evaluate(`(async () => {
+        await new Promise(r => setTimeout(r, 250));
+        const c = document.getElementById('mockup-canvas');
+        const px = [...c.getContext('2d').getImageData(500, 300, 1, 1).data];
+        const label = document.getElementById('m-color-hex').textContent.trim();
+        const m = /^#(..)(..)(..)$/.exec(label);
+        return {
+            px: px, label: label,
+            labelRgb: m ? [1, 2, 3].map(i => parseInt(m[i], 16)) : null,
+            thumb: parseFloat(document.getElementById('m-color-strip-thumb').style.left)
+        };
+    })()`);
+
+    check("mockup: the panel hue strip drives the garment and its own thumb",
+        !!strip.labelRgb &&
+        strip.px.slice(0, 3).join(",") === strip.labelRgb.join(",") &&
+        strip.px[1] > strip.px[0] && strip.px[2] > strip.px[0] &&
+        Math.abs(strip.thumb - 50) <= 4,
+        JSON.stringify(strip));
+
+    /* ----------------------------------------------------------------------
+       The model photograph, eligible since August 25, 2026.
+
+       This one CAN be asserted against pixels, which the wood frame above
+       cannot: its base is 1024x1536 with a transparent surround -- the model
+       was cut out of the studio backdrop -- so a background fill lands in the
+       space around the figure and shows. Corner (2, 2) is that surround.
+
+       The two templates together are the whole contract: transparency around
+       a subject qualifies, transparency that IS a print window does not, and
+       neither is detected -- both are declared in js/mockup-templates.js.
+       ---------------------------------------------------------------------- */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    await page.evaluate(`(() => {
+        localStorage.clear();
+        localStorage.setItem('tb_editor_preset', JSON.stringify('tshirt-model-white'));
+        return true;
+    })()`);
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const modelBg = await page.evaluate(`(async () => {
+        for (let i = 0; i < 80; i += 1) {
+            const label = document.getElementById('mockup-canvas').getAttribute('aria-label');
+            if (label && label.indexOf('White T-Shirt on Model') === 0) { break; }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        const canvas = document.getElementById('mockup-canvas');
+        const corner = () => ${CORNER};
+        const before = corner();
+        document.getElementById('m-bg-trigger').click();
+        const hex = document.getElementById('m-bg-in-hex');
+        hex.value = '#E5E5E2';
+        hex.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 400));
+        return {
+            label: canvas.getAttribute('aria-label'),
+            native: canvas.width + 'x' + canvas.height,
+            hidden: document.getElementById('m-bg-field').hidden,
+            before: before, after: corner()
+        };
+    })()`);
+
+    check("mockup: the model photograph offers a background",
+        modelBg.hidden === false && modelBg.native === "1024x1536",
+        JSON.stringify(modelBg));
+    check("mockup: that background reaches the photograph's transparent surround",
+        modelBg.before === "0,0,0,0" && modelBg.after === "229,229,226,255",
+        JSON.stringify(modelBg));
+
+    /* ----------------------------------------------------------------------
+       5c. The export panel and the saved-mockups tab (August 25, 2026).
+
+       Both replaced controls that the suite used to drive: a single
+       "Download PNG" button in the editor bar, and a tray that sat in the
+       flow under the canvas. What is asserted here is what silently breaks --
+       that the sizes are the canvas's own and not a hardcoded ladder (they
+       differ per product: 1000x1000 drawn, 1024x1536 photographed), that JPG
+       really is a JPEG, and that the tray tab still reaches the collection
+       now that it is hidden until asked for.
+       ---------------------------------------------------------------------- */
+    section("5c. Mockup editor: export panel and saved-mockups tab");
+
+    for (const [doc, native] of [["tshirt", "1000x1000"], ["tshirt-model-white", "1024x1536"]]) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+        await page.evaluate(`(() => {
+            localStorage.clear();
+            localStorage.setItem('tb_editor_preset', JSON.stringify('${doc}'));
+            return true;
+        })()`);
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+        const ex = await page.evaluate(`(async () => {
+            for (let i = 0; i < 80; i += 1) {
+                const c = document.getElementById('mockup-canvas');
+                if (c.width + 'x' + c.height === '${native}') { break; }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            const canvas = document.getElementById('mockup-canvas');
+            document.getElementById('dl-toggle').click();
+            await new Promise(r => setTimeout(r, 150));
+            const sizes = [...document.querySelectorAll('#dl-sizes .dl-size')]
+                .map(b => b.getAttribute('data-size'));
+
+            /* The anchor is never really followed: its href is read instead,
+               which is also how the filename checks in section 7 work. */
+            const seen = [];
+            const real = HTMLAnchorElement.prototype.click;
+            HTMLAnchorElement.prototype.click = function () {
+                seen.push({ name: this.download, href: this.href });
+            };
+            document.querySelector('#dl-panel [data-format="jpg"]').click();
+            await new Promise(r => setTimeout(r, 100));
+            const note = !document.getElementById('dl-note').hidden;
+            document.getElementById('dl-toggle').click();
+            await new Promise(r => setTimeout(r, 120));
+            document.querySelectorAll('#dl-sizes .dl-size')[1].click();
+            await new Promise(r => setTimeout(r, 400));
+            HTMLAnchorElement.prototype.click = real;
+
+            let decoded = null;
+            if (seen[0]) {
+                const img = new Image();
+                img.src = seen[0].href;
+                try { await img.decode(); decoded = img.naturalWidth + 'x' + img.naturalHeight; }
+                catch (e) { decoded = 'undecodable'; }
+            }
+            return {
+                native: canvas.width + 'x' + canvas.height,
+                sizes: sizes,
+                jpgNote: note,
+                file: seen[0] ? seen[0].name : null,
+                mime: seen[0] ? seen[0].href.slice(0, 15) : null,
+                decoded: decoded,
+                closed: document.getElementById('dl-panel').hidden
+            };
+        })()`);
+
+        const half = native.split("x").map((n) => Math.round(+n / 2)).join("x");
+        check(`mockup export @${doc}: the sizes are the canvas's own`,
+            ex.native === native &&
+            ex.sizes.join(" | ") === `${native} px | ${half} px | ` +
+                native.split("x").map((n) => Math.round(+n / 4)).join("x") + " px",
+            JSON.stringify(ex));
+        check(`mockup export @${doc}: JPG writes a real JPEG at the chosen size`,
+            ex.file === "templatebox-mockup.jpg" &&
+            ex.mime === "data:image/jpeg" && ex.decoded === half && ex.closed === true,
+            JSON.stringify(ex));
+        check(`mockup export @${doc}: JPG says it will flatten a transparent surround`,
+            ex.jpgNote === true, JSON.stringify({ note: ex.jpgNote }));
+    }
+
+    /* The tray: hidden behind a tab now, so the assertion is that adding one
+       still reaches it and that the count says so. A design has to be
+       uploaded first -- the button refuses an empty canvas, which is itself
+       worth keeping honest. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    await page.evaluate("localStorage.clear(), true");
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const tray = await page.evaluate(`(async () => {
+        const refused = (() => {
+            document.getElementById('add-to-tray').click();
+            return document.getElementById('m-design-error').textContent.length > 0;
+        })();
+
+        const c = document.createElement('canvas');
+        c.width = 200; c.height = 200;
+        const g = c.getContext('2d');
+        g.fillStyle = '#CC3333';
+        g.fillRect(0, 0, 200, 200);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'design.png', { type: 'image/png' }));
+        const input = document.getElementById('m-design');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 900));
+
+        /* Pixel (500, 300) is garment fabric, above the print area: the same
+           reading the colourway checks use. */
+        const fabric = () => [...document.getElementById('mockup-canvas')
+            .getContext('2d').getImageData(500, 300, 1, 1).data].join(',');
+        const setHex = async (value) => {
+            document.getElementById('m-color-trigger').click();
+            const hex = document.getElementById('m-color-in-hex');
+            hex.value = value;
+            hex.dispatchEvent(new Event('input', { bubbles: true }));
+            await new Promise(r => setTimeout(r, 300));
+            document.getElementById('m-color-trigger').click();
+        };
+        const setLabel = (value) => {
+            const el = document.getElementById('m-label');
+            el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+
+        /* Mockup A: red, default size. */
+        await setHex('#B5352E');
+        setLabel('Red tee');
+        document.getElementById('add-to-tray').click();
+        await new Promise(r => setTimeout(r, 300));
+        const afterAdd = {
+            trayShown: !document.getElementById('view-tray').hidden,
+            previewHidden: document.getElementById('view-preview').hidden,
+            count: document.getElementById('tray-count').textContent,
+            countShown: !document.getElementById('tray-count').hidden,
+            items: document.querySelectorAll('#tray-grid .tray-item').length,
+            captions: document.querySelectorAll('#tray-grid .tray-item-label').length
+        };
+
+        /* Mockup B: navy, resized. */
+        document.getElementById('view-tab-preview').click();
+        await setHex('#1F2A44');
+        const scale = document.getElementById('m-scale');
+        scale.value = '120';
+        scale.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 250));
+        setLabel('Navy tee');
+        document.getElementById('add-to-tray').click();
+        await new Promise(r => setTimeout(r, 300));
+
+        /* Reopen A. Its colour, its layer's size and its name all have to come
+           back, and the pane has to show the canvas again. */
+        document.querySelectorAll('#tray-grid .tray-open')[0].click();
+        await new Promise(r => setTimeout(r, 500));
+        const reopened = {
+            fabric: fabric(),
+            scale: document.getElementById('m-scale-number').value,
+            label: document.getElementById('m-label').value,
+            previewShown: !document.getElementById('view-preview').hidden,
+            active: [...document.querySelectorAll('#tray-grid .tray-item')]
+                .findIndex(t => t.classList.contains('is-active')),
+            /* The same fact in the accessibility tree. A class is invisible
+               to a screen reader, so the marking has to be asserted in both
+               places or half of it can rot unnoticed. */
+            current: [...document.querySelectorAll('#tray-grid .tray-open')]
+                .map(b => b.getAttribute('aria-current')).join(','),
+            items: document.querySelectorAll('#tray-grid .tray-item').length
+        };
+
+        /* Edit AFTER reopening, then switch away and back. A saved entry holds
+           its own copy of the state, so these edits must not follow it. */
+        await setHex('#2E4B3C');
+        scale.value = '40';
+        scale.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 250));
+        document.getElementById('view-tab-tray').click();
+        document.querySelectorAll('#tray-grid .tray-open')[1].click();
+        await new Promise(r => setTimeout(r, 450));
+        const backToB = { fabric: fabric(), scale: document.getElementById('m-scale-number').value };
+        document.getElementById('view-tab-tray').click();
+        document.querySelectorAll('#tray-grid .tray-open')[0].click();
+        await new Promise(r => setTimeout(r, 450));
+        const backToA = {
+            fabric: fabric(), scale: document.getElementById('m-scale-number').value,
+            current: [...document.querySelectorAll('#tray-grid .tray-open')]
+                .map(b => b.getAttribute('aria-current')).join(',')
+        };
+
+        document.getElementById('view-tab-tray').click();
+        await new Promise(r => setTimeout(r, 150));
+        document.querySelectorAll('#tray-grid .tray-remove')[1].click();
+        await new Promise(r => setTimeout(r, 200));
+        const afterRemove = {
+            items: document.querySelectorAll('#tray-grid .tray-item').length,
+            count: document.getElementById('tray-count').textContent
+        };
+
+        document.getElementById('view-tab-preview').click();
+        await new Promise(r => setTimeout(r, 150));
+        return Object.assign(afterAdd, {
+            refusedEmpty: refused,
+            reopened: reopened, backToB: backToB, backToA: backToA,
+            afterRemove: afterRemove,
+            backToPreview: !document.getElementById('view-preview').hidden &&
+                document.getElementById('view-tray').hidden
+        });
+    })()`);
+
+    check("mockup: an empty canvas is refused, with a reason",
+        tray.refusedEmpty === true, JSON.stringify(tray));
+    check("mockup: adding a mockup opens the tab it landed in and counts it",
+        tray.trayShown && tray.previewHidden && tray.items === 1 &&
+        tray.count === "1" && tray.countShown && tray.captions === 0,
+        JSON.stringify(tray));
+    check("mockup: clicking a saved mockup restores it and shows the canvas",
+        tray.reopened.fabric === "181,53,46,255" && tray.reopened.scale === "75" &&
+        tray.reopened.label === "Red tee" && tray.reopened.previewShown &&
+        tray.reopened.active === 0 && tray.reopened.items === 2,
+        JSON.stringify(tray.reopened));
+    /* Exactly one tile carries aria-current, and it moves with the selection.
+       Asserted at two points on purpose: set-once-never-cleared and
+       cleared-but-never-set both read as correct at a single moment. */
+    check("mockup: the loaded tile says so in the accessibility tree, and only it",
+        tray.reopened.current === "true,null" && tray.backToA.current === "true,null",
+        JSON.stringify({ reopened: tray.reopened.current, backToA: tray.backToA.current }));
+    /* The one that fails silently: share the state object between the entry
+       and the editor and every edit rewrites the mockup it came from, so the
+       tab quietly becomes two copies of the current render. */
+    check("mockup: editing a reopened mockup does not rewrite what was saved",
+        tray.backToB.fabric === "31,42,68,255" && tray.backToB.scale === "120" &&
+        tray.backToA.fabric === "181,53,46,255" && tray.backToA.scale === "75",
+        JSON.stringify({ b: tray.backToB, a: tray.backToA }));
+    check("mockup: removing a saved mockup drops it and recounts",
+        tray.afterRemove.items === 1 && tray.afterRemove.count === "1",
+        JSON.stringify(tray.afterRemove));
+    check("mockup: the Live Preview tab comes back",
+        tray.backToPreview === true, JSON.stringify(tray));
 
     /* ----------------------------------------------------------------------
        5b. The editor bar's two states.
@@ -1673,7 +2028,17 @@ async function mockupChecks(page) {
             docName: !!document.getElementById('doc-name'),
             label: !!document.getElementById('m-label'),
             headerHeight: Math.round(document.querySelector('.site-header').getBoundingClientRect().height),
-            downloadName: (document.getElementById('download-mockup-png') || {}).textContent
+            /* Download left the bar on August 25, 2026 for the control
+               column's action row. Both halves are read here, because
+               removing the first without adding the second would leave the
+               page with no exporter at all. */
+            barDownload: !!document.querySelector('.editor-bar .dl-toggle'),
+            columnDownload: !!document.querySelector('.mockup-actions #dl-toggle'),
+            addButton: (() => {
+                const el = document.getElementById('add-to-tray');
+                return el ? el.getAttribute('aria-label') : null;
+            })(),
+            addInPane: !!document.querySelector('.mockup-sidebar #add-to-tray')
         };
     })()`;
 
@@ -1693,12 +2058,21 @@ async function mockupChecks(page) {
             !b.brand && b.home && !b.field && b.hamburger && b.searchButton &&
             b.dropdown && b.headerHeight <= 100,
             JSON.stringify(b));
-        /* The label is hidden visually on phones but must still name the
-           button, or the only download control on the page is an unlabelled
-           icon to a screen reader. */
-        check(`mockup bar @${width}: the download button keeps its name`,
-            (b.downloadName || "").indexOf("Download PNG") !== -1,
-            JSON.stringify({ name: b.downloadName }));
+    }
+
+    /* Where the two actions live, at every width. The icon-only Add button is
+       the reason the name is asserted rather than the text: it has no visible
+       label at all, so an empty accessible name would leave a screen-reader
+       user with an unlabelled button and no way to reach the tray. */
+    for (const width of [1920, 1440, 1280, 1199, 768, 390, 320]) {
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, width);
+        const b = await page.evaluate(BAR);
+        check(`mockup @${width}: one exporter, in the column and not the bar`,
+            b.barDownload === false && b.columnDownload === true,
+            JSON.stringify({ bar: b.barDownload, column: b.columnDownload }));
+        check(`mockup @${width}: the icon-only Add button carries its name`,
+            b.addButton === "Add Mockup" && b.addInPane === false,
+            JSON.stringify({ name: b.addButton, insidePane: b.addInPane }));
     }
 
     /* The bar's name field is gone and the controls' one is what replaced
@@ -1877,19 +2251,35 @@ async function exportNameChecks(page) {
             r.typed === "adas-big-project-2026-templatebox.pdf", JSON.stringify(r));
     }
 
-    /* Canvas editors: the anchor's download attribute is the filename. */
+    /* Canvas editors: the anchor's download attribute is the filename.
+
+       Storage is cleared first, and that is not housekeeping. The "untouched"
+       case below asserts what an editor names a file when nobody has named
+       the work -- which only holds on a clean profile, and section 5c types
+       "Red tee" into #m-label and persists it. Without this the untouched
+       export comes back as red-tee.png and the failure points at the export
+       path, which is not where the problem is. Caught by a deliberate break
+       elsewhere in the same run, not by design. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    await page.evaluate("localStorage.clear(), true");
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     const mockup = await page.evaluate(`(async () => {
         const seen = [];
         HTMLAnchorElement.prototype.click = function () { seen.push(this.download); };
-        document.getElementById('download-mockup-png').click();
-        await new Promise(r => setTimeout(r, 250));
+        /* Two clicks per export since August 25, 2026: the toggle opens the
+           panel, the size row writes the file. Full size is index 0. */
+        const exportFullSize = async () => {
+            document.getElementById('dl-toggle').click();
+            await new Promise(r => setTimeout(r, 150));
+            document.querySelectorAll('#dl-sizes .dl-size')[0].click();
+            await new Promise(r => setTimeout(r, 350));
+        };
+        await exportFullSize();
         const label = document.getElementById('m-label');
         label.value = 'Front chest print, navy tee';
         label.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise(r => setTimeout(r, 300));
-        document.getElementById('download-mockup-png').click();
-        await new Promise(r => setTimeout(r, 250));
+        await exportFullSize();
         return { untouched: seen[0], typed: seen[1] };
     })()`);
 

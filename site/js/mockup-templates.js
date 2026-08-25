@@ -197,6 +197,19 @@ window.TB_PHOTO_MOCKUPS = [
         displaceStrength: 16,
         mode: "surface",
         backing: null,
+        /* Eligible for the Background panel (August 25, 2026), and unlike
+           every other photographic template that is a measured fact rather
+           than a preference: this base is 1024x1536 with a fully transparent
+           SURROUND -- all four corners read alpha 0 and 39.3% of the image is
+           clear -- because the model was cut out of the studio backdrop.
+
+           This is the opposite case to wood-a4, which is also transparent and
+           must NOT have this flag: there the clear pixels are the print
+           window, so a fill would land behind the artwork. Here they are the
+           space around the model, so a fill lands behind the scene, which is
+           exactly what a seller wants for a listing. Eligibility is still
+           declared rather than detected, for that reason. */
+        background: true,
         /* Measured from the base: garment centreline x=520, neckline bottom
            y=444, hem y=1419. The zone is a real 12x16in DTG print area
            scaled to this photograph (975px from collar to hem reads as 28in,

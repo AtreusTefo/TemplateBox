@@ -136,11 +136,13 @@
                 <span class="sr-only" data-save-label>Saves automatically</span>
             </span>
 
-            <!-- The label is in a span so it can be hidden VISUALLY on
-                 phones, where the bar has no room for it beside the
-                 hamburger and the search button. It stays in the document,
-                 so it is still the button's accessible name. -->
-            <button type="button" class="btn dl-toggle" id="download-mockup-png"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg><span class="dl-label">Download PNG</span></button>
+            <!-- Download is NOT here (August 25, 2026). It moved into the
+                 control pane's own action row beside "Add to My Mockups",
+                 where it became a panel offering JPG or PNG at three sizes --
+                 which the bar has no room for at 320px, and which belongs
+                 beside the other action that completes the task rather than
+                 in the navigation. resume, docs and poster still carry theirs
+                 in the bar and are untouched. -->
         </div>
 
         <nav class="site-nav" id="site-nav" aria-label="Primary">
@@ -230,9 +232,76 @@
         <div class="editor-shell">
         <div class="editor-layout mockup-layout show-edit" id="editor-layout">
 
-            <!-- Left pane: mockup controls -->
+            <!-- Left column: the two actions, then the controls pane. The
+                 actions are OUTSIDE the pane (August 25, 2026) -- they act on
+                 the whole mockup rather than on any control in the stack, and
+                 keeping them out of the card means the pane can scroll under
+                 them without a sticky band cutting into its own padding.
+                 This wrapper is what holds the viewport height; the pane
+                 inside it takes the rest and scrolls. -->
+            <div class="mockup-column">
+                <div class="mockup-actions">
+                    <!-- Icon only, with the words on hover and focus. The
+                         label is the tooltip AND the accessible name, which is
+                         why it is an aria-label rather than only a data-tip:
+                         a bookmark glyph with no name is unusable to a screen
+                         reader, and the two must agree or voice control
+                         cannot match what a person reads. -->
+                    <button type="button" class="btn btn-secondary btn-icon" id="add-to-tray"
+                            data-tip="Add Mockup" aria-label="Add Mockup">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4Z"/></svg>
+                    </button>
+
+                    <!-- Same disclosure component as poster.html's exporter --
+                         same .dl / .dl-toggle / .dl-panel classes and the same
+                         open/close rules -- rather than a second dropdown
+                         pattern. The contents differ because the choices do:
+                         a canvas mockup has a format and a pixel size, no
+                         paper stock or DPI. -->
+                    <div class="dl" data-download>
+                        <button type="button" class="btn dl-toggle" id="dl-toggle" aria-expanded="false" aria-controls="dl-panel">
+                            <!-- Text and a caret, no leading download glyph:
+                                 the pair has 1px of slack in a 20rem pane with
+                                 it, and 20px without. The caret is the part
+                                 that says this opens something. -->
+                            <span class="dl-text">Download</span>
+                            <svg class="dl-caret" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 10 5 5 5-5"/></svg>
+                        </button>
+
+                        <div class="dl-panel" id="dl-panel" hidden>
+                            <p class="dl-heading">Download</p>
+
+                            <p class="dl-label" id="dl-format-label">Format</p>
+                            <!-- Radios, not a select: two options that are
+                                 both worth showing at a glance, and the
+                                 chosen one has to stay visible while the
+                                 sizes below are read. -->
+                            <div class="dl-format" role="radiogroup" aria-labelledby="dl-format-label">
+                                <button type="button" role="radio" aria-checked="false" data-format="jpg">JPG</button>
+                                <button type="button" role="radio" aria-checked="true" data-format="png">PNG</button>
+                            </div>
+
+                            <p class="dl-label" id="dl-size-label">Size</p>
+                            <!-- Built by js/mockup.js, never hardcoded: the
+                                 sizes are the canvas's own dimensions halved
+                                 twice, and the canvas is 1000x1000 for a drawn
+                                 product, 1024x1536 for the model photograph
+                                 and 2000x2000 for the wood frame. A fixed
+                                 ladder would either distort one of them or
+                                 upscale it. -->
+                            <div class="dl-sizes" id="dl-sizes" role="group" aria-labelledby="dl-size-label"></div>
+
+                            <p class="dl-note" id="dl-note" hidden></p>
+                        </div>
+                    </div>
+                </div>
+
             <section class="editor-pane mockup-sidebar" aria-label="Mockup controls">
-                <h2>Mockup Controls</h2>
+                <!-- For the document outline only: the column above says what
+                     this is, and on a workspace a repeated title was one more
+                     band of height above the first control. -->
+                <h2 class="sr-only">Mockup Controls</h2>
+
                 <form id="mockup-form">
                     <!-- No template picker: the mockup is chosen by the
                          catalog card that opened this editor, handed over as
@@ -272,7 +341,6 @@
                             Upload Design
                         </button>
 
-                        <p class="upload-hint">PNG, JPG, or WebP with a transparent background works best. Validated client-side before drawing.</p>
                         <p class="form-error" id="m-design-error" role="alert"></p>
 
                         <!-- Acts on the selected layer only. Hidden outright
@@ -298,7 +366,7 @@
                          have no colorway concept -->
                     <div class="field panel-block" id="m-color-field">
                         <div class="panel-head">
-                            <span class="panel-title" id="m-color-label">Color</span>
+                            <span class="panel-title">Color</span>
                         </div>
 
                         <div class="color-control">
@@ -352,9 +420,28 @@
                             </div>
                         </div>
 
-                        <!-- The product's own colorways stay as one-click
-                             quick picks beside the free picker above. -->
-                        <div class="color-row" id="m-color-row" role="radiogroup" aria-labelledby="m-color-label"></div>
+                        <!-- August 25, 2026: the colourway swatch row that
+                             stood here is gone, and this hue strip stands in
+                             its place. Every colour those swatches reached is
+                             one click away inside the picker above, so the row
+                             was spending a whole band of panel height on a
+                             second route to colours the dropdown already
+                             carried.
+
+                             It is not a lookalike of the popover's hue track:
+                             it IS that track's twin, same class, same handler
+                             and the same picker instance's hue, so dragging
+                             here and dragging with the popover open move the
+                             one value.
+
+                             Pointer-only and aria-hidden, exactly as the
+                             popover's own track is and for the same reason --
+                             the trigger beside it opens Hex/R/G/B fields and a
+                             preset grid that set the identical value and are
+                             fully keyboard-operable. -->
+                        <div class="color-hue color-hue-inline" id="m-color-strip" aria-hidden="true">
+                            <span class="color-hue-thumb" id="m-color-strip-thumb"></span>
+                        </div>
                     </div>
 
                     <!-- BACKGROUND (August 24, 2026). Only for mockups whose
@@ -374,7 +461,7 @@
                          a template with no colorways. -->
                     <div class="field panel-block" id="m-bg-field">
                         <div class="panel-head">
-                            <span class="panel-title" id="m-bg-label">Background</span>
+                            <span class="panel-title">Background</span>
                         </div>
 
                         <div class="color-control">
@@ -421,13 +508,21 @@
                             </div>
                         </div>
 
-                        <!-- Quick picks, Transparent first: it is the default
-                             and the one people come back to, so it is a
-                             one-click return rather than a state reachable
-                             only by clearing a hex field. -->
-                        <div class="color-row" id="m-bg-row" role="radiogroup" aria-labelledby="m-bg-label"></div>
+                        <!-- The same hue strip the Colour panel carries, for
+                             the same reason: the quick-pick row that stood
+                             here spent a band of panel height on colours the
+                             picker already holds.
 
-                        <p class="upload-hint">Transparent exports a PNG with no background, ready to drop onto any listing.</p>
+                             Transparent was the one thing that row had and the
+                             picker did not, so it moved INTO the picker rather
+                             than being dropped -- it is the first swatch in
+                             the preset grid above, drawn as the usual grey
+                             chequer. Removing the row without moving it would
+                             have stranded the default state with no way back
+                             to it. -->
+                        <div class="color-hue color-hue-inline" id="m-bg-strip" aria-hidden="true">
+                            <span class="color-hue-thumb" id="m-bg-strip-thumb"></span>
+                        </div>
                     </div>
 
                     <div class="field panel-block">
@@ -447,35 +542,52 @@
                             <input type="range" id="m-scale" min="5" max="200" value="75" step="1">
                             <output id="m-scale-output" class="sr-only" for="m-scale">75%</output>
                         </div>
-                        <p class="upload-hint">Drag a design on the preview to move it. Corner handles resize it, and the round handle above rotates it.</p>
                     </div>
 
                     <div class="field">
                         <label for="m-label">Mockup Label</label>
                         <input type="text" id="m-label" maxlength="40" placeholder="Front chest print, navy tee">
-                        <!-- Says what the field does, because until August 24,
-                             2026 it did almost nothing: it captioned a tray
-                             item and the downloaded PNG was called
-                             templatebox-mockup.png whatever was typed here.
-                             It names the file now, and this is the only place
-                             left to name the work since the bar's own name
-                             input was removed. -->
-                        <p class="upload-hint">Names the PNG you download and the entry added to My Mockups. Leave it empty for <span class="mono">templatebox-mockup.png</span>.</p>
+                        <!-- This value names the downloaded PNG as well as
+                             the tray entry (templatebox-mockup.png when it is
+                             empty), and it is the only place left to name the
+                             work since the bar's own name input was removed.
+                             The prose that said so was cut on August 25, 2026
+                             with the panel's other standing hints. -->
                     </div>
                 </form>
 
-                <!-- Sticky: keeps the tray action reachable without scrolling
-                     back past the full control stack. Download moved into the
-                     editor-bar toolbar above, to match the other editors. -->
-                <div class="preview-actions">
-                    <button type="button" class="btn btn-block" id="add-to-tray">Add to My Mockups</button>
-                </div>
             </section>
+            </div>
 
             <!-- Right pane: live canvas preview + saved mockups tray -->
             <section class="preview-pane" aria-label="Mockup preview">
-                <h2>Live Preview</h2>
-                <div class="mockup-stage">
+                <h2 class="sr-only">Live Preview</h2>
+
+                <!-- Two views of one pane (August 25, 2026). The saved
+                     mockups used to sit in the flow BELOW the canvas, which
+                     meant the pane was always taller than the viewport and
+                     neither the render nor the collection was ever fully in
+                     view. A tab shows one at a time, at full height.
+
+                     Real tab semantics, so the panels below carry role
+                     ="tabpanel" and are hidden by the `hidden` attribute
+                     rather than by a class -- the attribute is what keeps a
+                     hidden panel out of the accessibility tree and out of
+                     the tab order. -->
+                <div class="preview-tabs" role="tablist" aria-label="Preview views">
+                    <button type="button" role="tab" id="view-tab-preview"
+                            aria-selected="true" aria-controls="view-preview" class="is-active">Live Preview</button>
+                    <button type="button" role="tab" id="view-tab-tray"
+                            aria-selected="false" aria-controls="view-tray">
+                        My Mockups
+                        <!-- The count is the only thing telling a visitor the
+                             other tab has anything in it, since the panel
+                             itself is hidden. -->
+                        <span class="tab-count" id="tray-count" hidden>0</span>
+                    </button>
+                </div>
+
+                <div class="mockup-stage" id="view-preview" role="tabpanel" aria-labelledby="view-tab-preview">
                     <div class="mockup-canvas-wrap">
                         <!-- Fixed internal resolution keeps exports high-quality;
                              CSS scales the visible element responsively.
@@ -496,10 +608,9 @@
                     </div>
                 </div>
 
-                <div class="mockup-tray">
-                    <h2>My Mockups</h2>
-                    <p class="tray-hint">Added mockups stay in this tab only, ready to download and drop into your product listings.</p>
-                    <p class="tray-empty" id="tray-empty">No mockups added yet. Upload a design and select "Add to My Mockups" above.</p>
+                <div class="mockup-tray" id="view-tray" role="tabpanel" aria-labelledby="view-tab-tray" hidden>
+                    <h2 class="sr-only">My Mockups</h2>
+                    <p class="tray-empty" id="tray-empty">No mockups added yet. Add one from the button above the controls, and it appears here.</p>
                     <div class="tray-grid" id="tray-grid"></div>
                 </div>
             </section>
