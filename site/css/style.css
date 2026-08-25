@@ -4983,6 +4983,26 @@ legend {
     align-items: center;
 }
 
+/* The two tab panels must actually disappear when their hidden attribute is
+   set (August 25, 2026). An author `display` beats the UA stylesheet's
+   [hidden] { display: none }, so `.mockup-stage`'s `display: flex` directly
+   above left the live canvas rendered above the tiles the whole time the My
+   Mockups tab was open -- the panel was flagged hidden and shown anyway.
+
+   `.mockup-tray` carries no author display and so hid correctly, which is
+   what made the defect one-sided and easy to miss from the other tab. It is
+   listed here anyway: the next rule that gives the tray a display would
+   reintroduce this silently.
+
+   The same trap is on record for admin.html's catalog preview -- see
+   CATALOG_THUMBNAIL_ADMIN.md, "two [hidden] overrides". Choosing the
+   attribute over a class for accessibility reasons is right, but it only
+   works if the stylesheet lets it. */
+.mockup-stage[hidden],
+.mockup-tray[hidden] {
+    display: none;
+}
+
 /* Stacking context for the selection overlay, and the element that now caps
    the preview's width (the canvases themselves fill it). */
 .mockup-canvas-wrap {
@@ -5940,6 +5960,14 @@ main:has(.mockup-layout) .editor-head {
        only as tall as the thumbnail, so more of them fit across the pane. */
     grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
     gap: var(--space-xs);
+    /* Each tile is as tall as its own render (August 25, 2026), since grid
+       items stretch to their row otherwise and the tile's border would end up
+       around empty space. Defensive rather than load-bearing today: a session
+       shows ONE product -- there is no in-editor template picker and switching
+       mockups reloads the page, which empties the tray -- so every thumbnail
+       in the grid currently has identical dimensions. Nothing in this grid
+       enforces that, which is why the rule stays. */
+    align-items: start;
 }
 
 /* The tile is the whole card: thumbnail, a remove control in its corner, and
@@ -5975,11 +6003,19 @@ main:has(.mockup-layout) .editor-head {
     background-color: var(--color-bg);
 }
 
+/* The tile takes the RENDER's shape rather than forcing a square (August 25,
+   2026). A 1:1 box with object-fit: contain letterboxed every product whose
+   canvas is not square: measured on the model photograph, a 1024x1536 thumb
+   drew at 84x127 inside a 127x127 tile, leaving a third of the tile empty and
+   the mockup looking like a shrunken preview of itself.
+
+   No object-fit here now, deliberately: the box is the image's own aspect, so
+   there is nothing left to fit. The card background still shows through the
+   transparent surround a drawn product exports. */
 .tray-thumb {
     display: block;
     width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: contain;
+    height: auto;
     background-color: var(--color-card);
 }
 

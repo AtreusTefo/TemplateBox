@@ -1850,6 +1850,18 @@ async function mockupChecks(page) {
     await page.evaluate("localStorage.clear(), true");
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     const tray = await page.evaluate(`(async () => {
+        /* Rendered, not just flagged. Setting the hidden ATTRIBUTE says
+           nothing about whether the element is on screen: an author display
+           in the stylesheet beats the UA sheet's [hidden] rule, which is
+           exactly how the live canvas stayed visible underneath the My
+           Mockups tab while every check here passed. */
+        const shown = (id) => {
+            const el = document.getElementById(id);
+            if (!el) { return false; }
+            return getComputedStyle(el).display !== 'none' &&
+                el.getBoundingClientRect().height > 0;
+        };
+
         const refused = (() => {
             document.getElementById('add-to-tray').click();
             return document.getElementById('m-design-error').textContent.length > 0;
@@ -1892,8 +1904,8 @@ async function mockupChecks(page) {
         document.getElementById('add-to-tray').click();
         await new Promise(r => setTimeout(r, 300));
         const afterAdd = {
-            trayShown: !document.getElementById('view-tray').hidden,
-            previewHidden: document.getElementById('view-preview').hidden,
+            trayShown: shown('view-tray'),
+            previewHidden: !shown('view-preview'),
             count: document.getElementById('tray-count').textContent,
             countShown: !document.getElementById('tray-count').hidden,
             items: document.querySelectorAll('#tray-grid .tray-item').length,
@@ -1919,14 +1931,15 @@ async function mockupChecks(page) {
             fabric: fabric(),
             scale: document.getElementById('m-scale-number').value,
             label: document.getElementById('m-label').value,
-            previewShown: !document.getElementById('view-preview').hidden,
+            previewShown: shown('view-preview'),
+            trayHiddenWhilePreviewing: !shown('view-tray'),
             active: [...document.querySelectorAll('#tray-grid .tray-item')]
                 .findIndex(t => t.classList.contains('is-active')),
             /* The same fact in the accessibility tree. A class is invisible
                to a screen reader, so the marking has to be asserted in both
                places or half of it can rot unnoticed. */
             current: [...document.querySelectorAll('#tray-grid .tray-open')]
-                .map(b => b.getAttribute('aria-current')).join(','),
+                .map(b => b.getAttribute('aria-current') || 'none').join(','),
             items: document.querySelectorAll('#tray-grid .tray-item').length
         };
 
@@ -1946,7 +1959,7 @@ async function mockupChecks(page) {
         const backToA = {
             fabric: fabric(), scale: document.getElementById('m-scale-number').value,
             current: [...document.querySelectorAll('#tray-grid .tray-open')]
-                .map(b => b.getAttribute('aria-current')).join(',')
+                .map(b => b.getAttribute('aria-current') || 'none').join(',')
         };
 
         document.getElementById('view-tab-tray').click();
@@ -1964,8 +1977,7 @@ async function mockupChecks(page) {
             refusedEmpty: refused,
             reopened: reopened, backToB: backToB, backToA: backToA,
             afterRemove: afterRemove,
-            backToPreview: !document.getElementById('view-preview').hidden &&
-                document.getElementById('view-tray').hidden
+            backToPreview: shown('view-preview') && !shown('view-tray')
         });
     })()`);
 
@@ -1978,13 +1990,20 @@ async function mockupChecks(page) {
     check("mockup: clicking a saved mockup restores it and shows the canvas",
         tray.reopened.fabric === "181,53,46,255" && tray.reopened.scale === "75" &&
         tray.reopened.label === "Red tee" && tray.reopened.previewShown &&
+        tray.reopened.trayHiddenWhilePreviewing &&
         tray.reopened.active === 0 && tray.reopened.items === 2,
         JSON.stringify(tray.reopened));
     /* Exactly one tile carries aria-current, and it moves with the selection.
        Asserted at two points on purpose: set-once-never-cleared and
-       cleared-but-never-set both read as correct at a single moment. */
+       cleared-but-never-set both read as correct at a single moment.
+
+       "none" rather than the raw getAttribute result: an absent attribute is
+       null, and Array.join() renders null as an empty string, so the first
+       version of this expected "true,null" and read "true," against perfectly
+       good code. A sentinel that survives join keeps the failure output
+       legible too. */
     check("mockup: the loaded tile says so in the accessibility tree, and only it",
-        tray.reopened.current === "true,null" && tray.backToA.current === "true,null",
+        tray.reopened.current === "true,none" && tray.backToA.current === "true,none",
         JSON.stringify({ reopened: tray.reopened.current, backToA: tray.backToA.current }));
     /* The one that fails silently: share the state object between the entry
        and the editor and every edit rewrites the mockup it came from, so the
@@ -1998,6 +2017,96 @@ async function mockupChecks(page) {
         JSON.stringify(tray.afterRemove));
     check("mockup: the Live Preview tab comes back",
         tray.backToPreview === true, JSON.stringify(tray));
+
+    /* A tile is the render's own shape, not a square (August 25, 2026).
+
+       Asserted on the MODEL photograph specifically, and that is the whole
+       point: its canvas is 1024x1536, so a forced 1:1 tile letterboxes it --
+       measured at 84x127 inside a 127x127 box, a third of the tile empty and
+       the mockup looking like a shrunken preview of itself. On the drawn
+       t-shirt the tray checks above run against a 1000x1000 canvas, where a
+       square tile and a correct one are indistinguishable, so this check
+       cannot be moved there without it passing for the wrong reason.
+
+       The comparison is the tile's rendered aspect against the thumbnail's
+       own natural aspect, rather than a hardcoded 0.667: the assertion is
+       "the tile matches its render", which stays true if a template's
+       dimensions ever change. */
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    await page.evaluate(`(() => {
+        localStorage.clear();
+        localStorage.setItem('tb_editor_preset', JSON.stringify('tshirt-model-white'));
+        return true;
+    })()`);
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const tileShape = await page.evaluate(`(async () => {
+        for (let i = 0; i < 80; i += 1) {
+            const label = document.getElementById('mockup-canvas').getAttribute('aria-label');
+            if (label && label.indexOf('White T-Shirt on Model') === 0) { break; }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        const c = document.createElement('canvas');
+        c.width = 300; c.height = 200;
+        const g = c.getContext('2d');
+        g.fillStyle = '#1B4FD8';
+        g.fillRect(0, 0, 300, 200);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'art.png', { type: 'image/png' }));
+        const input = document.getElementById('m-design');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 1000));
+        document.getElementById('add-to-tray').click();
+        await new Promise(r => setTimeout(r, 600));
+
+        const img = document.querySelector('#tray-grid .tray-thumb');
+        const tile = document.querySelector('#tray-grid .tray-item');
+        if (!img || !tile) { return { missing: true }; }
+        const ib = img.getBoundingClientRect();
+        const tb = tile.getBoundingClientRect();
+        const panel = document.getElementById('view-tray');
+        return {
+            natural: +(img.naturalWidth / img.naturalHeight).toFixed(3),
+            rendered: +(ib.width / ib.height).toFixed(3),
+            emptyShare: +(1 - (ib.width * ib.height) / (tb.width * tb.height)).toFixed(3),
+            /* The tab holds the tiles and nothing else -- no second canvas,
+               no duplicate of the Live Preview beside them. */
+            panelHolds: [...panel.children]
+                .map(el => el.tagName.toLowerCase() + (el.hidden ? '(hidden)' : '')).join(','),
+            canvases: panel.querySelectorAll('canvas').length,
+            /* The one the screenshot caught: the stage carries an author
+               display of flex, which outranks the UA sheet's [hidden] rule,
+               so setting the attribute left the live canvas rendered above
+               the tiles. Measured, not asked. */
+            stageStillRendered: (() => {
+                const stage = document.getElementById('view-preview');
+                return getComputedStyle(stage).display !== 'none' &&
+                    stage.getBoundingClientRect().height > 0;
+            })(),
+            /* What the stage's leak actually cost: with the canvas rendered
+               above them, the tiles sat a full render down the pane. Measured
+               as the tile's distance from the top of the panel rather than as
+               "the pane does not scroll" -- a tray holding a dozen mockups is
+               supposed to scroll, so that would have been the wrong contract
+               and would fail on a full tray. */
+            tileTopOffset: Math.round(
+                tile.getBoundingClientRect().top - panel.getBoundingClientRect().top)
+        };
+    })()`);
+
+    check("mockup: a saved tile is the render's shape, not a letterboxed square",
+        !tileShape.missing && Math.abs(tileShape.natural - tileShape.rendered) < 0.02 &&
+        tileShape.emptyShare < 0.05,
+        JSON.stringify(tileShape));
+    check("mockup: the My Mockups tab holds the tiles and nothing else",
+        tileShape.canvases === 0 &&
+        tileShape.panelHolds === "h2,p(hidden),div",
+        JSON.stringify({ holds: tileShape.panelHolds, canvases: tileShape.canvases }));
+    check("mockup: the live canvas is not rendered under the tiles",
+        tileShape.stageStillRendered === false && tileShape.tileTopOffset < 8,
+        JSON.stringify({ stage: tileShape.stageStillRendered,
+                         tileTop: tileShape.tileTopOffset }));
 
     /* ----------------------------------------------------------------------
        5b. The editor bar's two states.

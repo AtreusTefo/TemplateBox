@@ -146,6 +146,45 @@ Editing a reopened mockup and pressing Add again saves a **new** entry rather
 than updating the one it came from. Entries are versions, not documents; there
 is no in-place update, and the label is what tells two versions apart.
 
+**The `hidden` attribute had to be made to actually hide.** For a day the
+live canvas rendered above the tiles the entire time the My Mockups tab was
+open -- reported with a screenshot, not caught by the suite. `.mockup-stage`
+carries `display: flex`, and an author `display` beats the UA stylesheet's
+`[hidden] { display: none }`, so the panel was flagged hidden and shown anyway.
+`.mockup-tray` has no author display and hid correctly, which made the defect
+one-sided and invisible from the Live Preview tab. One rule fixes it, listing
+both panels: the tray is included so that a future rule giving it a display
+cannot reintroduce this silently.
+
+The same trap is already on record for `admin.html`'s catalog preview
+(`CATALOG_THUMBNAIL_ADMIN.md`, "two `[hidden]` overrides"). Choosing the
+attribute over a class is right for the accessibility tree, but it only works
+if the stylesheet lets it.
+
+**Every check that should have caught it was asserting the wrong thing.** They
+read `element.hidden` -- the property, true the instant the attribute is set,
+whatever is on screen -- so they confirmed the line of JavaScript that had just
+run rather than the result. They measure computed `display` and box height now.
+This is the section's own rule turned on itself: an assertion that cannot fail
+is not evidence, and `element.hidden` after `element.hidden = true` cannot fail.
+
+**A tile is the render's own shape, not a square.** The first version forced
+`aspect-ratio: 1 / 1` with `object-fit: contain`, which is right only for the
+drawn products. On the model photograph, whose canvas is 1024x1536, the thumb
+drew at 84x127 inside a 127x127 tile -- a third of the tile empty, and the
+mockup reading as a shrunken preview of itself rather than a saved piece of
+work. The tile takes the image's own dimensions now, and there is no
+`object-fit` left because the box IS the image's aspect. `align-items: start`
+on the grid keeps a tile from stretching to its row; that is defensive rather
+than load-bearing, since a session shows one product and therefore one thumb
+shape, but nothing in the grid enforces that.
+
+The suite asserts this on the model photograph specifically. On a 1000x1000
+drawn product a square tile and a correct one are indistinguishable, so the
+check would pass for the wrong reason anywhere else, and it compares the tile's
+rendered aspect against the thumbnail's own natural aspect rather than a
+hardcoded 0.667.
+
 **The loaded tile is marked twice over.** Visually it takes a border colour and
 an inset ring -- two signals, because a border colour alone is easy to miss in a
 grid of squares and invisible to anyone who cannot separate those two hues. In
