@@ -121,6 +121,13 @@ and the generated markup would point at a file the deploy does not contain.
 
 ### Compression
 
+**The pipeline itself now lives in `js/admin-image.js`** (August 24, 2026), shared
+with the blog cover intake. Only the numbers below are the catalog's own: what a
+thumbnail is FOR decides the budget, the pixel cap and the 4:5 reshape, and none
+of that belongs to a blog cover. It is one module rather than two copies because
+a second encoder would drift the way this project's footer constant and inline
+route whitelist already have -- invisibly, with both halves still working.
+
 Uploads are resized to a 1000px long edge and re-encoded until they fit
 `TARGET_BYTES` (60 KB), entirely in the browser, in a canvas, with no library
 and nothing uploaded anywhere.

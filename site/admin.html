@@ -62,9 +62,19 @@
                 <h2>Publish</h2>
                 <p class="admin-sync" data-admin-sync></p>
             </div>
+            <!-- One folder grant covers both panels; connecting here or in
+                 Catalog Thumbnails connects the other too. Chromium only, so
+                 the four export buttons below stay for Firefox and Safari and
+                 remain the whole workflow with nothing connected. -->
+            <p class="admin-status" data-blog-fs-state></p>
             <div class="admin-actions">
-                <button class="btn" type="button" data-export-download>Download js/blog-data.js</button>
-                <button class="btn" type="button" data-export-pages>Download Post Pages</button>
+                <button class="btn" type="button" data-blog-fs-connect hidden>Connect Project Folder</button>
+                <button class="btn" type="button" data-blog-publish hidden>Publish to Project</button>
+                <button class="btn btn-secondary" type="button" data-blog-fs-disconnect hidden>Disconnect</button>
+            </div>
+            <div class="admin-actions">
+                <button class="btn btn-secondary" type="button" data-export-download>Download js/blog-data.js</button>
+                <button class="btn btn-secondary" type="button" data-export-pages>Download Post Pages</button>
                 <button class="btn btn-secondary" type="button" data-export-copy>Copy File Contents</button>
                 <button class="btn btn-secondary" type="button" data-export-archive>Copy Guides Archive</button>
             </div>
@@ -73,12 +83,16 @@
                 <summary>How publishing works</summary>
                 <ol>
                     <li>Save your posts below. They are stored only in this browser.</li>
-                    <li>Click Download js/blog-data.js and replace the existing file at <span class="mono">js/blog-data.js</span> in the project. This drives the blog index and the card lists.</li>
-                    <li>Click Download Post Pages and put every downloaded file into the project's <span class="mono">blog/</span> folder. One static page per post.</li>
-                    <li>Click Copy Guides Archive and paste it over the <span class="mono">&lt;ul&gt;</span> inside <span class="mono">&lt;nav class="guide-archive"&gt;</span> in <span class="mono">blog.html</span>. This is the only link to a post in the served markup, so a post left out of it is invisible to anything that does not run JavaScript.</li>
-                    <li>Add any new post URL to <span class="mono">sitemap.xml</span> as <span class="mono">/blog/&lt;slug&gt;.html</span>.</li>
-                    <li>Commit and push to <span class="mono">main</span> (Netlify auto-deploys), or drag the <span class="mono">site</span> folder into Netlify.</li>
+                    <li>Connect the project folder, then click Publish to Project. It writes <span class="mono">js/blog-data.js</span>, one <span class="mono">blog/&lt;slug&gt;.html</span> per visible post, the guides archive in <span class="mono">blog.html</span> and the post URLs in <span class="mono">sitemap.xml</span> &mdash; and removes the pages of posts you deleted or hid.</li>
+                    <li>Review with <span class="mono">git diff</span>, then commit and push to <span class="mono">main</span> (Netlify auto-deploys), or drag the <span class="mono">site</span> folder into Netlify. Deploying is always yours: no page can push to your repository.</li>
                     <li>Visitors now see the updated posts on the live blog.</li>
+                </ol>
+                <p>Without a connected folder, or on Firefox and Safari, the same four artifacts are produced by the buttons on the second row and placed by hand:</p>
+                <ol>
+                    <li>Download js/blog-data.js and replace the existing file at <span class="mono">js/blog-data.js</span>. This drives the blog index and the card lists.</li>
+                    <li>Download Post Pages and put every downloaded file into <span class="mono">blog/</span>. One static page per post.</li>
+                    <li>Copy Guides Archive and paste it over the <span class="mono">&lt;ul&gt;</span> inside <span class="mono">&lt;nav class="guide-archive"&gt;</span> in <span class="mono">blog.html</span>. This is the only link to a post in the served markup, so a post left out of it is invisible to anything that does not run JavaScript.</li>
+                    <li>Add any new post URL to <span class="mono">sitemap.xml</span> as <span class="mono">/blog/&lt;slug&gt;.html</span>, and delete the page and URL of any post you removed.</li>
                 </ol>
             </details>
             <details class="admin-help">
@@ -158,7 +172,8 @@
                     <div class="field">
                         <label for="f-cover-file">Upload image (recommended minimum width: 1260px)</label>
                         <input id="f-cover-file" type="file" accept="image/*">
-                        <p class="upload-hint">Stored inline in the data file; keep it under 400 KB. Larger or non-image files are rejected.</p>
+                        <p class="upload-hint">Upload at any size. The image is resized to a 1600px long edge and re-encoded to 120 KB or less in your browser. It is stored inline in the data file, which every visitor to the blog index downloads, so anything heavy is better hosted and linked with the URL field below.</p>
+                        <p class="admin-status" data-cover-note aria-live="polite"></p>
                         <p class="form-error" data-cover-error></p>
                     </div>
                     <div class="field">
@@ -402,6 +417,10 @@
     <script src="js/blog.js"></script>
     <!-- Must load before admin.js, which reads window.TBProjectFolder at
          mount to decide whether the Publish controls can appear at all. -->
+    <!-- The shared image pipeline. Must load before admin.js, which both of
+         its workspaces read at mount: the blog cover intake and the catalog
+         thumbnail intake are the same encoder with different numbers. -->
+    <script src="js/admin-image.js"></script>
     <script src="js/admin-fs.js"></script>
     <script src="js/admin.js"></script>
 </body>

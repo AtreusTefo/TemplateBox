@@ -14,7 +14,6 @@
 (() => {
 
     const STORAGE_KEY = TBBlog.ADMIN_STORAGE_KEY;
-    const MAX_COVER_BYTES = 400 * 1024;
 
     /* DOM handles */
     const form = document.getElementById("post-form");
@@ -35,6 +34,7 @@
         coverThumb: document.querySelector("[data-cover-thumb]"),
         coverRemove: document.querySelector("[data-cover-remove]"),
         coverError: document.querySelector("[data-cover-error]"),
+        coverNote: document.querySelector("[data-cover-note]"),
         formTitle: document.querySelector("[data-form-title]"),
         formError: document.querySelector("[data-form-error]"),
         formStatus: document.querySelector("[data-form-status]"),
@@ -50,7 +50,11 @@
         exportPages: document.querySelector("[data-export-pages]"),
         exportCopy: document.querySelector("[data-export-copy]"),
         exportArchive: document.querySelector("[data-export-archive]"),
-        exportStatus: document.querySelector("[data-export-status]")
+        exportStatus: document.querySelector("[data-export-status]"),
+        fsState: document.querySelector("[data-blog-fs-state]"),
+        fsConnect: document.querySelector("[data-blog-fs-connect]"),
+        fsDisconnect: document.querySelector("[data-blog-fs-disconnect]"),
+        publishBtn: document.querySelector("[data-blog-publish]")
     };
 
     /* ----------------------------------------------------------------------
@@ -69,11 +73,33 @@
     /* Current cover value: https URL, data URI, or "" */
     let coverData = "";
 
+    /* The write is read back. TB.storageSet swallows quota and private-mode
+       failures by design, so without this a save that never landed still
+       reported "Saved to the local workspace" -- and the post was gone on the
+       next reload. Posts carry their cover inlined as a data URI, and that
+       storage is shared with the thumbnail workspace, so filling it is an
+       ordinary outcome rather than a remote one. The catalog half has had
+       this check since August 22, 2026; this half never got it. */
     function save() {
         TB.storageSet(STORAGE_KEY, posts);
+        const stored = TB.storageGet(STORAGE_KEY);
+        const persisted = Array.isArray(stored) && stored.length === posts.length;
         renderList();
         renderSyncState();
+        if (!persisted) {
+            setText(el.formError, "Warning: this browser did not store the workspace, most likely because the cover images filled its quota. Publish or export now; deleting posts you have already published frees space.");
+        }
+        return persisted;
     }
+
+    /* What the workspace looked like the last time it was published from this
+       page. renderSyncState compares against the deployed data file, which is
+       window.TB_BLOG_POSTS -- read once at page load and never updated, so
+       after a successful publish the panel went on insisting the changes were
+       not exported. Held in memory only, deliberately: after a reload the
+       freshly written blog-data.js IS the deployed file and the ordinary
+       comparison is correct again. */
+    let lastPublishedJson = null;
 
     function todayIso() {
         const d = new Date();
@@ -535,9 +561,13 @@ body + '\n' +
         const visibleCount = posts.filter((p) => p.visible !== false).length;
         const base = posts.length + " post" + (posts.length === 1 ? "" : "s") +
             " in workspace (" + visibleCount + " visible). ";
-        setText(el.sync, base + (liveJson === workJson
-            ? "In sync with the deployed data file."
-            : "Changes not yet exported to js/blog-data.js."));
+        if (workJson === liveJson) {
+            setText(el.sync, base + "In sync with the deployed data file.");
+        } else if (workJson === lastPublishedJson) {
+            setText(el.sync, base + "Published to the project folder. Commit and push to deploy.");
+        } else {
+            setText(el.sync, base + "Changes not yet exported to js/blog-data.js.");
+        }
     }
 
     /* ----------------------------------------------------------------------
@@ -655,8 +685,13 @@ body + '\n' +
         setText(el.formError, "");
         setText(el.formStatus, "");
         setText(el.coverError, "");
+        setText(el.coverNote, "");
         el.formTitle.textContent = "Add New Blog Post";
         el.saveBtn.textContent = "Add Blog Post";
+        /* Belt and braces against a reset landing between an upload starting
+           and its finally clause: the form must never come back unusable. */
+        el.saveBtn.disabled = false;
+        el.previewBtn.disabled = false;
         el.cancelBtn.hidden = true;
         el.previewPanel.hidden = true;
     }
@@ -735,6 +770,14 @@ body + '\n' +
     form.addEventListener("submit", (evt) => {
         evt.preventDefault();
         setText(el.formError, "");
+        /* The disabled Save button is not the guard. A form submits on Enter
+           in any text field, and requestSubmit() ignores button state
+           entirely -- so without this the post still saved mid-encode, with
+           no cover, while the preview filled in a moment later. */
+        if (el.saveBtn.disabled) {
+            setText(el.formError, "The cover image is still being processed. It will only take a moment.");
+            return;
+        }
         let post;
         try {
             post = collectPost();
@@ -753,15 +796,27 @@ body + '\n' +
         } else {
             posts.unshift(post);
         }
-        save();
-        setText(el.formStatus, "Saved to the local workspace. Use the Publish panel above to export js/blog-data.js when ready.");
+        /* Do not claim a save that did not land. save() writes the quota
+           warning into formError, and resetFormKeepStatus carries both lines
+           across the reset -- without that the warning was written and wiped
+           in the same tick, which is how it went unnoticed. */
+        const persisted = save();
+        setText(el.formStatus, persisted
+            ? "Saved to the local workspace. Use the Publish panel above to export js/blog-data.js when ready."
+            : "");
         resetFormKeepStatus();
     });
 
+    /* Carries the error across too, not just the status. save() writes its
+       quota warning into formError, and resetForm clears it -- so the warning
+       was written and wiped in the same tick, which is exactly how a save
+       that never landed went on reporting success. */
     function resetFormKeepStatus() {
         const status = el.formStatus.textContent;
+        const error = el.formError.textContent;
         resetForm();
         setText(el.formStatus, status);
+        setText(el.formError, error);
     }
 
     el.cancelBtn.addEventListener("click", resetForm);
@@ -800,34 +855,73 @@ body + '\n' +
 
     /* ----------------------------------------------------------------------
        Cover image intake.
+
        Mime-type gate per project standard: file.type must match image.*,
-       otherwise processing terminates immediately. Size is capped because
-       the image is inlined into the exported data file as a data URI.
+       otherwise processing terminates immediately.
+
+       Oversize uploads are re-encoded to fit rather than refused (August 24,
+       2026). The old behaviour was a flat "exceeds 400 KB" rejection, which
+       made an ordinary phone photograph unusable as a cover and left the
+       operator to go and shrink it by hand -- while the catalog half of this
+       same panel had done the shrinking for them since the day before.
+
+       **The budget is far tighter than a thumbnail's and the reason is the
+       data file.** A cover is inlined into js/blog-data.js as a data URI, and
+       base64 costs another third on top, so every cover is paid for by every
+       visitor who loads blog.html -- not just the one reading that post. Ten
+       posts at the old 400 KB cap is a 5 MB script. At 120 KB it is 1.6 MB,
+       which is still the largest thing on that page and is why the URL field
+       next to this one is worth using for anything heavy.
+
+       No reshape: a cover has no fixed frame to conform to, unlike a catalog
+       thumbnail. 1600px is twice the widest it renders, which covers a 2x
+       display without paying for pixels nobody sees.
        ---------------------------------------------------------------------- */
-    el.coverFile.addEventListener("change", () => {
+    const COVER_TARGET_BYTES = 120 * 1024;
+    const COVER_MAX_EDGE = 1600;
+
+    el.coverFile.addEventListener("change", async () => {
         setText(el.coverError, "");
+        setText(el.coverNote, "");
         const file = el.coverFile.files && el.coverFile.files[0];
         if (!file) {
             return;
         }
-        if (!/^image\//.test(file.type)) {
-            el.coverFile.value = "";
-            setText(el.coverError, "Rejected: the selected file is not an image.");
-            return;
-        }
-        if (file.size > MAX_COVER_BYTES) {
-            el.coverFile.value = "";
-            setText(el.coverError, "Rejected: image exceeds 400 KB. Compress it or host it and use the URL field.");
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-            coverData = String(reader.result || "");
+        /* Saving mid-encode stored the post with NO cover, then the encode
+           finished and filled the preview -- so the panel showed an image the
+           saved post did not have, silently. Disabling the input alone was
+           not enough: Save is a separate control and stayed live. */
+        setCoverBusy(true);
+        try {
+            const shot = await window.TBAdminImage.prepare(file, {
+                targetBytes: COVER_TARGET_BYTES,
+                maxEdge: COVER_MAX_EDGE,
+                oversizeMessage: "Rejected: file is over 24 MB. Export a smaller copy first.",
+                onProgress: (message) => setText(el.coverNote, message)
+            });
+            coverData = shot.data;
             el.coverUrl.value = "";
+            setText(el.coverNote, shot.note);
             showCoverPreview();
-        };
-        reader.readAsDataURL(file);
+        } catch (err) {
+            el.coverFile.value = "";
+            setText(el.coverNote, "");
+            setText(el.coverError, err.message);
+        } finally {
+            setCoverBusy(false);
+        }
     });
+
+    /* One switch for every control that must not be used while an upload is
+       still being encoded. */
+    function setCoverBusy(busy) {
+        el.coverFile.disabled = busy;
+        el.saveBtn.disabled = busy;
+        el.previewBtn.disabled = busy;
+        el.saveBtn.textContent = busy
+            ? "Waiting for the image..."
+            : (editingSlug ? "Save Changes" : "Add Blog Post");
+    }
 
     el.coverUrl.addEventListener("change", () => {
         const url = el.coverUrl.value.trim();
@@ -848,12 +942,312 @@ body + '\n' +
         coverData = "";
         el.coverFile.value = "";
         el.coverUrl.value = "";
+        setText(el.coverNote, "");
         showCoverPreview();
     });
 
     /* ----------------------------------------------------------------------
        Export bindings + boot
        ---------------------------------------------------------------------- */
+    /* ----------------------------------------------------------------------
+       Publishing the blog straight into the working copy (August 24, 2026).
+
+       The four exports above stay: they are the only route on Firefox and
+       Safari, and the only route with no folder connected. This removes the
+       manual half of all four at once, which mattered more here than it did
+       for thumbnails -- a post needed FOUR artifacts placed by hand, and
+       forgetting the third leaves the post invisible to anything that does
+       not run JavaScript (BLOG_POSTS_NOT_CRAWLABLE_WITHOUT_JAVASCRIPT.md).
+
+       Two of the four are whole-file writes with nothing to preserve:
+       js/blog-data.js and every blog/<slug>.html are generated in full. Only
+       blog.html's archive list and sitemap.xml need surgical edits, and both
+       have a single unambiguous anchor.
+
+       Order is the safety, exactly as on the thumbnail side: write and patch
+       everything first, RECONCILE LAST. A run that dies early leaves a page
+       nothing links to, which is inert. Deleting first would leave blog.html
+       and sitemap.xml pointing at pages that no longer exist.
+       ---------------------------------------------------------------------- */
+    const FS = window.TBProjectFolder;
+    const DATA_PATH = "js/blog-data.js";
+    const BLOG_INDEX_PATH = "blog.html";
+    const SITEMAP_PATH = "sitemap.xml";
+
+    function visiblePosts() {
+        return posts.filter((p) => p && p.visible !== false && p.slug && p.title);
+    }
+
+    /* Comment bodies blanked to spaces of equal length, so offsets found in
+       the masked copy stay valid in the original. Same reason as the catalog
+       patcher: a commented-out block must not steer a splice. */
+    function maskComments(html) {
+        return html.replace(/<!--[\s\S]*?-->/g, (m) => " ".repeat(m.length));
+    }
+
+    function newlineOf(text) {
+        return text.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
+    }
+
+    /* Replaces the <ul> inside <nav class="guide-archive">. That list is the
+       ONLY link to a post in blog.html's served markup, so it is also the
+       one thing here whose absence is invisible until a crawler tells you
+       months later. */
+    function patchGuideArchive(html) {
+        const masked = maskComments(html);
+        const nav = masked.search(/<nav class="guide-archive"[^>]*>/);
+        if (nav === -1) {
+            throw new Error("blog.html has no <nav class=\"guide-archive\">, so the archive cannot be updated.");
+        }
+        const navEnd = masked.indexOf("</nav>", nav);
+        const listStart = masked.indexOf("<ul", nav);
+        const listEnd = masked.indexOf("</ul>", listStart);
+        if (listStart === -1 || listEnd === -1 || navEnd === -1 ||
+                listStart > navEnd || listEnd > navEnd) {
+            throw new Error("blog.html's guide archive has no <ul> to replace.");
+        }
+        /* Back up over the indentation so the replacement supplies its own. */
+        let from = listStart;
+        while (from > 0 && (html.charAt(from - 1) === " " || html.charAt(from - 1) === "\t")) {
+            from -= 1;
+        }
+        const nl = newlineOf(html);
+        const block = buildArchiveList().replace(/\r?\n$/, "");
+        return html.slice(0, from) +
+            (nl === "\n" ? block : block.split("\n").join(nl)) +
+            html.slice(listEnd + "</ul>".length);
+    }
+
+    function verifyArchive(before, after) {
+        if (after.length < before.length * 0.75) {
+            return "blog.html lost a quarter of its content";
+        }
+        const doc = new DOMParser().parseFromString(after, "text/html");
+        if (doc.querySelector("parsererror")) {
+            return "the patched blog.html does not parse";
+        }
+        const nav = doc.querySelector(".guide-archive");
+        if (!nav) {
+            return "the guide archive is gone from the patched markup";
+        }
+        const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+        const wanted = visiblePosts().map((p) => "blog/" + encodeURIComponent(p.slug) + ".html");
+        if (hrefs.length !== wanted.length) {
+            return "the archive lists " + hrefs.length + " posts, expected " + wanted.length;
+        }
+        const missing = wanted.filter((h) => hrefs.indexOf(h) === -1);
+        if (missing.length) {
+            return "the archive does not link " + missing.join(", ");
+        }
+        return null;
+    }
+
+    /* Adds, updates and removes the <url> blocks whose <loc> is a blog post,
+       and touches nothing else. Rewriting the whole file from the post list
+       would be shorter and would silently drop every hand-maintained URL in
+       it -- the editors, the landing pages, the homepage. */
+    function patchSitemap(xml) {
+        const nl = newlineOf(xml);
+        const visible = visiblePosts();
+        const wanted = new Map();
+        visible.forEach((p) => {
+            wanted.set(POST_ORIGIN + "/blog/" + p.slug + ".html", p.updated || p.date || todayIso());
+        });
+
+        let out = xml;
+        const seen = new Set();
+
+        /* Existing blog blocks: refresh the ones still wanted, drop the rest. */
+        const blocks = [...out.matchAll(/[ \t]*<url>[\s\S]*?<\/url>\r?\n?/g)];
+        for (let i = blocks.length - 1; i >= 0; i -= 1) {
+            const block = blocks[i][0];
+            const loc = (block.match(/<loc>([^<]+)<\/loc>/) || [])[1];
+            if (!loc || loc.indexOf("/blog/") === -1) {
+                continue;
+            }
+            if (wanted.has(loc)) {
+                seen.add(loc);
+                const fixed = block.replace(/<lastmod>[^<]*<\/lastmod>/,
+                    "<lastmod>" + wanted.get(loc) + "</lastmod>");
+                out = out.slice(0, blocks[i].index) + fixed +
+                    out.slice(blocks[i].index + block.length);
+            } else {
+                out = out.slice(0, blocks[i].index) +
+                    out.slice(blocks[i].index + block.length);
+            }
+        }
+
+        /* Anything not already present goes in before the closing tag. */
+        const additions = [];
+        wanted.forEach((lastmod, loc) => {
+            if (seen.has(loc)) { return; }
+            additions.push(
+                "  <url>" + nl +
+                "    <loc>" + loc + "</loc>" + nl +
+                "    <lastmod>" + lastmod + "</lastmod>" + nl +
+                "  </url>" + nl);
+        });
+        if (additions.length) {
+            const close = out.lastIndexOf("</urlset>");
+            if (close === -1) {
+                throw new Error("sitemap.xml has no </urlset>, so no URL can be added.");
+            }
+            let at = close;
+            while (at > 0 && (out.charAt(at - 1) === " " || out.charAt(at - 1) === "\t")) {
+                at -= 1;
+            }
+            out = out.slice(0, at) + additions.join("") + out.slice(at);
+        }
+        return out;
+    }
+
+    function verifySitemap(before, after) {
+        const doc = new DOMParser().parseFromString(after, "text/xml");
+        if (doc.querySelector("parsererror")) {
+            return "the patched sitemap.xml is not valid XML";
+        }
+        const locs = Array.from(doc.querySelectorAll("url > loc")).map((n) => n.textContent.trim());
+        const wanted = visiblePosts().map((p) => POST_ORIGIN + "/blog/" + p.slug + ".html");
+        const missing = wanted.filter((l) => locs.indexOf(l) === -1);
+        if (missing.length) {
+            return "sitemap.xml does not list " + missing.join(", ");
+        }
+        const strayBlog = locs.filter((l) => l.indexOf("/blog/") >= 0 && wanted.indexOf(l) === -1);
+        if (strayBlog.length) {
+            return "sitemap.xml still lists " + strayBlog.join(", ");
+        }
+        /* Every non-post URL in the file must survive untouched. */
+        const beforeDoc = new DOMParser().parseFromString(before, "text/xml");
+        const keep = Array.from(beforeDoc.querySelectorAll("url > loc"))
+            .map((n) => n.textContent.trim())
+            .filter((l) => l.indexOf("/blog/") === -1);
+        const dropped = keep.filter((l) => locs.indexOf(l) === -1);
+        if (dropped.length) {
+            return "sitemap.xml lost " + dropped.length + " non-post URL(s): " + dropped.join(", ");
+        }
+        return null;
+    }
+
+    async function publishBlog() {
+        if (!FS || !FS.isConnected()) {
+            setText(el.exportStatus, "Connect the project folder first, or use the Download and Copy buttons.");
+            return;
+        }
+        const visible = visiblePosts();
+        if (!visible.length) {
+            setText(el.exportStatus, "No visible posts to publish.");
+            return;
+        }
+
+        setText(el.exportStatus, "Publishing " + visible.length + " post(s)...");
+        try {
+            await FS.writeFile(DATA_PATH, new Blob([buildDataFile()], { type: "text/javascript" }));
+            for (const post of visible) {
+                await FS.writeFile("blog/" + post.slug + ".html",
+                    new Blob([buildPostPage(post)], { type: "text/html" }));
+            }
+
+            const blogBefore = await FS.readText(BLOG_INDEX_PATH);
+            const blogAfter = patchGuideArchive(blogBefore);
+            const blogProblem = verifyArchive(blogBefore, blogAfter);
+            if (blogProblem) {
+                throw new Error("blog.html was left untouched: " + blogProblem);
+            }
+            await FS.writeFile(BLOG_INDEX_PATH, new Blob([blogAfter], { type: "text/html" }));
+
+            const mapBefore = await FS.readText(SITEMAP_PATH);
+            const mapAfter = patchSitemap(mapBefore);
+            const mapProblem = verifySitemap(mapBefore, mapAfter);
+            if (mapProblem) {
+                throw new Error("sitemap.xml was left untouched: " + mapProblem);
+            }
+            await FS.writeFile(SITEMAP_PATH, new Blob([mapAfter], { type: "application/xml" }));
+
+            /* Reconcile LAST. Every page in blog/ is generated from this
+               workspace, so one with no visible post behind it is a page for
+               a deleted or hidden post -- still served, still crawlable, and
+               no longer linked from anywhere. */
+            const keep = new Set(visible.map((p) => p.slug + ".html"));
+            const present = await FS.listDir("blog");
+            const removed = [];
+            for (const name of present) {
+                if (name.endsWith(".html") && !keep.has(name)) {
+                    if (await FS.deleteFile("blog/" + name)) {
+                        removed.push(name);
+                    }
+                }
+            }
+
+            lastPublishedJson = JSON.stringify(posts);
+            renderSyncState();
+            setText(el.exportStatus, "Published into " + FS.folderName() + "/: js/blog-data.js, " +
+                visible.length + " post page(s), the guides archive in blog.html and sitemap.xml." +
+                (removed.length
+                    ? " Removed " + removed.length + " page(s) with no visible post: " + removed.join(", ") + "."
+                    : "") +
+                " Review with git diff, then commit and push to deploy.");
+        } catch (err) {
+            setText(el.exportStatus, "Stopped: " + err.message);
+        }
+    }
+
+    function renderBlogFsState(state, detail) {
+        if (!el.fsState) {
+            return;
+        }
+        const messages = {
+            unsupported: "This browser cannot write to the project folder. Chrome and Edge can; Firefox and Safari cannot. Use the Download and Copy buttons.",
+            disconnected: "Not connected. Publishing writes all four artifacts for you; without it, use the Download and Copy buttons and place them by hand.",
+            "needs-permission": "A project folder is remembered but the browser dropped its permission on restart. Reconnect to publish.",
+            connected: "Connected to " + (detail || "the project folder") +
+                ". Publish writes the data file, the post pages, the guides archive and sitemap.xml."
+        };
+        setText(el.fsState, messages[state] || messages.disconnected);
+        const supported = state !== "unsupported";
+        el.fsConnect.hidden = !supported || state === "connected";
+        el.fsConnect.textContent = state === "needs-permission"
+            ? "Reconnect Project Folder"
+            : "Connect Project Folder";
+        el.fsDisconnect.hidden = state !== "connected";
+        el.publishBtn.hidden = state !== "connected";
+    }
+
+    async function refreshBlogFsState() {
+        if (!FS || !FS.supported()) {
+            renderBlogFsState("unsupported");
+            return;
+        }
+        if (FS.isConnected()) {
+            renderBlogFsState("connected", FS.folderName());
+            return;
+        }
+        renderBlogFsState(await FS.restore(), FS.folderName());
+    }
+
+    if (FS && el.fsConnect) {
+        el.fsConnect.addEventListener("click", async () => {
+            setText(el.exportStatus, "");
+            try {
+                const name = el.fsConnect.textContent.indexOf("Reconnect") === 0
+                    ? await FS.reconnect()
+                    : await FS.connect();
+                renderBlogFsState("connected", name);
+            } catch (err) {
+                if (err && err.name === "AbortError") { return; }
+                setText(el.exportStatus, err.message);
+            }
+        });
+        el.fsDisconnect.addEventListener("click", async () => {
+            await FS.disconnect();
+            renderBlogFsState("disconnected");
+            setText(el.exportStatus, "Disconnected. Nothing was changed in the project.");
+        });
+        el.publishBtn.addEventListener("click", publishBlog);
+        /* One folder, two panels: a connect made in the thumbnail panel has
+           to show up here too. */
+        window.addEventListener("tb-project-folder-changed", refreshBlogFsState);
+    }
+
     el.exportDownload.addEventListener("click", downloadDataFile);
     if (el.exportPages) {
         el.exportPages.addEventListener("click", downloadPostPages);
@@ -865,6 +1259,7 @@ body + '\n' +
 
     renderList();
     renderSyncState();
+    refreshBlogFsState();
 })();
 
 /* ==========================================================================
@@ -903,52 +1298,6 @@ body + '\n' +
 
     const STORAGE_KEY = "tb_admin_catalog_thumbs";
 
-    /* ----------------------------------------------------------------------
-       Compression budget.
-
-       Uploads are re-encoded to hit TARGET_BYTES rather than being rejected
-       for exceeding it. Calibrated against the four thumbnails already on
-       disk, which run 46-83 KB at 600x750 and 800x1000 -- about 0.8 bits per
-       pixel. OUTPUT_MAX_EDGE keeps that convention: 1000 is the long edge of
-       the largest shipped thumbnail, and it is already far more pixels than
-       the card needs, since a catalog card renders roughly 240 CSS px wide.
-
-       Be precise about what this does and does not promise. Re-encoding a
-       photograph to a byte budget is lossy by construction -- that is what
-       takes a multi-megabyte PNG to tens of kilobytes. What it preserves is
-       the appearance at the size the thumbnail is actually displayed, where
-       the source carries three to four times the pixels the card can show.
-       An image that ALREADY fits the budget is passed through untouched
-       rather than re-encoded, which is the one genuinely lossless path.
-       ---------------------------------------------------------------------- */
-    const TARGET_BYTES = 60 * 1024;
-    const OUTPUT_MAX_EDGE = 1000;
-
-    /* Decode guard, not a quality rule. A 50-megapixel photograph is several
-       hundred megabytes once decoded into a canvas, and the tab dies before
-       any of the code below runs. Nothing legitimate for a catalog thumbnail
-       comes near this. */
-    const MAX_INPUT_BYTES = 24 * 1024 * 1024;
-
-    /* Quality floor for the search. Below this the artefacts are visible in
-       the card itself, not merely on close inspection, and shipping a
-       visibly broken thumbnail to hit a byte count is the wrong trade -- the
-       encoder downscales instead. */
-    const MIN_QUALITY = 0.45;
-    const MAX_QUALITY = 0.92;
-
-    /* Mime type to file extension. This now names the OUTPUT format, which
-       the encoder below chooses -- it is no longer a gate on what may be
-       uploaded, because anything the browser can decode is re-encoded into
-       one of these. Deriving the extension from file.name would take it from
-       a user-controlled string: a file called "art.jpg" that is really a PNG
-       would be downloaded as .jpg and the generated markup would point at a
-       file the deploy does not contain. */
-    const EXT_BY_TYPE = {
-        "image/jpeg": "jpg",
-        "image/png": "png",
-        "image/webp": "webp"
-    };
 
     /* One record per catalog category: the filter value on the card's
        data-category, the visible label above the title, the editor the card
@@ -1051,6 +1400,7 @@ body + '\n' +
         previewTitle: document.querySelector("[data-thumb-preview-title]"),
         error: document.querySelector("[data-thumb-error]"),
         formStatus: document.querySelector("[data-thumb-form-status]"),
+        saveBtn: document.querySelector("[data-thumb-save]"),
         copy: document.querySelector("[data-thumb-copy]"),
         clear: document.querySelector("[data-thumb-clear]"),
         list: document.querySelector("[data-thumb-list]"),
@@ -1147,373 +1497,52 @@ body + '\n' +
     /* ----------------------------------------------------------------------
        Encoder.
 
-       Everything below runs on the client, in a canvas, with no library and
-       no upload. Nothing here talks to a server, per Rule 1.
+       The pipeline itself lives in js/admin-image.js, shared with the blog
+       cover intake in the IIFE above. Only the numbers are local: what a
+       catalog thumbnail is FOR decides the budget, the pixel cap and the
+       4:5 reshape, and none of that belongs to a blog cover.
        ---------------------------------------------------------------------- */
-    function readFileAsDataUri(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onerror = () => reject(new Error("The file could not be read."));
-            reader.onload = () => resolve(String(reader.result || ""));
-            reader.readAsDataURL(file);
-        });
-    }
+    const IMG = window.TBAdminImage;
+    const EXT_BY_TYPE = IMG.EXT_BY_TYPE;
+    const kb = IMG.kb;
+    const decode = IMG.decode;
+    const blobToDataUri = IMG.blobToDataUri;
 
-    function decode(dataUri) {
-        return new Promise((resolve, reject) => {
-            const probe = new Image();
-            probe.onerror = () => reject(
-                new Error("The file claims to be an image but could not be decoded."));
-            probe.onload = () => resolve(probe);
-            probe.src = dataUri;
-        });
-    }
+    /* Calibrated against the four thumbnails already on disk, which run
+       46-83 KB at 600x750 and 800x1000 -- about 0.8 bits per pixel. The
+       1000px cap is the long edge of the largest shipped thumbnail, already
+       far more pixels than the card needs at roughly 240 CSS px wide. */
+    const TARGET_BYTES = 60 * 1024;
+    const OUTPUT_MAX_EDGE = 1000;
 
-    function encode(canvas, mime, quality) {
-        return new Promise((resolve) => {
-            canvas.toBlob((blob) => resolve(blob), mime, quality);
-        });
-    }
-
-    function blobToDataUri(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onerror = () => reject(new Error("The encoded image could not be read back."));
-            reader.onload = () => resolve(String(reader.result || ""));
-            reader.readAsDataURL(blob);
-        });
-    }
-
-    function paint(source, w, h) {
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(source, 0, 0, w, h);
-        return canvas;
-    }
-
-    /* An <img> reports naturalWidth; a <canvas> reports width. Both are valid
-       drawImage sources and both now flow through this pipeline, since the
-       card-ratio pass below hands a canvas to the scaler. */
-    function srcW(source) { return source.naturalWidth || source.width; }
-    function srcH(source) { return source.naturalHeight || source.height; }
-
-    /* ----------------------------------------------------------------------
-       The card's aspect ratio (August 24, 2026).
-
-       .card-preview in css/style.css is `aspect-ratio: 4 / 5` and
-       `.card-preview.photo .card-thumb` is `object-fit: contain`. Change one
-       of those and this constant has to move with it, or thumbnails start
-       being letterboxed again -- which is exactly the defect this exists to
-       stop. The Leaning Wood Frame pair shipped at 1000x1000, square, and
-       lost about a fifth of its card to empty ground.
-
-       `contain` is deliberate and stays: a catalog thumbnail depicts a
-       finished design, designs carry content to their edges, and `cover`
-       would crop exactly those edges on every future upload with no warning.
-       The fix is to make the FILE the right shape, at which point `contain`
-       and `cover` are identical and the CSS stops mattering. That also keeps
-       the generated markup a fixed block with no per-card class to be
-       dropped the next time the card is published.
-       ---------------------------------------------------------------------- */
+    /* .card-preview is `aspect-ratio: 4 / 5` and `.card-preview.photo
+       .card-thumb` is `object-fit: contain`. Change either and this has to
+       move with it, or thumbnails start being letterboxed again -- the
+       defect this exists to stop. The Leaning Wood Frame pair shipped at
+       1000x1000, square, and lost about a fifth of its card to empty
+       ground. Making the FILE 4:5 leaves `contain` nothing to decide. */
     const CARD_ASPECT = 4 / 5;
 
-    /* One pixel of slack per thousand: a 800x1000 upload must not be
-       re-drawn just because floating point disagrees with itself. */
-    const ASPECT_TOLERANCE = 0.001;
-
     function isCardRatio(source) {
-        return Math.abs((srcW(source) / srcH(source)) - CARD_ASPECT) <= ASPECT_TOLERANCE;
+        const w = source.naturalWidth || source.width;
+        const h = source.naturalHeight || source.height;
+        return Math.abs((w / h) - CARD_ASPECT) <= 0.001;
     }
 
-    /* Reshapes an upload to the card's ratio. Two modes, and both produce a
-       4:5 file -- they differ only in what happens to the pixels that do not
-       fit:
-
-         fill  centre-crop. The card is filled edge to edge. Default, and what
-               a mockup or a photograph wants.
-         fit   pad with the card's own ground colour. The whole design is
-               visible, letterboxed inside a file that is still 4:5.
-
-       Padding rather than passing the image through is the point: either way
-       what lands on disk is 4:5, so `object-fit` has nothing left to decide
-       and no per-card class is needed.
-
-       An upload that is already 4:5 is returned untouched, so the common case
-       costs no re-draw at all. */
-    function fitToCard(img, mode) {
-        if (isCardRatio(img)) {
-            return img;
-        }
-
-        const w = srcW(img);
-        const h = srcH(img);
-
-        if (mode === "fit") {
-            /* Grow the short side to the ratio rather than shrinking the long
-               one: nothing is thrown away and no resolution is lost. */
-            const outW = Math.max(w, Math.round(h * CARD_ASPECT));
-            const outH = Math.max(h, Math.round(w / CARD_ASPECT));
-            const canvas = document.createElement("canvas");
-            canvas.width = outW;
-            canvas.height = outH;
-            const ctx = canvas.getContext("2d");
-            /* The padding is left TRANSPARENT rather than filled with the
-               card's ground colour, and that is a dark-mode decision. A baked
-               light pad is a pale band down each side of the card for every
-               visitor on the dark theme, permanently, because a file cannot
-               respond to a media query. Transparent padding lets
-               .card-preview's own background show through, so the card looks
-               the same in both themes -- exactly as an unpadded letterboxed
-               image does today.
-
-               The cost is the format: JPEG has no alpha channel, so a padded
-               thumbnail can only be encoded as WebP or PNG. compress() below
-               already detects transparency and drops JPEG from its format
-               list for exactly this reason, and WebP with alpha is well
-               inside the byte budget at these dimensions. */
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-            ctx.drawImage(img, Math.round((outW - w) / 2), Math.round((outH - h) / 2), w, h);
-            return canvas;
-        }
-
-        /* fill: take the largest 4:5 window the source contains, centred. */
-        const cropW = Math.min(w, Math.round(h * CARD_ASPECT));
-        const cropH = Math.min(h, Math.round(w / CARD_ASPECT));
-        const canvas = document.createElement("canvas");
-        canvas.width = cropW;
-        canvas.height = cropH;
-        const ctx = canvas.getContext("2d");
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, Math.round((w - cropW) / 2), Math.round((h - cropH) / 2),
-            cropW, cropH, 0, 0, cropW, cropH);
-        return canvas;
-    }
-
-    /* Downscale in halving steps rather than one jump. Every browser's
-       one-shot drawImage undersamples heavily on a large reduction -- a
-       3000px photograph drawn straight to 800px samples a fraction of the
-       pixels it skips, which reads as aliasing on any fine detail such as
-       fabric weave or text on a mockup. Halving repeatedly averages the
-       pixels that are being discarded, and it is the difference between a
-       thumbnail that looks resized and one that looks sharp. */
-    function scaleTo(img, maxEdge) {
-        const longest = Math.max(srcW(img), srcH(img));
-        const ratio = Math.min(1, maxEdge / longest);
-        const targetW = Math.max(1, Math.round(srcW(img) * ratio));
-        const targetH = Math.max(1, Math.round(srcH(img) * ratio));
-
-        let source = img;
-        let w = srcW(img);
-        let h = srcH(img);
-        while (w > targetW * 2 && h > targetH * 2) {
-            w = Math.max(targetW, Math.round(w / 2));
-            h = Math.max(targetH, Math.round(h / 2));
-            source = paint(source, w, h);
-        }
-        return paint(source, targetW, targetH);
-    }
-
-    /* JPEG cannot carry an alpha channel: flattening a transparent thumbnail
-       into it paints the transparent region solid black. Only PNG and WebP
-       survive it, so transparency decides the format list. The source is a
-       data URI, so the canvas is never tainted and getImageData is allowed.
-       Every pixel is scanned rather than sampled -- a sampled scan misses a
-       one-pixel transparent border, which is exactly the case that would
-       come back as a black outline in the card. */
-    function hasTransparency(canvas) {
-        const pixels = canvas.getContext("2d")
-            .getImageData(0, 0, canvas.width, canvas.height).data;
-        for (let i = 3; i < pixels.length; i += 4) {
-            if (pixels[i] < 255) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    let webpSupport = null;
-    async function supportsWebp() {
-        if (webpSupport === null) {
-            const probe = document.createElement("canvas");
-            probe.width = 1;
-            probe.height = 1;
-            const blob = await encode(probe, "image/webp", 0.8);
-            /* A browser that cannot encode WebP silently returns PNG rather
-               than failing, so the type is the only honest test. */
-            webpSupport = Boolean(blob) && blob.type === "image/webp";
-        }
-        return webpSupport;
-    }
-
-    /* Highest quality that fits the budget, by binary search. Six probes
-       land within about one part in seventy of the true threshold, which is
-       finer than the encoder's own quality granularity, and costs six
-       encodes instead of the dozen a linear walk down would take. */
-    async function bestQualityUnder(canvas, mime, targetBytes) {
-        const top = await encode(canvas, mime, MAX_QUALITY);
-        if (!top || top.type !== mime) {
-            return null;
-        }
-        if (top.size <= targetBytes) {
-            return { blob: top, quality: MAX_QUALITY };
-        }
-
-        let low = MIN_QUALITY;
-        let high = MAX_QUALITY;
-        let best = null;
-        for (let i = 0; i < 6; i += 1) {
-            const mid = (low + high) / 2;
-            const blob = await encode(canvas, mime, mid);
-            if (blob && blob.type === mime && blob.size <= targetBytes) {
-                best = { blob: blob, quality: mid };
-                low = mid;
-            } else {
-                high = mid;
-            }
-        }
-        return best;
-    }
-
-    /* Format, dimensions and quality that together meet the budget. Tries
-       the full size first and only gives up pixels when quality alone cannot
-       get there, because dropping resolution is the more visible of the two
-       losses at the size a card renders. */
-    async function compress(img, targetBytes, mode) {
-        /* Reshape BEFORE scaling, so the long edge that OUTPUT_MAX_EDGE caps
-           is the one that survives into the file. Cropping after the scale
-           would leave a 1000px source producing an 800px-tall thumbnail. */
-        const source = fitToCard(img, mode);
-        const full = scaleTo(source, OUTPUT_MAX_EDGE);
-        const transparent = hasTransparency(full);
-        const webp = await supportsWebp();
-
-        /* WebP first wherever it exists: at equal perceived quality it is
-           reliably a quarter to a third smaller than JPEG, which is the
-           whole reason a 60 KB budget is reachable at these dimensions. */
-        const formats = [];
-        if (webp) { formats.push("image/webp"); }
-        if (!transparent) { formats.push("image/jpeg"); }
-        if (transparent && !webp) { formats.push("image/png"); }
-
-        let canvas = full;
-        for (let attempt = 0; attempt < 4; attempt += 1) {
-            for (const mime of formats) {
-                if (mime === "image/png") {
-                    /* PNG ignores the quality argument; it either fits at
-                       this size or it does not. */
-                    const blob = await encode(canvas, "image/png");
-                    if (blob && blob.size <= targetBytes) {
-                        return { blob: blob, mime: mime, w: canvas.width, h: canvas.height };
-                    }
-                    continue;
-                }
-                const found = await bestQualityUnder(canvas, mime, targetBytes);
-                if (found) {
-                    return {
-                        blob: found.blob, mime: mime,
-                        w: canvas.width, h: canvas.height
-                    };
-                }
-            }
-            const nextEdge = Math.round(Math.max(canvas.width, canvas.height) * 0.75);
-            if (nextEdge < 200) { break; }
-            /* From the reshaped source, not the original: dropping back to
-               `img` here would undo the crop on every retry. */
-            canvas = scaleTo(source, nextEdge);
-        }
-        return null;
-    }
-
-    /* ----------------------------------------------------------------------
-       Image intake. Mime-type gate per the project standard: file.type must
-       be an image type, otherwise processing terminates immediately and the
-       input is cleared. The decode is a second gate -- a file can carry an
-       image mime type and still not be an image.
-
-       An upload that already fits the budget at sensible dimensions is kept
-       byte for byte. Re-encoding it would only throw away quality to reach a
-       size it had already reached.
-       ---------------------------------------------------------------------- */
     async function readImage(file, onOk, onFail, onProgress, mode) {
-        if (!file.type.startsWith("image/")) {
-            onFail("Rejected: the selected file is not an image.");
-            return;
-        }
-        if (file.size > MAX_INPUT_BYTES) {
-            onFail("Rejected: file is over 24 MB. That is a full-resolution photograph, not a thumbnail; export a smaller copy first.");
-            return;
-        }
-
         try {
-            const original = await readFileAsDataUri(file);
-            const img = await decode(original);
-
-            /* The ratio test is not decoration. Without it a square upload
-               already under the budget is kept byte for byte and walks
-               straight past the card-ratio pass -- which is precisely how the
-               1000x1000 pair that letterboxed its card got onto disk. An
-               upload has to be the right SHAPE as well as the right size to
-               skip re-encoding. */
-            const alreadyFits = file.size <= TARGET_BYTES &&
-                Math.max(img.naturalWidth, img.naturalHeight) <= OUTPUT_MAX_EDGE &&
-                isCardRatio(img) &&
-                Object.prototype.hasOwnProperty.call(EXT_BY_TYPE, file.type);
-            if (alreadyFits) {
-                onOk({
-                    data: original,
-                    ext: EXT_BY_TYPE[file.type],
-                    w: img.naturalWidth,
-                    h: img.naturalHeight,
-                    note: "Kept as uploaded: " + kb(file.size) + ", " +
-                        img.naturalWidth + "x" + img.naturalHeight +
-                        ". Already 4:5 and within budget, so it was not re-encoded."
-                });
-                return;
-            }
-
-            if (onProgress) {
-                onProgress("Compressing " + kb(file.size) + " image...");
-            }
-            /* Yields a frame so the message paints before the encoder locks
-               the main thread. */
-            await new Promise((resolve) => window.setTimeout(resolve, 0));
-
-            const result = await compress(img, TARGET_BYTES, mode);
-            if (!result) {
-                onFail("Could not get this image under " + kb(TARGET_BYTES) +
-                    " without destroying it. Crop or flatten it and try again.");
-                return;
-            }
-
-            const data = await blobToDataUri(result.blob);
-            const resized = result.w !== img.naturalWidth || result.h !== img.naturalHeight;
-            const reshaped = !isCardRatio(img);
-            onOk({
-                data: data,
-                ext: EXT_BY_TYPE[result.mime],
-                w: result.w,
-                h: result.h,
-                note: "Compressed " + kb(file.size) + " to " + kb(result.blob.size) +
-                    " " + EXT_BY_TYPE[result.mime].toUpperCase() + ", " +
-                    result.w + "x" + result.h +
-                    (reshaped ? (mode === "fit" ? " (padded to 4:5)" : " (cropped to 4:5)") : "") +
-                    (resized ? " (resized from " + img.naturalWidth + "x" + img.naturalHeight + ")" : "") + "."
-            });
+            onOk(await IMG.prepare(file, {
+                targetBytes: TARGET_BYTES,
+                maxEdge: OUTPUT_MAX_EDGE,
+                aspect: CARD_ASPECT,
+                aspectLabel: "4:5",
+                fitMode: mode,
+                oversizeMessage: "Rejected: file is over 24 MB. That is a full-resolution photograph, not a thumbnail; export a smaller copy first.",
+                onProgress: onProgress
+            }));
         } catch (err) {
-            onFail("Rejected: " + err.message);
+            onFail(err.message);
         }
-    }
-
-    function kb(bytes) {
-        return bytes >= 1024 * 1024
-            ? (bytes / (1024 * 1024)).toFixed(1) + " MB"
-            : Math.round(bytes / 1024) + " KB";
     }
 
     /* Read at upload time rather than stored: the control applies to the
@@ -1522,6 +1551,20 @@ body + '\n' +
        which is also what an older saved draft implies. */
     function cardFitMode() {
         return el.fit && el.fit.value === "fit" ? "fit" : "fill";
+    }
+
+    /* A COUNTER rather than a flag: this half has two upload slots and either
+       can be encoding, so a flag cleared by whichever finished first would
+       re-enable Save while the other was still running -- the same silent
+       drop the blog cover had. */
+    let thumbEncodes = 0;
+
+    function setThumbBusy(delta) {
+        thumbEncodes = Math.max(0, thumbEncodes + delta);
+        const busy = thumbEncodes > 0;
+        el.saveBtn.disabled = busy;
+        el.copy.disabled = busy;
+        el.saveBtn.textContent = busy ? "Waiting for the image..." : "Save Thumbnails";
     }
 
     function bindUpload(input, errorTarget, noteTarget, removeBtn, assign, onRemove) {
@@ -1536,13 +1579,16 @@ body + '\n' +
                moment, so the control is disabled while it runs rather than
                left looking idle and clickable. */
             input.disabled = true;
+            setThumbBusy(1);
             readImage(file, (shot) => {
                 input.disabled = false;
+                setThumbBusy(-1);
                 assign(shot);
                 setText(noteTarget, shot.note || "");
                 renderPreview();
             }, (message) => {
                 input.disabled = false;
+                setThumbBusy(-1);
                 input.value = "";
                 assign(null);
                 setText(errorTarget, message);
@@ -1760,6 +1806,12 @@ body + '\n' +
     form.addEventListener("submit", (evt) => {
         evt.preventDefault();
         setText(el.error, "");
+        /* Same reason as the blog form above: Enter in a field and
+           requestSubmit() both bypass a disabled button. */
+        if (thumbEncodes > 0) {
+            setText(el.error, "An image is still being processed. It will only take a moment.");
+            return;
+        }
         let record;
         try {
             record = collectRecord();

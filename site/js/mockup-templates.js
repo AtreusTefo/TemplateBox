@@ -128,7 +128,7 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "wood-a4",
         title: "Leaning Wood Frame Poster",
-        thumb: "assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.jpg",
+        thumb: "assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.webp",
         base: "assets/mockups/wood-a4-base.png",
         overlay: "assets/mockups/wood-a4-overlay.png",
         /* Measured: inside the print window this overlay averages alpha 193
@@ -148,7 +148,7 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "tshirt-model-white",
         title: "White T-Shirt on Model",
-        thumb: "assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb.jpg",
+        thumb: "assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb.webp",
         base: "assets/mockups/tshirt-model-white-base.png",
         /* Fabric, not glass: the artwork is bent and shaded by the two maps
            below during the displacement pass, so this template carries no

@@ -531,6 +531,33 @@ function staticChecks() {
             broken.length === 0, `missing file(s): ${broken.join(", ")}`);
     });
 
+    /* 1k2. The same rule for asset paths named in JavaScript.
+
+            1k above covers <img src> in markup, and that is where it was
+            written, so it sailed straight past two broken references that a
+            thumbnail re-publish had left in js/mockup-templates.js: the
+            registry still named .jpg files that the publish had replaced
+            with .webp and deleted. Nothing failed -- the mockup editor's
+            template picker simply showed a broken thumbnail, on a page the
+            suite was not looking at.
+
+            Any "assets/..." string literal counts, whatever key it sits
+            under, because the defect is a dangling path and not a particular
+            field name. */
+    const assetScripts = ["js/mockup-templates.js", "js/ads.js", "js/app.js"];
+    assetScripts.forEach((rel) => {
+        const full = path.join(SITE, ...rel.split("/"));
+        if (!fs.existsSync(full)) { return; }
+        const src = fs.readFileSync(full, "utf8");
+        const paths = [...new Set(
+            [...src.matchAll(/"(assets\/[^"]+)"/g)].map((m) => m[1])
+        )];
+        if (!paths.length) { return; }
+        const broken = paths.filter((p) => !fs.existsSync(path.join(SITE, p)));
+        check(`${rel}: every asset path it names exists on disk (${paths.length} checked)`,
+            broken.length === 0, `missing file(s): ${broken.join(", ")}`);
+    });
+
     /* The catalog-empty message names the card count. It said 17 against
        eighteen cards until August 22, 2026, because adding a card does not
        force anyone to touch that sentence. */
@@ -2306,6 +2333,82 @@ async function adminThumbnailChecks(page) {
    Both were found the hard way while confirming the defect.
    ========================================================================== */
 
+/* ==========================================================================
+   8. Admin: a save that did not persist must not report success.
+
+   TB.storageSet swallows quota and private-mode failures by design, so the
+   blog workspace could write nothing and still print "Saved to the local
+   workspace" -- with the post gone on the next reload. Posts carry their
+   cover inlined as a data URI and that storage is shared with the thumbnail
+   workspace, so filling it is ordinary rather than remote.
+
+   The first attempt at the fix LOOKED right and did nothing: save() wrote
+   the warning into formError, and the reset that runs immediately afterwards
+   cleared it in the same tick. That is why this is a test and not a reading
+   of the code -- the failure mode here is a message that exists for a
+   microsecond.
+
+   Both directions are asserted. A warning that appears and never clears
+   would be just as wrong: the operator would learn to ignore it.
+   ========================================================================== */
+
+async function adminPersistenceChecks(page) {
+    section("8. Admin: a save that did not persist says so");
+
+    await page.navigate(`http://localhost:${PORT}/admin.html`, 1440);
+
+    const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise(r => setTimeout(r, ms));
+        const fill = (title) => {
+            document.querySelector("[data-new-post]").click();
+            document.getElementById("f-title").value = title;
+            document.getElementById("f-title").dispatchEvent(new Event("input"));
+            document.getElementById("f-content").value =
+                "## Heading" + String.fromCharCode(10, 10) + "Body text for the probe.";
+            document.getElementById("post-form").requestSubmit();
+        };
+
+        localStorage.clear();
+
+        /* Every write fails, exactly as a full quota does. */
+        const realSet = TB.storageSet;
+        TB.storageSet = () => {};
+        fill("Quota Probe");
+        await wait(300);
+        const warned = document.querySelector("[data-form-error]").textContent;
+        const claimed = document.querySelector("[data-form-status]").textContent;
+
+        /* Storage works again: the warning must go and success must return. */
+        TB.storageSet = realSet;
+        localStorage.clear();
+        fill("Good Save");
+        await wait(300);
+        const okWarn = document.querySelector("[data-form-error]").textContent;
+        const okStatus = document.querySelector("[data-form-status]").textContent;
+        const stored = JSON.parse(localStorage.getItem("tb_admin_posts") || "[]");
+        localStorage.clear();
+
+        return JSON.stringify({
+            warnedOnFailure: warned.indexOf("did not store the workspace") >= 0,
+            claimedSuccessOnFailure: claimed.indexOf("Saved to the local workspace") >= 0,
+            warningClearedOnSuccess: okWarn === "",
+            reportedSuccessOnSuccess: okStatus.indexOf("Saved to the local workspace") >= 0,
+            persistedOnSuccess: stored.some((p) => p.slug === "good-save")
+        });
+    })()`);
+
+    const r = JSON.parse(out);
+    check("admin: a save that did not persist warns about it",
+        r.warnedOnFailure, "no quota warning was shown");
+    check("admin: a save that did not persist does not claim success",
+        !r.claimedSuccessOnFailure, "it still said \"Saved to the local workspace\"");
+    check("admin: a save that DID persist clears the warning",
+        r.warningClearedOnSuccess, "the warning stuck after a good save");
+    check("admin: a save that DID persist reports success and stores the post",
+        r.reportedSuccessOnSuccess && r.persistedOnSuccess,
+        `status shown: ${r.reportedSuccessOnSuccess}, post stored: ${r.persistedOnSuccess}`);
+}
+
 async function exportNameChecks(page) {
     section("7. Editors: the typed name names the downloaded file");
 
@@ -2550,6 +2653,7 @@ async function main() {
                 await launchChecks(page);
                 await mockupChecks(page);
                 await adminThumbnailChecks(page);
+                await adminPersistenceChecks(page);
                 await exportNameChecks(page);
             } finally {
                 page.close();
