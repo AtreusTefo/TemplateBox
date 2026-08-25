@@ -11,6 +11,31 @@
 
 "use strict";
 
+/* --------------------------------------------------------------------------
+   Shared by BOTH workspaces below.
+
+   Each half patches a hand-maintained file -- the blog half rewrites the
+   guides archive in blog.html and the post URLs in sitemap.xml, the catalog
+   half splices one card's preview in index.html -- and both must locate
+   their target the same way.
+
+   maskComments blanks comment bodies to spaces of equal length, so every
+   offset found in the masked copy is still valid in the original. Searching
+   the raw text would let a commented-out card, or a stray "</div>" inside a
+   comment, steer a splice: index.html carries several explanatory comments
+   between its cards, including one describing that very markup.
+
+   These lived as a copy in each IIFE until August 25, 2026. They were still
+   identical then, which is the point -- the footer constant and the inline
+   route whitelist were identical too, right up until they were not, and
+   both cost a defect nobody could see. One definition cannot drift.
+   -------------------------------------------------------------------------- */
+const maskComments = (html) =>
+    html.replace(/<!--[\s\S]*?-->/g, (match) => " ".repeat(match.length));
+
+const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
+
+
 (() => {
 
     const STORAGE_KEY = TBBlog.ADMIN_STORAGE_KEY;
@@ -978,17 +1003,6 @@ body + '\n' +
         return posts.filter((p) => p && p.visible !== false && p.slug && p.title);
     }
 
-    /* Comment bodies blanked to spaces of equal length, so offsets found in
-       the masked copy stay valid in the original. Same reason as the catalog
-       patcher: a commented-out block must not steer a splice. */
-    function maskComments(html) {
-        return html.replace(/<!--[\s\S]*?-->/g, (m) => " ".repeat(m.length));
-    }
-
-    function newlineOf(text) {
-        return text.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
-    }
-
     /* Replaces the <ul> inside <nav class="guide-archive">. That list is the
        ONLY link to a post in blog.html's served markup, so it is also the
        one thing here whose absence is invisible until a crawler tells you
@@ -1212,6 +1226,14 @@ body + '\n' +
         el.publishBtn.hidden = state !== "connected";
     }
 
+    /* Every path must end in a rendered state. restore() reads IndexedDB and
+       asks the browser to vouch for a stored handle, and either can reject --
+       blocked storage, a partitioned context, a handle the browser will not
+       stand behind. When that rejection was left unhandled the renderer never
+       ran, so the panel kept the markup's own defaults: no status text and
+       every button still carrying its `hidden` attribute. The result was a
+       publish feature that could not be reached OR explained. Falling back to
+       "disconnected" always leaves Connect available. */
     async function refreshBlogFsState() {
         if (!FS || !FS.supported()) {
             renderBlogFsState("unsupported");
@@ -1221,7 +1243,13 @@ body + '\n' +
             renderBlogFsState("connected", FS.folderName());
             return;
         }
-        renderBlogFsState(await FS.restore(), FS.folderName());
+        try {
+            renderBlogFsState(await FS.restore(), FS.folderName());
+        } catch (err) {
+            renderBlogFsState("disconnected");
+            setText(el.exportStatus, "Could not check for a remembered project folder (" +
+                err.message + "). Connecting one still works.");
+        }
     }
 
     if (FS && el.fsConnect) {
@@ -1242,7 +1270,9 @@ body + '\n' +
             renderBlogFsState("disconnected");
             setText(el.exportStatus, "Disconnected. Nothing was changed in the project.");
         });
-        el.publishBtn.addEventListener("click", publishBlog);
+        el.publishBtn.addEventListener("click", () => publishBlog().catch((err) => {
+            setText(el.exportStatus, "Stopped: " + err.message);
+        }));
         /* One folder, two panels: a connect made in the thumbnail panel has
            to show up here too. */
         window.addEventListener("tb-project-folder-changed", refreshBlogFsState);
@@ -1720,8 +1750,18 @@ body + '\n' +
         } else if (known) {
             el.folder.value = defaultFolder(known);
             /* Nothing saved for this card yet, so show what the site has
-               rather than an empty form that invites overwriting it. */
-            hydrateFromProject(known, hydrateToken);
+               rather than an empty form that invites overwriting it.
+
+               Not awaited -- this runs from a change handler and the rest of
+               the form must not wait on disk. The catch is therefore the only
+               thing standing between a bad read and an unhandled rejection
+               that leaves the form silently empty, which is worse than it
+               sounds: an empty form is exactly what invites uploading over
+               thumbnails the card already has. */
+            hydrateFromProject(known, hydrateToken).catch((err) => {
+                setText(el.formStatus, "Could not read this card's current thumbnails from the project (" +
+                    err.message + "). Anything you upload will REPLACE whatever the card has now.");
+            });
         }
         renderPreview();
     }
@@ -2014,14 +2054,6 @@ body + '\n' +
        would let a commented-out card or a stray "</div>" inside a comment
        steer the splice -- index.html carries several explanatory comments
        between cards, including one that describes this very markup. */
-    function maskComments(html) {
-        return html.replace(/<!--[\s\S]*?-->/g, (match) => " ".repeat(match.length));
-    }
-
-    function newlineOf(html) {
-        return html.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
-    }
-
     function withNewline(block, nl) {
         return nl === "\n" ? block : block.split("\n").join(nl);
     }
@@ -2538,6 +2570,13 @@ body + '\n' +
         };
     }
 
+    /* publish() catches per record, so reaching here means something outside
+       that loop failed. Reported rather than dropped: a click that produces
+       neither a result nor a message reads as the button being broken. */
+    function reportPublishFailure(err) {
+        setText(el.status, "Stopped: " + (err && err.message ? err.message : err));
+    }
+
     async function publish(records) {
         if (!FS || !FS.isConnected()) {
             setText(el.status, "Connect the project folder first, or use Download and Copy Markup.");
@@ -2604,13 +2643,29 @@ body + '\n' +
         renderList();
     }
 
+    /* Same contract as the blog panel's: a rejected restore() must still
+       leave a rendered, usable state rather than the markup's hidden
+       defaults. See the note there. */
     async function refreshFsState() {
         if (!FS || !FS.supported()) {
             renderFsState("unsupported");
             return;
         }
-        const state = await FS.restore();
-        renderFsState(state, FS.folderName());
+        /* Live state first, storage only as the fallback. restore() answers
+           from IndexedDB, so asking it about a connection this page just
+           made means racing the write -- which is precisely how connecting
+           in one panel left the other reading "Not connected". */
+        if (FS.isConnected()) {
+            renderFsState("connected", FS.folderName());
+            return;
+        }
+        try {
+            renderFsState(await FS.restore(), FS.folderName());
+        } catch (err) {
+            renderFsState("disconnected");
+            setText(el.status, "Could not check for a remembered project folder (" +
+                err.message + "). Connecting one still works.");
+        }
     }
 
     /* ----------------------------------------------------------------------
@@ -2682,7 +2737,7 @@ body + '\n' +
                 pubBtn.className = "btn btn-small";
                 pubBtn.type = "button";
                 pubBtn.textContent = "Publish";
-                pubBtn.addEventListener("click", () => publish([record]));
+                pubBtn.addEventListener("click", () => publish([record]).catch(reportPublishFailure));
                 actions.appendChild(pubBtn);
             }
 
@@ -2777,7 +2832,12 @@ body + '\n' +
             setText(el.status, "Disconnected. Nothing was changed in the project.");
         });
 
-        el.fsPublishAll.addEventListener("click", () => publish(items));
+        el.fsPublishAll.addEventListener("click", () => publish(items).catch(reportPublishFailure));
+        /* One folder, two panels -- and the broadcast has to be listened for
+           in BOTH. It was wired on the blog side only, so connecting there
+           left this panel reading "Not connected" with its Publish buttons
+           hidden until a reload, while connecting here updated both. */
+        window.addEventListener("tb-project-folder-changed", refreshFsState);
     }
 
     buildCategoryOptions();

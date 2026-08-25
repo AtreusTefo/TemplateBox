@@ -163,13 +163,18 @@ window.TBProjectFolder = (() => {
             throw new Error("That folder is not the site directory: it has no index.html and no assets folder. Choose the site folder inside the project, not the project root.");
         }
         dirHandle = picked;
-        announce();
         try {
             await dbPut(HANDLE_KEY, picked);
         } catch (err) {
             /* Storage refused the handle. The connection still works for
                this session; it just will not survive a reload. */
         }
+        /* AFTER the write, not before. A listener woken by this event may
+           read the stored handle back to decide what to show, and firing
+           first meant it read the state as it was a moment ago -- so
+           connecting in one panel left the other still saying "Not
+           connected" until a reload. */
+        announce();
         return picked.name;
     }
 
@@ -215,12 +220,14 @@ window.TBProjectFolder = (() => {
 
     async function disconnect() {
         dirHandle = null;
-        announce();
         try {
             await dbDelete(HANDLE_KEY);
         } catch (err) {
             /* Nothing stored, or storage unavailable. */
         }
+        /* After the delete, for the same reason as connect(): a listener
+           that reads storage back would otherwise still find the handle. */
+        announce();
     }
 
     function isConnected() {
