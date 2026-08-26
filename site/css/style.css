@@ -3692,6 +3692,50 @@ body.has-site-anchor {
     color: var(--color-brand);
 }
 
+/* Left edge, docs.html: the mark on its own, with no word beside it and no
+   viewport gate. It is the other half of the pair above, not a variant of
+   it -- .editor-brand is mark-plus-word and appears only from 75rem, because
+   mockup.html hands the narrow band back to .editor-home. This one REPLACES
+   .editor-home on its page, so gating it would leave a band with no identity
+   at all, which is the exact shape of the search-control hole this bar's
+   comment block already warns about. */
+.editor-mark {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    text-decoration: none;
+    color: var(--color-text);
+    /* Negative, not 1 like the icon it replaces. The document-name input
+       carries no order at all, so it sits at the default 0 and any positive
+       value lands the mark AFTER the name field -- which is where the house
+       icon has actually been rendering on this bar. -1 is the only value
+       that puts it at the far left without giving an order to elements that
+       resume and poster share. */
+    order: -1;
+}
+
+.editor-mark svg {
+    width: 1.5rem;
+    height: 1.6875rem;
+    flex-shrink: 0;
+}
+
+.editor-mark:hover {
+    color: var(--color-brand);
+}
+
+/* .site-header is justify-content: space-between, so whatever free space the
+   bar has left over gets shared out between its items unless something
+   absorbs it. The base .editor-actions rule absorbs it with margin-left:auto;
+   the 75rem rule below hands that job to the search FIELD instead, which is
+   right for mockup.html and wrong for a bar that has no field -- there, the
+   space is split and the document name ends up floating in the middle of the
+   bar with a 219px hole between it and the mark. Three classes, so it wins
+   over the two-class rule in the media query wherever either is declared. */
+.editor-bar .editor-mark ~ .editor-actions {
+    margin-left: auto;
+}
+
 .editor-bar .editor-home { order: 1; }
 .editor-bar .nav-toggle { order: 2; }
 .editor-bar .site-nav { order: 3; }
@@ -3776,10 +3820,23 @@ body.has-site-anchor {
    on that page is a heading inside the export panel, which this rule would
    have reached for no reason at all. */
 @media (max-width: 48rem) {
-    .editor-bar .dl-toggle {
+    .editor-bar .dl-toggle,
+    .editor-bar .bar-action {
         gap: 0;
         padding-left: var(--space-sm);
         padding-right: var(--space-sm);
+    }
+
+    /* docs.html carries three labelled buttons in this bar since August 26,
+       2026 -- Print, Clear Form and Download PDF. Measured at 320px, the
+       three labels overflow the row and the sticky header wraps to a second
+       line, which is the 56px cost the note above exists to prevent, so all
+       three give up their label here and keep their icon. Each button
+       carries its own aria-label, so the accessible name survives the label
+       going. Only this bar has .bar-label elements; resume and poster are
+       untouched. */
+    .editor-bar .bar-label {
+        display: none;
     }
 }
 
@@ -3927,7 +3984,12 @@ body.has-site-anchor {
     position: relative;
 }
 
-.dl-toggle {
+/* One selector list rather than a second block that looks like this one:
+   .bar-action is docs.html's Print and Clear Form, which sit beside Download
+   in the same toolbar and have to be the same size as it. Two similar rules
+   would drift the first time either is touched. */
+.dl-toggle,
+.bar-action {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2xs);
@@ -3935,7 +3997,8 @@ body.has-site-anchor {
     font-size: 0.8125rem;
 }
 
-.dl-toggle svg {
+.dl-toggle svg,
+.bar-action svg {
     width: 1rem;
     height: 1rem;
     fill: none;
@@ -4904,19 +4967,6 @@ legend {
 
 .doc-note.left {
     text-align: left;
-}
-
-/* Editor controls specific to the document builder */
-
-.doc-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
-}
-
-.doc-actions .btn {
-    flex: 1 1 8rem;
 }
 
 .item-grid {
@@ -7284,7 +7334,6 @@ main:has(.mockup-layout) .editor-head {
     .site-footer,
     .mobile-tabs,
     .editor-pane,
-    .doc-actions,
     .upload-hint,
     .loading-status,
     .skip-link,
