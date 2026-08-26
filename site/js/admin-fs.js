@@ -39,6 +39,14 @@ window.TBProjectFolder = (() => {
        should be able to hand this module a directory it did not verify. */
     let dirHandle = null;
 
+    /* Both admin panels share one connection, so a connect made in either
+       has to reach the other. Without this the blog panel keeps offering a
+       Connect button after the thumbnail panel has already connected, which
+       reads as two separate grants for one folder. */
+    function announce() {
+        window.dispatchEvent(new CustomEvent("tb-project-folder-changed"));
+    }
+
     function supported() {
         return typeof window.showDirectoryPicker === "function";
     }
@@ -120,11 +128,20 @@ window.TBProjectFolder = (() => {
        relative to. */
     async function looksLikePublishDir(handle) {
         try {
-            await handle.getFileHandle("index.html");
-            await handle.getDirectoryHandle("assets");
+            await retrying("the chosen folder", async () => {
+                await handle.getFileHandle("index.html");
+                await handle.getDirectoryHandle("assets");
+            });
             return true;
         } catch (err) {
-            return false;
+            /* Only a genuinely absent entry means "wrong folder". Swallowing
+               everything here once turned a transient stale handle into
+               "that folder is not the site directory", which sends the
+               operator off to re-pick the folder they already had right. */
+            if (err && err.name === "NotFoundError") {
+                return false;
+            }
+            throw err;
         }
     }
 
@@ -152,6 +169,12 @@ window.TBProjectFolder = (() => {
             /* Storage refused the handle. The connection still works for
                this session; it just will not survive a reload. */
         }
+        /* AFTER the write, not before. A listener woken by this event may
+           read the stored handle back to decide what to show, and firing
+           first meant it read the state as it was a moment ago -- so
+           connecting in one panel left the other still saying "Not
+           connected" until a reload. */
+        announce();
         return picked.name;
     }
 
@@ -174,6 +197,7 @@ window.TBProjectFolder = (() => {
         }
         if (await queryPermission(stored) === "granted") {
             dirHandle = stored;
+            announce();
             return "connected";
         }
         dirHandle = null;
@@ -190,6 +214,7 @@ window.TBProjectFolder = (() => {
             throw new Error("Write permission was not granted.");
         }
         dirHandle = stored;
+        announce();
         return stored.name;
     }
 
@@ -200,6 +225,9 @@ window.TBProjectFolder = (() => {
         } catch (err) {
             /* Nothing stored, or storage unavailable. */
         }
+        /* After the delete, for the same reason as connect(): a listener
+           that reads storage back would otherwise still find the handle. */
+        announce();
     }
 
     function isConnected() {
@@ -220,6 +248,57 @@ window.TBProjectFolder = (() => {
             throw new Error("No project folder is connected.");
         }
         return dirHandle;
+    }
+
+    /* ----------------------------------------------------------------------
+       Stale-handle retry (August 25, 2026).
+
+       Chrome caches filesystem state on a handle object. Writing into a
+       directory changes that directory underneath the long-lived handle this
+       module holds, so a later getFileHandle/getFile through it can fail
+       with:
+
+         InvalidStateError: An operation that depends on state cached in an
+         interface object was made but the state had changed since it was
+         read from disk.
+
+       Which is exactly what a publish does: write several files, then read
+       and rewrite another in the same tree. The failure is real but
+       transient -- re-resolving the path from the root picks up the current
+       state and succeeds. NotReadableError is the same situation reported
+       differently (a File snapshot taken before the change).
+
+       It does NOT reproduce against an origin-private directory, which is
+       what every test here can reach, so this is written defensively from
+       the error's own wording rather than from a reproduction. Retrying once
+       is deliberate: a second failure is a real problem -- a revoked grant,
+       a deleted folder -- and looping would only bury it.
+
+       Every operation below is idempotent (resolve a path, then read, write
+       or delete), so re-running one is safe. Nothing here appends. */
+    function isStaleHandle(err) {
+        return Boolean(err) &&
+            (err.name === "InvalidStateError" || err.name === "NotReadableError");
+    }
+
+    async function retrying(label, run) {
+        try {
+            return await run();
+        } catch (err) {
+            if (!isStaleHandle(err)) {
+                throw err;
+            }
+            try {
+                return await run();
+            } catch (second) {
+                if (!isStaleHandle(second)) {
+                    throw second;
+                }
+                throw new Error("the project folder changed underneath " + label +
+                    " while it was being written. Nothing further was changed; " +
+                    "check nothing else is editing the folder, then publish again.");
+            }
+        }
     }
 
     function split(relPath) {
@@ -246,18 +325,22 @@ window.TBProjectFolder = (() => {
 
     async function writeFile(relPath, data) {
         const { dirs, name } = split(relPath);
-        const dir = await resolveDir(dirs, true);
-        const file = await dir.getFileHandle(name, { create: true });
-        const stream = await file.createWritable();
-        await stream.write(data);
-        await stream.close();
+        return retrying(relPath, async () => {
+            const dir = await resolveDir(dirs, true);
+            const file = await dir.getFileHandle(name, { create: true });
+            const stream = await file.createWritable();
+            await stream.write(data);
+            await stream.close();
+        });
     }
 
     async function readText(relPath) {
         const { dirs, name } = split(relPath);
-        const dir = await resolveDir(dirs, false);
-        const file = await dir.getFileHandle(name, { create: false });
-        return (await file.getFile()).text();
+        return retrying(relPath, async () => {
+            const dir = await resolveDir(dirs, false);
+            const file = await dir.getFileHandle(name, { create: false });
+            return (await file.getFile()).text();
+        });
     }
 
     /* The file itself, or null when it is not there. Null rather than a throw
@@ -266,9 +349,11 @@ window.TBProjectFolder = (() => {
     async function readFile(relPath) {
         try {
             const { dirs, name } = split(relPath);
-            const dir = await resolveDir(dirs, false);
-            const file = await dir.getFileHandle(name, { create: false });
-            return await file.getFile();
+            return await retrying(relPath, async () => {
+                const dir = await resolveDir(dirs, false);
+                const file = await dir.getFileHandle(name, { create: false });
+                return await file.getFile();
+            });
         } catch (err) {
             return null;
         }
@@ -277,8 +362,10 @@ window.TBProjectFolder = (() => {
     async function deleteFile(relPath) {
         const { dirs, name } = split(relPath);
         try {
-            const dir = await resolveDir(dirs, false);
-            await dir.removeEntry(name);
+            await retrying(relPath, async () => {
+                const dir = await resolveDir(dirs, false);
+                await dir.removeEntry(name);
+            });
             return true;
         } catch (err) {
             return false;
@@ -289,12 +376,16 @@ window.TBProjectFolder = (() => {
         const dirs = String(relDir || "").split("/").filter(Boolean);
         const names = [];
         try {
-            const dir = await resolveDir(dirs, false);
-            for await (const entry of dir.values()) {
-                if (entry.kind === "file") {
-                    names.push(entry.name);
+            await retrying(relDir || "the project folder", async () => {
+                /* Cleared so a retry cannot double-list. */
+                names.length = 0;
+                const dir = await resolveDir(dirs, false);
+                for await (const entry of dir.values()) {
+                    if (entry.kind === "file") {
+                        names.push(entry.name);
+                    }
                 }
-            }
+            });
         } catch (err) {
             /* Folder does not exist yet; nothing to list. */
         }

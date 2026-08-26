@@ -102,7 +102,18 @@
     <a class="skip-link" href="#editor-layout">Skip to main content</a>
 
     <header class="site-header editor-bar">
-        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+        <!-- Left edge: the site mark on its own, no wordmark (August 26,
+             2026). It replaces the house icon this bar used to carry, which
+             the shared .editor-bar rule hides from 75rem so mockup.html's
+             .editor-brand can take over -- and this page has no brand, so
+             above 75rem the far left of the bar was simply empty. A new
+             class for the same reason .editor-brand was one: .editor-home is
+             shared with resume, poster and mockup and must stay
+             byte-identical, and .editor-brand exists to carry the word
+             beside the mark, which is the half asked to be dropped here.
+             Ungated on purpose -- one identity at every width, so there is no
+             band served by neither. -->
+        <a class="editor-mark" href="index.html" title="TemplateBox home" aria-label="TemplateBox home, all templates"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg></a>
 
         <label class="sr-only" for="doc-name">Document name</label>
         <input type="text" class="doc-name" id="doc-name" title="Names the file you download" maxlength="80" value="Untitled document" aria-label="Document name">
@@ -113,7 +124,21 @@
                 <span class="sr-only" data-save-label>Saves automatically</span>
             </span>
 
-            <button type="button" class="btn dl-toggle" id="download-pdf"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>Download PDF</button>
+            <!-- Print and Clear Form moved up here from the preview pane's
+                 sticky bar (August 26, 2026), so the three actions that
+                 finish a document sit together at the right of the bar.
+                 Deliberately no second copy was left below: js/docs.js binds
+                 both by id, and two elements sharing an id would leave one of
+                 them permanently dead.
+
+                 Every label is wrapped in .bar-label because three labelled
+                 buttons do not fit a 320px bar -- see the 48rem rule in
+                 style.css, which drops all three to icons rather than let the
+                 sticky header wrap to a second row. -->
+            <button type="button" class="btn btn-secondary bar-action" id="print-doc" title="Print" aria-label="Print"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg><span class="bar-label">Print</span></button>
+            <button type="button" class="btn btn-secondary bar-action" id="clear-doc" title="Clear Form" aria-label="Clear Form"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 5v6h6"/><path d="M4.5 15.5a9 9 0 1 0 2.2-9.4L2 10"/></svg><span class="bar-label">Clear Form</span></button>
+
+            <button type="button" class="btn dl-toggle" id="download-pdf" title="Download PDF" aria-label="Download PDF"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg><span class="bar-label">Download PDF</span></button>
         </div>
 
         <nav class="site-nav" aria-label="Primary">
@@ -407,14 +432,14 @@
             <section class="preview-pane" aria-label="Live document preview">
                 <h2>Live Preview</h2>
                 <div class="doc-sheet" id="doc-sheet"></div>
-                <!-- Sticky: Print and Clear stay reachable without scrolling
-                     back past the full control stack. Download moved into the
-                     editor-bar toolbar above, to match the other editors. -->
+                <!-- Print and Clear Form left this bar on August 26, 2026
+                     for the editor-bar toolbar above, where Download already
+                     was; all three actions now sit together on the right of
+                     the navigation. The bar itself stays: it is what the ad
+                     anchor's lift is measured against (see CLAUDE.md), and
+                     the export note belongs beside the rendered sheet rather
+                     than in the navigation. -->
                 <div class="preview-actions">
-                    <div class="doc-actions">
-                        <button type="button" class="btn btn-secondary" id="print-doc">Print</button>
-                        <button type="button" class="btn btn-secondary" id="clear-doc">Clear Form</button>
-                    </div>
                     <p class="upload-hint">Exports locally as selectable vector text via jsPDF. No file ever leaves your device.</p>
                 </div>
             </section>

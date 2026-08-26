@@ -38,6 +38,7 @@
        handles, the bounding box and the layer name tag must therefore never
        touch it. */
     const overlay = document.getElementById("mockup-overlay");
+    const canvasWrap = document.querySelector(".mockup-canvas-wrap");
     const octx = overlay ? overlay.getContext("2d") : null;
 
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -618,7 +619,6 @@
        ---------------------------------------------------------------------- */
 
     const colorField = document.getElementById("m-color-field");
-    const colorRow = document.getElementById("m-color-row");
     const colorTrigger = document.getElementById("m-color-trigger");
     const colorPopover = document.getElementById("m-color-popover");
     const colorDot = document.getElementById("m-color-dot");
@@ -633,10 +633,16 @@
     const inB = document.getElementById("m-color-in-b");
     const presetGrid = document.getElementById("m-color-presets");
 
+    /* The hue strip that sits in the panel under the trigger, where the
+       colourway swatch row used to be (August 25, 2026). Driven by the same
+       picker instance as the popover's own strip, not by a second copy of the
+       maths. */
+    const colorStrip = document.getElementById("m-color-strip");
+    const colorStripThumb = document.getElementById("m-color-strip-thumb");
+
     /* The background picker: the same component again, driven by the same
        factory. See the Background section further down. */
     const bgField = document.getElementById("m-bg-field");
-    const bgRow = document.getElementById("m-bg-row");
     const bgTrigger = document.getElementById("m-bg-trigger");
     const bgPopover = document.getElementById("m-bg-popover");
     const bgDot = document.getElementById("m-bg-dot");
@@ -650,6 +656,8 @@
     const bgInG = document.getElementById("m-bg-in-g");
     const bgInB = document.getElementById("m-bg-in-b");
     const bgPresetGrid = document.getElementById("m-bg-presets");
+    const bgStrip = document.getElementById("m-bg-strip");
+    const bgStripThumb = document.getElementById("m-bg-strip-thumb");
 
     const fileInput = document.getElementById("m-design");
     const fileError = document.getElementById("m-design-error");
@@ -667,9 +675,24 @@
     const scaleOutput = document.getElementById("m-scale-output");
     const labelInput = document.getElementById("m-label");
     const addToTrayBtn = document.getElementById("add-to-tray");
-    const downloadBtn = document.getElementById("download-mockup-png");
     const trayGrid = document.getElementById("tray-grid");
     const trayEmpty = document.getElementById("tray-empty");
+    const trayCount = document.getElementById("tray-count");
+
+    /* The two views of the preview pane, and the tabs that switch them. */
+    const viewTabs = [document.getElementById("view-tab-preview"),
+                      document.getElementById("view-tab-tray")];
+    const viewPanels = [document.getElementById("view-preview"),
+                        document.getElementById("view-tray")];
+
+    /* The export panel, which lives in the control pane's action row since
+       August 25, 2026. The editor bar's single "Download PNG" button is gone
+       -- there is one exporter on this page, and it is here. */
+    const dlToggle = document.getElementById("dl-toggle");
+    const dlPanel = document.getElementById("dl-panel");
+    const dlFormats = dlPanel ? dlPanel.querySelectorAll("[data-format]") : [];
+    const dlSizes = document.getElementById("dl-sizes");
+    const dlNote = document.getElementById("dl-note");
     /* No #doc-name here (August 24, 2026). The bar's document-name input was
        removed when the bar gained navigation and a search field; #m-label,
        "Mockup Label" in the controls, is what names a mockup now. A stale
@@ -866,9 +889,31 @@
         drawLayersInArea(config.printArea, 16);
     }
 
+    /* Publishes the canvas's real aspect ratio to CSS, which uses it to bound
+       the render's WIDTH by the height the pane has left -- see the
+       .mockup-canvas-wrap cap in css/style.css. Written here rather than at
+       the three places that resize the canvas: a photographic template sizes
+       itself from a base image that loads asynchronously, so the value has to
+       be re-read after painting rather than once at startup.
+
+       Only written when it changes, so this costs nothing on a drag. */
+    let publishedAspect = 0;
+
+    function syncCanvasAspect() {
+        if (!canvas.height) {
+            return;
+        }
+        const aspect = canvas.width / canvas.height;
+        if (aspect !== publishedAspect) {
+            publishedAspect = aspect;
+            canvasWrap.style.setProperty("--mockup-aspect", String(aspect));
+        }
+    }
+
     function draw() {
         paint();
         drawOverlay();
+        syncCanvasAspect();
     }
 
     /* The Sandwich Method compositor for photographic templates. Layer
@@ -1566,8 +1611,10 @@
     });
 
     /* ----------------------------------------------------------------------
-       Colour: the product's own colorways as quick picks, plus a free HSV
-       picker. Both write to the same state the canvas reads.
+       Colour: one free HSV picker, reachable two ways -- the trigger opens
+       the full popover, and the hue strip under it rotates the colour in
+       place. Both write to the same state the canvas reads. The colorway
+       quick-pick row that used to sit here was removed on August 25, 2026.
        ---------------------------------------------------------------------- */
 
     function activeColor(config) {
@@ -1589,40 +1636,22 @@
         return color ? color.hex : customHex;
     }
 
-    function renderColorSwatches() {
-        while (colorRow.firstChild) {
-            colorRow.removeChild(colorRow.firstChild);
-        }
+    /* The colourway swatch row this used to build is gone (August 25, 2026);
+       what is left is the one job that could not go with it. A photographic
+       template has no colorway concept, so the whole field disappears rather
+       than offering a colour control over a photograph.
 
+       The shipped colorways did not disappear with their buttons. The
+       product still OPENS on its default one -- that is what gives the drawn
+       garments their hand-picked outline colour -- and every hex those
+       swatches offered is a click away in the picker's preset grid, which is
+       why the row was cut: it was a second route to colours the dropdown
+       already carried, at the cost of a band of panel height. */
+    function syncColorField() {
         const config = PRODUCTS[currentProduct];
-
-        /* Photographic templates have no colorway concept: the whole field
-           disappears instead of presenting an empty radio group. */
         if (colorField) {
             colorField.hidden = !config.colors;
         }
-        if (!config.colors) {
-            return;
-        }
-
-        Object.keys(config.colors).forEach((key) => {
-            const info = config.colors[key];
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "swatch";
-            btn.style.backgroundColor = info.hex;
-            btn.setAttribute("role", "radio");
-            btn.setAttribute("aria-checked", "false");
-            btn.setAttribute("aria-label", info.name);
-            btn.setAttribute("data-hex", info.hex.toUpperCase());
-            btn.addEventListener("click", () => {
-                currentColor = key;
-                syncColorUI();
-                persist();
-                draw();
-            });
-            colorRow.appendChild(btn);
-        });
     }
 
     /* ----------------------------------------------------------------------
@@ -1635,19 +1664,22 @@
        second copy of 150 lines of gradient tracks, hex/RGB plumbing and
        popover lifecycle.
 
-       What is NOT in here is as deliberate as what is. The product's swatch
-       row and the canvas's accessible label are specific to the colourway
-       path, and the two instances hold genuinely different state -- a
-       colourway key plus a custom hex on one side, a hex or null on the
-       other. Pushing those through the factory would have meant more
-       injection points than shared code, which is a worse abstraction than
-       two small call sites. The factory owns exactly the parts that are
-       identical: the popover, the saturation/value square, the hue strip,
-       the hex and RGB fields, the presets and the eyedropper.
+       What is NOT in here is as deliberate as what is. The canvas's
+       accessible label is specific to the colourway path, and the two
+       instances hold genuinely different state -- a colourway key plus a
+       custom hex on one side, a hex or null on the other. Pushing those
+       through the factory would have meant more injection points than shared
+       code, which is a worse abstraction than two small call sites. The
+       factory owns exactly the parts that are identical: the popover, the
+       saturation/value square, the hue strips, the hex and RGB fields, the
+       presets and the eyedropper.
 
        Each instance keeps its own `hue`. It was module-level state when there
        was one picker; shared between two it would make the background's hue
-       strip jump whenever the garment colour changed.
+       strip jump whenever the garment colour changed. The product picker now
+       drives TWO strips off that one value (August 25, 2026) -- see
+       `hueTracks` -- which is the same reason again, one level down: two
+       views of one hue, never two hues.
 
        nodes    the elements this instance drives.
        options  getHex()            the colour to display, or null
@@ -1686,6 +1718,17 @@
     function createColorPicker(nodes, options) {
         let hue = 0;
 
+        /* Two strips, one hue. The popover's, and -- on the product picker --
+           the one standing in the panel where the swatch row used to be. They
+           are the same control at two sizes, so they share this instance's
+           `hue`, the handler below and the repaint in sync(); neither knows
+           the other exists. An instance given only a popover strip simply has
+           a one-entry list. */
+        const hueTracks = [
+            { track: nodes.hue, thumb: nodes.hueThumb },
+            { track: nodes.hueInline, thumb: nodes.hueInlineThumb }
+        ].filter((entry) => !!entry.track);
+
         function commit(hex, skip) {
             return options.setHex(hex, skip);
         }
@@ -1716,9 +1759,11 @@
                 nodes.svThumb.style.top = ((1 - hsv.v) * 100) + "%";
                 nodes.svThumb.style.backgroundColor = hex || "transparent";
             }
-            if (nodes.hueThumb) {
-                nodes.hueThumb.style.left = ((hue / 360) * 100) + "%";
-            }
+            hueTracks.forEach((track) => {
+                if (track.thumb) {
+                    track.thumb.style.left = ((hue / 360) * 100) + "%";
+                }
+            });
 
             const fields = hex ? { hex: hex, r: rgb.r, g: rgb.g, b: rgb.b }
                 : { hex: "", r: "", g: "", b: "" };
@@ -1734,6 +1779,23 @@
             }
             while (nodes.presets.firstChild) {
                 nodes.presets.removeChild(nodes.presets.firstChild);
+            }
+
+            /* "No colour at all" as the first preset, for the instance that
+               has such a state -- the background's Transparent (August 25,
+               2026). It moved in here when the quick-pick row that used to
+               carry it was removed: every other colour on that row is in the
+               grid below, but this one is not a colour and no hex can express
+               it, so dropping the row without moving it would have stranded
+               the default state with no way back. */
+            if (options.allowClear) {
+                const clear = document.createElement("button");
+                clear.type = "button";
+                clear.className = "color-preset swatch-transparent";
+                clear.setAttribute("aria-label", "Transparent");
+                clear.setAttribute("title", "Transparent");
+                clear.addEventListener("click", () => commit(null));
+                nodes.presets.appendChild(clear);
             }
 
             /* Native colour sampling where the browser offers it (Chromium's
@@ -1822,18 +1884,20 @@
             commit(rgbToHex(rgb.r, rgb.g, rgb.b));
         });
 
-        bindTrack(nodes.hue, (evt) => {
-            const r = trackRatio(nodes.hue, evt);
-            hue = r.x * 360;
-            const current = hexToRgb(options.getHex()) || { r: 255, g: 255, b: 255 };
-            const hsv = rgbToHsv(current.r, current.g, current.b);
-            /* A pure white or black start has no saturation to rotate, so the
-               new hue would produce the same greyscale colour and the strip
-               would look broken. Fall back to a fully saturated sample. */
-            const s = hsv.s > 0.001 ? hsv.s : 1;
-            const v = hsv.v > 0.001 ? hsv.v : 1;
-            const rgb = hsvToRgb(hue, s, v);
-            commit(rgbToHex(rgb.r, rgb.g, rgb.b));
+        hueTracks.forEach((entry) => {
+            bindTrack(entry.track, (evt) => {
+                hue = trackRatio(entry.track, evt).x * 360;
+                const current = hexToRgb(options.getHex()) || { r: 255, g: 255, b: 255 };
+                const hsv = rgbToHsv(current.r, current.g, current.b);
+                /* A pure white or black start has no saturation to rotate, so
+                   the new hue would produce the same greyscale colour and the
+                   strip would look broken. Fall back to a fully saturated
+                   sample. */
+                const s = hsv.s > 0.001 ? hsv.s : 1;
+                const v = hsv.v > 0.001 ? hsv.v : 1;
+                const rgb = hsvToRgb(hue, s, v);
+                commit(rgbToHex(rgb.r, rgb.g, rgb.b));
+            });
         });
 
         /* --- hex / R / G / B --- */
@@ -1866,6 +1930,7 @@
     const productPicker = createColorPicker({
         trigger: colorTrigger, popover: colorPopover,
         sv: svArea, svThumb: svThumb, hue: hueArea, hueThumb: hueThumb,
+        hueInline: colorStrip, hueInlineThumb: colorStripThumb,
         inHex: inHex, inR: inR, inG: inG, inB: inB, presets: presetGrid
     }, {
         getHex: () => activeHex(),
@@ -1888,14 +1953,6 @@
         if (colorHexLabel) {
             colorHexLabel.textContent = hex;
         }
-
-        /* Highlight whichever quick pick matches, whether it was reached by
-           its own button or by landing on that exact value in the picker. */
-        colorRow.querySelectorAll(".swatch").forEach((sw) => {
-            const on = sw.getAttribute("data-hex") === hex.toUpperCase();
-            sw.classList.toggle("is-active", on);
-            sw.setAttribute("aria-checked", String(on));
-        });
     }
 
     function setCustomColor(hex, skip) {
@@ -1933,17 +1990,6 @@
        exported PNG byte-identical to what it was before this existed.
        ---------------------------------------------------------------------- */
 
-    /* Transparent first: it is the default and the state people come back to.
-       The rest are studio backdrops rather than brand colours -- the free
-       picker covers those. */
-    const BG_QUICK_PICKS = [
-        { hex: null, name: "Transparent" },
-        { hex: "#FFFFFF", name: "White" },
-        { hex: "#F4F3EF", name: "Cream" },
-        { hex: "#E5E5E2", name: "Light Grey" },
-        { hex: "#2A2A28", name: "Charcoal" }
-    ];
-
     function backgroundEligible(config) {
         if (!config) {
             return false;
@@ -1956,10 +2002,13 @@
     const backgroundPicker = createColorPicker({
         trigger: bgTrigger, popover: bgPopover,
         sv: bgSvArea, svThumb: bgSvThumb, hue: bgHueArea, hueThumb: bgHueThumb,
+        hueInline: bgStrip, hueInlineThumb: bgStripThumb,
         inHex: bgInHex, inR: bgInR, inG: bgInG, inB: bgInB, presets: bgPresetGrid
     }, {
         getHex: () => bgHex,
-        setHex: (hex, skip) => setBackground(hex, skip)
+        setHex: (hex, skip) => setBackground(hex, skip),
+        /* Only this instance has a "no colour" state to return to. */
+        allowClear: true
     });
 
     function setBackground(hex, skip) {
@@ -1978,29 +2027,6 @@
         return true;
     }
 
-    function renderBackgroundSwatches() {
-        if (!bgRow) {
-            return;
-        }
-        while (bgRow.firstChild) {
-            bgRow.removeChild(bgRow.firstChild);
-        }
-        BG_QUICK_PICKS.forEach((pick) => {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = pick.hex ? "swatch" : "swatch swatch-transparent";
-            if (pick.hex) {
-                btn.style.backgroundColor = pick.hex;
-            }
-            btn.setAttribute("role", "radio");
-            btn.setAttribute("aria-checked", "false");
-            btn.setAttribute("aria-label", pick.name);
-            btn.setAttribute("data-hex", pick.hex ? pick.hex.toUpperCase() : "none");
-            btn.addEventListener("click", () => setBackground(pick.hex));
-            bgRow.appendChild(btn);
-        });
-    }
-
     function syncBackgroundUI(skip) {
         /* The whole panel disappears for a product with a background of its
            own, rather than offering a control that would do nothing. */
@@ -2015,14 +2041,6 @@
         }
         if (bgHexLabel) {
             bgHexLabel.textContent = bgHex || "Transparent";
-        }
-        if (bgRow) {
-            bgRow.querySelectorAll(".swatch").forEach((sw) => {
-                const on = sw.getAttribute("data-hex") ===
-                    (bgHex ? bgHex.toUpperCase() : "none");
-                sw.classList.toggle("is-active", on);
-                sw.setAttribute("aria-checked", String(on));
-            });
         }
     }
 
@@ -2260,63 +2278,171 @@
        DOM-XSS prevention rule.
        ---------------------------------------------------------------------- */
 
+    /* The pane shows ONE of its two panels (August 25, 2026). Both used to be
+       in the flow, the tray under the canvas, which made the pane taller than
+       any viewport: the render was never fully visible and neither was the
+       collection. `hidden` rather than a class, so the panel that is not
+       showing is out of the accessibility tree and out of the tab order. */
+    function showView(index) {
+        viewTabs.forEach((tab, i) => {
+            if (!tab) { return; }
+            tab.setAttribute("aria-selected", String(i === index));
+            tab.classList.toggle("is-active", i === index);
+        });
+        viewPanels.forEach((panel, i) => {
+            if (panel) { panel.hidden = i !== index; }
+        });
+    }
+
+    viewTabs.forEach((tab, i) => {
+        if (tab) { tab.addEventListener("click", () => showView(i)); }
+    });
+
     function renderTray() {
         while (trayGrid.firstChild) {
             trayGrid.removeChild(trayGrid.firstChild);
         }
         trayEmpty.hidden = trayItems.length > 0;
 
+        /* The count on the tab is the only sign the other panel holds
+           anything, now that it is hidden until asked for. */
+        if (trayCount) {
+            trayCount.textContent = String(trayItems.length);
+            trayCount.hidden = trayItems.length === 0;
+        }
+
         trayItems.forEach((item) => {
             const card = document.createElement("div");
             card.className = "tray-item";
+            if (item.id === activeTrayId) {
+                card.classList.add("is-active");
+            }
+
+            /* The thumbnail IS the control (August 25, 2026). The card used to
+               carry a caption and two buttons under it; what a saved mockup is
+               for is being looked at and gone back to, and the label reads
+               better as the button's name than as a line of text under every
+               tile. Download went with the caption -- clicking a mockup loads
+               it, and the panel above exports it at any size or format, which
+               the per-item button could not. */
+            const open = document.createElement("button");
+            open.type = "button";
+            open.className = "tray-open";
+            open.setAttribute("data-tray-id", item.id);
+            open.setAttribute("data-tip", TB.desanitize(item.label));
+            open.setAttribute("aria-label", "Open " + TB.desanitize(item.label));
+
+            /* Which tile is loaded, for anyone who cannot see the border and
+               the inset ring that say so. Without this the grid announces
+               "Open Red tee, Open Navy tee" with nothing to distinguish the
+               one already on the canvas, and the tab stops being a set you
+               can tell your position in. Set only on the active tile: the
+               attribute is a singular "this is the current one", so writing
+               aria-current="false" everywhere else would be noise. */
+            if (item.id === activeTrayId) {
+                open.setAttribute("aria-current", "true");
+            }
 
             const img = document.createElement("img");
             img.className = "tray-thumb";
             img.src = item.thumb;
-            img.alt = TB.desanitize(item.label) + " mockup preview";
-            card.appendChild(img);
-
-            const body = document.createElement("div");
-            body.className = "tray-item-body";
-
-            const labelEl = document.createElement("p");
-            labelEl.className = "tray-item-label";
-            labelEl.textContent = TB.desanitize(item.label);
-            body.appendChild(labelEl);
-
-            const actions = document.createElement("div");
-            actions.className = "tray-item-actions";
-
-            const dlBtn = document.createElement("button");
-            dlBtn.type = "button";
-            dlBtn.className = "btn btn-secondary btn-small";
-            dlBtn.textContent = "Download";
-            dlBtn.addEventListener("click", () => {
-                const link = document.createElement("a");
-                link.href = item.thumb;
-                /* The label the visitor gave this one, which is already
-                   either what they typed or the generated fallback. The id is
-                   a timestamp and names nothing to a human. */
-                link.download = (TB.fileSlug(item.label) ||
-                    "templatebox-mockup-" + item.id) + ".png";
-                link.click();
-            });
+            img.alt = "";
+            open.appendChild(img);
+            open.addEventListener("click", () => openTrayItem(item.id));
+            card.appendChild(open);
 
             const rmBtn = document.createElement("button");
             rmBtn.type = "button";
-            rmBtn.className = "btn btn-secondary btn-small";
-            rmBtn.textContent = "Remove";
+            rmBtn.className = "tray-remove";
+            rmBtn.setAttribute("aria-label", "Remove " + TB.desanitize(item.label));
+            rmBtn.setAttribute("data-tip", "Remove");
+            rmBtn.appendChild(icon(["M6 6l12 12", "M18 6 6 18"]));
             rmBtn.addEventListener("click", () => {
                 trayItems = trayItems.filter((entry) => entry.id !== item.id);
+                if (activeTrayId === item.id) {
+                    activeTrayId = null;
+                }
                 renderTray();
             });
+            card.appendChild(rmBtn);
 
-            actions.appendChild(dlBtn);
-            actions.appendChild(rmBtn);
-            body.appendChild(actions);
-            card.appendChild(body);
             trayGrid.appendChild(card);
         });
+    }
+
+    /* ----------------------------------------------------------------------
+       Saving and reopening a mockup.
+
+       A tray entry holds the STATE that produced it, not only the picture:
+       the colourway, the background and every layer's placement, plus a
+       reference to each layer's bitmap. That is what makes the tab a set of
+       mockups a visitor switches between rather than a strip of screenshots
+       -- clicking one puts the editor back where it was, and the live preview
+       is genuinely live rather than a saved image pretending to be one.
+
+       The bitmaps are shared by reference and everything else is copied.
+       Sharing the bitmap is safe because a layer never mutates its image;
+       copying the rest is what stops editing a reopened mockup rewriting the
+       entry it came from. Copied again on the way out for the same reason.
+
+       Session-scoped, exactly as the tray always was: the images are held in
+       memory and never written to storage, so a reload empties the tab.
+       ---------------------------------------------------------------------- */
+
+    let activeTrayId = null;
+
+    function copyLayers(list) {
+        return list.map((layer) => ({
+            id: layer.id,
+            name: layer.name,
+            img: layer.img,
+            scale: layer.scale,
+            offsetX: layer.offsetX,
+            offsetY: layer.offsetY,
+            rotation: layer.rotation,
+            visible: layer.visible,
+            rect: null
+        }));
+    }
+
+    function snapshotState() {
+        return {
+            color: currentColor,
+            customHex: customHex,
+            bg: bgHex,
+            layers: copyLayers(layers)
+        };
+    }
+
+    function openTrayItem(id) {
+        const item = trayItems.find((entry) => entry.id === id);
+        if (!item || !item.state) {
+            return;
+        }
+
+        currentColor = item.state.color;
+        customHex = item.state.customHex;
+        bgHex = item.state.bg;
+        layers = copyLayers(item.state.layers);
+        selectedId = layers.length ? layers[layers.length - 1].id : null;
+        activeTrayId = id;
+
+        /* The label follows the mockup, so exporting straight after reopening
+           writes the file under the name it was saved with. */
+        labelInput.value = TB.desanitize(item.label);
+
+        syncColorUI();
+        syncBackgroundUI();
+        renderLayerList();
+        syncScaleControls();
+        syncLayerActions();
+        syncCanvasLabel();
+        renderTray();
+        persist();
+        draw();
+
+        /* Back to the canvas, which is the whole point of the click. */
+        showView(0);
     }
 
     let trayCounter = 0;
@@ -2336,28 +2462,184 @@
             label: TB.sanitize(typed || fallback),
             /* Reads the product canvas alone, so no selection chrome can
                reach the thumbnail. */
-            thumb: canvas.toDataURL("image/png")
+            thumb: canvas.toDataURL("image/png"),
+            /* What makes this reopenable rather than just viewable. */
+            state: snapshotState()
         };
         trayItems.push(item);
+        activeTrayId = item.id;
         renderTray();
+        /* Switch to the collection. With the tray hidden behind a tab, a
+           silent add looks like a button that did nothing; this shows the
+           visitor the render they just saved, and one click goes back. */
+        showView(1);
     });
 
     /* ----------------------------------------------------------------------
-       Single-mockup PNG export via a local data stream.
+       Export: a format and a size, still a local data stream (August 25,
+       2026). It was one button that wrote the canvas out at its own
+       resolution as a PNG, which is a fine default and a poor only option --
+       a listing image wants a smaller file, and a print-on-demand upload
+       often wants JPG.
+
+       THE SIZES ARE DERIVED, NEVER HARDCODED. The canvas is 1000x1000 for a
+       drawn product, 1024x1536 for the model photograph and 2000x2000 for the
+       wood frame, so a fixed ladder like 1600x2000 would distort two of the
+       three and upscale the third. Full size, half and quarter keep every
+       product's own proportions and can never invent detail the canvas does
+       not have. Each row states the real pixels, so the visitor is choosing a
+       size rather than a word.
        ---------------------------------------------------------------------- */
 
-    downloadBtn.addEventListener("click", () => {
-        const link = document.createElement("a");
-        link.href = canvas.toDataURL("image/png");
+    const EXPORT_TIERS = [
+        { name: "Full size", divisor: 1 },
+        { name: "Half", divisor: 2 },
+        { name: "Quarter", divisor: 4 }
+    ];
+
+    let exportFormat = "png";
+
+    function exportName() {
         /* Mockup Label names the download (August 24, 2026). It named only
            the tray caption before, so a visitor who filled it in and pressed
            Download got "templatebox-mockup.png" regardless -- and since the
            bar's own name input was removed when the bar gained navigation,
            this field is the only place left to name the work. Empty, it falls
-           back to what the file has always been called. */
-        link.download = (TB.fileSlug(labelInput.value) || "templatebox-mockup") + ".png";
+           back to what the file has always been called. The size is NOT in
+           the name: a visitor exporting a second size wants it beside the
+           first under the name they chose, not one the editor invented. */
+        return (TB.fileSlug(labelInput.value) || "templatebox-mockup") +
+            (exportFormat === "jpg" ? ".jpg" : ".png");
+    }
+
+    function exportAt(width, height) {
+        const out = document.createElement("canvas");
+        out.width = Math.max(1, Math.round(width));
+        out.height = Math.max(1, Math.round(height));
+        const octx = out.getContext("2d");
+
+        /* JPEG has no alpha channel. Drawn straight, every transparent pixel
+           in the surround comes out BLACK, which on a product exported with
+           no background is most of the image. Flattening onto white is what
+           the format can actually carry, and it matches what a listing page
+           shows behind a JPG anyway. PNG keeps the transparency, which is why
+           it stays the default. */
+        if (exportFormat === "jpg") {
+            octx.fillStyle = "#FFFFFF";
+            octx.fillRect(0, 0, out.width, out.height);
+        }
+
+        /* The product canvas alone. #mockup-overlay carries the selection
+           box, the corner handles and the layer tag, and reading it here is
+           exactly how those would get baked into a visitor's file. */
+        octx.imageSmoothingQuality = "high";
+        octx.drawImage(canvas, 0, 0, out.width, out.height);
+
+        const link = document.createElement("a");
+        link.href = exportFormat === "jpg"
+            ? out.toDataURL("image/jpeg", 0.92)
+            : out.toDataURL("image/png");
+        link.download = exportName();
         link.click();
-    });
+    }
+
+    /* Rebuilt every time the panel opens, not once at startup: a photographic
+       template sizes the canvas from its own base image, and that image loads
+       after this script runs. */
+    function renderExportSizes() {
+        if (!dlSizes) {
+            return;
+        }
+        while (dlSizes.firstChild) {
+            dlSizes.removeChild(dlSizes.firstChild);
+        }
+
+        EXPORT_TIERS.forEach((tier) => {
+            const w = Math.round(canvas.width / tier.divisor);
+            const h = Math.round(canvas.height / tier.divisor);
+            const dims = w + "x" + h + " px";
+
+            const row = document.createElement("button");
+            row.type = "button";
+            row.className = "dl-size";
+            row.setAttribute("data-size", dims);
+
+            const text = document.createElement("span");
+            text.textContent = dims;
+            row.appendChild(text);
+
+            const mark = document.createElement("span");
+            mark.className = "dl-size-go";
+            mark.appendChild(icon([
+                "M12 3v12", "m7.5 10.5 4.5 4.5 4.5-4.5", "M4 20h16"
+            ]));
+            row.appendChild(mark);
+
+            /* The tier names the row for assistive tech, with the pixels
+               after it: "Half, 512x768 px" reads better than digits alone. */
+            row.setAttribute("aria-label", tier.name + ", " + dims);
+            row.addEventListener("click", () => {
+                exportAt(w, h);
+                setExportOpen(false);
+            });
+            dlSizes.appendChild(row);
+        });
+    }
+
+    function syncExportFormat() {
+        dlFormats.forEach((btn) => {
+            const on = btn.getAttribute("data-format") === exportFormat;
+            btn.setAttribute("aria-checked", String(on));
+            btn.classList.toggle("is-active", on);
+        });
+        if (dlNote) {
+            /* Said only when it applies: a JPG of a mockup with no background
+               is a white rectangle behind the product, and finding that out
+               after downloading is too late. */
+            const flattens = exportFormat === "jpg" && !activeBackground();
+            dlNote.hidden = !flattens;
+            dlNote.textContent = flattens
+                ? "JPG cannot hold transparency, so the empty surround is exported white."
+                : "";
+        }
+    }
+
+    function setExportOpen(open) {
+        if (!dlPanel || !dlToggle) {
+            return;
+        }
+        if (open) {
+            renderExportSizes();
+            syncExportFormat();
+        }
+        dlPanel.hidden = !open;
+        dlToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    if (dlToggle && dlPanel) {
+        dlToggle.addEventListener("click", () => setExportOpen(dlPanel.hidden));
+
+        dlFormats.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                exportFormat = btn.getAttribute("data-format");
+                syncExportFormat();
+            });
+        });
+
+        /* Same dismissal rules as poster.html's exporter: a click outside, or
+           Escape, which returns focus to the control that opened it. */
+        document.addEventListener("click", (evt) => {
+            if (dlPanel.hidden) { return; }
+            if (dlPanel.contains(evt.target) || dlToggle.contains(evt.target)) { return; }
+            setExportOpen(false);
+        });
+        document.addEventListener("keydown", (evt) => {
+            if (evt.key === "Escape" && !dlPanel.hidden) {
+                setExportOpen(false);
+                dlToggle.focus();
+            }
+        });
+    }
 
     /* ----------------------------------------------------------------------
        Per-template control state
@@ -2503,10 +2785,9 @@
     selectedId = layers.length ? layers[layers.length - 1].id : null;
 
     productPicker.buildPresets();
-    renderColorSwatches();
+    syncColorField();
     syncColorUI();
     backgroundPicker.buildPresets();
-    renderBackgroundSwatches();
     syncBackgroundUI();
     renderLayerList();
     syncScaleControls();
