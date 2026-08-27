@@ -160,7 +160,15 @@ window.TB_PHOTO_MOCKUPS = [
            light catching the fold ridges. Multiply clamps that away, so it
            is split into its own screen layer. */
         light: "assets/mockups/tshirt-model-white-light.png",
-        lightGain: 1,
+        /* 0.3, not 1. The light map is "everything above the fabric's
+           median" on a WHITE garment, which is mostly bright DIFFUSE, not
+           surface reflection -- the same confusion that washed dark dyes out
+           in recolour before the tone map split them apart. Screened at full
+           strength onto dark ink it destroys it: a #12305C navy fill measured
+           p95 luma 159 against a source of 44, and a quarter of the print
+           lost its blue identity outright. At 0.3 the highlight still models
+           the surface and the ink stays the colour it was. */
+        lightGain: 0.3,
         /* Alpha mask of the garment, hole-filled and feathered. Recolour is
            confined to it, so the tint cannot creep onto skin or background. */
         garment: "assets/mockups/tshirt-model-white-garment.png",
@@ -221,6 +229,64 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 729, y: 548 },
             { x: 729, y: 1105 },
             { x: 311, y: 1105 }
+        ]
+    },
+    {
+        id: "cap-model-white",
+        title: "White Baseball Cap on Model",
+        thumb: "assets/thumbnails/product-mockups/apparel/cap-model-white-thumb.jpg",
+        base: "assets/mockups/cap-model-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/cap-model-white-displace.png",
+        shade: "assets/mockups/cap-model-white-shade.png",
+        light: "assets/mockups/cap-model-white-light.png",
+        /* 0.3, not 1. The light map is "everything above the fabric's
+           median" on a WHITE garment, which is mostly bright DIFFUSE, not
+           surface reflection -- the same confusion that washed dark dyes out
+           in recolour before the tone map split them apart. Screened at full
+           strength onto dark ink it destroys it: a #12305C navy fill measured
+           p95 luma 159 against a source of 44, and a quarter of the print
+           lost its blue identity outright. At 0.3 the highlight still models
+           the surface and the ink stays the colour it was. */
+        lightGain: 0.3,
+        garment: "assets/mockups/cap-model-white-garment.png",
+        tone: "assets/mockups/cap-model-white-tone.png",
+        grain: "assets/mockups/cap-model-white-grain.png",
+        /* Higher than the shirt's 16 because this base is 1939px wide against
+           the shirt's 1024, and displaceStrength is in base-image pixels. It
+           is NOT scaled proportionally (that would be ~30): a structured cap
+           front is buckram-stiffened and barely moves, and its gradient p99
+           measured 22.1 against the shirt's 32.2. What bends the print here is
+           the crown's curvature and the two seams, not folds. */
+        displaceStrength: 20,
+        mode: "surface",
+        backing: null,
+        /* The cap is a cut-out on transparency, like the shirt, so the
+           Background colour panel applies. */
+        background: true,
+        /* The model also wears a white tee, which classifies as the same
+           fabric -- 299,506px, 22.6% of the mask. The factory now keeps only
+           the region connected to the print zone, so recolour dyes the cap
+           and leaves the shirt alone. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* Front panel, clear of the brim seam (measured at y~740 on the
+           centreline) and of the eyelets above. 2:1, the ratio of a standard
+           4.5x2.25in cap embroidery area. Verified 99.9% fabric; the 141
+           stray pixels are isolated specks, not an edge. */
+        warpZone: [
+            { x: 600, y: 300 },
+            { x: 1340, y: 300 },
+            { x: 1340, y: 670 },
+            { x: 600, y: 670 }
         ]
     }
 ];

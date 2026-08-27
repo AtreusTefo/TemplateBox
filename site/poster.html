@@ -105,6 +105,27 @@
          already flags as worth revisiting rather than widening). -->
     <header class="site-header editor-bar">
         <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+        <!-- Two left-hand identities, one visible at a time: the icon below
+             75rem, the wordmark above it, where there is room for a word.
+             Both link home. Matches mockup.html, which established this. -->
+        <a class="editor-brand" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
+
+        <!-- Collapses the links below 75rem. Same control, same class and the
+             same js/app.js handler as every other page. -->
+        <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+
+        <!-- Search as a link below 75rem, where the field is hidden. -->
+        <a class="search-toggle" href="search.html" aria-label="Search templates and guides"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg></a>
+
+        <!-- A real GET form, so it needs no JavaScript: there is nothing on
+             this page to filter, so navigating is the only correct answer and
+             the browser does that itself. -->
+        <form class="editor-search" role="search" action="search.html" method="get">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg>
+            <label class="sr-only" for="editor-search-input">Search templates and guides</label>
+            <input type="search" id="editor-search-input" name="q" placeholder="Search posters and templates"
+                   autocomplete="off" spellcheck="false" maxlength="80">
+        </form>
 
         <label class="sr-only" for="doc-name">Poster name</label>
         <input type="text" class="doc-name" id="doc-name" title="Names the file you download" maxlength="80" value="Untitled poster" aria-label="Poster name">
@@ -126,7 +147,10 @@
             <div class="dl" data-download>
                 <button type="button" class="btn dl-toggle" id="dl-toggle" aria-expanded="false" aria-controls="dl-panel">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>
-                    Download
+                    <!-- Wrapped so the phone rule can hide the word without
+                         hiding the accessible name: this button has no
+                         aria-label, so the text IS the name. -->
+                    <span>Download</span>
                 </button>
 
                 <div class="dl-panel" id="dl-panel" hidden>
@@ -203,7 +227,41 @@
             </div>
         </div>
 
-        <nav class="site-nav" aria-label="Primary">
+        <nav class="site-nav" id="site-nav" aria-label="Primary">
+            <div class="nav-more" data-nav-more>
+                <button type="button" aria-expanded="false" aria-controls="nav-more-panel" data-nav-more-toggle>
+                    Posters
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7"/></svg>
+                </button>
+                <div class="nav-more-panel" id="nav-more-panel" hidden data-nav-more-panel>
+                    <div>
+                        <h2>Posters and Prints</h2>
+                        <ul>
+                            <li><a href="poster.html" data-target="poster">Framed Photo Poster</a></li>
+                            <li><a href="poster.html" data-target="poster">Matte Wood Canvas</a></li>
+                            <li><a href="poster.html" data-target="poster">Polished Gold Frame</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Other Editors</h2>
+                        <ul>
+                            <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
+                            <li><a href="docs.html" data-target="docs">Business Document Builder</a></li>
+                            <li><a href="mockup.html" data-target="mockup">Product Mockup Generator</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>Browse</h2>
+                        <ul>
+                            <li><a href="index.html#templates">All Templates</a></li>
+                            <li><a href="search.html">Search</a></li>
+                            <li><a href="blog.html">Guides and Articles</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <a href="index.html">Templates</a>
+            <a href="blog.html">Guides</a>
         </nav>
     </header>
 

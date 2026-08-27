@@ -261,6 +261,18 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                        </ul>\n' +
 '                    </div>\n' +
 '                    <div>\n' +
+'                        <h2>Product Mockups</h2>\n' +
+'                        <ul>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>\n' +
+'                        </ul>\n' +
+'                    </div>\n' +
+'                    <div>\n' +
 '                        <h2>Editors</h2>\n' +
 '                        <ul>\n' +
 '                            <li><a href="../resume.html" data-target="resume">Resume Builder</a></li>\n' +
@@ -1402,6 +1414,10 @@ body + '\n' +
         },
         {
             id: "tshirt-model-white", title: "White T-Shirt on Model Mockup", category: "mockups", doc: "tshirt-model-white",
+            folder: "assets/thumbnails/product-mockups/apparel"
+        },
+        {
+            id: "cap-model-white", title: "White Baseball Cap Mockup", category: "mockups", doc: "cap-model-white",
             folder: "assets/thumbnails/product-mockups/apparel"
         }
     ];

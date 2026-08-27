@@ -432,16 +432,18 @@
             <section class="preview-pane" aria-label="Live document preview">
                 <h2>Live Preview</h2>
                 <div class="doc-sheet" id="doc-sheet"></div>
-                <!-- Print and Clear Form left this bar on August 26, 2026
-                     for the editor-bar toolbar above, where Download already
-                     was; all three actions now sit together on the right of
-                     the navigation. The bar itself stays: it is what the ad
-                     anchor's lift is measured against (see CLAUDE.md), and
-                     the export note belongs beside the rendered sheet rather
-                     than in the navigation. -->
-                <div class="preview-actions">
-                    <p class="upload-hint">Exports locally as selectable vector text via jsPDF. No file ever leaves your device.</p>
-                </div>
+                <!-- No .preview-actions bar here any more (August 27, 2026).
+                     Print, Clear Form and Download all moved to the editor-bar
+                     toolbar on August 26, leaving the export note as the bar's
+                     only content; with that note dropped the container went
+                     too, because the class carries a border-top, padding and a
+                     background and an empty one paints a stray rule across the
+                     foot of the pane. The note kept the bar alive on the
+                     reasoning that the ad anchor's lift is measured against it
+                     -- with no bar there is nothing on this page to lift, which
+                     is already the case on mockup.html. CLAUDE.md still
+                     describes that lift as covering resume, docs and poster;
+                     only poster keeps a bar now. -->
             </section>
 
         </div>

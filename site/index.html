@@ -203,6 +203,24 @@
                         </ul>
                     </div>
                     <div>
+                        <h2>Product Mockups</h2>
+                        <!-- Each carries data-target and data-doc, so
+                             js/app.js's bindLaunchControls routes the click
+                             through loading.html with the variant preset
+                             written, exactly as the catalog cards do. The
+                             href is a real page so a crawler still follows
+                             it -- do not swap these for buttons. -->
+                        <ul>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>
+                        </ul>
+                    </div>
+                    <div>
                         <h2>Editors</h2>
                         <ul>
                             <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
@@ -674,12 +692,30 @@
                     </div>
                 </article>
 
+                <!-- The first template whose photograph holds two pieces of
+                     the same cloth: the model also wears a white tee, which
+                     classifies identically to the cap. The factory keeps only
+                     the region connected to the print zone, so recolour dyes
+                     the cap and leaves the shirt alone. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/cap-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/cap-model-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></h3>
+                    </div>
+                </article>
+
             </div>
 
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 18.
+                Try a broader term, or clear the search to see all 19.
             </p>
         </section>
 
