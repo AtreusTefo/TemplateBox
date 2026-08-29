@@ -109,11 +109,27 @@
    data-target="mockup" data-doc="<id>". No other code changes are needed.
 
    Asset conventions:
-     site/assets/mockups/<id>-base.png / <id>-overlay.png
-     site/assets/mockups/<id>-displace.png / <id>-shade.png   (fabric only)
+     site/assets/mockups/<category>/<id>-base.png / <id>-overlay.png
+     site/assets/mockups/<category>/<id>-displace.png / <id>-shade.png  (fabric)
      site/assets/thumbnails/product-mockups/<category>/<id>-thumb.jpg
    Paths must stay URL-safe: lowercase, hyphenated, no spaces. The admin tool
    derives every filename from the id, so the id and the assets cannot drift.
+
+   <category> is a nested taxonomy path, and the SAME path is used in both
+   trees -- apparel/t-shirts, apparel/hats/baseball-caps, drinkware/mugs,
+   packaging/boxes, print/posters-and-frames, and so on. The admin tool takes
+   it once and writes it into both. It carries no runtime meaning: nothing
+   parses these strings, and the catalog card's data-category is what filters
+   the grid. The folders exist so a collection of hundreds of source photos,
+   seven maps apiece, stays navigable on disk -- and so the eventual move to
+   object storage (see the scale note below) is a prefix swap rather than a
+   sort. Segment names omit the word "mockup": the tree is already under
+   assets/mockups/, so apparel/hats/baseball-caps, never
+   "apparel mockups/hats Mockups/baseball cap mockups".
+
+   Empty category folders are not in git -- git tracks files, not directories
+   -- so a fresh clone has only the folders that hold assets. Creating one is
+   part of adding the first template that needs it, not a separate step.
 
    Scale note: assets are local while the catalog is small. When the
    collection outgrows the repository (roughly 1GB), move base/overlay
@@ -128,9 +144,9 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "wood-a4",
         title: "Leaning Wood Frame Poster",
-        thumb: "assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.webp",
-        base: "assets/mockups/wood-a4-base.png",
-        overlay: "assets/mockups/wood-a4-overlay.png",
+        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4-thumb.webp",
+        base: "assets/mockups/print/posters-and-frames/wood-a4-base.png",
+        overlay: "assets/mockups/print/posters-and-frames/wood-a4-overlay.png",
         /* Measured: inside the print window this overlay averages alpha 193
            over a near-white body (mean luma 211), so it is a luminance map,
            not a shadow cut-out. */
@@ -148,18 +164,18 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "tshirt-model-white",
         title: "White T-Shirt on Model",
-        thumb: "assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb.webp",
-        base: "assets/mockups/tshirt-model-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-thumb.webp",
+        base: "assets/mockups/apparel/t-shirts/tshirt-model-white-base.png",
         /* Fabric, not glass: the artwork is bent and shaded by the two maps
            below during the displacement pass, so this template carries no
            full-canvas overlay at all. */
         overlay: null,
-        displace: "assets/mockups/tshirt-model-white-displace.png",
-        shade: "assets/mockups/tshirt-model-white-shade.png",
+        displace: "assets/mockups/apparel/t-shirts/tshirt-model-white-displace.png",
+        shade: "assets/mockups/apparel/t-shirts/tshirt-model-white-shade.png",
         /* 2.8% of this garment sits above its own reference white -- the
            light catching the fold ridges. Multiply clamps that away, so it
            is split into its own screen layer. */
-        light: "assets/mockups/tshirt-model-white-light.png",
+        light: "assets/mockups/apparel/t-shirts/tshirt-model-white-light.png",
         /* 0.3, not 1. The light map is "everything above the fabric's
            median" on a WHITE garment, which is mostly bright DIFFUSE, not
            surface reflection -- the same confusion that washed dark dyes out
@@ -171,15 +187,15 @@ window.TB_PHOTO_MOCKUPS = [
         lightGain: 0.3,
         /* Alpha mask of the garment, hole-filled and feathered. Recolour is
            confined to it, so the tint cannot creep onto skin or background. */
-        garment: "assets/mockups/tshirt-model-white-garment.png",
+        garment: "assets/mockups/apparel/t-shirts/tshirt-model-white-garment.png",
         /* Diffuse response normalised to the garment's own peak, used ONLY by
            recolour. Distinct from `shade` on purpose: shade is median-split
            for the print pass and pairs with `light`, which would wash a dye
            out. */
-        tone: "assets/mockups/tshirt-model-white-tone.png",
+        tone: "assets/mockups/apparel/t-shirts/tshirt-model-white-tone.png",
         /* High-pass of the weave, centred at 128. Screened back over a
            heather colourway as the undyed fibre; unused by solid dyes. */
-        grain: "assets/mockups/tshirt-model-white-grain.png",
+        grain: "assets/mockups/apparel/t-shirts/tshirt-model-white-grain.png",
         /* Declaring both `garment` and `garmentColors` is what turns the
            colour field on for a photographic template. The first entry is the
            photographed garment itself and is never tinted. */
@@ -234,12 +250,12 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "cap-model-white",
         title: "White Baseball Cap on Model",
-        thumb: "assets/thumbnails/product-mockups/apparel/cap-model-white-thumb.jpg",
-        base: "assets/mockups/cap-model-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb.jpg",
+        base: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-base.png",
         overlay: null,
-        displace: "assets/mockups/cap-model-white-displace.png",
-        shade: "assets/mockups/cap-model-white-shade.png",
-        light: "assets/mockups/cap-model-white-light.png",
+        displace: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-displace.png",
+        shade: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-shade.png",
+        light: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-light.png",
         /* 0.3, not 1. The light map is "everything above the fabric's
            median" on a WHITE garment, which is mostly bright DIFFUSE, not
            surface reflection -- the same confusion that washed dark dyes out
@@ -249,9 +265,9 @@ window.TB_PHOTO_MOCKUPS = [
            lost its blue identity outright. At 0.3 the highlight still models
            the surface and the ink stays the colour it was. */
         lightGain: 0.3,
-        garment: "assets/mockups/cap-model-white-garment.png",
-        tone: "assets/mockups/cap-model-white-tone.png",
-        grain: "assets/mockups/cap-model-white-grain.png",
+        garment: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-garment.png",
+        tone: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-tone.png",
+        grain: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-grain.png",
         /* Higher than the shirt's 16 because this base is 1939px wide against
            the shirt's 1024, and displaceStrength is in base-image pixels. It
            is NOT scaled proportionally (that would be ~30): a structured cap

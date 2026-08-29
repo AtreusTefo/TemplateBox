@@ -19,9 +19,9 @@ The first template is a leaning wood A4 frame (`wood-a4`), built from a purchase
 | `site/js/mockup-templates.js` | THE registry of photographic templates (`window.TB_PHOTO_MOCKUPS`). Data only; adding a template requires no changes to `js/mockup.js`. |
 | `site/js/vendor/glfx.js` | Vendored copy of glfx.js 0.0.4 (MIT, Evan Wallace) for the 4-point perspective warp. Lazy-loaded only when a non-rectangular warp zone is rendered; never requested for rectangular templates. Vendored rather than CDN-linked because the cdnjs URL circulating in research notes (`cdnjs.cloudflare.com/ajax/libs/glfx.js/0.0.4/glfx.min.js`) does not exist (404); the file was fetched from jsdelivr (`npm/glfx@0.0.4`). |
 | `site/tools/mockup-admin.html` | Internal coordinate picker. Load a base image locally, click the four print-area corners (TL, TR, BR, BL), and copy a ready-to-paste registry entry. Covered by the existing `X-Robots-Tag: noindex` rule on `/tools/*` in `netlify.toml`. |
-| `site/assets/mockups/wood-a4-base.png` | Scene photograph, 2000x2000, with a fully transparent print window (moved from `site/assets/`). |
-| `site/assets/mockups/wood-a4-overlay.png` | Shadow/glare overlay, 2000x2000 (moved from `site/assets/`). |
-| `site/assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.jpg` | Generated catalog thumbnail (800x1000, 63KB): white backing + base + overlay, cropped to the card's 4:5 ratio. |
+| `site/assets/mockups/print/posters-and-frames/wood-a4-base.png` | Scene photograph, 2000x2000, with a fully transparent print window (moved from `site/assets/`). |
+| `site/assets/mockups/print/posters-and-frames/wood-a4-overlay.png` | Shadow/glare overlay, 2000x2000 (moved from `site/assets/`). |
+| `site/assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4-thumb.jpg` | Generated catalog thumbnail (800x1000, 63KB): white backing + base + overlay, cropped to the card's 4:5 ratio. |
 
 ## Files Modified
 
@@ -79,7 +79,7 @@ A direct visit to `mockup.html` with no preset falls back to the last product us
 
 ## Adding a Template (data-only workflow)
 
-1. Save assets as `site/assets/mockups/<id>-base.png` and `<id>-overlay.png` (URL-safe names: lowercase, hyphens, no spaces - the folders supplied for wood-a4 contained spaces and commas and had to be renamed before they could be referenced).
+1. Save assets as `site/assets/mockups/<category>/<id>-base.png` and `<id>-overlay.png` (URL-safe names: lowercase, hyphens, no spaces - the folders supplied for wood-a4 contained spaces and commas and had to be renamed before they could be referenced). `<category>` is a nested taxonomy path (`apparel/t-shirts`, `print/posters-and-frames`), and the same path is used for the thumbnail in step 4; the folder may not exist yet, since git does not track empty directories. See `docs/implementation/MOCKUP_ASSET_FOLDER_STRUCTURE.md`.
 2. Open `tools/mockup-admin.html`, load the base image, click the four print-area corners, fill in the id/title/mode, and copy the generated entry.
 3. Paste the entry into `window.TB_PHOTO_MOCKUPS` in `site/js/mockup-templates.js`, then set `overlayBlend` by inspecting the overlay asset: white-with-grey-shading means `multiply`, dark-shapes-on-transparency means `source-over`, black-with-bright-streaks means `screen`. Do not skip this — the wrong value silently washes the artwork out (see the section above).
 4. Generate a thumbnail under roughly 100KB at `site/assets/thumbnails/product-mockups/<category>/<id>-thumb.jpg` (composite white backing + base + overlay, crop to 4:5). Do not use the full-resolution renders as thumbnails: the supplied `wood-a4-thumbnail.webp` files are 2000x2000 at about 1.4MB each, which is catalog-poison at 100+ planned items. They remain in the repository unused.

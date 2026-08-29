@@ -1410,15 +1410,15 @@ body + '\n' +
         { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },
         {
             id: "wood-a4", title: "Leaning Wood Frame Poster Mockup", category: "mockups", doc: "wood-a4",
-            folder: "assets/thumbnails/product-mockups/posters-frames-canvas-billboards"
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames"
         },
         {
             id: "tshirt-model-white", title: "White T-Shirt on Model Mockup", category: "mockups", doc: "tshirt-model-white",
-            folder: "assets/thumbnails/product-mockups/apparel"
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
         },
         {
             id: "cap-model-white", title: "White Baseball Cap Mockup", category: "mockups", doc: "cap-model-white",
-            folder: "assets/thumbnails/product-mockups/apparel"
+            folder: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps"
         }
     ];
 

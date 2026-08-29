@@ -224,8 +224,9 @@
             <label for="tpl-title">Title</label>
             <input type="text" id="tpl-title" value="" placeholder="White T-Shirt on Model">
 
-            <label for="tpl-category">Thumbnail category folder</label>
-            <input type="text" id="tpl-category" value="apparel">
+            <label for="tpl-category">Category folder</label>
+            <input type="text" id="tpl-category" value="apparel" placeholder="apparel/hats/baseball-caps">
+            <p class="hint">A taxonomy path, and the same one is written into both trees: assets/mockups/&lt;category&gt;/ for the maps and assets/thumbnails/product-mockups/&lt;category&gt;/ for the thumbnail. Nest as deep as the product needs -- apparel/t-shirts, apparel/hats/baseball-caps, drinkware/mugs, packaging/boxes, print/posters-and-frames. Lowercase and hyphenated; slashes are kept, everything else is slugged. Leave the word "mockup" out of the segments, the tree is already under assets/mockups/.</p>
 
             <label for="tpl-mode">Mode</label>
             <select id="tpl-mode">
@@ -249,8 +250,9 @@
             <p class="status" id="copy-status"></p>
 
             <ol id="checklist">
-                <li>Save the downloads into site/assets/mockups/ and the thumbnail into site/assets/thumbnails/product-mockups/&lt;category&gt;/.</li>
-                <li>Save the base photograph itself as &lt;id&gt;-base.png in the same folder.</li>
+                <li>Create site/assets/mockups/&lt;category&gt;/ and site/assets/thumbnails/product-mockups/&lt;category&gt;/ if this is the first template in that category -- git tracks files, not directories, so a category folder only exists once it holds something.</li>
+                <li>Save the map downloads into the first and the thumbnail into the second.</li>
+                <li>Save the base photograph itself as &lt;id&gt;-base.png beside the maps.</li>
                 <li>Paste the entry into js/mockup-templates.js.</li>
                 <li>Add a catalog card in index.html with data-target="mockup" data-doc="&lt;id&gt;".</li>
                 <li>Run node tests/verify-layout.js.</li>
@@ -889,6 +891,20 @@
         return cleaned || fallback;
     }
 
+    /* The category is a taxonomy PATH, not one segment, so slug() alone would
+       flatten apparel/hats/baseball-caps into apparel-hats-baseball-caps and
+       silently emit a filename where a folder was meant. Slug each segment,
+       keep the separators, and drop empty ones -- a stray leading, trailing or
+       doubled separator would otherwise produce "assets/mockups//x-base.png",
+       which resolves on a server but not from the filesystem. Backslashes are
+       accepted because the operator is on Windows and will paste one. */
+    function slugPath(value, fallback) {
+        const parts = String(value || "").split(/[\\/]+/)
+            .map((part) => slug(part, ""))
+            .filter(Boolean);
+        return parts.join("/") || fallback;
+    }
+
     function save(blob, name) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -911,7 +927,7 @@
             return;
         }
         const id = slug($("tpl-id").value, "my-mockup");
-        const category = slug($("tpl-category").value, "apparel");
+        const category = slugPath($("tpl-category").value, "apparel");
         const title = ($("tpl-title").value || "").trim() || id;
         const fabric = $("fabric-on").checked;
         const corners = points.map((p) =>
@@ -923,18 +939,18 @@
             "        id: \"" + id + "\",\n" +
             "        title: \"" + title.replace(/\\/g, "").replace(/"/g, "'") + "\",\n" +
             "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "-thumb.jpg\",\n" +
-            "        base: \"assets/mockups/" + id + "-base.png\",\n";
+            "        base: \"assets/mockups/" + category + "/" + id + "-base.png\",\n";
 
         if (fabric) {
             body +=
                 "        overlay: null,\n" +
-                "        displace: \"assets/mockups/" + id + "-displace.png\",\n" +
-                "        shade: \"assets/mockups/" + id + "-shade.png\",\n" +
-                "        light: \"assets/mockups/" + id + "-light.png\",\n" +
+                "        displace: \"assets/mockups/" + category + "/" + id + "-displace.png\",\n" +
+                "        shade: \"assets/mockups/" + category + "/" + id + "-shade.png\",\n" +
+                "        light: \"assets/mockups/" + category + "/" + id + "-light.png\",\n" +
                 "        lightGain: " + Number($("light-gain").value) + ",\n" +
-                "        garment: \"assets/mockups/" + id + "-garment.png\",\n" +
-                "        tone: \"assets/mockups/" + id + "-tone.png\",\n" +
-                "        grain: \"assets/mockups/" + id + "-grain.png\",\n" +
+                "        garment: \"assets/mockups/" + category + "/" + id + "-garment.png\",\n" +
+                "        tone: \"assets/mockups/" + category + "/" + id + "-tone.png\",\n" +
+                "        grain: \"assets/mockups/" + category + "/" + id + "-grain.png\",\n" +
                 "        garmentColors: {\n" +
                 "            original: { name: \"As photographed\", hex: \"#E9E9EC\", original: true },\n" +
                 "            black: { name: \"Black\", hex: \"#1A1A1A\" },\n" +
@@ -950,7 +966,7 @@
                 "        backing: null,\n";
         } else {
             body +=
-                "        overlay: \"assets/mockups/" + id + "-overlay.png\",\n" +
+                "        overlay: \"assets/mockups/" + category + "/" + id + "-overlay.png\",\n" +
                 "        overlayBlend: \"" + $("tpl-blend").value + "\",\n" +
                 "        mode: \"" + $("tpl-mode").value + "\",\n";
         }

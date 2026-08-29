@@ -130,7 +130,7 @@ window.TBResume = (() => {
         if (body.kind === "paragraph") {
             return Boolean(readField(state.fields, body.field));
         }
-        if (body.kind === "list") {
+        if (body.kind === "list" || body.kind === "meters") {
             return splitList((state.fields || {})[body.field], body.split).length > 0;
         }
         if (body.kind === "entries") {
@@ -150,6 +150,24 @@ window.TBResume = (() => {
     function columnsOf(template) {
         const L = template.layout;
         const pw = template.page.width;
+
+        /* Single-column templates have no rail, so they get NO sidebar column
+           at all rather than a zero-width one. A degenerate column would
+           still be a valid target for `column: "sidebar"`, and a descriptor
+           naming it by mistake would then lay text out invisibly instead of
+           failing where the mistake is. Absence is checked for throughout:
+           paintRail, the cursor set-up and the block loop. */
+        if (L.kind === "single-column" || !L.sidebar) {
+            return {
+                main: {
+                    boxX: 0, boxW: pw,
+                    x: L.main.left,
+                    width: pw - L.main.left - L.main.right,
+                    first: L.main.firstBaseline, bottom: L.main.bottom
+                }
+            };
+        }
+
         const sbW = pw * L.sidebar.width;
         const onRight = L.sidebar.side !== "left";
         const sbX = onRight ? pw - sbW : 0;
@@ -192,18 +210,23 @@ window.TBResume = (() => {
 
         paintRail(ctx, 0);
 
-        const cursor = { main: cols.main.first, sidebar: cols.sidebar.first };
-        const started = { main: false, sidebar: false };
-        const pageOf = { main: 0, sidebar: 0 };
+        const cursor = { main: cols.main.first };
+        const started = { main: false };
+        const pageOf = { main: 0 };
+        if (cols.sidebar) {
+            cursor.sidebar = cols.sidebar.first;
+            started.sidebar = false;
+            pageOf.sidebar = 0;
+        }
 
         template.blocks.forEach((block) => {
-            const key = block.column === "sidebar" ? "sidebar" : "main";
+            const key = (block.column === "sidebar" && cols.sidebar) ? "sidebar" : "main";
             layoutBlock(ctx, block, key, cursor, started, pageOf);
         });
 
         ctx.overflow = {
             main: cursor.main > cols.main.bottom,
-            sidebar: cursor.sidebar > cols.sidebar.bottom
+            sidebar: Boolean(cols.sidebar) && cursor.sidebar > cols.sidebar.bottom
         };
         return ctx;
     }
@@ -211,6 +234,7 @@ window.TBResume = (() => {
     function paintRail(ctx, page) {
         const L = ctx.template.layout;
         const c = ctx.cols.sidebar;
+        if (!c) return;
         ctx.ops.push({
             op: "rect", page: page,
             x: c.boxX, y: 0, w: c.boxW, h: ctx.template.page.height,
@@ -230,6 +254,31 @@ window.TBResume = (() => {
         ctx.pages = Math.max(ctx.pages, pageOf.main + 1);
         paintRail(ctx, pageOf.main);
         cursor.main = c.first;
+    }
+
+    /* The x a painter needs for a given alignment. Both painters anchor the
+       SAME x -- jsPDF's align option and SVG's text-anchor agree on what the
+       coordinate means -- so alignment is decided once here rather than
+       measured separately in each medium. */
+    function anchorX(col, align) {
+        if (align === "center") return col.x + col.width / 2;
+        if (align === "right") return col.x + col.width;
+        return col.x;
+    }
+
+    /* One rule emitter for every horizontal rule: the one above a heading,
+       the one below it, and the standalone `rule` block. `bleedLeft` and
+       `length` exist for the grey rail's part-width sidebar rules and are
+       inert (0 and 1) everywhere else. */
+    function emitRule(ctx, page, col, spec, y) {
+        const bleed = spec.bleedLeft || 0;
+        const len = spec.length === undefined ? 1 : spec.length;
+        ctx.ops.push({
+            op: "line", page: page, x1: col.x - bleed, y1: y,
+            x2: col.x - bleed + (col.width + bleed) * len, y2: y,
+            color: colorOf(spec.color, ctx.template, ctx.state),
+            width: spec.width || 1
+        });
     }
 
     function text(ctx, page, x, y, str, t, widthForAlign) {
@@ -257,8 +306,9 @@ window.TBResume = (() => {
                 const i = value.indexOf(" ");
                 lines = i > 0 ? [value.slice(0, i), value.slice(i + 1)] : [value];
             }
+            const nameX = anchorX(col, t.align);
             lines.forEach((line, idx) => {
-                text(ctx, page, col.x, cursor[key], line, t);
+                text(ctx, page, nameX, cursor[key], line, t);
                 if (idx < lines.length - 1) cursor[key] += t.lineHeight || t.size;
             });
             if (block.rule) {
@@ -276,8 +326,30 @@ window.TBResume = (() => {
             return;
         }
 
+        /* A rule that belongs to no heading -- the hairline above the name
+           on a fully ruled sheet. Kept a block rather than another optional
+           key on `display`, because it is page furniture in its own right and
+           a template may want one anywhere. */
+        if (block.kind === "rule") {
+            cursor[key] += block.gapBefore || 0;
+            ensureRoom(ctx, key, cursor, pageOf, block.gapAfter || 0);
+            emitRule(ctx, pageOf[key], col, block, cursor[key]);
+            cursor[key] += block.gapAfter || 0;
+            started[key] = true;
+            return;
+        }
+
         if (block.kind === "contact") {
             layoutContact(ctx, block, key, cursor, pageOf);
+            started[key] = true;
+            return;
+        }
+
+        /* One centred line of contact details with a drawn glyph between
+           each pair -- the classic single-column masthead, as against the
+           stacked icon rows of `contact`. */
+        if (block.kind === "contactRow") {
+            layoutContactRow(ctx, block, key, cursor, pageOf);
             started[key] = true;
             return;
         }
@@ -288,22 +360,26 @@ window.TBResume = (() => {
             if (started[key]) cursor[key] += t.gapBefore || 0;
 
             const label = t.uppercase ? block.label.toUpperCase() : block.label;
-            ensureRoom(ctx, key, cursor, pageOf, 40);
-            text(ctx, pageOf[key], col.x, cursor[key], label, t);
+            /* Enough room for the whole heading assembly, so a page never
+               breaks between a rule and the heading it belongs to. */
+            ensureRoom(ctx, key, cursor, pageOf, t.ruleBefore ? 72 : 40);
+
+            if (t.ruleBefore) {
+                emitRule(ctx, pageOf[key], col, t.ruleBefore, cursor[key]);
+                cursor[key] += t.ruleBefore.gapAfter || 0;
+            }
+
+            text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], label, t);
 
             if (t.rule) {
                 const ry = cursor[key] + (t.rule.offset || 2);
-                const x1 = col.x - (t.rule.bleedLeft || 0);
-                const len = t.rule.length === undefined ? 1 : t.rule.length;
-                ctx.ops.push({
-                    op: "line", page: pageOf[key], x1: x1, y1: ry,
-                    x2: x1 + (col.width + (t.rule.bleedLeft || 0)) * len, y2: ry,
-                    color: colorOf(t.rule.color, ctx.template, ctx.state),
-                    width: t.rule.width || 1
-                });
+                emitRule(ctx, pageOf[key], col, t.rule, ry);
                 cursor[key] = ry;
             }
-            cursor[key] += t.gapAfter || 0;
+            /* A block may tighten its own heading-to-body gap: entry lists
+               sit closer under the rule than prose and lists do, and that is
+               a property of the body, not of the heading style. */
+            cursor[key] += (block.gapAfter === undefined ? (t.gapAfter || 0) : block.gapAfter);
             layoutBody(ctx, block.body, key, cursor, pageOf);
             started[key] = true;
         }
@@ -328,6 +404,10 @@ window.TBResume = (() => {
         if (body.kind === "list") {
             const t = T[body.type || "bullet"];
             const items = splitList((ctx.state.fields || {})[body.field], body.split);
+            if (body.columns) {
+                layoutListColumns(ctx, items, t, body.columns, key, cursor, pageOf);
+                return;
+            }
             items.forEach((item, i) => {
                 if (i) cursor[key] += t.itemGap || t.lineHeight;
                 layoutBulletItem(ctx, item, t, key, cursor, pageOf);
@@ -362,6 +442,53 @@ window.TBResume = (() => {
             return;
         }
 
+        /* Name, bar, level -- the language proficiency block. The bar is two
+           rects rather than a stroked line, so track and fill are one
+           primitive each and neither painter needs a new operation. */
+        if (body.kind === "meters") {
+            const t = T[body.type || "body"];
+            const rows = splitList((ctx.state.fields || {})[body.field], body.split);
+            const bar = body.bar || {};
+            const lh = t.lineHeight || t.size;
+            const h = bar.height || 6;
+
+            rows.forEach((row, i) => {
+                if (i) cursor[key] += body.itemGap || lh;
+
+                const cut = row.indexOf(":");
+                const name = (cut < 0 ? row : row.slice(0, cut)).trim();
+                const level = cut < 0 ? "" : row.slice(cut + 1).trim();
+                const fraction = meterFraction(level, body.levels);
+                if (!name && !level) return;
+
+                ensureRoom(ctx, key, cursor, pageOf, lh * 3);
+                const page = pageOf[key];
+                text(ctx, page, col.x, cursor[key], name + (level ? ":" : ""), t);
+
+                if (fraction === null) {
+                    if (level) cursor[key] += lh;
+                } else {
+                    cursor[key] += bar.gapBefore === undefined ? 12 : bar.gapBefore;
+                    ctx.ops.push({
+                        op: "rect", page: page, x: col.x, y: cursor[key] - h / 2,
+                        w: col.width, h: h,
+                        fill: colorOf(bar.track || "#D1D3D4", ctx.template, ctx.state)
+                    });
+                    if (fraction > 0) {
+                        ctx.ops.push({
+                            op: "rect", page: page, x: col.x, y: cursor[key] - h / 2,
+                            w: col.width * fraction, h: h,
+                            fill: colorOf(bar.fill || "ink", ctx.template, ctx.state)
+                        });
+                    }
+                    cursor[key] += bar.gapAfter === undefined ? 16 : bar.gapAfter;
+                }
+
+                if (level) text(ctx, pageOf[key], col.x, cursor[key], level, t);
+            });
+            return;
+        }
+
         if (body.kind === "entries") {
             const rows = ctx.state[body.source] || [];
             let emitted = 0;
@@ -375,6 +502,16 @@ window.TBResume = (() => {
                 ensureRoom(ctx, key, cursor, pageOf, 40);
 
                 if (headRuns.length) layoutRuns(ctx, headRuns, key, cursor, pageOf);
+
+                /* Dates set flush right on the head's OWN baseline, so the
+                   cursor must not have moved yet -- that is why this is laid
+                   out here rather than as another run inside the head. */
+                if (body.aside) {
+                    const asideRuns = buildRuns(body.aside, row, ctx.template);
+                    if (asideRuns.length) {
+                        layoutRunsRight(ctx, asideRuns, key, cursor[key], pageOf[key]);
+                    }
+                }
 
                 const subRuns = body.sub ? buildRuns(body.sub, row, ctx.template) : [];
                 if (subRuns.length) {
@@ -410,17 +547,110 @@ window.TBResume = (() => {
         });
     }
 
-    function layoutBulletItem(ctx, item, t, key, cursor, pageOf) {
+    /* The mirror of layoutRuns: the group is measured whole, then drawn left
+       to right from an x that lands its last glyph on the column's right
+       edge. Right-anchoring each run on its own would stack them all at the
+       same place, so the measurement has to finish before anything is drawn. */
+    function layoutRunsRight(ctx, runs, key, y, page) {
         const col = ctx.cols[key];
+        const T = ctx.template.type;
+        let total = 0;
+        runs.forEach((run) => { total += ctx.measure(run.text, T[run.type]); });
+        let x = col.x + col.width - total;
+        runs.forEach((run) => {
+            const t = T[run.type];
+            text(ctx, page, x, y, run.text, t);
+            x += ctx.measure(run.text, t);
+        });
+    }
+
+    /* A list set side by side -- the two-up skills block of a classic CV.
+       Both columns start on the same baseline and the cursor advances by the
+       taller one.
+
+       Deliberately NOT paginated. Room is reserved once, up front, and the
+       sub-columns run on a private cursor key, which makes ensureRoom a no-op
+       inside them (it only ever acts on "main"). A skills list that broke
+       mid-column would leave its two halves on different pages, which reads
+       as a rendering fault rather than a longer document -- the same
+       judgement the sidebar's single-page rule already makes. */
+    function layoutListColumns(ctx, items, t, spec, key, cursor, pageOf) {
+        const col = ctx.cols[key];
+        const count = Math.max(2, spec.count || 2);
+        const gutter = spec.gutter === undefined ? 12 : spec.gutter;
+        const lh = t.lineHeight || t.size;
+        const perColumn = Math.ceil(items.length / count);
+        if (!items.length) return;
+
+        ensureRoom(ctx, key, cursor, pageOf, perColumn * (t.itemGap || lh));
+
+        /* `split` is the fraction of the column width at which the second of
+           two columns begins, taken from the source artwork. Any count other
+           than exactly two gets equal widths. */
+        const boxes = [];
+        if (count === 2 && spec.split) {
+            boxes.push({ x: col.x, width: col.width * spec.split - gutter });
+            boxes.push({ x: col.x + col.width * spec.split,
+                         width: col.width * (1 - spec.split) });
+        } else {
+            const w = (col.width - gutter * (count - 1)) / count;
+            for (let i = 0; i < count; i += 1) {
+                boxes.push({ x: col.x + (w + gutter) * i, width: w });
+            }
+        }
+
+        let deepest = cursor[key];
+        boxes.forEach((box, ci) => {
+            const slice = items.slice(ci * perColumn, (ci + 1) * perColumn);
+            const sub = { col: cursor[key] };
+            const subPage = { col: pageOf[key] };
+            slice.forEach((item, i) => {
+                if (i) sub.col += t.itemGap || lh;
+                layoutBulletItem(ctx, item, t, "col", sub, subPage, box);
+            });
+            if (slice.length) deepest = Math.max(deepest, sub.col);
+        });
+        cursor[key] = deepest;
+    }
+
+    /* The bar's fill, resolved from the level text the visitor typed. The
+       scale belongs to the template, not the engine: `levels` maps a token to
+       a fraction, so a descriptor can publish CEFR bands, a five-point scale,
+       or none at all. A bare percentage always works. Unrecognised text draws
+       NO bar rather than a guessed one -- a meter at an invented length is a
+       worse answer than no meter. */
+    function meterFraction(level, levels) {
+        if (!level) return null;
+        const pct = level.match(/(\d{1,3})\s*%/);
+        if (pct) return Math.min(1, Math.max(0, parseInt(pct[1], 10) / 100));
+
+        const map = levels || {};
+        const keys = Object.keys(map);
+        for (let i = 0; i < keys.length; i += 1) {
+            const token = keys[i].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            if (new RegExp("(^|[^A-Za-z0-9])" + token + "([^A-Za-z0-9]|$)", "i").test(level)) {
+                return map[keys[i]];
+            }
+        }
+        return null;
+    }
+
+    /* `box` overrides the column, for sub-column layout; `t.inset` moves the
+       whole item in from the column edge, which is how bullets sit indented
+       under a full-width heading. */
+    function layoutBulletItem(ctx, item, t, key, cursor, pageOf, box) {
+        const col = box || ctx.cols[key];
+        const inset = t.inset || 0;
         const indent = t.indent || 8;
-        const lines = ctx.wrap(item, t, col.width - indent);
+        const x = col.x + inset;
+        const lines = ctx.wrap(item, t, col.width - inset - indent);
         lines.forEach((line, i) => {
             if (i) cursor[key] += t.lineHeight || t.size;
             ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
             if (i === 0 && t.marker) {
-                text(ctx, pageOf[key], col.x, cursor[key], t.marker, t);
+                text(ctx, pageOf[key], x, cursor[key], t.marker, t);
             }
-            text(ctx, pageOf[key], col.x + indent, cursor[key], line, t);
+            text(ctx, pageOf[key], x + indent, cursor[key], line, t);
         });
     }
 
@@ -458,6 +688,70 @@ window.TBResume = (() => {
                 text(ctx, page, col.x + (block.textOffset || 28), cursor[key], line, t);
             });
         });
+    }
+
+    /* One centred line: value, glyph, value, glyph, value -- the masthead of
+       a classic single-column CV, as against the stacked icon rows above.
+
+       The row is measured whole and then drawn left to right from a computed
+       start. That is the only way to centre a line that mixes text with drawn
+       vector art: neither medium can centre the pair as a unit, so the engine
+       has to do the arithmetic itself. */
+    function layoutContactRow(ctx, block, key, cursor, pageOf) {
+        const col = ctx.cols[key];
+        const t = ctx.template.type[block.type || "body"];
+        const sep = block.separator || {};
+        const size = sep.size || 7;
+        const gap = sep.gap === undefined ? 12 : sep.gap;
+
+        const values = (block.fields || [])
+            .map((n) => readField(ctx.state.fields, n))
+            .filter(Boolean);
+        if (!values.length) return;
+
+        cursor[key] += block.gapBefore || 0;
+        ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
+        const page = pageOf[key];
+        const y = cursor[key];
+
+        const widths = values.map((v) => ctx.measure(v, t));
+        const stride = gap * 2 + size;
+        let total = stride * (values.length - 1);
+        widths.forEach((w) => { total += w; });
+
+        /* A row wider than its column would be centred about a point it has
+           already passed, hanging off BOTH edges. Too wide is set from the
+           left margin instead, so it overruns in one direction only. */
+        const centred = block.align === "center" && total <= col.width;
+        let x = centred ? col.x + (col.width - total) / 2 : col.x;
+
+        const glyph = colorOf(sep.color || "body", ctx.template, ctx.state);
+        values.forEach((value, i) => {
+            text(ctx, page, x, y, value, t);
+            x += widths[i];
+            if (i < values.length - 1) {
+                drawSeparator(ctx, page, sep.shape, x + gap + size / 2,
+                              y - t.size * 0.35, size / 2, glyph);
+                x += stride;
+            }
+        });
+    }
+
+    /* Separator glyphs are primitives for the same reason the contact icons
+       are: the export stays vector and the template needs no image asset. */
+    function drawSeparator(ctx, page, shape, cx, cy, r, color) {
+        if (shape === "diamond") {
+            ctx.ops.push({ op: "poly", page: page, fill: color, points: [
+                [cx, cy - r], [cx + r, cy], [cx, cy + r], [cx - r, cy]
+            ]});
+            return;
+        }
+        if (shape === "square") {
+            ctx.ops.push({ op: "rect", page: page, fill: color,
+                           x: cx - r, y: cy - r, w: r * 2, h: r * 2 });
+            return;
+        }
+        ctx.ops.push({ op: "circle", page: page, cx: cx, cy: cy, r: r, fill: color });
     }
 
     function drawIcon(ctx, page, kind, cx, cy, r, disc, glyph) {
@@ -550,6 +844,12 @@ window.TBResume = (() => {
             n.setAttribute("font-size", o.size);
             n.setAttribute("font-weight", o.weight === "bold" ? "700" : "400");
             n.setAttribute("fill", o.color);
+            /* The same x the PDF anchors: jsPDF's align option and SVG's
+               text-anchor place a centred or right-aligned string identically
+               about the coordinate, so no second measurement is needed here
+               and the two mediums cannot disagree. */
+            if (o.align === "center") n.setAttribute("text-anchor", "middle");
+            else if (o.align === "right") n.setAttribute("text-anchor", "end");
             /* Namespaced attribute: setAttribute("xml:space", ...) silently
                fails to register, and SVG then collapses the leading space of
                a run such as " - ", so the preview loses whitespace the PDF
