@@ -421,11 +421,57 @@
     /* Reduces `fabric` in place to a single connected region: the one under
        the print zone, or the largest if no zone is marked yet. Returns how
        many pixels were discarded so the caller can say so. */
+    /* Connectivity is computed on a DILATED copy of the classified mask and
+       then intersected back, rather than on the mask itself.
+
+       The reason is thin dark detail INSIDE one surface. A paper bag's twisted
+       rope handles carry 1-3px grooves that fall below the luma gate, and an
+       undilated flood treats each groove as the end of the region: it climbed
+       25% of one handle and stopped, so recolour dyed the bag and left white
+       handles with a partial gradient where the flood died. That is an
+       artifact, not a design choice, and it is invisible until someone picks a
+       colour.
+
+       Radius 6 is the measured minimum that carries a rope handle (25.2% of
+       the handle band to 98.9%). It does not weaken the separation this
+       function exists for, which was the cap photograph's problem -- the model
+       wears a white tee that classifies as the same surface. Re-measured
+       against that image at radii 0, 1, 2, 3, 4 and 6, the tee stays at 0.0%
+       and the cap zone at 100%: the gap across the face is orders of magnitude
+       wider than a groove, so bridging grooves cannot bridge that. Raising
+       this further trades away real separation for nothing, since 6 already
+       closes the handles. */
+    const CONNECT_DILATE = 6;
+
     function restrictToPrintedGarment(fabric, W, H) {
         const N = W * H;
         let before = 0;
         for (let i = 0; i < N; i++) { before += fabric[i]; }
         if (!before) { return { dropped: 0 }; }
+
+        /* Separable dilation: a horizontal pass, then a vertical one. */
+        const rowPass = new Uint8Array(N), dil = new Uint8Array(N);
+        for (let y = 0; y < H; y++) {
+            const row = y * W;
+            for (let x = 0; x < W; x++) {
+                let v = 0;
+                for (let k = -CONNECT_DILATE; k <= CONNECT_DILATE; k++) {
+                    const xx = x + k;
+                    if (xx >= 0 && xx < W && fabric[row + xx]) { v = 1; break; }
+                }
+                rowPass[row + x] = v;
+            }
+        }
+        for (let x = 0; x < W; x++) {
+            for (let y = 0; y < H; y++) {
+                let v = 0;
+                for (let k = -CONNECT_DILATE; k <= CONNECT_DILATE; k++) {
+                    const yy = y + k;
+                    if (yy >= 0 && yy < H && rowPass[yy * W + x]) { v = 1; break; }
+                }
+                dil[y * W + x] = v;
+            }
+        }
 
         const label = new Int32Array(N).fill(-1);
         let best = -1, bestCount = 0, zoneLabel = -1;
@@ -441,25 +487,32 @@
         let next = 0;
         const stack = [];
         for (let start = 0; start < N; start++) {
-            if (!fabric[start] || label[start] !== -1) { continue; }
+            if (!dil[start] || label[start] !== -1) { continue; }
             const id = next++;
+            /* Counted in ORIGINAL fabric pixels, not dilated ones, so "largest
+               region" still means the most actual surface. Dilation inflates
+               every region, and a thin sprawling one gains proportionally
+               more than a compact one. */
             let count = 0;
             stack.length = 0;
             stack.push(start);
             label[start] = id;
             while (stack.length) {
                 const i = stack.pop();
-                count++;
+                if (fabric[i]) { count++; }
                 const x = i % W;
-                if (x > 0 && fabric[i - 1] && label[i - 1] === -1) { label[i - 1] = id; stack.push(i - 1); }
-                if (x < W - 1 && fabric[i + 1] && label[i + 1] === -1) { label[i + 1] = id; stack.push(i + 1); }
-                if (i >= W && fabric[i - W] && label[i - W] === -1) { label[i - W] = id; stack.push(i - W); }
-                if (i < N - W && fabric[i + W] && label[i + W] === -1) { label[i + W] = id; stack.push(i + W); }
+                if (x > 0 && dil[i - 1] && label[i - 1] === -1) { label[i - 1] = id; stack.push(i - 1); }
+                if (x < W - 1 && dil[i + 1] && label[i + 1] === -1) { label[i + 1] = id; stack.push(i + 1); }
+                if (i >= W && dil[i - W] && label[i - W] === -1) { label[i - W] = id; stack.push(i - W); }
+                if (i < N - W && dil[i + W] && label[i + W] === -1) { label[i + W] = id; stack.push(i + W); }
             }
             if (count > bestCount) { bestCount = count; best = id; }
         }
 
-        if (seed >= 0 && fabric[seed] && label[seed] !== -1) { zoneLabel = label[seed]; }
+        /* The seed only has to land in the dilated region, not on a classified
+           pixel: a zone centre sitting on a groove is exactly the case this
+           change exists to survive. */
+        if (seed >= 0 && dil[seed] && label[seed] !== -1) { zoneLabel = label[seed]; }
         const keep = zoneLabel !== -1 ? zoneLabel : best;
         if (keep === -1) { return { dropped: 0 }; }
 

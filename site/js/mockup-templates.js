@@ -304,5 +304,71 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 1340, y: 670 },
             { x: 600, y: 670 }
         ]
+    },
+    {
+        id: "bag-paper-white",
+        title: "White Paper Shopping Bag",
+        thumb: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-white-thumb.jpg",
+        base: "assets/mockups/packaging/bags/bag-paper-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/packaging/bags/bag-paper-white-displace.png",
+        shade: "assets/mockups/packaging/bags/bag-paper-white-shade.png",
+        light: "assets/mockups/packaging/bags/bag-paper-white-light.png",
+        lightGain: 0.3,
+        garment: "assets/mockups/packaging/bags/bag-paper-white-garment.png",
+        tone: "assets/mockups/packaging/bags/bag-paper-white-tone.png",
+        /* No `grain`, and that is a property of the material rather than an
+           omission. The map exists to screen undyed fibre back over a heather
+           blend, and paper has no blend -- there are no heather colourways
+           below for it to serve. The weave measured 2.55 luma levels, above
+           the 2.0 floor, so a map COULD have been derived; it would have been
+           1.5MB that `ensurePhotoAssets` loads and nothing ever samples,
+           because renderGarmentTint reads it only when a colourway declares a
+           heather fraction. The extras list filters on presence, so leaving
+           the key out drops the request. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            /* The colourway that makes a white base the right choice: the
+               classifier gates on sat < 14, so a photographed kraft bag
+               (measured around 70) could never have been derived at all.
+               Dyeing white to kraft gets the same product from a base the
+               pipeline can actually read. */
+            kraft: { name: "Kraft Brown", hex: "#C29A6B" },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" }
+        },
+        /* 8, against the shirt's 16 at 1024px and the cap's 20 at 1939px --
+           0.39% of base width where those are 1.56% and 1.03%. Paper is the
+           stiffest of the three surfaces, so it belongs at the bottom of that
+           ordering, but the number was picked off the test grid rather than
+           derived: at 12 the ruled lines start reading as cloth and at 18
+           they wander outright. The displacement map is normalised to its own
+           p99 (9.94 here, against the shirt's 41.5), so a nearly flat surface
+           has its gentle creases stretched across the full encoded range --
+           which is exactly why the strength has to come down to compensate,
+           not up to match the larger base. */
+        displaceStrength: 8,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency like the shirt and the cap: all four
+           corners read alpha 0 and 38.0% of the image is clear, so a
+           Background fill lands behind the product, not behind the artwork. */
+        background: true,
+        /* The front panel is one plane, bounded by the two folds that show up
+           as the only strong horizontal steps in the row-mean scan: the rim
+           at y=868 and the base gusset at y=2600. No vertical crease exists
+           between them -- the column means fall smoothly 230 to 220 across
+           the full width, which is the left-hand key light, not a gusset --
+           so the whole panel width is usable and the four corners sit on one
+           surface. 1150 square, centred on the panel (x 192..1858), verified
+           100.00% surface: no alpha, no dark pixels, no saturated pixels. */
+        warpZone: [
+            { x: 450, y: 1150 },
+            { x: 1600, y: 1150 },
+            { x: 1600, y: 2300 },
+            { x: 450, y: 2300 }
+        ]
     }
 ];
