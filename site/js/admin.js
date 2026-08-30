@@ -266,6 +266,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
@@ -1425,6 +1426,10 @@ body + '\n' +
         {
             id: "bag-paper-white", title: "White Paper Bag Mockup", category: "mockups", doc: "bag-paper-white",
             folder: "assets/thumbnails/product-mockups/packaging/bags"
+        },
+        {
+            id: "card-white-walnut", title: "Business Card Mockup", category: "mockups", doc: "card-white-walnut",
+            folder: "assets/thumbnails/product-mockups/print/business-cards"
         }
     ];
 

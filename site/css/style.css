@@ -5530,6 +5530,43 @@ main:has(.mockup-layout) .editor-head {
     display: none;
 }
 
+/* Surface switch, shown only on a template with more than one printable
+   surface (the two-card business card mockup). Sits directly above the layer
+   list because it scopes it: the list shows the selected surface's layers.
+   Styled off .layer-row's vocabulary so the two read as one control group. */
+.zone-switch {
+    display: flex;
+    gap: var(--space-3xs);
+    margin-bottom: var(--space-2xs);
+}
+
+.zone-switch[hidden] {
+    display: none;
+}
+
+.zone-tab {
+    flex: 1 1 0;
+    min-height: 2.25rem;
+    padding: 0 var(--space-2xs);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-muted);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) var(--ease),
+        color var(--motion-fast) var(--ease);
+}
+
+.zone-tab:hover {
+    color: var(--color-text);
+}
+
+.zone-tab[aria-pressed="true"] {
+    color: var(--color-text);
+    border-color: var(--color-brand);
+}
+
 .layer-row {
     display: flex;
     align-items: center;

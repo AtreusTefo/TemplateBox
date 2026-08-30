@@ -474,14 +474,23 @@
         }
 
         const label = new Int32Array(N).fill(-1);
-        let best = -1, bestCount = 0, zoneLabel = -1;
+        let best = -1, bestCount = 0;
+        const zoneLabels = [];
 
-        /* The print zone's own centre, when the corners are in. */
-        let seed = -1;
+        /* One seed per print zone. This picker only ever supplies one, but a
+           template can declare several -- `warpZones` in the registry, which
+           the business card pair uses -- and there the zones are SEPARATE
+           regions with bare background between them. Seeding from one would
+           keep that card and discard the other, and the discarded one renders
+           its design with no shading and stays undyed on recolour. Dilation
+           cannot rescue it either: it bridges a groove, not a deliberate gap.
+           So this takes a list, and a second zone added by hand to the
+           registry must be added to the derive as a second seed. */
+        const seeds = [];
         if (points.length === 4) {
             const a = zoneRect();
             const cx = Math.round(a.x + a.w / 2), cy = Math.round(a.y + a.h / 2);
-            if (cx >= 0 && cy >= 0 && cx < W && cy < H) { seed = cy * W + cx; }
+            if (cx >= 0 && cy >= 0 && cx < W && cy < H) { seeds.push(cy * W + cx); }
         }
 
         let next = 0;
@@ -509,16 +518,20 @@
             if (count > bestCount) { bestCount = count; best = id; }
         }
 
-        /* The seed only has to land in the dilated region, not on a classified
-           pixel: a zone centre sitting on a groove is exactly the case this
-           change exists to survive. */
-        if (seed >= 0 && dil[seed] && label[seed] !== -1) { zoneLabel = label[seed]; }
-        const keep = zoneLabel !== -1 ? zoneLabel : best;
-        if (keep === -1) { return { dropped: 0 }; }
+        /* A seed only has to land in the dilated region, not on a classified
+           pixel: a zone centre sitting on a groove is exactly the case the
+           dilation exists to survive. */
+        seeds.forEach((seed) => {
+            if (seed >= 0 && dil[seed] && label[seed] !== -1 && zoneLabels.indexOf(label[seed]) === -1) {
+                zoneLabels.push(label[seed]);
+            }
+        });
+        const keep = zoneLabels.length ? zoneLabels : (best === -1 ? [] : [best]);
+        if (!keep.length) { return { dropped: 0 }; }
 
         let after = 0;
         for (let i = 0; i < N; i++) {
-            if (fabric[i] && label[i] !== keep) { fabric[i] = 0; } else { after += fabric[i]; }
+            if (fabric[i] && keep.indexOf(label[i]) === -1) { fabric[i] = 0; } else { after += fabric[i]; }
         }
         return { dropped: before - after };
     }

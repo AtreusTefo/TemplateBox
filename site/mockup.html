@@ -183,6 +183,7 @@
                         <ul>
                             <li><a href="mockup.html" data-target="mockup" data-doc="wood-a4">Leaning Wood Frame Poster</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Shopping Bag</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Cards on Walnut</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="mug">Ceramic Mug</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="box">Packaging Box</a></li>
                         </ul>
@@ -335,6 +336,18 @@
                              -- the visible buttons carry the accessible
                              names and call .click() on it. -->
                         <input type="file" id="m-design" class="file-trigger" accept="image/*">
+
+                        <!-- Surface switch. Empty and hidden in the served
+                             markup: js/mockup.js fills it only for a template
+                             that declares more than one printable surface,
+                             which today is the two-card business card mockup
+                             alone. Every other template never sees it.
+
+                             It moves the EDITING focus, not what renders --
+                             both cards always paint their own designs. It
+                             decides which surface a new upload lands on and
+                             which surface's layers the list below shows. -->
+                        <div class="zone-switch" id="m-zone-switch" data-mockup-zones role="group" aria-label="Choose which surface to edit" hidden></div>
 
                         <ul class="layer-list" id="m-layer-list" data-mockup-layers aria-labelledby="m-design-label"></ul>
 

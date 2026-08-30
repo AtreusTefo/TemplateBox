@@ -370,5 +370,74 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 1600, y: 2300 },
             { x: 450, y: 2300 }
         ]
+    },
+    {
+        id: "card-white-walnut",
+        title: "Business Cards on Walnut",
+        thumb: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut-thumb.jpg",
+        base: "assets/mockups/print/business-cards/card-white-walnut-base.png",
+        overlay: null,
+        displace: "assets/mockups/print/business-cards/card-white-walnut-displace.png",
+        shade: "assets/mockups/print/business-cards/card-white-walnut-shade.png",
+        light: "assets/mockups/print/business-cards/card-white-walnut-light.png",
+        lightGain: 0.3,
+        garment: "assets/mockups/print/business-cards/card-white-walnut-garment.png",
+        tone: "assets/mockups/print/business-cards/card-white-walnut-tone.png",
+        /* No `grain`, for the same reason the paper bag has none: the map
+           exists to screen undyed fibre back over a heather blend, and card
+           stock has no blend. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            ivory: { name: "Ivory", hex: "#EDE6D6" },
+            kraft: { name: "Kraft Brown", hex: "#C29A6B" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            black: { name: "Black", hex: "#1A1A1A" }
+        },
+        /* 4, the lowest in the catalog: 0.17% of base width where the bag is
+           0.39%, the cap 1.03% and the shirt 1.56%. A printed card lying flat
+           on a desk is the stiffest surface here and belongs at the bottom of
+           that ordering. Its gradient p99 measured 4.54 against the bag's
+           10.32, so the map is normalising something very close to paper
+           noise -- on the test grid 7 already reads as a buckled card and 12
+           ripples outright, while 2 is indistinguishable from a flat paste. */
+        displaceStrength: 4,
+        mode: "surface",
+        /* Opaque scene, so NO `background` flag. The walnut is the product,
+           not a backdrop to be filled: a colour fill would have nothing to
+           land on and the Background panel correctly never appears. This is
+           the first template whose base needs no alpha channel at all, which
+           is also why it is written as RGB rather than RGBA. */
+        warpZones: [
+            [
+                { x: 529, y: 578 },
+                { x: 1868, y: 578 },
+                { x: 1868, y: 1397 },
+                { x: 529, y: 1397 }
+            ],
+            [
+                { x: 529, y: 1567 },
+                { x: 1868, y: 1567 },
+                { x: 1868, y: 2386 },
+                { x: 529, y: 2386 }
+            ]
+        ],
+        zoneLabels: ["Front", "Back"],
+        /* The first zone again. Every path that predates multi-zone reads
+           this one, and the validator requires it, so the two must not drift:
+           it is warpZones[0], not an independent value.
+
+           Both are 1340x820 and identical to the pixel, so a design renders
+           at the same scale whichever card it is on. Measured from the
+           photograph's modal card edges (x 526..1871 on both, y 575..1400 and
+           y 1564..2390) inset by 3 and trimmed to a common height; verified
+           100.0000% surface with zero impure pixels on both. The 163px of
+           bare wood between them is what keeps the two cards separable -- and
+           is also why the mask has to be flooded from BOTH zone centres. */
+        warpZone: [
+            { x: 529, y: 578 },
+            { x: 1868, y: 578 },
+            { x: 1868, y: 1397 },
+            { x: 529, y: 1397 }
+        ]
     }
 ];
