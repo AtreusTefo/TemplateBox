@@ -15,7 +15,7 @@ Scope: `site/mockup.html`, `site/js/mockup.js`, `site/css/style.css`. No other p
 | Designs per mockup | Exactly one, via `drawDesignInArea()` | Ordered array of up to 12 layers, via `paintLayers()` |
 | Placement | Drag and a size slider | Drag, corner-handle resize, rotate handle, per-layer size |
 | Layer management | None | Add, replace, remove, hide/show, select — per layer |
-| Colour | Four fixed colorway swatches | Same swatches as quick picks, plus a free HSV picker (gradient square, hue strip, Hex/R/G/B, preset grid, native eyedropper where available) |
+| Colour | Four fixed colorway swatches | Same swatches as quick picks, plus a free HSV picker (gradient square, hue strip, Hex/R/G/B, preset grid, native eyedropper where available). The swatch row was replaced by an inline hue strip on August 25, 2026 -- see `MOCKUP_CONTROL_PANEL_TRIM.md` |
 | Size control | Slider, 30-100% | Slider plus a typed percentage and a reset, 5-200% |
 | Layout | Even 1fr/1fr split | 20rem control column beside the stage, at 48rem and above |
 

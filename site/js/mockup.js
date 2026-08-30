@@ -38,6 +38,7 @@
        handles, the bounding box and the layer name tag must therefore never
        touch it. */
     const overlay = document.getElementById("mockup-overlay");
+    const canvasWrap = document.querySelector(".mockup-canvas-wrap");
     const octx = overlay ? overlay.getContext("2d") : null;
 
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -308,11 +309,19 @@
         if (!valid) {
             return;
         }
+        /* Recolour needs BOTH a palette and a mask: without the mask there is
+           nothing to confine the tint to and it would flood the whole frame,
+           model included. Declaring only one of the pair leaves the colour
+           field hidden, exactly as it is for a framed poster. */
+        const recolorable = tpl.garment && tpl.garmentColors &&
+            typeof tpl.garmentColors === "object" &&
+            Object.keys(tpl.garmentColors).length > 0;
+
         PRODUCTS[tpl.id] = {
             type: "photo",
             label: typeof tpl.title === "string" && tpl.title ? tpl.title : tpl.id,
             template: tpl,
-            colors: null
+            colors: recolorable ? tpl.garmentColors : null
         };
     });
 
@@ -362,11 +371,21 @@
             return photoAssets[key];
         }
         const tpl = PRODUCTS[key].template;
+        /* Every optional map costs one more load to wait on. Only the base
+           is required; the rest degrade the render without breaking it. */
+        const extras = ["overlay", "displace", "shade", "light", "garment", "tone", "grain"]
+            .filter((k) => tpl[k]);
         const entry = {
             status: "loading",
             base: null,
             overlay: null,
-            pending: tpl.overlay ? 2 : 1
+            displace: null,
+            shade: null,
+            light: null,
+            garment: null,
+            tone: null,
+            grain: null,
+            pending: 1 + extras.length
         };
         photoAssets[key] = entry;
 
@@ -376,7 +395,10 @@
                 return;
             }
             /* A missing overlay only costs realism; a missing base is fatal
-               for the template. */
+               for the template. A missing displacement map is the same class
+               of loss as a missing overlay -- the artwork simply renders
+               flat, which is what every template did before the pass
+               existed. */
             entry.status = entry.base ? "ready" : "error";
             if (currentProduct === key) {
                 draw();
@@ -387,12 +409,12 @@
             entry.base = img;
             settle();
         });
-        if (tpl.overlay) {
-            loadTemplateImage(tpl.overlay, (img) => {
-                entry.overlay = img;
+        extras.forEach((k) => {
+            loadTemplateImage(tpl[k], (img) => {
+                entry[k] = img;
                 settle();
             });
-        }
+        });
         return entry;
     }
 
@@ -449,6 +471,34 @@
         sctx.fillRect(0, 0, w, h);
         paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, false);
         return sheetCanvas;
+    }
+
+    /* The sheet handed to the fabric displacement pass. Unlike renderSheet()
+       above it is the size of the WHOLE canvas, because the displacement and
+       shading maps are registered to the base photograph pixel-for-pixel and
+       the shader samples all three in one coordinate space. Layers are still
+       painted into the print zone, and their hit rects are still recorded --
+       displacement shifts the artwork by a few pixels at most, so unlike the
+       perspective warp this path keeps drag-to-position working. */
+    let fabricSheet = null;
+
+    function renderFabricSheet(area) {
+        if (!fabricSheet) {
+            fabricSheet = document.createElement("canvas");
+        }
+        if (fabricSheet.width !== canvas.width || fabricSheet.height !== canvas.height) {
+            fabricSheet.width = canvas.width;
+            fabricSheet.height = canvas.height;
+        }
+        const sctx = fabricSheet.getContext("2d");
+        sctx.clearRect(0, 0, fabricSheet.width, fabricSheet.height);
+        sctx.save();
+        sctx.beginPath();
+        sctx.rect(area.x, area.y, area.w, area.h);
+        sctx.clip();
+        paintLayers(sctx, area, true);
+        sctx.restore();
+        return fabricSheet;
     }
 
     function drawWarpedDesign(zone) {
@@ -569,7 +619,6 @@
        ---------------------------------------------------------------------- */
 
     const colorField = document.getElementById("m-color-field");
-    const colorRow = document.getElementById("m-color-row");
     const colorTrigger = document.getElementById("m-color-trigger");
     const colorPopover = document.getElementById("m-color-popover");
     const colorDot = document.getElementById("m-color-dot");
@@ -583,6 +632,32 @@
     const inG = document.getElementById("m-color-in-g");
     const inB = document.getElementById("m-color-in-b");
     const presetGrid = document.getElementById("m-color-presets");
+
+    /* The hue strip that sits in the panel under the trigger, where the
+       colourway swatch row used to be (August 25, 2026). Driven by the same
+       picker instance as the popover's own strip, not by a second copy of the
+       maths. */
+    const colorStrip = document.getElementById("m-color-strip");
+    const colorStripThumb = document.getElementById("m-color-strip-thumb");
+
+    /* The background picker: the same component again, driven by the same
+       factory. See the Background section further down. */
+    const bgField = document.getElementById("m-bg-field");
+    const bgTrigger = document.getElementById("m-bg-trigger");
+    const bgPopover = document.getElementById("m-bg-popover");
+    const bgDot = document.getElementById("m-bg-dot");
+    const bgHexLabel = document.getElementById("m-bg-hex");
+    const bgSvArea = document.getElementById("m-bg-sv");
+    const bgSvThumb = document.getElementById("m-bg-sv-thumb");
+    const bgHueArea = document.getElementById("m-bg-hue");
+    const bgHueThumb = document.getElementById("m-bg-hue-thumb");
+    const bgInHex = document.getElementById("m-bg-in-hex");
+    const bgInR = document.getElementById("m-bg-in-r");
+    const bgInG = document.getElementById("m-bg-in-g");
+    const bgInB = document.getElementById("m-bg-in-b");
+    const bgPresetGrid = document.getElementById("m-bg-presets");
+    const bgStrip = document.getElementById("m-bg-strip");
+    const bgStripThumb = document.getElementById("m-bg-strip-thumb");
 
     const fileInput = document.getElementById("m-design");
     const fileError = document.getElementById("m-design-error");
@@ -600,11 +675,28 @@
     const scaleOutput = document.getElementById("m-scale-output");
     const labelInput = document.getElementById("m-label");
     const addToTrayBtn = document.getElementById("add-to-tray");
-    const downloadBtn = document.getElementById("download-mockup-png");
     const trayGrid = document.getElementById("tray-grid");
     const trayEmpty = document.getElementById("tray-empty");
-    const docNameInput = document.getElementById("doc-name");
-    const DEFAULT_DOC_NAME = "Untitled mockup";
+    const trayCount = document.getElementById("tray-count");
+
+    /* The two views of the preview pane, and the tabs that switch them. */
+    const viewTabs = [document.getElementById("view-tab-preview"),
+                      document.getElementById("view-tab-tray")];
+    const viewPanels = [document.getElementById("view-preview"),
+                        document.getElementById("view-tray")];
+
+    /* The export panel, which lives in the control pane's action row since
+       August 25, 2026. The editor bar's single "Download PNG" button is gone
+       -- there is one exporter on this page, and it is here. */
+    const dlToggle = document.getElementById("dl-toggle");
+    const dlPanel = document.getElementById("dl-panel");
+    const dlFormats = dlPanel ? dlPanel.querySelectorAll("[data-format]") : [];
+    const dlSizes = document.getElementById("dl-sizes");
+    const dlNote = document.getElementById("dl-note");
+    /* No #doc-name here (August 24, 2026). The bar's document-name input was
+       removed when the bar gained navigation and a search field; #m-label,
+       "Mockup Label" in the controls, is what names a mockup now. A stale
+       `docName` in a returning visitor's storage is simply not read. */
 
     /* ----------------------------------------------------------------------
        State. Design bitmaps live only in memory: neither a layer's source
@@ -634,7 +726,10 @@
     let currentProduct = "tshirt";
     let currentColor = "black";
     let customHex = "#FFFFFF";
-    let pickerHue = 0;
+    /* The canvas background, or null for transparent -- which is the default
+       and what every export produced before this existed. `pickerHue` used to
+       live here; it belongs to a picker instance now that there are two. */
+    let bgHex = null;
 
     let layers = [];
     let selectedId = null;
@@ -750,6 +845,27 @@
         ctx.restore();
     }
 
+    /* The chosen background, painted before anything else so it sits behind
+       the product, the artwork and any overlay. On the canvas rather than in
+       CSS deliberately: the PNG export and the tray thumbnails both read
+       #mockup-canvas, so a background painted here is in both of them for
+       free, and a background painted in CSS would be in neither.
+
+       Called after clearRect in both render paths. A null background paints
+       nothing at all, which leaves the export transparent exactly as it was
+       before this existed. */
+    function paintBackground() {
+        const hex = activeBackground();
+        if (!hex) {
+            return;
+        }
+        ctx.save();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = hex;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
+
     function paint() {
         const product = PRODUCTS[currentProduct] ? currentProduct : "tshirt";
         currentProduct = product;
@@ -768,13 +884,36 @@
         const color = activeColor(config);
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        paintBackground();
         config.drawBase(ctx, color.hex, color.outline);
         drawLayersInArea(config.printArea, 16);
+    }
+
+    /* Publishes the canvas's real aspect ratio to CSS, which uses it to bound
+       the render's WIDTH by the height the pane has left -- see the
+       .mockup-canvas-wrap cap in css/style.css. Written here rather than at
+       the three places that resize the canvas: a photographic template sizes
+       itself from a base image that loads asynchronously, so the value has to
+       be re-read after painting rather than once at startup.
+
+       Only written when it changes, so this costs nothing on a drag. */
+    let publishedAspect = 0;
+
+    function syncCanvasAspect() {
+        if (!canvas.height) {
+            return;
+        }
+        const aspect = canvas.width / canvas.height;
+        if (aspect !== publishedAspect) {
+            publishedAspect = aspect;
+            canvasWrap.style.setProperty("--mockup-aspect", String(aspect));
+        }
     }
 
     function draw() {
         paint();
         drawOverlay();
+        syncCanvasAspect();
     }
 
     /* The Sandwich Method compositor for photographic templates. Layer
@@ -783,6 +922,96 @@
        is painted first and the base then masks it; "surface" bases are
        opaque, so the design is painted over them. The shadow/glare overlay
        is always the final layer. */
+    /* ----------------------------------------------------------------------
+       Garment recolour.
+
+       A recoloured shirt is the shading that was already derived, tinted --
+       no extra maps and no per-colour assets. Flat colour, multiplied by the
+       fold structure, lifted by the specular, then confined to the garment
+       mask. Because both maps are measured against the fabric's own median,
+       a mid-tone colour lands at its true value where the garment is evenly
+       lit and darkens only where it genuinely folds.
+
+       The specular is what stops a dark colour reading as flat paint: on
+       black or navy almost everything the eye uses to identify cloth is in
+       the highlights, not the shadows.
+       ---------------------------------------------------------------------- */
+
+    /* Undyed cotton, the colour the fibres that miss the dye keep. Not pure
+       white: natural cotton is warm and slightly grey, and mixing toward
+       #FFFFFF gives a heather that reads as faded rather than blended. */
+    const NATURAL_FIBRE = { r: 242, g: 240, b: 236 };
+
+    function mixToward(hex, target, amount) {
+        const rgb = hexToRgb(hex);
+        if (!rgb) {
+            return hex;
+        }
+        const t = clamp(amount, 0, 1);
+        return rgbToHex(
+            Math.round(rgb.r + (target.r - rgb.r) * t),
+            Math.round(rgb.g + (target.g - rgb.g) * t),
+            Math.round(rgb.b + (target.b - rgb.b) * t)
+        );
+    }
+
+    let tintCanvas = null;
+
+    /* A heather is dyed fibres interleaved with undyed ones, so it needs two
+       things a flat dye does not: the mean lift toward natural fibre, and the
+       fibre speckle itself. The mean is exact arithmetic on the hex. The
+       speckle is the photograph's own weave, screened back on -- `tone` can
+       only multiply, so it can darken the dye but can never produce a fibre
+       lighter than it. */
+    function renderGarmentTint(colorInfo, assets, w, h) {
+        const heather = typeof colorInfo.heather === "number"
+            ? clamp(colorInfo.heather, 0, 1)
+            : 0;
+        const hex = heather > 0
+            ? mixToward(colorInfo.hex, NATURAL_FIBRE, heather)
+            : colorInfo.hex;
+        if (!tintCanvas) {
+            tintCanvas = document.createElement("canvas");
+        }
+        if (tintCanvas.width !== w || tintCanvas.height !== h) {
+            tintCanvas.width = w;
+            tintCanvas.height = h;
+        }
+        const t = tintCanvas.getContext("2d");
+        t.globalCompositeOperation = "source-over";
+        t.clearRect(0, 0, w, h);
+        t.fillStyle = hex;
+        t.fillRect(0, 0, w, h);
+
+        /* The TONE map, not the shade/light pair the print pass uses. Tone is
+           the garment's diffuse response normalised to its own peak, so a dye
+           can only ever darken -- which is what a dye does. Screening the
+           specular over a colour instead washes it out: navy measured
+           (140,146,159), a pale blue-grey, because on a white garment that
+           map is mostly bright DIFFUSE rather than true surface reflection. */
+        const shading = assets.tone || assets.shade;
+        if (shading) {
+            t.globalCompositeOperation = "multiply";
+            t.drawImage(shading, 0, 0, w, h);
+        }
+        /* The undyed fibres. Screened, because they are lighter than the dye
+           and no multiply can reach them. Scaled by the heather fraction, so
+           a 100% dyed colourway never touches this path at all. */
+        if (heather > 0 && assets.grain) {
+            t.globalCompositeOperation = "screen";
+            t.globalAlpha = heather * 0.35;
+            t.drawImage(assets.grain, 0, 0, w, h);
+            t.globalAlpha = 1;
+        }
+        /* Last, and the reason the tint cannot reach skin, hair or
+           background. The mask is feathered, so this also gives the recolour
+           the same soft edge the photograph has. */
+        t.globalCompositeOperation = "destination-in";
+        t.drawImage(assets.garment, 0, 0, w, h);
+        t.globalCompositeOperation = "source-over";
+        return tintCanvas;
+    }
+
     function drawPhoto(config) {
         const assets = ensurePhotoAssets(currentProduct);
 
@@ -823,26 +1052,65 @@
             canvas.height = h;
         }
         ctx.clearRect(0, 0, w, h);
+        /* Behind the photograph, so it shows only where the base is actually
+           transparent -- which is why a template has to opt in: on a scene
+           with an opaque backdrop this would be invisible, and on one with a
+           transparent print window it would land behind the artwork. */
+        paintBackground();
 
         const tpl = config.template;
         const rectZone = zoneIsRect(tpl.warpZone);
         const area = zoneBounds(tpl.warpZone);
+
+        /* A paper sheet sits behind artwork that does not fill a frame's
+           window, and keeps exports opaque behind a transparent base. A
+           GARMENT has no such backing: painting one would put a white
+           rectangle on the shirt. Templates may state it outright; absent
+           that, only "window" mode gets one. */
+        const backing = Object.prototype.hasOwnProperty.call(tpl, "backing")
+            ? tpl.backing
+            : (tpl.mode === "window" ? "#FFFFFF" : null);
 
         const paintDesign = () => {
             if (readyLayers().length && !rectZone) {
                 drawWarpedDesign(tpl.warpZone);
                 return;
             }
-            /* The white backing reads as the paper sheet behind a design
-               that does not cover the full print area, and keeps exports
-               opaque behind a transparent "window" base. */
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(area.x, area.y, area.w, area.h);
+            /* Fabric: displace the artwork around the folds and shade it
+               with the garment's own light, in one GPU pass. Returning null
+               means no WebGL, which is a quality loss and not an error -- the
+               flat draw below is exactly what shipped before this existed. */
+            if (readyLayers().length && assets.displace && window.TB_Displace) {
+                const out = window.TB_Displace.render(
+                    renderFabricSheet(area),
+                    assets.displace,
+                    assets.shade,
+                    tpl.displaceStrength,
+                    assets.light,
+                    typeof tpl.lightGain === "number" ? tpl.lightGain : 1
+                );
+                if (out) {
+                    ctx.drawImage(out, 0, 0);
+                    return;
+                }
+            }
+            if (backing) {
+                ctx.fillStyle = backing;
+                ctx.fillRect(area.x, area.y, area.w, area.h);
+            }
             drawLayersInArea(area, 0);
         };
 
         if (tpl.mode === "surface") {
             ctx.drawImage(assets.base, 0, 0, w, h);
+            /* Recolour sits between the photograph and the artwork: the print
+               is on top of the dyed shirt, not under it. The palette's
+               "original" entry is the garment as photographed, so it skips
+               the tint entirely rather than trying to reproduce itself. */
+            const garmentColor = activeColor(config);
+            if (assets.garment && garmentColor && !garmentColor.original) {
+                ctx.drawImage(renderGarmentTint(garmentColor, assets, w, h), 0, 0);
+            }
             paintDesign();
         } else {
             paintDesign();
@@ -1343,8 +1611,10 @@
     });
 
     /* ----------------------------------------------------------------------
-       Colour: the product's own colorways as quick picks, plus a free HSV
-       picker. Both write to the same state the canvas reads.
+       Colour: one free HSV picker, reachable two ways -- the trigger opens
+       the full popover, and the hue strip under it rotates the colour in
+       place. Both write to the same state the canvas reads. The colorway
+       quick-pick row that used to sit here was removed on August 25, 2026.
        ---------------------------------------------------------------------- */
 
     function activeColor(config) {
@@ -1366,187 +1636,55 @@
         return color ? color.hex : customHex;
     }
 
-    function renderColorSwatches() {
-        while (colorRow.firstChild) {
-            colorRow.removeChild(colorRow.firstChild);
-        }
+    /* The colourway swatch row this used to build is gone (August 25, 2026);
+       what is left is the one job that could not go with it. A photographic
+       template has no colorway concept, so the whole field disappears rather
+       than offering a colour control over a photograph.
 
+       The shipped colorways did not disappear with their buttons. The
+       product still OPENS on its default one -- that is what gives the drawn
+       garments their hand-picked outline colour -- and every hex those
+       swatches offered is a click away in the picker's preset grid, which is
+       why the row was cut: it was a second route to colours the dropdown
+       already carried, at the cost of a band of panel height. */
+    function syncColorField() {
         const config = PRODUCTS[currentProduct];
-
-        /* Photographic templates have no colorway concept: the whole field
-           disappears instead of presenting an empty radio group. */
         if (colorField) {
             colorField.hidden = !config.colors;
         }
-        if (!config.colors) {
-            return;
-        }
-
-        Object.keys(config.colors).forEach((key) => {
-            const info = config.colors[key];
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "swatch";
-            btn.style.backgroundColor = info.hex;
-            btn.setAttribute("role", "radio");
-            btn.setAttribute("aria-checked", "false");
-            btn.setAttribute("aria-label", info.name);
-            btn.setAttribute("data-hex", info.hex.toUpperCase());
-            btn.addEventListener("click", () => {
-                currentColor = key;
-                syncColorUI();
-                persist();
-                draw();
-            });
-            colorRow.appendChild(btn);
-        });
     }
 
-    function buildColorPresets() {
-        if (!presetGrid) {
-            return;
-        }
-        while (presetGrid.firstChild) {
-            presetGrid.removeChild(presetGrid.firstChild);
-        }
+    /* ----------------------------------------------------------------------
+       The colour picker component.
 
-        /* Native colour sampling where the browser offers it (Chromium's
-           EyeDropper). No polyfill and no button at all elsewhere: a control
-           that silently does nothing is worse than one that is absent. */
-        if (window.EyeDropper) {
-            const drop = document.createElement("button");
-            drop.type = "button";
-            drop.className = "color-eyedropper";
-            drop.setAttribute("aria-label", "Pick a colour from the screen");
-            drop.setAttribute("title", "Pick a colour from the screen");
-            drop.appendChild(icon([
-                "m2 22 4-1 11-11-3-3L3 18l-1 4Z",
-                "m15 5 4-4 4 4-4 4",
-                "m13 7 4 4"
-            ]));
-            drop.addEventListener("click", () => {
-                new window.EyeDropper().open().then((result) => {
-                    setCustomColor(result.sRGBHex);
-                }, () => {
-                    /* Dismissed with Escape: nothing to do. */
-                });
-            });
-            presetGrid.appendChild(drop);
-        }
+       ONE implementation, two instances (August 24, 2026): the product's
+       colourway picker, and the background picker added alongside it. It was
+       a single hard-wired picker reading module state directly until the
+       background needed the same control; generalising it was preferred to a
+       second copy of 150 lines of gradient tracks, hex/RGB plumbing and
+       popover lifecycle.
 
-        COLOR_PRESETS.forEach((hex) => {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "color-preset";
-            btn.style.backgroundColor = hex;
-            btn.setAttribute("aria-label", hex);
-            btn.setAttribute("title", hex);
-            btn.addEventListener("click", () => setCustomColor(hex));
-            presetGrid.appendChild(btn);
-        });
-    }
+       What is NOT in here is as deliberate as what is. The canvas's
+       accessible label is specific to the colourway path, and the two
+       instances hold genuinely different state -- a colourway key plus a
+       custom hex on one side, a hex or null on the other. Pushing those
+       through the factory would have meant more injection points than shared
+       code, which is a worse abstraction than two small call sites. The
+       factory owns exactly the parts that are identical: the popover, the
+       saturation/value square, the hue strips, the hex and RGB fields, the
+       presets and the eyedropper.
 
-    /* Repaints every part of the colour UI from the active hex. `skip` names
-       an input the visitor is currently typing in, which must not be
-       rewritten underneath the caret. */
-    function syncColorUI(skip) {
-        const hex = activeHex();
-        const rgb = hexToRgb(hex) || { r: 255, g: 255, b: 255 };
-        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+       Each instance keeps its own `hue`. It was module-level state when there
+       was one picker; shared between two it would make the background's hue
+       strip jump whenever the garment colour changed. The product picker now
+       drives TWO strips off that one value (August 25, 2026) -- see
+       `hueTracks` -- which is the same reason again, one level down: two
+       views of one hue, never two hues.
 
-        /* A greyscale colour carries no meaningful hue, so the strip keeps
-           its last position instead of snapping to red. */
-        if (hsv.s > 0.001 && hsv.v > 0.001) {
-            pickerHue = hsv.h;
-        }
-
-        if (colorDot) {
-            colorDot.style.backgroundColor = hex;
-        }
-        if (colorHexLabel) {
-            colorHexLabel.textContent = hex;
-        }
-        if (svArea) {
-            svArea.style.setProperty("--picker-hue", String(Math.round(pickerHue)));
-        }
-        if (svThumb) {
-            svThumb.style.left = (hsv.s * 100) + "%";
-            svThumb.style.top = ((1 - hsv.v) * 100) + "%";
-            svThumb.style.backgroundColor = hex;
-        }
-        if (hueThumb) {
-            hueThumb.style.left = ((pickerHue / 360) * 100) + "%";
-        }
-
-        if (inHex && skip !== inHex) { inHex.value = hex; }
-        if (inR && skip !== inR) { inR.value = String(rgb.r); }
-        if (inG && skip !== inG) { inG.value = String(rgb.g); }
-        if (inB && skip !== inB) { inB.value = String(rgb.b); }
-
-        /* Highlight whichever quick pick matches, whether it was reached by
-           its own button or by landing on that exact value in the picker. */
-        colorRow.querySelectorAll(".swatch").forEach((sw) => {
-            const on = sw.getAttribute("data-hex") === hex.toUpperCase();
-            sw.classList.toggle("is-active", on);
-            sw.setAttribute("aria-checked", String(on));
-        });
-    }
-
-    function setCustomColor(hex, skip) {
-        const rgb = hexToRgb(hex);
-        if (!rgb) {
-            return false;
-        }
-        customHex = rgbToHex(rgb.r, rgb.g, rgb.b);
-        currentColor = CUSTOM_COLOR;
-        syncColorUI(skip);
-        persist();
-        draw();
-        return true;
-    }
-
-    /* --- popover open/close --- */
-
-    function onPickerOutside(evt) {
-        if (colorPopover.contains(evt.target) || colorTrigger.contains(evt.target)) {
-            return;
-        }
-        closePicker();
-    }
-
-    function onPickerKey(evt) {
-        if (evt.key === "Escape") {
-            closePicker();
-            colorTrigger.focus();
-        }
-    }
-
-    function openPicker() {
-        colorPopover.hidden = false;
-        colorTrigger.setAttribute("aria-expanded", "true");
-        syncColorUI();
-        document.addEventListener("pointerdown", onPickerOutside, true);
-        document.addEventListener("keydown", onPickerKey, true);
-    }
-
-    function closePicker() {
-        colorPopover.hidden = true;
-        colorTrigger.setAttribute("aria-expanded", "false");
-        document.removeEventListener("pointerdown", onPickerOutside, true);
-        document.removeEventListener("keydown", onPickerKey, true);
-    }
-
-    if (colorTrigger && colorPopover) {
-        colorTrigger.addEventListener("click", () => {
-            if (colorPopover.hidden) {
-                openPicker();
-            } else {
-                closePicker();
-            }
-        });
-    }
-
-    /* --- gradient tracks --- */
+       nodes    the elements this instance drives.
+       options  getHex()            the colour to display, or null
+                setHex(hex, skip)   commit a colour; returns truthy on success
+       ---------------------------------------------------------------------- */
 
     function trackRatio(el, evt) {
         const rect = el.getBoundingClientRect();
@@ -1577,49 +1715,341 @@
         el.addEventListener("pointercancel", stop);
     }
 
-    bindTrack(svArea, (evt) => {
-        const r = trackRatio(svArea, evt);
-        const rgb = hsvToRgb(pickerHue, r.x, 1 - r.y);
-        setCustomColor(rgbToHex(rgb.r, rgb.g, rgb.b));
-    });
+    function createColorPicker(nodes, options) {
+        let hue = 0;
 
-    bindTrack(hueArea, (evt) => {
-        const r = trackRatio(hueArea, evt);
-        pickerHue = r.x * 360;
-        const current = hexToRgb(activeHex()) || { r: 255, g: 255, b: 255 };
-        const hsv = rgbToHsv(current.r, current.g, current.b);
-        /* A pure white or black start has no saturation to rotate, so the new
-           hue would produce the same greyscale colour and the strip would
-           look broken. Fall back to a fully saturated sample instead. */
-        const s = hsv.s > 0.001 ? hsv.s : 1;
-        const v = hsv.v > 0.001 ? hsv.v : 1;
-        const rgb = hsvToRgb(pickerHue, s, v);
-        setCustomColor(rgbToHex(rgb.r, rgb.g, rgb.b));
-    });
+        /* Two strips, one hue. The popover's, and -- on the product picker --
+           the one standing in the panel where the swatch row used to be. They
+           are the same control at two sizes, so they share this instance's
+           `hue`, the handler below and the repaint in sync(); neither knows
+           the other exists. An instance given only a popover strip simply has
+           a one-entry list. */
+        const hueTracks = [
+            { track: nodes.hue, thumb: nodes.hueThumb },
+            { track: nodes.hueInline, thumb: nodes.hueInlineThumb }
+        ].filter((entry) => !!entry.track);
 
-    /* --- hex / R / G / B --- */
+        function commit(hex, skip) {
+            return options.setHex(hex, skip);
+        }
 
-    if (inHex) {
-        inHex.addEventListener("input", () => {
-            if (hexToRgb(inHex.value)) {
-                setCustomColor(inHex.value, inHex);
+        /* Repaints every part of this picker from its current colour. `skip`
+           names an input the visitor is currently typing in, which must not be
+           rewritten underneath the caret. */
+        function sync(skip) {
+            const hex = options.getHex();
+            /* No colour at all (the background's Transparent state): the
+               gradients keep their last position rather than snapping, and
+               the fields empty. Painting white here would say the background
+               IS white, which is a different export. */
+            const rgb = hexToRgb(hex) || { r: 255, g: 255, b: 255 };
+            const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+
+            /* A greyscale colour carries no meaningful hue, so the strip keeps
+               its last position instead of snapping to red. */
+            if (hsv.s > 0.001 && hsv.v > 0.001) {
+                hue = hsv.h;
             }
+
+            if (nodes.sv) {
+                nodes.sv.style.setProperty("--picker-hue", String(Math.round(hue)));
+            }
+            if (nodes.svThumb) {
+                nodes.svThumb.style.left = (hsv.s * 100) + "%";
+                nodes.svThumb.style.top = ((1 - hsv.v) * 100) + "%";
+                nodes.svThumb.style.backgroundColor = hex || "transparent";
+            }
+            hueTracks.forEach((track) => {
+                if (track.thumb) {
+                    track.thumb.style.left = ((hue / 360) * 100) + "%";
+                }
+            });
+
+            const fields = hex ? { hex: hex, r: rgb.r, g: rgb.g, b: rgb.b }
+                : { hex: "", r: "", g: "", b: "" };
+            if (nodes.inHex && skip !== nodes.inHex) { nodes.inHex.value = fields.hex; }
+            if (nodes.inR && skip !== nodes.inR) { nodes.inR.value = String(fields.r); }
+            if (nodes.inG && skip !== nodes.inG) { nodes.inG.value = String(fields.g); }
+            if (nodes.inB && skip !== nodes.inB) { nodes.inB.value = String(fields.b); }
+        }
+
+        function buildPresets() {
+            if (!nodes.presets) {
+                return;
+            }
+            while (nodes.presets.firstChild) {
+                nodes.presets.removeChild(nodes.presets.firstChild);
+            }
+
+            /* "No colour at all" as the first preset, for the instance that
+               has such a state -- the background's Transparent (August 25,
+               2026). It moved in here when the quick-pick row that used to
+               carry it was removed: every other colour on that row is in the
+               grid below, but this one is not a colour and no hex can express
+               it, so dropping the row without moving it would have stranded
+               the default state with no way back. */
+            if (options.allowClear) {
+                const clear = document.createElement("button");
+                clear.type = "button";
+                clear.className = "color-preset swatch-transparent";
+                clear.setAttribute("aria-label", "Transparent");
+                clear.setAttribute("title", "Transparent");
+                clear.addEventListener("click", () => commit(null));
+                nodes.presets.appendChild(clear);
+            }
+
+            /* Native colour sampling where the browser offers it (Chromium's
+               EyeDropper). No polyfill and no button at all elsewhere: a
+               control that silently does nothing is worse than one that is
+               absent. */
+            if (window.EyeDropper) {
+                const drop = document.createElement("button");
+                drop.type = "button";
+                drop.className = "color-eyedropper";
+                drop.setAttribute("aria-label", "Pick a colour from the screen");
+                drop.setAttribute("title", "Pick a colour from the screen");
+                drop.appendChild(icon([
+                    "m2 22 4-1 11-11-3-3L3 18l-1 4Z",
+                    "m15 5 4-4 4 4-4 4",
+                    "m13 7 4 4"
+                ]));
+                drop.addEventListener("click", () => {
+                    new window.EyeDropper().open().then((result) => {
+                        commit(result.sRGBHex);
+                    }, () => {
+                        /* Dismissed with Escape: nothing to do. */
+                    });
+                });
+                nodes.presets.appendChild(drop);
+            }
+
+            COLOR_PRESETS.forEach((hex) => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "color-preset";
+                btn.style.backgroundColor = hex;
+                btn.setAttribute("aria-label", hex);
+                btn.setAttribute("title", hex);
+                btn.addEventListener("click", () => commit(hex));
+                nodes.presets.appendChild(btn);
+            });
+        }
+
+        /* --- popover open/close --- */
+
+        function onOutside(evt) {
+            if (nodes.popover.contains(evt.target) || nodes.trigger.contains(evt.target)) {
+                return;
+            }
+            close();
+        }
+
+        function onKey(evt) {
+            if (evt.key === "Escape") {
+                close();
+                nodes.trigger.focus();
+            }
+        }
+
+        function open() {
+            nodes.popover.hidden = false;
+            nodes.trigger.setAttribute("aria-expanded", "true");
+            sync();
+            document.addEventListener("pointerdown", onOutside, true);
+            document.addEventListener("keydown", onKey, true);
+        }
+
+        function close() {
+            nodes.popover.hidden = true;
+            nodes.trigger.setAttribute("aria-expanded", "false");
+            document.removeEventListener("pointerdown", onOutside, true);
+            document.removeEventListener("keydown", onKey, true);
+        }
+
+        if (nodes.trigger && nodes.popover) {
+            nodes.trigger.addEventListener("click", () => {
+                if (nodes.popover.hidden) {
+                    open();
+                } else {
+                    close();
+                }
+            });
+        }
+
+        /* --- gradient tracks --- */
+
+        bindTrack(nodes.sv, (evt) => {
+            const r = trackRatio(nodes.sv, evt);
+            const rgb = hsvToRgb(hue, r.x, 1 - r.y);
+            commit(rgbToHex(rgb.r, rgb.g, rgb.b));
         });
-        inHex.addEventListener("blur", () => syncColorUI());
+
+        hueTracks.forEach((entry) => {
+            bindTrack(entry.track, (evt) => {
+                hue = trackRatio(entry.track, evt).x * 360;
+                const current = hexToRgb(options.getHex()) || { r: 255, g: 255, b: 255 };
+                const hsv = rgbToHsv(current.r, current.g, current.b);
+                /* A pure white or black start has no saturation to rotate, so
+                   the new hue would produce the same greyscale colour and the
+                   strip would look broken. Fall back to a fully saturated
+                   sample. */
+                const s = hsv.s > 0.001 ? hsv.s : 1;
+                const v = hsv.v > 0.001 ? hsv.v : 1;
+                const rgb = hsvToRgb(hue, s, v);
+                commit(rgbToHex(rgb.r, rgb.g, rgb.b));
+            });
+        });
+
+        /* --- hex / R / G / B --- */
+
+        if (nodes.inHex) {
+            nodes.inHex.addEventListener("input", () => {
+                if (hexToRgb(nodes.inHex.value)) {
+                    commit(nodes.inHex.value, nodes.inHex);
+                }
+            });
+            nodes.inHex.addEventListener("blur", () => sync());
+        }
+
+        [nodes.inR, nodes.inG, nodes.inB].forEach((input) => {
+            if (!input) {
+                return;
+            }
+            input.addEventListener("input", () => {
+                const r = clamp(parseInt(nodes.inR.value, 10) || 0, 0, 255);
+                const g = clamp(parseInt(nodes.inG.value, 10) || 0, 0, 255);
+                const b = clamp(parseInt(nodes.inB.value, 10) || 0, 0, 255);
+                commit(rgbToHex(r, g, b), input);
+            });
+            input.addEventListener("blur", () => sync());
+        });
+
+        return { sync: sync, buildPresets: buildPresets, close: close };
     }
 
-    [inR, inG, inB].forEach((input) => {
-        if (!input) {
-            return;
-        }
-        input.addEventListener("input", () => {
-            const r = clamp(parseInt(inR.value, 10) || 0, 0, 255);
-            const g = clamp(parseInt(inG.value, 10) || 0, 0, 255);
-            const b = clamp(parseInt(inB.value, 10) || 0, 0, 255);
-            setCustomColor(rgbToHex(r, g, b), input);
-        });
-        input.addEventListener("blur", () => syncColorUI());
+    const productPicker = createColorPicker({
+        trigger: colorTrigger, popover: colorPopover,
+        sv: svArea, svThumb: svThumb, hue: hueArea, hueThumb: hueThumb,
+        hueInline: colorStrip, hueInlineThumb: colorStripThumb,
+        inHex: inHex, inR: inR, inG: inG, inB: inB, presets: presetGrid
+    }, {
+        getHex: () => activeHex(),
+        setHex: (hex, skip) => setCustomColor(hex, skip)
     });
+
+    /* Repaints the whole colourway UI: the picker's own nodes, plus the two
+       things outside it that track the same value. */
+    function syncColorUI(skip) {
+        /* Every route that changes the colourway lands here -- swatch, hex
+           field, RGB fields, picker, eyedropper -- so it is the one place the
+           canvas label needs re-deriving. */
+        syncCanvasLabel();
+        productPicker.sync(skip);
+
+        const hex = activeHex();
+        if (colorDot) {
+            colorDot.style.backgroundColor = hex;
+        }
+        if (colorHexLabel) {
+            colorHexLabel.textContent = hex;
+        }
+    }
+
+    function setCustomColor(hex, skip) {
+        const rgb = hexToRgb(hex);
+        if (!rgb) {
+            return false;
+        }
+        customHex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        currentColor = CUSTOM_COLOR;
+        syncColorUI(skip);
+        persist();
+        draw();
+        return true;
+    }
+
+    /* ----------------------------------------------------------------------
+       Background colour (August 24, 2026).
+
+       Only offered where the mockup HAS a blank background:
+
+         - the four drawn products, which paint onto a cleared canvas, so
+           everything around the garment is transparent and exports that way;
+         - a photographic template that declares `background: true`.
+
+       Eligibility is declared, never inferred. wood-a4's base photograph is
+       transparent inside its print window -- that transparency IS the mask
+       the design shows through -- so an alpha test would qualify it and paint
+       the chosen colour behind the poster.
+
+       Distinct from `backing` in drawPhoto(), the white paper sheet behind
+       artwork that does not fill a frame's window. That stays white whatever
+       is chosen here.
+
+       null is Transparent and is the default. Choosing nothing must leave the
+       exported PNG byte-identical to what it was before this existed.
+       ---------------------------------------------------------------------- */
+
+    function backgroundEligible(config) {
+        if (!config) {
+            return false;
+        }
+        return config.type === "photo"
+            ? !!(config.template && config.template.background === true)
+            : true;
+    }
+
+    const backgroundPicker = createColorPicker({
+        trigger: bgTrigger, popover: bgPopover,
+        sv: bgSvArea, svThumb: bgSvThumb, hue: bgHueArea, hueThumb: bgHueThumb,
+        hueInline: bgStrip, hueInlineThumb: bgStripThumb,
+        inHex: bgInHex, inR: bgInR, inG: bgInG, inB: bgInB, presets: bgPresetGrid
+    }, {
+        getHex: () => bgHex,
+        setHex: (hex, skip) => setBackground(hex, skip),
+        /* Only this instance has a "no colour" state to return to. */
+        allowClear: true
+    });
+
+    function setBackground(hex, skip) {
+        if (hex === null) {
+            bgHex = null;
+        } else {
+            const rgb = hexToRgb(hex);
+            if (!rgb) {
+                return false;
+            }
+            bgHex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        }
+        syncBackgroundUI(skip);
+        persist();
+        draw();
+        return true;
+    }
+
+    function syncBackgroundUI(skip) {
+        /* The whole panel disappears for a product with a background of its
+           own, rather than offering a control that would do nothing. */
+        if (bgField) {
+            bgField.hidden = !backgroundEligible(PRODUCTS[currentProduct]);
+        }
+        backgroundPicker.sync(skip);
+
+        if (bgDot) {
+            bgDot.classList.toggle("is-transparent", !bgHex);
+            bgDot.style.backgroundColor = bgHex || "";
+        }
+        if (bgHexLabel) {
+            bgHexLabel.textContent = bgHex || "Transparent";
+        }
+    }
+
+    /* The colour actually painted behind everything, or null. Read by both
+       render paths, so an ineligible product can never pick up a background
+       left over from an eligible one. */
+    function activeBackground() {
+        return backgroundEligible(PRODUCTS[currentProduct]) ? bgHex : null;
+    }
 
     /* ----------------------------------------------------------------------
        Design size. The slider, the numeric field and the corner handles all
@@ -1823,6 +2253,9 @@
             product: currentProduct,
             color: currentColor,
             customHex: customHex,
+            /* null for transparent. Validated on the way back in, never
+               trusted as a fill style. */
+            bg: bgHex,
             layers: layers.map((layer) => ({
                 name: layer.name,
                 scale: layer.scale,
@@ -1831,14 +2264,9 @@
                 rotation: layer.rotation,
                 visible: layer.visible
             })),
-            label: TB.sanitize(labelInput.value),
-            docName: TB.sanitize(docNameInput ? docNameInput.value : DEFAULT_DOC_NAME)
+            label: TB.sanitize(labelInput.value)
         });
         TB.markSaved();
-    }
-
-    if (docNameInput) {
-        docNameInput.addEventListener("input", persist);
     }
 
     labelInput.addEventListener("input", persist);
@@ -1850,59 +2278,171 @@
        DOM-XSS prevention rule.
        ---------------------------------------------------------------------- */
 
+    /* The pane shows ONE of its two panels (August 25, 2026). Both used to be
+       in the flow, the tray under the canvas, which made the pane taller than
+       any viewport: the render was never fully visible and neither was the
+       collection. `hidden` rather than a class, so the panel that is not
+       showing is out of the accessibility tree and out of the tab order. */
+    function showView(index) {
+        viewTabs.forEach((tab, i) => {
+            if (!tab) { return; }
+            tab.setAttribute("aria-selected", String(i === index));
+            tab.classList.toggle("is-active", i === index);
+        });
+        viewPanels.forEach((panel, i) => {
+            if (panel) { panel.hidden = i !== index; }
+        });
+    }
+
+    viewTabs.forEach((tab, i) => {
+        if (tab) { tab.addEventListener("click", () => showView(i)); }
+    });
+
     function renderTray() {
         while (trayGrid.firstChild) {
             trayGrid.removeChild(trayGrid.firstChild);
         }
         trayEmpty.hidden = trayItems.length > 0;
 
+        /* The count on the tab is the only sign the other panel holds
+           anything, now that it is hidden until asked for. */
+        if (trayCount) {
+            trayCount.textContent = String(trayItems.length);
+            trayCount.hidden = trayItems.length === 0;
+        }
+
         trayItems.forEach((item) => {
             const card = document.createElement("div");
             card.className = "tray-item";
+            if (item.id === activeTrayId) {
+                card.classList.add("is-active");
+            }
+
+            /* The thumbnail IS the control (August 25, 2026). The card used to
+               carry a caption and two buttons under it; what a saved mockup is
+               for is being looked at and gone back to, and the label reads
+               better as the button's name than as a line of text under every
+               tile. Download went with the caption -- clicking a mockup loads
+               it, and the panel above exports it at any size or format, which
+               the per-item button could not. */
+            const open = document.createElement("button");
+            open.type = "button";
+            open.className = "tray-open";
+            open.setAttribute("data-tray-id", item.id);
+            open.setAttribute("data-tip", TB.desanitize(item.label));
+            open.setAttribute("aria-label", "Open " + TB.desanitize(item.label));
+
+            /* Which tile is loaded, for anyone who cannot see the border and
+               the inset ring that say so. Without this the grid announces
+               "Open Red tee, Open Navy tee" with nothing to distinguish the
+               one already on the canvas, and the tab stops being a set you
+               can tell your position in. Set only on the active tile: the
+               attribute is a singular "this is the current one", so writing
+               aria-current="false" everywhere else would be noise. */
+            if (item.id === activeTrayId) {
+                open.setAttribute("aria-current", "true");
+            }
 
             const img = document.createElement("img");
             img.className = "tray-thumb";
             img.src = item.thumb;
-            img.alt = TB.desanitize(item.label) + " mockup preview";
-            card.appendChild(img);
-
-            const body = document.createElement("div");
-            body.className = "tray-item-body";
-
-            const labelEl = document.createElement("p");
-            labelEl.className = "tray-item-label";
-            labelEl.textContent = TB.desanitize(item.label);
-            body.appendChild(labelEl);
-
-            const actions = document.createElement("div");
-            actions.className = "tray-item-actions";
-
-            const dlBtn = document.createElement("button");
-            dlBtn.type = "button";
-            dlBtn.className = "btn btn-secondary btn-small";
-            dlBtn.textContent = "Download";
-            dlBtn.addEventListener("click", () => {
-                const link = document.createElement("a");
-                link.href = item.thumb;
-                link.download = "templatebox-mockup-" + item.id + ".png";
-                link.click();
-            });
+            img.alt = "";
+            open.appendChild(img);
+            open.addEventListener("click", () => openTrayItem(item.id));
+            card.appendChild(open);
 
             const rmBtn = document.createElement("button");
             rmBtn.type = "button";
-            rmBtn.className = "btn btn-secondary btn-small";
-            rmBtn.textContent = "Remove";
+            rmBtn.className = "tray-remove";
+            rmBtn.setAttribute("aria-label", "Remove " + TB.desanitize(item.label));
+            rmBtn.setAttribute("data-tip", "Remove");
+            rmBtn.appendChild(icon(["M6 6l12 12", "M18 6 6 18"]));
             rmBtn.addEventListener("click", () => {
                 trayItems = trayItems.filter((entry) => entry.id !== item.id);
+                if (activeTrayId === item.id) {
+                    activeTrayId = null;
+                }
                 renderTray();
             });
+            card.appendChild(rmBtn);
 
-            actions.appendChild(dlBtn);
-            actions.appendChild(rmBtn);
-            body.appendChild(actions);
-            card.appendChild(body);
             trayGrid.appendChild(card);
         });
+    }
+
+    /* ----------------------------------------------------------------------
+       Saving and reopening a mockup.
+
+       A tray entry holds the STATE that produced it, not only the picture:
+       the colourway, the background and every layer's placement, plus a
+       reference to each layer's bitmap. That is what makes the tab a set of
+       mockups a visitor switches between rather than a strip of screenshots
+       -- clicking one puts the editor back where it was, and the live preview
+       is genuinely live rather than a saved image pretending to be one.
+
+       The bitmaps are shared by reference and everything else is copied.
+       Sharing the bitmap is safe because a layer never mutates its image;
+       copying the rest is what stops editing a reopened mockup rewriting the
+       entry it came from. Copied again on the way out for the same reason.
+
+       Session-scoped, exactly as the tray always was: the images are held in
+       memory and never written to storage, so a reload empties the tab.
+       ---------------------------------------------------------------------- */
+
+    let activeTrayId = null;
+
+    function copyLayers(list) {
+        return list.map((layer) => ({
+            id: layer.id,
+            name: layer.name,
+            img: layer.img,
+            scale: layer.scale,
+            offsetX: layer.offsetX,
+            offsetY: layer.offsetY,
+            rotation: layer.rotation,
+            visible: layer.visible,
+            rect: null
+        }));
+    }
+
+    function snapshotState() {
+        return {
+            color: currentColor,
+            customHex: customHex,
+            bg: bgHex,
+            layers: copyLayers(layers)
+        };
+    }
+
+    function openTrayItem(id) {
+        const item = trayItems.find((entry) => entry.id === id);
+        if (!item || !item.state) {
+            return;
+        }
+
+        currentColor = item.state.color;
+        customHex = item.state.customHex;
+        bgHex = item.state.bg;
+        layers = copyLayers(item.state.layers);
+        selectedId = layers.length ? layers[layers.length - 1].id : null;
+        activeTrayId = id;
+
+        /* The label follows the mockup, so exporting straight after reopening
+           writes the file under the name it was saved with. */
+        labelInput.value = TB.desanitize(item.label);
+
+        syncColorUI();
+        syncBackgroundUI();
+        renderLayerList();
+        syncScaleControls();
+        syncLayerActions();
+        syncCanvasLabel();
+        renderTray();
+        persist();
+        draw();
+
+        /* Back to the canvas, which is the whole point of the click. */
+        showView(0);
     }
 
     let trayCounter = 0;
@@ -1922,22 +2462,184 @@
             label: TB.sanitize(typed || fallback),
             /* Reads the product canvas alone, so no selection chrome can
                reach the thumbnail. */
-            thumb: canvas.toDataURL("image/png")
+            thumb: canvas.toDataURL("image/png"),
+            /* What makes this reopenable rather than just viewable. */
+            state: snapshotState()
         };
         trayItems.push(item);
+        activeTrayId = item.id;
         renderTray();
+        /* Switch to the collection. With the tray hidden behind a tab, a
+           silent add looks like a button that did nothing; this shows the
+           visitor the render they just saved, and one click goes back. */
+        showView(1);
     });
 
     /* ----------------------------------------------------------------------
-       Single-mockup PNG export via a local data stream.
+       Export: a format and a size, still a local data stream (August 25,
+       2026). It was one button that wrote the canvas out at its own
+       resolution as a PNG, which is a fine default and a poor only option --
+       a listing image wants a smaller file, and a print-on-demand upload
+       often wants JPG.
+
+       THE SIZES ARE DERIVED, NEVER HARDCODED. The canvas is 1000x1000 for a
+       drawn product, 1024x1536 for the model photograph and 2000x2000 for the
+       wood frame, so a fixed ladder like 1600x2000 would distort two of the
+       three and upscale the third. Full size, half and quarter keep every
+       product's own proportions and can never invent detail the canvas does
+       not have. Each row states the real pixels, so the visitor is choosing a
+       size rather than a word.
        ---------------------------------------------------------------------- */
 
-    downloadBtn.addEventListener("click", () => {
+    const EXPORT_TIERS = [
+        { name: "Full size", divisor: 1 },
+        { name: "Half", divisor: 2 },
+        { name: "Quarter", divisor: 4 }
+    ];
+
+    let exportFormat = "png";
+
+    function exportName() {
+        /* Mockup Label names the download (August 24, 2026). It named only
+           the tray caption before, so a visitor who filled it in and pressed
+           Download got "templatebox-mockup.png" regardless -- and since the
+           bar's own name input was removed when the bar gained navigation,
+           this field is the only place left to name the work. Empty, it falls
+           back to what the file has always been called. The size is NOT in
+           the name: a visitor exporting a second size wants it beside the
+           first under the name they chose, not one the editor invented. */
+        return (TB.fileSlug(labelInput.value) || "templatebox-mockup") +
+            (exportFormat === "jpg" ? ".jpg" : ".png");
+    }
+
+    function exportAt(width, height) {
+        const out = document.createElement("canvas");
+        out.width = Math.max(1, Math.round(width));
+        out.height = Math.max(1, Math.round(height));
+        const octx = out.getContext("2d");
+
+        /* JPEG has no alpha channel. Drawn straight, every transparent pixel
+           in the surround comes out BLACK, which on a product exported with
+           no background is most of the image. Flattening onto white is what
+           the format can actually carry, and it matches what a listing page
+           shows behind a JPG anyway. PNG keeps the transparency, which is why
+           it stays the default. */
+        if (exportFormat === "jpg") {
+            octx.fillStyle = "#FFFFFF";
+            octx.fillRect(0, 0, out.width, out.height);
+        }
+
+        /* The product canvas alone. #mockup-overlay carries the selection
+           box, the corner handles and the layer tag, and reading it here is
+           exactly how those would get baked into a visitor's file. */
+        octx.imageSmoothingQuality = "high";
+        octx.drawImage(canvas, 0, 0, out.width, out.height);
+
         const link = document.createElement("a");
-        link.href = canvas.toDataURL("image/png");
-        link.download = "templatebox-mockup.png";
+        link.href = exportFormat === "jpg"
+            ? out.toDataURL("image/jpeg", 0.92)
+            : out.toDataURL("image/png");
+        link.download = exportName();
         link.click();
-    });
+    }
+
+    /* Rebuilt every time the panel opens, not once at startup: a photographic
+       template sizes the canvas from its own base image, and that image loads
+       after this script runs. */
+    function renderExportSizes() {
+        if (!dlSizes) {
+            return;
+        }
+        while (dlSizes.firstChild) {
+            dlSizes.removeChild(dlSizes.firstChild);
+        }
+
+        EXPORT_TIERS.forEach((tier) => {
+            const w = Math.round(canvas.width / tier.divisor);
+            const h = Math.round(canvas.height / tier.divisor);
+            const dims = w + "x" + h + " px";
+
+            const row = document.createElement("button");
+            row.type = "button";
+            row.className = "dl-size";
+            row.setAttribute("data-size", dims);
+
+            const text = document.createElement("span");
+            text.textContent = dims;
+            row.appendChild(text);
+
+            const mark = document.createElement("span");
+            mark.className = "dl-size-go";
+            mark.appendChild(icon([
+                "M12 3v12", "m7.5 10.5 4.5 4.5 4.5-4.5", "M4 20h16"
+            ]));
+            row.appendChild(mark);
+
+            /* The tier names the row for assistive tech, with the pixels
+               after it: "Half, 512x768 px" reads better than digits alone. */
+            row.setAttribute("aria-label", tier.name + ", " + dims);
+            row.addEventListener("click", () => {
+                exportAt(w, h);
+                setExportOpen(false);
+            });
+            dlSizes.appendChild(row);
+        });
+    }
+
+    function syncExportFormat() {
+        dlFormats.forEach((btn) => {
+            const on = btn.getAttribute("data-format") === exportFormat;
+            btn.setAttribute("aria-checked", String(on));
+            btn.classList.toggle("is-active", on);
+        });
+        if (dlNote) {
+            /* Said only when it applies: a JPG of a mockup with no background
+               is a white rectangle behind the product, and finding that out
+               after downloading is too late. */
+            const flattens = exportFormat === "jpg" && !activeBackground();
+            dlNote.hidden = !flattens;
+            dlNote.textContent = flattens
+                ? "JPG cannot hold transparency, so the empty surround is exported white."
+                : "";
+        }
+    }
+
+    function setExportOpen(open) {
+        if (!dlPanel || !dlToggle) {
+            return;
+        }
+        if (open) {
+            renderExportSizes();
+            syncExportFormat();
+        }
+        dlPanel.hidden = !open;
+        dlToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    if (dlToggle && dlPanel) {
+        dlToggle.addEventListener("click", () => setExportOpen(dlPanel.hidden));
+
+        dlFormats.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                exportFormat = btn.getAttribute("data-format");
+                syncExportFormat();
+            });
+        });
+
+        /* Same dismissal rules as poster.html's exporter: a click outside, or
+           Escape, which returns focus to the control that opened it. */
+        document.addEventListener("click", (evt) => {
+            if (dlPanel.hidden) { return; }
+            if (dlPanel.contains(evt.target) || dlToggle.contains(evt.target)) { return; }
+            setExportOpen(false);
+        });
+        document.addEventListener("keydown", (evt) => {
+            if (evt.key === "Escape" && !dlPanel.hidden) {
+                setExportOpen(false);
+                dlToggle.focus();
+            }
+        });
+    }
 
     /* ----------------------------------------------------------------------
        Per-template control state
@@ -1951,8 +2653,15 @@
        mockup, so it carries the whole burden for screen-reader users.
        ---------------------------------------------------------------------- */
 
+    /* With the template picker gone this label is the only thing naming the
+       mockup for a screen-reader user. Now that the colourway changes what is
+       rendered, it has to name that too -- otherwise choosing a colour
+       produces no perceivable feedback at all. */
     function syncCanvasLabel() {
-        canvas.setAttribute("aria-label", PRODUCTS[currentProduct].label + " mockup preview");
+        const config = PRODUCTS[currentProduct];
+        const color = activeColor(config);
+        const suffix = color && !color.original ? " in " + color.name : "";
+        canvas.setAttribute("aria-label", config.label + suffix + " mockup preview");
     }
 
     /* ----------------------------------------------------------------------
@@ -2015,6 +2724,14 @@
             const c = hexToRgb(saved.customHex);
             customHex = rgbToHex(c.r, c.g, c.b);
         }
+        /* Anything that is not a six-digit hex is treated as transparent.
+           localStorage is editable by the visitor, and this value reaches
+           ctx.fillStyle -- which accepts far more than colours -- so it is
+           re-derived from parsed components rather than passed through. */
+        if (typeof saved.bg === "string") {
+            const bg = hexToRgb(saved.bg);
+            bgHex = bg ? rgbToHex(bg.r, bg.g, bg.b) : null;
+        }
         if (saved.color === CUSTOM_COLOR) {
             currentColor = CUSTOM_COLOR;
         } else if (PRODUCTS[currentProduct].colors && PRODUCTS[currentProduct].colors[saved.color]) {
@@ -2024,9 +2741,6 @@
             labelInput.value = TB.desanitize(saved.label);
         }
         restoreLayers(saved);
-    }
-    if (docNameInput) {
-        docNameInput.value = TB.desanitize((saved && saved.docName) || DEFAULT_DOC_NAME);
     }
 
     /* The catalog card that opened this editor decides which mockup loads
@@ -2053,11 +2767,28 @@
         });
     }
 
+    /* "black" is the module-level default and a reasonable one for a DRAWN
+       garment, but on a photographic template it would tint the shirt before
+       the visitor has asked for anything -- a first-time arrival would meet a
+       black shirt rather than the photograph the catalog card showed them.
+       Unless a colour was genuinely restored for THIS product, a photographic
+       template opens as photographed. */
+    const finalConfig = PRODUCTS[currentProduct];
+    const restoredForThisProduct = !!saved && saved.product === currentProduct &&
+        (saved.color === CUSTOM_COLOR ||
+            (finalConfig.colors && !!finalConfig.colors[saved.color]));
+    if (finalConfig.type === "photo" && finalConfig.colors &&
+        currentColor !== CUSTOM_COLOR && !restoredForThisProduct) {
+        currentColor = Object.keys(finalConfig.colors)[0];
+    }
+
     selectedId = layers.length ? layers[layers.length - 1].id : null;
 
-    buildColorPresets();
-    renderColorSwatches();
+    productPicker.buildPresets();
+    syncColorField();
     syncColorUI();
+    backgroundPicker.buildPresets();
+    syncBackgroundUI();
     renderLayerList();
     syncScaleControls();
     syncLayerActions();

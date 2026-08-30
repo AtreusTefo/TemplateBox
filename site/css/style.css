@@ -336,7 +336,11 @@ button {
 .site-header {
     background-color: var(--color-card);
     border-bottom: 1px solid var(--color-border);
-    padding: 1.25rem 1.5rem;
+    /* Published as a token because the collapsed nav pins a control against
+       this exact gutter, and the gutter narrows on phones. A literal in both
+       places drifts the moment one of them changes. */
+    --header-pad-x: 1.5rem;
+    padding: 1.25rem var(--header-pad-x);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -402,12 +406,214 @@ button {
    gives back another 16px. */
 @media (max-width: 48rem) {
     .site-header {
-        padding-left: var(--space-md);
-        padding-right: var(--space-md);
+        --header-pad-x: var(--space-md);
     }
 
     .site-nav {
         gap: var(--space-sm);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Hamburger and search toggles (August 18, 2026).
+
+   Five controls in the bar wrapped onto a second row on a phone -- the whole
+   reason .site-nav carries flex-wrap at all -- which made the sticky header
+   tall enough to eat a real share of a small viewport. Below 48rem the
+   primary links collapse behind the hamburger and the bar keeps one row.
+
+   Both controls are display:none above the breakpoint, so on a desktop this
+   whole section is inert and the header is byte-for-byte the layout it was.
+   They are NOT rendered at all on the four editor pages, whose .site-nav is
+   empty -- a control that opens nothing is worse than no control.
+
+   .search-toggle is an ANCHOR to search.html, not a button (August 24,
+   2026). It was a button toggling a `search-open` class that revealed the
+   header field, and that reveal only existed below 22.5rem, so on every
+   width from 361px to 992px it was a control that did nothing. Everything
+   below is written to suit either element: no button-only properties, and
+   text-decoration reset for the link. -------------------------------------- */
+.nav-toggle,
+.search-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    /* 2.75rem is the tap target the rest of the header already uses. */
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--motion-fast) var(--ease);
+}
+
+.nav-toggle:hover,
+.search-toggle:hover,
+.search-toggle:focus-visible,
+.nav-toggle[aria-expanded="true"] {
+    background-color: var(--color-surface);
+}
+
+.nav-toggle svg,
+.search-toggle svg {
+    width: 1.375rem;
+    height: 1.375rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    display: block;
+}
+
+/* The collapsed bar runs to 74.9375rem, i.e. every width below the ad rail's
+   75rem floor. That is this project's own definition of "not a desktop": the
+   site anchor ends at 74.9375rem and the rail begins at 75rem, and the two
+   bands are documented as meeting exactly. Reusing that seam keeps the header
+   from disagreeing with the ad layout about what a tablet is. */
+@media (max-width: 74.9375rem) {
+    /* Visual order is set here rather than in the markup, because the
+       hamburger has to land beside the wordmark on 17 pages whose headers
+       do not all carry the same children -- the search field and its button
+       exist on the homepage only. Reordering in CSS keeps one rule instead
+       of 17 hand-placed buttons.
+
+       Every child needs an order once any of them has one: an unset order is
+       0, which would jump that item ahead of the wordmark.
+
+       The auto margin does the parking: an auto margin absorbs the free
+       space before justify-content gets any, so the wordmark and hamburger
+       stay together at the start and the rest stays at the end. It yields to
+       the search field's flex-grow where that field is present, which is
+       what keeps the tablet bar looking like the desktop one. */
+    .wordmark {
+        order: 1;
+    }
+
+    .nav-toggle {
+        display: inline-flex;
+        order: 2;
+        margin-right: auto;
+    }
+
+    /* Stays inline on tablets, where it still fits. Only phones trade it for
+       the button below. */
+    .site-search {
+        order: 3;
+    }
+
+    /* Collapsed by default. The theme toggle is not matched here: it is a
+       child of .site-header, not of .site-nav, so it stays in the bar.
+
+       `.site-header` is carried on the link selector purely for weight:
+       `.site-nav a` further down this file sets display:inline-flex at the
+       same (0,1,1) specificity and, being later in source order, would win.
+       A media query adds no specificity of its own, so the collapse has to
+       out-specify it rather than merely follow it. */
+    .site-header .site-nav > a,
+    .site-nav > .nav-more {
+        display: none;
+    }
+
+    /* Opened: the nav claims a full-width second row of the header's own
+       flex line rather than overlaying the page. Nothing is positioned, so
+       there is no stacking or containing-block interaction to get wrong,
+       and the mega-menu panel -- absolute against .site-header at top:100%
+       -- still lands under the grown header without a hardcoded height. */
+    .site-header.nav-open .site-nav {
+        flex: 0 0 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        margin-top: var(--space-2xs);
+        padding-top: var(--space-2xs);
+        border-top: 1px solid var(--color-border);
+    }
+
+    .site-header.nav-open .site-nav > a,
+    .site-header.nav-open .site-nav > .nav-more {
+        display: flex;
+    }
+
+    .site-header.nav-open .site-nav > .nav-more {
+        width: 100%;
+    }
+
+    .site-header.nav-open .site-nav > .nav-more > button {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .site-nav {
+        order: 5;
+    }
+
+    /* The theme toggle stays in the bar beside the search button rather than
+       riding the column down, so switching theme is one tap whether or not
+       the menu is open.
+
+       It has to leave the flow to do that: it is a child of .site-nav, and
+       .site-nav is the full-width second row. Re-parenting it in the markup
+       instead would have rebuilt the desktop bar (see the .theme-toggle
+       block above), so it is pinned here, and only while the menu is open.
+       .site-header is position:sticky and therefore already a containing
+       block, so this lands against the header's own padding box. The offsets
+       mirror that padding -- 1.25rem from the shorthand, and the gutter
+       token, which is 1.5rem on tablets and 1rem on phones. Hardcoding the
+       phone value here put it 8px past the gutter on every tablet. */
+    .site-header.nav-open .site-nav > .theme-toggle {
+        position: absolute;
+        top: 1.25rem;
+        right: var(--header-pad-x);
+    }
+
+    /* ...and the search button steps aside by exactly the toggle's width
+       (2.75rem) plus the header's own gap (1rem), or the two would occupy the
+       same corner -- without this they overlapped precisely and the toggle
+       simply covered the search. Getting the gap term wrong is visible: at
+       0.5rem the button jumped 8px sideways the moment the menu opened. */
+    .site-header.nav-open .search-toggle,
+    .site-header.nav-open .site-search {
+        margin-right: 3.75rem;
+    }
+}
+
+/* Phones and small tablets: the search FIELD is display:none under 62rem, so
+   search would otherwise be unreachable there. Above 62rem the field is
+   inline and a link as well would be two search affordances in one bar.
+
+   The `search-open` ordering rule that stood here went with the reveal it
+   served (August 24, 2026): the control opens search.html now. */
+@media (max-width: 62rem) {
+    .search-toggle {
+        display: inline-flex;
+        order: 4;
+    }
+}
+
+/* At 320px the wordmark alone is 155px of the 288px between the gutters, so
+   the theme toggle still wrapped to a second row: 145px of header rather
+   than 85px. Dropping the word to the mark alone frees ~130px and the bar
+   fits on one line, which is what the Pinterest-style reference does too.
+
+   Hidden the .sr-only way rather than display:none on purpose -- the SVG is
+   aria-hidden, so the span is the link's ONLY accessible name and removing
+   it from the tree would leave an unlabelled link home. */
+@media (max-width: 22.5rem) {
+    .wordmark span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
 }
 
@@ -435,6 +641,13 @@ button {
    existing right-hand group rather than becoming a fourth flex child and
    redistributing the header; loading.html has no nav, so there it is the last
    child of the header itself.
+
+   Staying inside .site-nav is load-bearing, not incidental. Pulled out to a
+   header child it becomes a fourth space-between item, the leftover space
+   splits three ways instead of two, and the desktop bar visibly changes --
+   measured an 81px gap opening between the nav and the toggle, and the search
+   field sliding ~98px. The phones' hamburger therefore leaves it behind by
+   taking it out of flow (see the 48rem block), not by re-parenting it.
    -------------------------------------------------------------------------- */
 .theme-toggle {
     display: inline-flex;
@@ -521,7 +734,11 @@ button {
     align-items: center;
 }
 
-.site-search input {
+/* Shared with the mockup editor bar's field (.editor-search), which differs
+   only in where it lives and when it is shown -- one appearance, two
+   placements, rather than a second copy of the styling. */
+.site-search input,
+.editor-search input {
     width: 100%;
     min-height: 2.75rem;
     padding: 0 2.5rem 0 2.5rem;
@@ -536,13 +753,15 @@ button {
         background-color var(--motion-fast) var(--ease);
 }
 
-.site-search input:focus {
+.site-search input:focus,
+.editor-search input:focus {
     outline: 2px solid var(--color-brand);
     outline-offset: -1px;
     background-color: var(--color-card);
 }
 
-.site-search svg {
+.site-search svg,
+.editor-search > svg {
     position: absolute;
     left: 0.875rem;
     width: 1.0625rem;
@@ -1072,8 +1291,25 @@ main:has(.home-layout) {
 
 .feed-tabs {
     position: sticky;
-    /* Sits directly beneath the sticky site header */
-    top: 5.25rem;
+    /* Sits directly beneath the sticky site header.
+
+       --header-h is the header's REAL rendered height, written onto <html> by
+       initHeaderHeight() in js/app.js and kept current by a ResizeObserver.
+       A literal offset cannot work here: .site-header is flex-wrap: wrap and
+       carries a search box and five nav controls, so its height is a function
+       of how its contents wrap, not of the viewport width. Measured, it is
+       85px from 600px up but 145px from 360px to 480px and 201px at 320px,
+       against the 76px the old literal reserved -- so on every phone width the
+       whole 45px tab row sat INSIDE the header's box and was painted over by
+       it (the header is z-index 20, these tabs 15). Filtering is a primary
+       action on this page and it was invisible and untappable on any phone
+       whenever the header was showing and the page was scrolled.
+
+       The fallbacks are the old literals on purpose: if js/app.js fails to
+       load or throws, every offset here resolves to exactly what it was
+       before, so this degrades to the previous behaviour rather than to a
+       broken one. */
+    top: var(--header-h, 5.25rem);
     z-index: 15;
     background-color: var(--color-bg);
     border-bottom: 1px solid var(--color-border);
@@ -1146,13 +1382,18 @@ body:has(.home-layout).is-nav-hidden .site-header {
     transform: translateY(-100%);
 }
 
+/* Travels its own sticky offset, which is now the header's measured height,
+   so it lands flush at y=0 as the header clears -- at every width, including
+   the phone widths where that height is 145px or 201px rather than 85px. The
+   two-tier media query this replaces existed only to approximate that height
+   with a literal, and approximated it wrongly on exactly those widths. */
 body:has(.home-layout).is-nav-hidden .feed-tabs {
-    transform: translateY(-5.25rem);
+    transform: translateY(calc(-1 * var(--header-h, 5.25rem)));
 }
 
 @media (max-width: 48rem) {
     body:has(.home-layout).is-nav-hidden .feed-tabs {
-        transform: translateY(-4.75rem);
+        transform: translateY(calc(-1 * var(--header-h, 4.75rem)));
     }
 }
 
@@ -1209,7 +1450,7 @@ body.is-nav-hidden .site-header:focus-within {
 
 @media (max-width: 48rem) {
     .feed-tabs {
-        top: 4.75rem;
+        top: var(--header-h, 4.75rem);
         margin: 0 calc(var(--space-md) * -1) var(--space-md);
         padding: 0 var(--space-md);
     }
@@ -1440,11 +1681,68 @@ body.is-nav-hidden .site-header:focus-within {
     padding: 0;
 }
 
+/* `contain`, not `cover` (August 23, 2026). A catalog thumbnail depicts a
+   finished design, and a design carries content to its edges -- a printed
+   border, a caption near the foot. `cover` fills the tile by cropping
+   whatever does not fit the 4:5 window, which takes exactly those edges: a
+   707x1000 poster loses 11.5% of its height. Letterboxing instead leaves a
+   little of the card's own ground either side, which reads as a mat.
+
+   This is deliberately the SHARED rule rather than a class on the one card
+   that needed it. A bespoke class would be dropped the next time that card
+   was published from admin.html, whose generator emits a fixed
+   `card-preview photo` block -- the same silent loss the removed `framed`
+   machinery existed to prevent.
+
+   **The paragraph below was wrong when it was written (corrected August 24,
+   2026).** It claimed every shipped thumbnail was already 4:5, and two were
+   not: the Leaning Wood Frame pair was 1000x1000 and the framed photo poster
+   was 707x1000. So this keyword was not academic at all -- it was letterboxing
+   about a fifth of the wood frame card, on the live homepage, while the
+   comment said it could not be. A claim that "this changes nothing today" is
+   worth checking against the files rather than asserting.
+
+   Fixed at the source rather than by changing the keyword: admin.html's
+   intake now reshapes every upload to the card's ratio, and the three
+   off-ratio files were re-run through it. With a 4:5 file `contain` and
+   `cover` are identical, so the reasoning above stands and no longer decides
+   anything on its own. tests/verify-layout.js section 2f measures the painted
+   image against its card, and section 6 covers the intake.
+
+   The original note follows, kept because its reasoning is still why this is
+   `contain`: every shipped thumbnail is exactly 4:5
+   (800x1000 and 600x750), where the two keywords are identical. It only
+   decides what happens to an off-ratio upload, and showing the whole design
+   is the right answer for a catalog. */
 .card-preview.photo .card-thumb {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
+}
+
+/* Bare-product default, styled-demo on hover (August 18, 2026) -- the same
+   "default is the plain product" rule .mk-art already follows, extended to
+   these two real photo thumbnails. (The poster cards followed it too, via a
+   wood-frame hover composite, until that was removed on August 23, 2026.)
+   card-thumb-blank lays out the box normally and IS the permanent state on
+   touch, since it is never gated behind (hover: hover). card-thumb-hover
+   stacks on top absolutely -- .card-media is already position:relative for
+   the hover-zoom transform above, so it is the containing block -- and
+   crossfades in only where a hover state actually exists. Opacity only, so
+   this costs no layout and cannot perturb the masonry packing. */
+.card-preview.photo .card-thumb-hover {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity var(--motion-base) var(--ease);
+}
+
+@media (hover: hover) {
+    .catalog-grid .template-card:hover .card-preview.photo .card-thumb-hover,
+    .catalog-grid .template-card:focus-within .card-preview.photo .card-thumb-hover {
+        opacity: 1;
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -2078,88 +2376,6 @@ body.is-nav-hidden .site-header:focus-within {
     }
 }
 
-/* Posters and prints: the poster mocked into the real wood-a4 frame.
-
-   No canvas and no glfx.js: the warpZone in js/mockup-templates.js is an
-   axis-aligned rectangle (x 655-1461, y 224-1583 of a 2000x2000 base), so it
-   needs no perspective transform and can be expressed as flat percentages.
-
-   The scene is a square the height of the preview, centred and clipped, so
-   the base image is never distorted whatever ratio the card carries:
-
-       height: 100%; aspect-ratio: 1; left: 50%; translateX(-50%)
-
-   Expressing the window against that square is what makes the numbers
-   independent of the card's own ratio. Vertical is direct (top and height are
-   percentages of the containing block's height, which is the square's side).
-   Horizontal uses the element's own width: the window centre sits at 52.9% of
-   the square rather than 50%, and that 2.9% offset is 7.196% of the window's
-   own width (40.3%), hence translateX(-42.804%) instead of -50%.
-
-   Compositing follows the template's declared mode "window": design first,
-   then the base whose transparent print opening reveals it, then the overlay
-   multiplied on top. The overlay is a baked luminance map -- at the default
-   source-over it would paint over the artwork and wash it out entirely (see
-   docs/error-fixes/PHOTO_MOCKUP_OVERLAY_WASHES_OUT_DESIGN.md). */
-@media (hover: hover) {
-    .card-preview.framed .card-media::before,
-    .card-preview.framed .card-media::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        height: 100%;
-        aspect-ratio: 1;
-        left: 50%;
-        transform: translateX(-50%);
-        background-size: 100% 100%;
-        background-repeat: no-repeat;
-        opacity: 0;
-        /* Never intercept the click: the card surface is the target. */
-        pointer-events: none;
-        transition: opacity var(--motion-base) var(--ease);
-    }
-
-    .card-preview.framed .card-media::before {
-        background-image: url("../assets/mockups/wood-a4-base.png");
-        z-index: 2;
-    }
-
-    .card-preview.framed .card-media::after {
-        background-image: url("../assets/mockups/wood-a4-overlay.png");
-        mix-blend-mode: multiply;
-        z-index: 3;
-    }
-
-    .template-card:hover .card-preview.framed .card-media::before,
-    .template-card:hover .card-preview.framed .card-media::after,
-    .template-card:focus-within .card-preview.framed .card-media::before,
-    .template-card:focus-within .card-preview.framed .card-media::after {
-        opacity: 1;
-    }
-
-    /* The miniature drops its drawn frame and caption and becomes just the
-       artwork, sized into the print opening. */
-    .template-card:hover .card-preview.framed .mock-doc.poster,
-    .template-card:focus-within .card-preview.framed .mock-doc.poster {
-        position: absolute;
-        top: 11.2%;
-        height: 67.95%;
-        aspect-ratio: 806 / 1359;
-        left: 50%;
-        transform: translateX(-42.804%);
-        width: auto;
-        border: 0;
-        padding: 0;
-        gap: 0;
-        z-index: 1;
-    }
-
-    .template-card:hover .card-preview.framed .mk-caption,
-    .template-card:focus-within .card-preview.framed .mk-caption {
-        display: none;
-    }
-}
-
 /* --------------------------------------------------------------------------
    Buttons (44px / 2.75rem minimum touch targets throughout)
    -------------------------------------------------------------------------- */
@@ -2397,10 +2613,6 @@ body.is-nav-hidden .site-header:focus-within {
    viewport, zero
    vertical scroll. */
 @media (max-width: 70rem) {
-    #ad-banner-2 {
-        display: none;
-    }
-
     main:has(.loading-wrap) {
         padding: var(--space-xs) var(--space-md) var(--space-xs);
     }
@@ -2465,6 +2677,28 @@ body.is-nav-hidden .site-header:focus-within {
    keeps this verifiable at a glance instead of needing a hand-checked list
    of which intermediate widths were and were not measured. */
 @media (max-width: 48rem) {
+    /* The second 300x250 is dropped on PHONES only, from August 20, 2026.
+
+       This gate was 70rem, which meant the whole tablet band -- every tablet
+       in portrait and most in landscape -- saw one banner where the page has
+       two zones to serve. The reason for cutting it was always vertical: a
+       second 300x250 stacked under the card is what pushes a short phone into
+       scroll. That reasoning is about STACKING, and it stops applying the
+       moment the two fit side by side. .ad-row is flex with wrap, so at 769px
+       and up the pair sits in one row (300 + 300 + 24px gap = 624px, inside
+       even the narrowest tablet) and costs the same 250px of height that one
+       banner costs. Below 48rem they stack and the second one genuinely does
+       not fit, which is why the rule survives here rather than being deleted.
+
+       Verified after the change, with the anchor's 76px reservation included:
+       both banners share one row and the page has zero vertical scroll at
+       800x1280, 810x1080, 820x1180, 1024x768, 1112x834, 1180x820 and
+       1199x800. 768x1024 is not in that list on purpose -- 768px IS 48rem, so
+       it is the phone band's top edge and correctly shows one banner. */
+    #ad-banner-2 {
+        display: none;
+    }
+
     .loading-template {
         display: none;
     }
@@ -3071,19 +3305,47 @@ body.is-nav-hidden .site-header:focus-within {
 }
 
 /* Reserve the space the fixed bar occupies, or the foot of the page sits
-   under it and cannot be scrolled clear. The desktop unit is 728x90, so it
-   needs noticeably more room than the 320x50 phone one. */
+   under it and cannot be scrolled clear.
+
+   One value, because there is only one unit. This was 7.25rem here with a
+   4.75rem override below 48rem, sized for a 728x90 that mounted above that
+   breakpoint -- but that desktop half was retired on August 13, 2026, and
+   from then until August 20 the 7.25rem branch was unreachable dead code:
+   the anchor's own gate stopped at 48rem, so the only rule that could ever
+   apply was the override.
+
+   Extending the gate to the tablet band brought the dead branch back to life
+   and it immediately over-reserved, because mountSiteAnchor was mounting
+   leaderboardMobile (320x50) at every width -- measured 116px of padding
+   under a 50px creative on every tablet page.
+
+   Later the same day the anchor became size-tiered for real: a 320px bar
+   centred in a 1024px window is mostly empty chrome, so the tablet band
+   mounts the 728x90 instead (mountAnchorUnit in js/ads.js). So the two tiers
+   below are back, but this time they are gated on ANCHOR_PHONE_MAX itself --
+   the exact line the JS switches the zone on -- rather than on a remembered
+   breakpoint that outlived the unit it was written for. That is the whole
+   difference between this and the rule it replaces. Move one and the other
+   has to move with it; `${tag}: anchor reservation matches the mounted unit`
+   in tests/verify-layout.js fails if they ever disagree. */
 body.has-site-anchor {
-    padding-bottom: 7.25rem;
+    padding-bottom: 4.75rem;
 }
 
-@media (max-width: 48rem) {
+@media (min-width: 48.0625rem) {
     body.has-site-anchor {
-        padding-bottom: 4.75rem;
+        padding-bottom: 7.25rem;
     }
 }
 
-@media (max-width: 48rem) {
+/* The editors' fixed anchor. Ran to 48rem until August 20, 2026, when the
+   editors' in-flow 728x90 tablet band was retired in favour of this: the
+   in-flow unit scrolled out of a session measured in minutes, which
+   contradicts the dwell-time argument that is the only reason editors carry
+   advertising at all. Same creative, now persistent. The ceiling is the
+   rail's floor, so the two meet exactly and no editor width shows both or
+   neither. */
+@media (max-width: 74.9375rem) {
     .editor-anchor.is-filled {
         display: flex;
         flex-direction: column;
@@ -3100,13 +3362,6 @@ body.has-site-anchor {
         padding-bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
     }
 
-    /* The disclosure label is kept, but small: on a 50px unit a full-size
-       label would nearly double the height the anchor costs. */
-    .editor-anchor .ad-label {
-        font-size: 0.5625rem;
-        margin-bottom: 0.125rem;
-    }
-
     /* Reserve the space the fixed anchor occupies. Without this the last of
        the page sits underneath it and cannot be scrolled clear. */
     body.has-ad-anchor {
@@ -3117,6 +3372,56 @@ body.has-site-anchor {
        be covered by the anchor. Lift it above. */
     body.has-ad-anchor .preview-actions {
         bottom: 4.75rem;
+    }
+}
+
+/* The disclosure label is kept, but small: on a 50px unit a full-size label
+   would nearly double the height the anchor costs.
+
+   Deliberately NOT scoped to the phone tier, which was tried and measured
+   wrong. Letting the tablet's 90px unit carry a full-size label looks fine in
+   isolation but takes the bar to 122.6px against the 7.25rem (116px) the tier
+   reserves, and the sticky export bar is lifted by that same 116px -- so the
+   bar ended up 18.6px INSIDE the anchor on all four editors at every tablet
+   width. The reservation, the lift and the label size are one system: change
+   the label and the other two have to be re-measured. Keeping the small label
+   at every width also matches .site-anchor, which has always had it
+   unscoped. */
+.editor-anchor .ad-label {
+    font-size: 0.5625rem;
+    margin-bottom: 0.125rem;
+}
+
+/* Tablet tier: mountAnchorUnit mounts the 728x90 above ANCHOR_PHONE_MAX, so
+   both the reservation and the export bar's lift grow to match it. Gated on
+   the same 48.0625rem line the JS switches the zone on -- see the
+   has-site-anchor note above for why that matters. */
+@media (min-width: 48.0625rem) and (max-width: 74.9375rem) {
+    body.has-ad-anchor {
+        padding-bottom: 7.25rem;
+    }
+
+    /* 8.25rem, not the 7.25rem the reservation uses, and the extra 1rem is
+       measured rather than padding-by-feel.
+
+       In this band -- and only in this band -- .preview-pane is
+       position: sticky (its rule starts at 48.0625rem), and with a sticky
+       pane the export bar's stuck position comes out a consistent 12px lower
+       than its `bottom` nominally asks for: at 1024x768 a `bottom: 116px`
+       bar sits with its foot at 664 where the arithmetic says 652, and the
+       same 12px appears at 769px and 1199px. Below 48.0625rem the pane is
+       not sticky and the offset lands exactly on its nominal value (measured
+       724 against 724 at 400x800), which is why the phone tier above needs
+       no such allowance and must not copy this one.
+
+       At 7.25rem the bar therefore finished 11.4px INSIDE the 115.4px-tall
+       anchor on all four editors at every tablet width -- the anchor is
+       z-index 30 against the bar's 5, so it painted over the export control.
+       8.25rem clears it by 4.6px. `${tag}: export bar clears the anchor` in
+       tests/verify-layout.js is what stops this silently regressing if the
+       pane's stickiness or the anchor's height ever changes. */
+    body.has-ad-anchor .preview-actions {
+        bottom: 8.25rem;
     }
 }
 
@@ -3340,6 +3645,201 @@ body.has-site-anchor {
     gap: var(--space-sm);
 }
 
+/* --------------------------------------------------------------------------
+   The mockup editor's bar (August 24, 2026).
+
+   mockup.html only. resume.html, docs.html and poster.html keep the bar they
+   had -- every rule in this block is scoped to a class or an element that
+   only mockup.html carries, and the three of them are verified byte-identical
+   against HEAD by section 4 of the suite.
+
+   ONE boundary governs the whole bar: 75rem. It is the width js/app.js
+   already collapses .site-nav at (its matchMedia reads 74.9375rem, the pixel
+   below), and the same seam where the ad anchor ends and the ad rail begins.
+   Inventing a second boundary here would put the CSS and the JS into
+   disagreement about when the bar is collapsed, which is how the header
+   ended up with a control that toggled nothing.
+
+   Nothing here sets a width, a margin or a transform on the header itself.
+   The fixed ad rail insets the whole page with one padding-right on <body>
+   and the header inherits it by staying in normal flow; a rule of its own
+   would break exactly the mechanism FIXED_FULL_HEIGHT_AD_RAIL.md warns
+   about. Explicit `order` values only, which move paint order within the
+   flex line and reserve nothing.
+   -------------------------------------------------------------------------- */
+
+/* Left edge, desktop: the wordmark, matching the site header's own. */
+.editor-brand {
+    display: none;
+    align-items: center;
+    gap: var(--space-2xs);
+    flex-shrink: 0;
+    font-family: var(--font-serif);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--color-text);
+    order: 1;
+}
+
+.editor-brand svg {
+    width: 1.5rem;
+    height: 1.6875rem;
+    flex-shrink: 0;
+}
+
+.editor-brand:hover {
+    color: var(--color-brand);
+}
+
+/* Left edge, docs.html: the mark on its own, with no word beside it and no
+   viewport gate. It is the other half of the pair above, not a variant of
+   it -- .editor-brand is mark-plus-word and appears only from 75rem, because
+   mockup.html hands the narrow band back to .editor-home. This one REPLACES
+   .editor-home on its page, so gating it would leave a band with no identity
+   at all, which is the exact shape of the search-control hole this bar's
+   comment block already warns about. */
+.editor-mark {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    text-decoration: none;
+    color: var(--color-text);
+    /* Negative, not 1 like the icon it replaces. The document-name input
+       carries no order at all, so it sits at the default 0 and any positive
+       value lands the mark AFTER the name field -- which is where the house
+       icon has actually been rendering on this bar. -1 is the only value
+       that puts it at the far left without giving an order to elements that
+       resume and poster share. */
+    order: -1;
+}
+
+.editor-mark svg {
+    width: 1.5rem;
+    height: 1.6875rem;
+    flex-shrink: 0;
+}
+
+.editor-mark:hover {
+    color: var(--color-brand);
+}
+
+/* .site-header is justify-content: space-between, so whatever free space the
+   bar has left over gets shared out between its items unless something
+   absorbs it. The base .editor-actions rule absorbs it with margin-left:auto;
+   the 75rem rule below hands that job to the search FIELD instead, which is
+   right for mockup.html and wrong for a bar that has no field -- there, the
+   space is split and the document name ends up floating in the middle of the
+   bar with a 219px hole between it and the mark. Three classes, so it wins
+   over the two-class rule in the media query wherever either is declared. */
+.editor-bar .editor-mark ~ .editor-actions {
+    margin-left: auto;
+}
+
+.editor-bar .editor-home { order: 1; }
+.editor-bar .nav-toggle { order: 2; }
+.editor-bar .site-nav { order: 3; }
+.editor-bar .editor-search { order: 4; }
+.editor-bar .editor-actions { order: 5; }
+.editor-bar .search-toggle { order: 6; }
+
+/* The bar's search field. Shares the site header field's appearance through
+   the .site-search rules further up (declared as a two-selector list there),
+   and only its display gate differs: this one runs to 75rem rather than
+   62rem, because the whole bar switches at one boundary. */
+.editor-search {
+    display: none;
+    flex: 0 1 18rem;
+    min-width: 0;
+    margin-left: auto;
+    position: relative;
+    align-items: center;
+}
+
+/* From 75rem: wordmark, inline links, inline field. */
+@media (min-width: 75rem) {
+    .editor-bar .editor-home {
+        display: none;
+    }
+
+    .editor-brand {
+        display: inline-flex;
+    }
+
+    .editor-search {
+        display: flex;
+    }
+
+    /* The links sit next to the brand, not out by the actions. */
+    .editor-bar .site-nav {
+        margin-right: var(--space-sm);
+    }
+
+    /* .editor-actions carries margin-left:auto for the bars that have no
+       search field. Here the FIELD takes that job, or the two autos would
+       split the free space between them and leave the field floating in the
+       middle of the bar. */
+    .editor-bar .editor-actions {
+        margin-left: 0;
+    }
+}
+
+/* Below 75rem: the icon, the hamburger and search as a button. The generic
+   rule reveals .search-toggle only under 62rem, because that is where the
+   site header's own field disappears; this bar's field is gated at 75rem, so
+   its button has to appear at the same width or the band between the two
+   would offer neither. */
+@media (max-width: 74.9375rem) {
+    .editor-bar .search-toggle {
+        display: inline-flex;
+    }
+
+    /* The nav becomes the header's full-width second row when open, exactly
+       as it does on every other page. */
+    .editor-bar .site-nav {
+        order: 7;
+    }
+
+    /* This bar has no theme toggle in its nav, so there is no control in the
+       top-right corner for the search button to step aside from. */
+    .editor-bar.nav-open .search-toggle {
+        margin-right: 0;
+    }
+}
+
+/* Phones: the download button keeps its icon and gives up its label.
+
+   Measured at 390px: with the label, the bar wrapped to a second row and the
+   sticky header went from 85px to 141px -- 56px of a small viewport, taken
+   permanently from a workspace, which is the exact cost the header collapse
+   exists to avoid. Without it the row fits at 320px with room to spare.
+
+   The `.editor-bar .dl-label` rule that hid the mockup bar's own download
+   label on phones was deleted on August 25, 2026 with the button it was
+   sized for: mockup.html exports from the control pane now, and `.dl-label`
+   on that page is a heading inside the export panel, which this rule would
+   have reached for no reason at all. */
+@media (max-width: 48rem) {
+    .editor-bar .dl-toggle,
+    .editor-bar .bar-action {
+        gap: 0;
+        padding-left: var(--space-sm);
+        padding-right: var(--space-sm);
+    }
+
+    /* docs.html carries three labelled buttons in this bar since August 26,
+       2026 -- Print, Clear Form and Download PDF. Measured at 320px, the
+       three labels overflow the row and the sticky header wraps to a second
+       line, which is the 56px cost the note above exists to prevent, so all
+       three give up their label here and keep their icon. Each button
+       carries its own aria-label, so the accessible name survives the label
+       going. Only this bar has .bar-label elements; resume and poster are
+       untouched. */
+    .editor-bar .bar-label {
+        display: none;
+    }
+}
+
 .editor-home {
     display: inline-flex;
     align-items: center;
@@ -3484,7 +3984,12 @@ body.has-site-anchor {
     position: relative;
 }
 
-.dl-toggle {
+/* One selector list rather than a second block that looks like this one:
+   .bar-action is docs.html's Print and Clear Form, which sit beside Download
+   in the same toolbar and have to be the same size as it. Two similar rules
+   would drift the first time either is touched. */
+.dl-toggle,
+.bar-action {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2xs);
@@ -3492,7 +3997,8 @@ body.has-site-anchor {
     font-size: 0.8125rem;
 }
 
-.dl-toggle svg {
+.dl-toggle svg,
+.bar-action svg {
     width: 1rem;
     height: 1rem;
     fill: none;
@@ -4001,6 +4507,26 @@ legend {
     outline-offset: 2px;
 }
 
+/* Transparency, drawn the way every image editor draws it: a grey chequer.
+   Used by the mockup editor's background quick picks and by its trigger dot,
+   where "no colour" is a real, choosable state rather than an empty control.
+   Two 45-degree gradients offset by half a tile make the chequer, so it costs
+   no asset and follows the theme's own border colour. */
+.swatch-transparent,
+.color-trigger-dot.is-transparent {
+    background-color: var(--color-bg);
+    background-image:
+        linear-gradient(45deg, var(--color-border) 25%, transparent 25%, transparent 75%, var(--color-border) 75%),
+        linear-gradient(45deg, var(--color-border) 25%, transparent 25%, transparent 75%, var(--color-border) 75%);
+    background-size: 0.625rem 0.625rem;
+    background-position: 0 0, 0.3125rem 0.3125rem;
+}
+
+.color-trigger-dot.is-transparent {
+    background-size: 0.4375rem 0.4375rem;
+    background-position: 0 0, 0.21875rem 0.21875rem;
+}
+
 /* --------------------------------------------------------------------------
    Resume document preview (the html2pdf.js capture target)
    -------------------------------------------------------------------------- */
@@ -4443,19 +4969,6 @@ legend {
     text-align: left;
 }
 
-/* Editor controls specific to the document builder */
-
-.doc-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
-}
-
-.doc-actions .btn {
-    flex: 1 1 8rem;
-}
-
 .item-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -4514,9 +5027,30 @@ legend {
 .mockup-stage {
     background-color: var(--color-bg);
     border: 1px solid var(--color-border);
-    padding: 1.5rem;
+    padding: var(--space-sm);
     display: flex;
     justify-content: center;
+    align-items: center;
+}
+
+/* The two tab panels must actually disappear when their hidden attribute is
+   set (August 25, 2026). An author `display` beats the UA stylesheet's
+   [hidden] { display: none }, so `.mockup-stage`'s `display: flex` directly
+   above left the live canvas rendered above the tiles the whole time the My
+   Mockups tab was open -- the panel was flagged hidden and shown anyway.
+
+   `.mockup-tray` carries no author display and so hid correctly, which is
+   what made the defect one-sided and easy to miss from the other tab. It is
+   listed here anyway: the next rule that gives the tray a display would
+   reintroduce this silently.
+
+   The same trap is on record for admin.html's catalog preview -- see
+   CATALOG_THUMBNAIL_ADMIN.md, "two [hidden] overrides". Choosing the
+   attribute over a class for accessibility reasons is right, but it only
+   works if the stylesheet lets it. */
+.mockup-stage[hidden],
+.mockup-tray[hidden] {
+    display: none;
 }
 
 /* Stacking context for the selection overlay, and the element that now caps
@@ -4532,6 +5066,94 @@ legend {
     width: 100%;
     height: auto;
     touch-action: none;
+}
+
+/* --------------------------------------------------------------------------
+   Mockup editor: both panes hold the viewport, and the render fits in one
+   (August 25, 2026)
+
+   Reported as: the mockup and the controls should both be fully on screen,
+   without scrolling the live preview to see the rest of the render, and there
+   is too much empty space above them.
+
+   Three separate causes, three fixes:
+
+   1. The chrome above the panes. `.editor-head` is EMPTY on this page -- the
+      h1 inside it is .sr-only and the autosave indicator moved into the bar
+      long ago -- yet it still contributed a 1.5rem bottom margin, and main's
+      2.5rem top padding sat above that. The element is not removed, because
+      it holds the page's only h1; its margin is zeroed and the page's top
+      padding halved. Measured together with the two pane headings becoming
+      .sr-only: 152px of chrome above the canvas, down to 58px.
+
+   2. The control pane scrolled with the page while the preview was already
+      sticky, so reaching the last control pushed the render off screen. It
+      gets the same treatment as the preview: sticky, capped to the viewport,
+      scrolling internally. Two independent columns, which is what a workspace
+      is.
+
+   3. The canvas is width-driven (`width: 100%`), so a tall product overflowed
+      the capped pane and had to be scrolled to. The cap below bounds its
+      WIDTH by the height available and the product's own aspect ratio --
+      js/mockup.js writes `--mockup-aspect` from the canvas's real dimensions
+      -- so height follows arithmetic instead of luck: width <= cap * aspect
+      means height <= cap.
+
+      Deliberately not `object-fit: contain` with a max-height, which is the
+      obvious one-line answer: it letterboxes inside the element's box, and
+      the pointer maths in js/mockup.js maps client coordinates through
+      `canvas.width / rect.width`. Letterboxing makes rect bigger than the
+      pixels it holds, and every drag, resize and rotate lands somewhere other
+      than the pointer. The overlay canvas would drift from the product canvas
+      for the same reason.
+   -------------------------------------------------------------------------- */
+
+main:has(.mockup-layout) {
+    padding-top: var(--space-lg);
+}
+
+main:has(.mockup-layout) .editor-head {
+    margin-bottom: 0;
+}
+
+@media (min-width: 48.0625rem) {
+    /* No bottom padding in the two-column band, and it is doing real work:
+       the header (85px), main's top padding and a column capped at
+       100vh - 7rem come to 3px under an 800px viewport, so any bottom padding
+       at all puts the workspace into page scroll to reveal empty space. Below
+       this width nothing is capped and the page scrolls normally, so the
+       padding stays there. */
+    main:has(.mockup-layout) {
+        padding-bottom: 0;
+    }
+
+    /* The COLUMN holds the viewport height, not the pane: the action row
+       above the pane has to stay put while the controls scroll under it, so
+       the sticky element is the wrapper and the pane inside it takes whatever
+       is left. min-height: 0 is what lets that pane shrink below its content
+       and scroll -- without it a flex item refuses to go under its content
+       height and the whole column grows past the cap. */
+    .mockup-column {
+        position: sticky;
+        top: 5.75rem;
+        align-self: start;
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 7rem);
+    }
+
+    .mockup-column .editor-pane {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    /* 15rem is the chrome this pane carries above and below the render: the
+       sticky offset, the pane's padding, the tab row and the stage's frame.
+       The 32rem ceiling is the old cap and still applies on a tall window. */
+    .mockup-layout .mockup-canvas-wrap {
+        max-width: min(32rem, calc((100vh - 15rem) * var(--mockup-aspect, 1)));
+    }
 }
 
 /* The resting cursor is set from js/mockup.js per hit target -- grab over a
@@ -4962,6 +5584,17 @@ legend {
         #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000);
 }
 
+/* The same track again, standing in the panel under the trigger where the
+   mockup editor's colourway swatches used to be (August 25, 2026). One extra
+   rule rather than a second component: taller, because this one is dragged
+   with a thumb on a phone rather than inside an open popover, and spaced off
+   the trigger the way the swatch row was. */
+.color-hue-inline {
+    height: 1.125rem;
+    margin-top: var(--space-2xs);
+    margin-bottom: 1rem;
+}
+
 .color-hue-thumb {
     position: absolute;
     top: 50%;
@@ -5056,12 +5689,215 @@ legend {
     color: var(--color-text);
 }
 
-.color-row {
+/* --------------------------------------------------------------------------
+   Mockup editor: the control pane's action row (August 25, 2026)
+
+   "Add to My Mockups" was a sticky bar at the FOOT of this pane and Download
+   was over in the editor bar. Both are here now, at the top and sticky to the
+   pane's own scroll, because they are the two halves of one thought -- keep
+   this render, or take it away -- and a visitor should not have to hunt at
+   opposite ends of the page for them.
+
+   `top: -1.5rem` cancels the pane's own padding so the row sits flush against
+   the pane edge when it sticks, and the negative margins let its background
+   span the full pane width rather than leaving 1.5rem of scrolling content
+   visible either side.
+   -------------------------------------------------------------------------- */
+
+.mockup-actions {
+    /* The pair sits together at the left rather than pushed to opposite ends
+       of the column: they are one thought -- keep this render, or take it
+       away -- and a button 250px from the one it belongs with reads as a
+       different control. */
     display: flex;
-    gap: 0.75rem;
-    margin-top: var(--space-xs);
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-sm);
+    position: relative;
+}
+
+/* Outside the control pane (August 25, 2026), so the panel has nothing to be
+   clipped by: it hangs over the pane below. */
+.mockup-actions .dl-panel {
+    max-height: calc(100vh - 12rem);
+}
+
+@media (min-width: 48.0625rem) {
+    /* Anchored to the ROW, not to the toggle. The shared panel is right-
+       aligned to its button, which was right for a button at the bar's right
+       edge; with the toggle moved beside Add at the LEFT, right-aligning it
+       hangs the panel off the left of the page (measured: -130px). Anchoring
+       left to the row lines it up with the column under it instead.
+
+       Below this width the shared phone rule takes over and the panel is a
+       full-width sheet at the foot of the viewport, which is why this is
+       scoped rather than global. */
+    .mockup-actions .dl {
+        position: static;
+    }
+
+    .mockup-actions .dl-panel {
+        left: 0;
+        right: auto;
+        width: min(20rem, 100%);
+    }
+}
+
+.mockup-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3xs);
+    min-height: 2.75rem;
+    padding-left: var(--space-sm);
+    padding-right: var(--space-sm);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+/* Icon only, with its name in the tooltip. Square, so it reads as a tool
+   rather than a truncated button, and the same 2.75rem tap target the rest of
+   the site uses. */
+.mockup-actions .btn-icon {
+    width: 2.75rem;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* The shared tip is right-anchored so it grows inwards from a control on the
+   right. This one sits at the column's LEFT edge, where growing inwards means
+   growing off the screen: measured at 320px the label's left edge lands at
+   -12px. Anchored left, it grows into the column instead. */
+.mockup-actions .btn-icon[data-tip]::after {
+    right: auto;
+    left: 0;
+}
+
+.mockup-actions .btn svg {
+    flex: 0 0 auto;
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* The export panel's own contents. The shell -- .dl, .dl-toggle, .dl-panel --
+   is poster.html's exporter, shared and unchanged; only the two controls
+   inside it are specific to a canvas mockup. */
+
+.dl-caret {
+    width: 1rem;
+    height: 1rem;
+    opacity: 0.8;
+}
+
+.dl-format {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3xs);
+    margin-bottom: var(--space-sm);
+}
+
+.dl-format button {
+    min-height: 2.25rem;
+    padding: 0 var(--space-xs);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dl-format button.is-active {
+    background-color: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-card);
+}
+
+.dl-sizes {
+    display: grid;
+    gap: var(--space-3xs);
+}
+
+.dl-size {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-xs);
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 var(--space-xs);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dl-size:hover {
+    border-color: var(--color-border-strong);
+}
+
+.dl-size-go svg {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--color-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Mockup editor: the preview pane's two tabs (August 25, 2026)
+
+   One pane, two panels: the live canvas, and the saved mockups that used to
+   sit below it in the flow. Same visual language as .mobile-tabs, which does
+   the same job one level up (controls against preview), so the editor has one
+   tab pattern rather than two.
+   -------------------------------------------------------------------------- */
+
+.preview-tabs {
+    display: flex;
+    gap: var(--space-3xs);
+    margin-bottom: var(--space-sm);
+}
+
+.preview-tabs button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3xs);
+    min-height: 2.5rem;
+    padding: 0 var(--space-sm);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.preview-tabs button.is-active {
+    background-color: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-card);
+}
+
+.tab-count {
+    min-width: 1.25rem;
+    padding: 0 0.25rem;
+    background-color: var(--color-brand);
+    color: var(--color-brand-ink);
+    font-size: 0.6875rem;
+    line-height: 1.25rem;
+    text-align: center;
 }
 
 /* --------------------------------------------------------------------------
@@ -5153,21 +5989,11 @@ legend {
     text-align: right;
 }
 
+/* A panel behind a tab since August 25, 2026, not a section under the canvas:
+   no top border and no separating margin, because there is nothing above it in
+   the pane to be separated from. */
 .mockup-tray {
-    margin-top: 1.75rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--color-border);
-}
-
-.mockup-tray h2 {
-    font-size: 1.125rem;
-    margin-bottom: 0.25rem;
-}
-
-.tray-hint {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    margin-bottom: 1rem;
+    margin-top: 0;
 }
 
 .tray-empty {
@@ -5180,45 +6006,100 @@ legend {
 
 .tray-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-    gap: 1rem;
+    /* 7rem rather than 9rem: with the caption and buttons gone the tile is
+       only as tall as the thumbnail, so more of them fit across the pane. */
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    gap: var(--space-xs);
+    /* Each tile is as tall as its own render (August 25, 2026), since grid
+       items stretch to their row otherwise and the tile's border would end up
+       around empty space. Defensive rather than load-bearing today: a session
+       shows ONE product -- there is no in-editor template picker and switching
+       mockups reloads the page, which empties the tray -- so every thumbnail
+       in the grid currently has identical dimensions. Nothing in this grid
+       enforces that, which is why the rule stays. */
+    align-items: start;
 }
 
+/* The tile is the whole card: thumbnail, a remove control in its corner, and
+   nothing else. The caption and the two buttons that used to sit under every
+   thumbnail are gone (August 25, 2026) -- the label is the button's name and
+   its hover tip, and Download is the panel above, which can write any size or
+   format where the per-item button only ever wrote the thumbnail. */
 .tray-item {
+    position: relative;
     border: 1px solid var(--color-border);
     background-color: var(--color-bg);
 }
 
-.tray-thumb {
+/* The one that is loaded in the preview right now. Two signals rather than
+   one, because a border colour alone is easy to miss in a grid of squares and
+   invisible to anyone who cannot separate these two hues. */
+.tray-item.is-active {
+    border-color: var(--color-text);
+    box-shadow: inset 0 0 0 2px var(--color-text);
+}
+
+.tray-open {
+    display: block;
     width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: contain;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.tray-open:hover .tray-thumb,
+.tray-open:focus-visible .tray-thumb {
+    background-color: var(--color-bg);
+}
+
+/* The tile takes the RENDER's shape rather than forcing a square (August 25,
+   2026). A 1:1 box with object-fit: contain letterboxed every product whose
+   canvas is not square: measured on the model photograph, a 1024x1536 thumb
+   drew at 84x127 inside a 127x127 tile, leaving a third of the tile empty and
+   the mockup looking like a shrunken preview of itself.
+
+   No object-fit here now, deliberately: the box is the image's own aspect, so
+   there is nothing left to fit. The card background still shows through the
+   transparent surround a drawn product exports. */
+.tray-thumb {
+    display: block;
+    width: 100%;
+    height: auto;
     background-color: var(--color-card);
-    border-bottom: 1px solid var(--color-border);
 }
 
-.tray-item-body {
-    padding: 0.625rem;
+/* Always in the layout and the tab order rather than revealed on hover: a
+   control that appears only under a pointer cannot be reached by touch or by
+   keyboard, and removing a mockup is the only management action left. */
+.tray-remove {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    cursor: pointer;
 }
 
-.tray-item-label {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    /* Long labels stay inside the fixed-width thumbnail column */
-    overflow-wrap: break-word;
+.tray-remove:hover {
+    border-color: var(--color-warn);
+    color: var(--color-warn);
 }
 
-.tray-item-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.tray-item-actions button {
-    flex: 1;
-    min-height: 2.25rem;
-    padding: 0 0.5rem;
-    font-size: 0.75rem;
+.tray-remove svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
 }
 
 .form-error {
@@ -5275,6 +6156,197 @@ legend {
     content: "";
     position: absolute;
     inset: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Search page (search.html) -- August 24, 2026.
+
+   The site's only search RESULTS surface, and what the phone and tablet
+   search control opens now that it is a link rather than a dead reveal.
+
+   Almost nothing here styles a card: the templates are the real
+   <article class="template-card"> nodes imported out of index.html, so they
+   arrive with their own styling as long as they sit inside something
+   carrying .catalog-grid. That is why the horizontal browse rows below keep
+   that class and only override its `display`.
+   -------------------------------------------------------------------------- */
+
+/* Pinned under the site header, the way the reference mobile surface pins
+   its field: on a long results list the field never scrolls away.
+
+   --header-h is the header's REAL rendered height, published onto <html> by
+   initHeaderHeight() in js/app.js and kept current by a ResizeObserver. A
+   literal cannot work: .site-header is flex-wrap: wrap, so its height is a
+   function of how its contents wrap, not of the viewport width -- 85px from
+   600px up but 145px at 390px and more at 320px. The fallback is the desktop
+   literal, so if js/app.js fails to load this degrades to being slightly too
+   high on a phone rather than to being broken. Same mechanism, and the same
+   reasoning, as .feed-tabs on the homepage.
+
+   The header does NOT hide on scroll here: that behaviour is scoped to
+   `body:has(.home-layout)`, so there is no is-nav-hidden partner rule to
+   write for this bar. */
+.search-page-bar {
+    position: sticky;
+    top: var(--header-h, 5.25rem);
+    z-index: 15;
+    /* Bleeds to the padding edges of main, so the rule under it spans the
+       full column rather than floating inside the gutters. */
+    margin: 0 calc(var(--space-lg) * -1) var(--space-lg);
+    padding: var(--space-sm) var(--space-lg);
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.search-page-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    max-width: 44rem;
+    margin: 0 auto;
+}
+
+.search-page-field input {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0 2.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 1.5rem;
+    background-color: var(--color-card);
+    font-family: var(--font-sans);
+    /* 16px minimum: anything smaller triggers mobile auto-zoom on focus. */
+    font-size: 1rem;
+    color: var(--color-text);
+    transition: border-color var(--motion-fast) var(--ease);
+}
+
+.search-page-field input:focus {
+    outline: 2px solid var(--color-brand);
+    outline-offset: -1px;
+    background-color: var(--color-bg);
+}
+
+.search-page-field > svg {
+    position: absolute;
+    left: 1rem;
+    width: 1.0625rem;
+    height: 1.0625rem;
+    fill: none;
+    stroke: var(--color-muted);
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+/* Revealed by js/search.js only while the field has content, exactly as the
+   header field's own clear button behaves. */
+.search-page-field button {
+    position: absolute;
+    right: 0.5rem;
+    width: 2rem;
+    height: 2rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--color-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.search-page-field button:hover {
+    color: var(--color-text);
+    background-color: var(--color-border);
+}
+
+.search-page-field.has-value button {
+    display: inline-flex;
+}
+
+/* Results ------------------------------------------------------------- */
+
+.search-results > section + section {
+    margin-top: var(--space-2xl);
+}
+
+.search-results > section[hidden] {
+    display: none;
+}
+
+.section-count {
+    font-size: 0.875rem;
+    color: var(--color-muted);
+}
+
+/* The filtered-out state. `.catalog-grid > .is-hidden` already covers the
+   template grid; the guides grid needs its own, and a card in a browse row
+   is never filtered at all. */
+.guides-grid > .is-hidden {
+    display: none;
+}
+
+.search-fallback {
+    margin-top: var(--space-xl);
+    color: var(--color-muted);
+}
+
+.search-fallback strong {
+    display: block;
+    color: var(--color-text);
+}
+
+/* Browse rows ----------------------------------------------------------
+
+   One row per category, scrolled sideways rather than wrapped: the point of
+   the browse state is to show that there is more in each category than fits,
+   which a wrapped grid of everything cannot say.
+
+   .browse-scroll is declared AFTER .catalog-grid deliberately. The two carry
+   the same (0,1,0) specificity, so source order is the whole contest, and
+   this has to win the `display` while leaving every `.catalog-grid .card-*`
+   descendant rule to keep applying to the cards inside it. */
+.browse-row + .browse-row {
+    margin-top: var(--space-2xl);
+}
+
+.browse-row .section-head {
+    margin-bottom: var(--space-md);
+}
+
+.browse-scroll {
+    display: flex;
+    gap: var(--space-md);
+    overflow-x: auto;
+    /* The scrollbar is suppressed the same way the category tabs and the ad
+       rails suppress theirs: the row is obviously scrollable from the card
+       clipped at its edge. */
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    /* Room for the hover lift, which would otherwise be clipped by the
+       scroll container. */
+    padding-bottom: var(--space-2xs);
+}
+
+.browse-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* Sized so a card is cut off at the right edge at every width, which is what
+   says "this row scrolls" without a control that says it. */
+.browse-scroll > * {
+    flex: 0 0 clamp(9rem, 42vw, 13rem);
+}
+
+.browse-scroll > .guide-card {
+    flex-basis: clamp(15rem, 70vw, 20rem);
+}
+
+@media (min-width: 48rem) {
+    .browse-scroll > * {
+        flex-basis: 13rem;
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -6021,6 +7093,46 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
+   Catalog thumbnail workspace (admin.html)
+
+   The preview is the homepage's own markup -- .catalog-grid > .template-card
+   > .card-preview.photo -- so the 4:5 window, the hover crossfade and the
+   card chrome are inherited rather than reimplemented. Only two things are
+   admin-specific: the grid is capped to one card's width, and the hover image
+   needs a real hide.
+   -------------------------------------------------------------------------- */
+
+/* One card, at roughly the width the homepage gives a card on a laptop. The
+   column override has to sit here rather than beside .catalog-grid: media
+   queries carry no specificity, so it beats the grid's 2/3/4-column ladder
+   only by being declared after it. */
+.admin-thumb-preview {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 15rem;
+    margin-top: 0.5rem;
+}
+
+/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`.
+   Both of these carry one: .catalog-grid sets display: grid on the wrapper,
+   and .card-preview.photo .card-thumb sets display: block on the images.
+   Without the second rule the hover slot would paint over the default image
+   whenever an item has no hover thumbnail -- which is the optional case, so
+   it is the common one. */
+.admin-thumb-preview[hidden] {
+    display: none;
+}
+
+.admin-thumb-preview .card-thumb[hidden] {
+    display: none;
+}
+
+.admin-thumb-paths {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    word-break: break-all;
+}
+
+/* --------------------------------------------------------------------------
    Responsive rules (layouts verified down to a 320px viewport)
    -------------------------------------------------------------------------- */
 
@@ -6135,6 +7247,54 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
+   No text field may be smaller than 16px on a phone.
+
+   iOS Safari zooms the whole page in when a text-entry field whose computed
+   font-size is under 16px receives focus, and it does NOT zoom back out on
+   blur. The visitor is left at roughly 1.2x with the layout overflowing
+   sideways and has to pinch out by hand -- once per field, on a page whose
+   whole purpose is filling fields in. It is a device behaviour, not a style
+   choice, and 16px is the only threshold that switches it off.
+
+   Measured at 390px before this rule existed: 27 fields across the four
+   editors were under it -- .doc-name at 15px on all four, the poster text
+   toolbar and its Advanced and Download panels at 13px, and the mockup colour
+   and scale inputs at 12-13px. Twelve of them are on screen without opening
+   anything.
+
+   Scoped to the phone breakpoint deliberately. These are dense desktop
+   toolbars whose proportions are deliberate at full width, and the zoom
+   behaviour they are being protected from only exists on touch devices, so
+   there is nothing to gain by widening the controls on a desktop too.
+
+   The [type="..."] variants are listed alongside the bare element selectors
+   because several of the rules being overridden are themselves attribute
+   selectors, which outrank a bare tag selector regardless of source order.
+   Colour and range inputs are deliberately absent: neither is a text-entry
+   field and neither triggers the zoom.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 48rem) {
+    .doc-name,
+    .dl-panel select,
+    .dl-panel input,
+    .dl-panel input[type="password"],
+    .text-toolbar select,
+    .text-toolbar input,
+    .text-toolbar input[type="number"],
+    .tt-adv-panel input,
+    .tt-adv-panel input[type="number"],
+    .tt-adv-panel select,
+    .caption-row textarea,
+    .color-input-cell input,
+    .color-input-cell input[type="number"],
+    .size-number input,
+    .size-number input[type="number"] {
+        font-size: 1rem;
+    }
+}
+
+/* --------------------------------------------------------------------------
    Print: strip the site shell so the document sheet prints on its own page.
    Used by the Print action in the business document builder; the PDF export
    remains the higher-fidelity path.
@@ -6174,7 +7334,6 @@ legend {
     .site-footer,
     .mobile-tabs,
     .editor-pane,
-    .doc-actions,
     .upload-hint,
     .loading-status,
     .skip-link,
@@ -6182,6 +7341,12 @@ legend {
     .editor-head,
     .editor-intro,
     .preview-actions,
+    /* Both added August 25, 2026 with the workspace rebuild. The action row
+       moved OUT of the control pane, so `.editor-pane` above no longer hides
+       it, and the preview pane's new tab row is chrome that would otherwise
+       print above the render -- .preview-pane itself DOES print. */
+    .mockup-actions,
+    .preview-tabs,
     .related-tools,
     .save-state,
     .editor-rail,

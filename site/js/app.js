@@ -90,6 +90,37 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Export file names (August 24, 2026).
+
+       Every editor names its download from something the visitor typed, and
+       every one of them carried its own copy of this regex chain. Three of
+       the four then ignored the name field entirely: typing a document name
+       in the bar changed nothing, because the resume exported from the
+       person's name field, the business document from its type and
+       recipient, and the mockup from a hard-coded literal. Only the poster
+       ever used what was typed. One implementation, used by all four.
+
+       desanitize FIRST. The name arrives from state that has been through
+       sanitize(), so an apostrophe is "&#39;" by the time it gets here -- and
+       stripping punctuation from that leaves the digits behind. "Ada's CV"
+       would have exported as "ada39s-cv.pdf".
+       ---------------------------------------------------------------------- */
+    const MAX_FILE_SLUG = 60;
+
+    function fileSlug(value) {
+        return desanitize(String(value || ""))
+            .replace(/[^A-Za-z0-9 _-]/g, "")
+            .trim()
+            .replace(/\s+/g, "-")
+            .replace(/-+/g, "-")
+            .toLowerCase()
+            .slice(0, MAX_FILE_SLUG)
+            /* Trimmed again after the cap, or a name cut mid-word at the
+               limit can end on a hyphen. */
+            .replace(/^-+|-+$/g, "");
+    }
+
+    /* ----------------------------------------------------------------------
        Safe localStorage wrappers. Private browsing modes and full quotas
        throw synchronously; the app must keep working without persistence.
        ---------------------------------------------------------------------- */
@@ -429,6 +460,51 @@ const TB = (() => {
        ---------------------------------------------------------------------- */
     const GUIDES_ON_HOME = 3;
 
+    /* One guide card. Extracted from initGuidesStrip when search.html needed
+       the same card: the search page lists guides beside templates, and a
+       second renderer would be a second place for the URL shape, the date
+       format and the description field to be got wrong. Returns null for a
+       post with no slug, which has nowhere to link to. */
+    function buildGuideCard(post) {
+        const slug = String((post && post.slug) || "");
+        if (!slug) {
+            return null;
+        }
+
+        const card = document.createElement("article");
+        card.className = "guide-card";
+
+        if (post.date) {
+            const meta = document.createElement("p");
+            meta.className = "card-category";
+            meta.textContent = formatPostDate(post.date);
+            card.appendChild(meta);
+        }
+
+        const heading = document.createElement("h3");
+        heading.className = "card-title";
+
+        const link = document.createElement("a");
+        /* Static post page, not the post.html fallback route: see the
+           postUrlFor comment in js/blog.js for why. */
+        link.href = "blog/" + encodeURIComponent(slug) + ".html";
+        link.textContent = desanitize(String(post.title || "Untitled"));
+        heading.appendChild(link);
+        card.appendChild(heading);
+
+        /* Field is `description` (see js/blog-data.js and the blog card
+           renderer in js/blog.js); there is no `standfirst` on a post,
+           so reading one silently dropped every excerpt. */
+        if (post.description) {
+            const desc = document.createElement("p");
+            desc.className = "card-desc";
+            desc.textContent = desanitize(String(post.description));
+            card.appendChild(desc);
+        }
+
+        return card;
+    }
+
     function initGuidesStrip() {
         const section = document.querySelector("[data-guides-section]");
         const grid = document.querySelector("[data-guides-grid]");
@@ -447,43 +523,10 @@ const TB = (() => {
             .slice(0, GUIDES_ON_HOME);
 
         newest.forEach((post) => {
-            const slug = String(post.slug || "");
-            if (!slug) {
-                return;
+            const card = buildGuideCard(post);
+            if (card) {
+                grid.appendChild(card);
             }
-
-            const card = document.createElement("article");
-            card.className = "guide-card";
-
-            if (post.date) {
-                const meta = document.createElement("p");
-                meta.className = "card-category";
-                meta.textContent = formatPostDate(post.date);
-                card.appendChild(meta);
-            }
-
-            const heading = document.createElement("h3");
-            heading.className = "card-title";
-
-            const link = document.createElement("a");
-            /* Static post page, not the post.html fallback route: see the
-               postUrlFor comment in js/blog.js for why. */
-            link.href = "blog/" + encodeURIComponent(slug) + ".html";
-            link.textContent = desanitize(String(post.title || "Untitled"));
-            heading.appendChild(link);
-            card.appendChild(heading);
-
-            /* Field is `description` (see js/blog-data.js and the blog card
-               renderer in js/blog.js); there is no `standfirst` on a post,
-               so reading one silently dropped every excerpt. */
-            if (post.description) {
-                const desc = document.createElement("p");
-                desc.className = "card-desc";
-                desc.textContent = desanitize(String(post.description));
-                card.appendChild(desc);
-            }
-
-            grid.appendChild(card);
         });
 
         if (grid.childElementCount) {
@@ -849,6 +892,168 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Publish the site header's real height as --header-h on <html>.
+
+       Nothing here knows about any element that consumes it, exactly as
+       initScrollDirection() knows nothing about who reacts to .is-nav-hidden:
+       this writes one custom property and CSS decides what to do with it.
+
+       It exists because .site-header's height is not a function of viewport
+       width. It is flex-wrap: wrap carrying a wordmark, a search box and five
+       nav controls, so its height depends on how those wrap: measured, 85px
+       from 600px up, 145px from 360px to 480px, and 201px at 320px. Every
+       sticky offset calibrated to sit "just under the header" was therefore a
+       literal that was correct on desktop and wrong on every phone -- the
+       category tabs' 76px put the entire tab row inside the header's box,
+       where the header painted straight over it.
+
+       ResizeObserver rather than a resize listener: the height changes when
+       the header's CONTENTS rewrap, which a viewport resize is only one cause
+       of (web fonts landing and the search box appearing at 62rem are two
+       others, and neither fires a resize event).
+       ---------------------------------------------------------------------- */
+    function initHeaderHeight() {
+        const header = document.querySelector(".site-header");
+        if (!header) {
+            return;
+        }
+
+        function publish() {
+            /* Rounded up: a fractional height would leave a sub-pixel seam of
+               page showing between the header's bottom edge and whatever sits
+               under it, which reads as a flicker while scrolling. */
+            const h = Math.ceil(header.getBoundingClientRect().height);
+            if (h > 0) {
+                document.documentElement.style.setProperty("--header-h", h + "px");
+            }
+        }
+
+        publish();
+
+        if (typeof ResizeObserver === "function") {
+            new ResizeObserver(publish).observe(header);
+        } else {
+            /* No ResizeObserver: the CSS fallbacks still hold, and a resize
+               listener recovers the common case of an orientation change. */
+            window.addEventListener("resize", publish, { passive: true });
+        }
+    }
+
+    /* ----------------------------------------------------------------------
+       Header hamburger (August 18, 2026; the search half was removed on
+       August 24, 2026).
+
+       Five controls in the bar wrapped onto a second row on a phone, making
+       the sticky header tall enough to cost a real share of a small
+       viewport. Below 74.9375rem -- every width under the ad rail's floor,
+       so phones and tablets alike -- the primary links collapse behind a
+       hamburger sitting beside the wordmark.
+
+       This function used to own a second toggle as well: below 62rem, where
+       the search field is display:none, a button set a `search-open` class
+       that was supposed to reveal the field as its own row. It only ever
+       worked at 360px and below, because the one rule that undid the
+       display:none was scoped to a 22.5rem media query -- so from 361px to
+       992px the button toggled a class that changed nothing at all. The
+       button is a link to search.html now, which is a page rather than a
+       reveal, and every trace of the class it toggled is gone from here and
+       from the stylesheet. See
+       docs/error-fixes/HEADER_SEARCH_BUTTON_DEAD_ON_PHONES_AND_TABLETS.md.
+
+       Everything about the collapsed/expanded LAYOUT is CSS. This only owns
+       the open/closed state and the accessibility plumbing, so a page whose
+       header does not carry the button (the editor pages, whose .site-nav is
+       empty) needs no special case: the query simply misses.
+       ---------------------------------------------------------------------- */
+    function initHeaderToggles() {
+        const header = document.querySelector(".site-header");
+        if (!header) {
+            return;
+        }
+        const navToggle = header.querySelector("[data-nav-toggle]");
+        const nav = document.getElementById("site-nav");
+
+        /* Mirrors the stylesheet's collapse range exactly, so the two cannot
+           disagree about when the bar is collapsed. 74.9375rem is the width
+           just below the ad rail's 75rem floor -- the same seam the site
+           anchor stops at, and this project's own boundary for "not a
+           desktop". */
+        const collapsed = window.matchMedia("(max-width: 74.9375rem)");
+
+        function setNav(open) {
+            header.classList.toggle("nav-open", open);
+            if (navToggle) {
+                navToggle.setAttribute("aria-expanded", String(open));
+                navToggle.setAttribute(
+                    "aria-label",
+                    open ? "Close navigation menu" : "Open navigation menu"
+                );
+            }
+            /* Collapsing the bar hides .nav-more outright, so a mega-menu
+               left open would keep aria-expanded="true" on a control that is
+               no longer rendered, and would reappear already expanded the
+               next time the hamburger is opened. */
+            if (!open) {
+                const morePanel = header.querySelector("[data-nav-more-panel]");
+                const moreToggle = header.querySelector("[data-nav-more-toggle]");
+                if (morePanel && !morePanel.hidden) {
+                    morePanel.hidden = true;
+                    if (moreToggle) {
+                        moreToggle.setAttribute("aria-expanded", "false");
+                    }
+                }
+            }
+        }
+
+        if (navToggle && nav) {
+            navToggle.addEventListener("click", () => {
+                setNav(!header.classList.contains("nav-open"));
+            });
+
+            /* A tap on any link navigates, but an in-page hash link does
+                 not, and leaving the panel open over the destination is
+                 disorienting. Closing on any link covers both. */
+            nav.addEventListener("click", (event) => {
+                const link = event.target instanceof Element
+                    ? event.target.closest("a")
+                    : null;
+                if (link) {
+                    setNav(false);
+                }
+            });
+        }
+
+        /* Escape closes the menu and returns focus to its trigger, or a
+           keyboard user who opened it has no way back out. */
+        header.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") {
+                return;
+            }
+            if (header.classList.contains("nav-open")) {
+                setNav(false);
+                if (navToggle) {
+                    navToggle.focus();
+                }
+            }
+        });
+
+        /* Widening past the breakpoint restores the inline bar, and a state
+           class left behind would keep .site-nav a full-width column on a
+           desktop. Cleared on the transition rather than on every resize. */
+        function onBreakpoint(event) {
+            if (!event.matches) {
+                setNav(false);
+            }
+        }
+        if (typeof collapsed.addEventListener === "function") {
+            collapsed.addEventListener("change", onBreakpoint);
+        } else if (typeof collapsed.addListener === "function") {
+            /* Safari before 14. */
+            collapsed.addListener(onBreakpoint);
+        }
+    }
+
+    /* ----------------------------------------------------------------------
        Header mega-menu.
 
        Originally homepage-only, because the homepage was the one page with
@@ -1115,8 +1320,12 @@ const TB = (() => {
             initGuidesStrip,
             initSaveState,
             initFormNav,
+            initHeaderToggles,
             initNavMore,
             initSearch,
+            /* Before initScrollDirection: the hide transform reads --header-h,
+               so it should be published before anything can hide the header. */
+            initHeaderHeight,
             initScrollDirection,
             initThemeToggle
         ].forEach((init) => {
@@ -1132,10 +1341,20 @@ const TB = (() => {
     return {
         sanitize,
         desanitize,
+        /* Shared by all four editors so a downloaded file is named the same
+           way wherever it came from. */
+        fileSlug,
         storageSet,
         storageGet,
         takePreset,
         launchTemplate,
+        /* search.html inserts real catalog cards long after initCatalog has
+           run its one binding pass, so it has to bind its own subtree or
+           every card it shows would bypass loading.html. */
+        bindLaunchControls,
+        /* Same card, two pages: the homepage guides strip and the search
+           page's guide results. */
+        buildGuideCard,
         markSaved,
         /* docs.html changes which fieldsets are visible with the document
            type, so it rebuilds the nav after a type change */

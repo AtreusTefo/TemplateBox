@@ -101,10 +101,19 @@
 <body>
 
     <header class="site-header editor-bar">
-        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+        <!-- Left edge: the site mark on its own, matching docs.html (August
+             27, 2026). It replaces the four controls this bar used to carry
+             here -- the house icon, the mark-plus-wordmark, the hamburger and
+             the search link -- so the two document editors present one
+             identity in the same place. Ungated for the same reason it is on
+             docs.html: .editor-brand is gated at 75rem because mockup.html
+             hands the narrow band back to .editor-home, and with no
+             .editor-home left on this page a gate would leave a band with no
+             identity at all. -->
+        <a class="editor-mark" href="index.html" title="TemplateBox home" aria-label="TemplateBox home, all templates"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg></a>
 
         <label class="sr-only" for="doc-name">Resume name</label>
-        <input type="text" class="doc-name" id="doc-name" maxlength="80" value="Untitled resume" aria-label="Resume name">
+        <input type="text" class="doc-name" id="doc-name" title="Names the file you download" maxlength="80" value="Untitled resume" aria-label="Resume name">
 
         <div class="editor-actions">
             <span class="save-cloud" id="save-state" role="status" aria-live="polite" title="Saves automatically">
@@ -112,7 +121,12 @@
                 <span class="sr-only" data-save-label>Saves automatically</span>
             </span>
 
-            <button type="button" class="btn dl-toggle" id="download-pdf"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>Download PDF</button>
+            <!-- Deliberately NOT wrapped in .bar-label, unlike docs.html. That
+                 class exists because docs carries three labelled buttons that
+                 overflow a 320px bar and must drop to icons; this bar has one,
+                 so borrowing the rule would hide "Download PDF" on a phone to
+                 solve an overflow that cannot happen here. -->
+            <button type="button" class="btn dl-toggle" id="download-pdf" title="Download PDF"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg><span>Download PDF</span></button>
         </div>
 
         <nav class="site-nav" aria-label="Primary">
@@ -217,11 +231,15 @@
             <section class="preview-pane" aria-label="Live resume preview">
                 <h2>Live Preview</h2>
                 <div class="resume-sheet" id="resume-sheet"></div>
-                <!-- Download moved into the editor-bar toolbar above, to match
-                     the other editors. -->
-                <div class="preview-actions">
-                    <p class="upload-hint">Exports locally as selectable vector text via jsPDF. No file ever leaves your device.</p>
-                </div>
+                <!-- No .preview-actions bar here any more (August 27, 2026).
+                     Download moved into the editor-bar toolbar above, and the
+                     export note that was the bar's last remaining content has
+                     been dropped, so the container went with it: the class
+                     carries a border-top, padding and a background, and an
+                     empty one paints a stray rule across the foot of the pane.
+                     Same resolution mockup.html reached when its actions moved
+                     to the toolbar. With no bar, the ad anchor has nothing to
+                     lift on this page. -->
             </section>
 
         </div>

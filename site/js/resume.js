@@ -416,11 +416,21 @@
             return;
         }
         const state = collectState();
-        const safeName = TB.desanitize(state.fields.name)
-            .trim()
-            .replace(/[^A-Za-z0-9 _-]/g, "")
-            .replace(/\s+/g, "-")
-            .toLowerCase() || "resume";
+
+        /* The name in the bar is what names the file (August 24, 2026).
+           Before this it named nothing at all: the export was always built
+           from the person's name field, so renaming the resume in the header
+           had no observable effect anywhere -- typed, saved, and silently
+           unused.
+
+           It only wins when the visitor actually changed it. Left at the
+           default, the person's name is the better filename and stays the
+           fallback, so nothing regresses for anyone who never touches the
+           field. */
+        const named = TB.desanitize(state.docName).trim() === DEFAULT_DOC_NAME
+            ? ""
+            : TB.fileSlug(state.docName);
+        const safeName = named || TB.fileSlug(state.fields.name) || "resume";
 
         buildPdf(state).save(safeName + "-templatebox.pdf");
     });
