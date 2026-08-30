@@ -163,8 +163,40 @@ window.TB_RESUME_TEMPLATES = [
     },
 
     {
+        /* SHIPPED August 30, 2026. Built and verified on August 2 but held
+           back from the picker because it reads address, city, postcode and
+           phoneAlt, none of which the editor form collected -- offering it
+           would have presented a template that silently dropped half its
+           sidebar. The form collects all four now, so the only thing that was
+           keeping it internal is gone.
+
+           Named for the card it serves rather than for its rail, so the picker
+           button and the catalog card say the same thing. It is the site's
+           only TWO-COLUMN resume, which is a real ATS trade: parsers handle a
+           single column more reliably. It ships as design-led, with the other
+           three carrying the unqualified ATS claim -- there is no photograph
+           and extraction order is deterministic, which are the two mitigations
+           that matter. See docs/implementation/RESUME_TEMPLATE_ENGINE_IMPLEMENTATION.md,
+           "ATS Position".
+
+           It still reads `education[].field`, which the form does NOT collect.
+           That is deliberate and safe rather than an oversight: buildRuns drops
+           an empty field along with the separator that would dangle after it,
+           so the head reads "Degree, Dates" instead of "Degree, , Dates". A
+           visitor who wants the field of study types it into the degree, which
+           is what the sample content has always done. */
         id: "grey-rail",
-        title: "Grey Rail Resume",
+        title: "Modern Professional CV",
+        catalog: true,
+
+        /* The rail and the display ink are ONE colour and both resolve to
+           accent, so the swatch row is live here as it is on Ruled Serif
+           rather than being a control that changes nothing. Every swatch on
+           the row is dark enough to carry the rail's white sidebar text --
+           that is the constraint any new swatch has to meet, not a
+           coincidence. defaultAccent is the artwork's own grey, so the
+           template still opens exactly as it was verified. */
+        defaultAccent: "#4A4A4A",
 
         /* A4 in points. */
         page: { width: 595, height: 842 },
@@ -189,9 +221,9 @@ window.TB_RESUME_TEMPLATES = [
         },
 
         palette: {
-            railBg:     "#4A4A4A",
+            railBg:     "accent",    /* the rail block, and the icon glyphs */
             sidebarInk: "#FFFFFF",
-            display:    "#4A4A4A",   /* name, section headings, rules */
+            display:    "accent",    /* name, section headings, rules */
             ink:        "#000000",   /* entry heads and company lines */
             body:       "#46464D"    /* prose and bullets */
         },

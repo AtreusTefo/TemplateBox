@@ -170,7 +170,16 @@
 
                 <h2>Accent Color</h2>
                 <div class="swatch-row" id="swatch-row" aria-label="Accent color choices">
+                    <!-- INVARIANT: every template's `defaultAccent` must be a
+                         swatch on this row. applyAccent() marks a swatch
+                         active by matching its hex exactly, so a default that
+                         is not here opens the editor with the row showing
+                         nothing selected and the colour unreachable again once
+                         changed. Two of the four templates rely on this: the
+                         green below is Ruled Serif's, the graphite is the
+                         two-column template's. -->
                     <button type="button" class="swatch is-active" data-accent="#1A1A1A" style="background-color:#1A1A1A" aria-label="Charcoal accent"></button>
+                    <button type="button" class="swatch" data-accent="#4A4A4A" style="background-color:#4A4A4A" aria-label="Graphite accent"></button>
                     <button type="button" class="swatch" data-accent="#1F4E79" style="background-color:#1F4E79" aria-label="Navy accent"></button>
                     <button type="button" class="swatch" data-accent="#2E5E4E" style="background-color:#2E5E4E" aria-label="Forest accent"></button>
                     <!-- The Ruled Serif template's own green. It is here so
@@ -215,6 +224,29 @@
                         <div class="field">
                             <label for="f-location">Location</label>
                             <input type="text" id="f-location" data-bind="location" maxlength="60">
+                        </div>
+                        <!-- The four the two-column template needs for its
+                             sidebar contact block. It sets the address across
+                             three lines and offers a second phone, where the
+                             single-column templates run one joined line off
+                             `location` and `phone`. Hidden for those, and
+                             still collected, like every other conditional
+                             field here. -->
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-address">Street Address</label>
+                            <input type="text" id="f-address" data-bind="address" maxlength="80">
+                        </div>
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-city">City</label>
+                            <input type="text" id="f-city" data-bind="city" maxlength="60">
+                        </div>
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-postcode">Postcode</label>
+                            <input type="text" id="f-postcode" data-bind="postcode" maxlength="20">
+                        </div>
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-phone-alt">Second Phone</label>
+                            <input type="tel" id="f-phone-alt" data-bind="phoneAlt" maxlength="30">
                         </div>
                     </fieldset>
 

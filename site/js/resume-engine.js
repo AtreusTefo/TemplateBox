@@ -67,12 +67,23 @@ window.TBResume = (() => {
     /* Colour roles never reach a painter as a role: everything in the display
        list is already a hex string. `accent` is per-document runtime state. */
     function colorOf(role, template, state) {
-        if (role === "accent") {
+        const p = template.palette || {};
+        /* ONE level of indirection: a palette entry may itself name `accent`
+           rather than a hex. That is how a template makes a named role follow
+           the document's colour -- grey-rail's rail and display ink are one
+           colour and both track the swatch row -- without every block in the
+           descriptor having to say `accent` and lose the role's name.
+
+           Resolved before the accent test rather than after, because the
+           lookup used to return the palette's value verbatim: an entry of
+           "accent" reached the painters as the literal string, which is not a
+           colour any medium understands. */
+        const resolved = (p[role] === undefined) ? role : p[role];
+        if (resolved === "accent") {
             const a = state && state.accent;
             return /^#[0-9A-Fa-f]{6}$/.test(a) ? a : "#1A1A1A";
         }
-        const p = template.palette || {};
-        return p[role] || role || "#000000";
+        return resolved || "#000000";
     }
 
     /* ----------------------------------------------------------------------

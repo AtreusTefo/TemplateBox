@@ -62,7 +62,11 @@
             summary: "",
             skills: "",
             languages: "",
-            accomplishments: ""
+            accomplishments: "",
+            address: "",
+            city: "",
+            postcode: "",
+            phoneAlt: ""
         },
         experience: [{ role: "", company: "", place: "", dates: "", description: "" }],
         education: [{ degree: "", school: "", place: "", dates: "" }]
@@ -87,7 +91,13 @@
                "Friendly, positive attitude" would become two skills. */
             skills: "Supply chain strategy, Vendor negotiation, Lean process design, Demand forecasting, Team leadership, SAP, Power BI",
             languages: "English: Native\nSpanish: Upper intermediate (B2)\nFrench: Intermediate (B1)",
-            accomplishments: "Named Operations Leader of the Year by the Midwest Logistics Council.\nSpeaker on depot automation at the 2024 Supply Chain Summit."
+            accomplishments: "Named Operations Leader of the Year by the Midwest Logistics Council.\nSpeaker on depot automation at the 2024 Supply Chain Summit.",
+            /* Only the two-column template draws these; the others compose
+               their contact line from `location` and `phone` above. */
+            address: "1400 North Lake Shore Drive",
+            city: "Chicago, IL",
+            postcode: "60610",
+            phoneAlt: "+1 (555) 220-7741"
         },
         /* Descriptions are one achievement per LINE. Ruled Serif splits them
            into bullets on the newline; Classic reflows them as prose, which

@@ -1782,6 +1782,7 @@ body.is-nav-hidden .site-header:focus-within {
 .mock-doc.accent-forest { --mk-accent: #2E5E4E; }
 .mock-doc.accent-brand { --mk-accent: #8A5A2B; }
 .mock-doc.accent-green { --mk-accent: #327B3C; }
+.mock-doc.accent-graphite { --mk-accent: #4A4A4A; }
 
 /* Resume miniature */
 
@@ -1865,6 +1866,61 @@ body.is-nav-hidden .site-header:focus-within {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0 0.25rem;
+}
+
+/* Modern Professional CV miniature: the site's only TWO-COLUMN resume, whose
+   whole signature is a full-bleed rail down the right edge carrying the
+   contact details and skills in white. The container drops its own padding so
+   the rail can reach all four edges -- a rail inset from them would read as a
+   panel rather than as the edge of the sheet -- and each column carries its
+   own padding instead. */
+
+.mock-doc.railed {
+    flex-direction: row;
+    padding: 0;
+    gap: 0;
+}
+
+.mock-doc.railed .mk-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1875rem;
+    padding: 0.625rem 0.5rem;
+}
+
+/* 37.65% is the descriptor's own sidebar fraction (224 of 595), so the card
+   depicts the proportion the export actually produces. */
+.mock-doc.railed .mk-rail {
+    flex: 0 0 37.65%;
+    background-color: var(--mk-accent);
+    color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.625rem 0.375rem;
+}
+
+.mock-doc.railed .mk-rail-h {
+    font-size: 0.3125rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+    padding-bottom: 0.0625rem;
+    margin-top: 0.1875rem;
+}
+
+.mock-doc.railed .mk-rail-line {
+    font-size: 0.28125rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+/* The name stacks onto two lines in this design, one word per line. */
+.mock-doc.railed .mk-name {
+    line-height: 1.05;
 }
 
 /* Shared: document title, ruled label/value rows, spacer */
