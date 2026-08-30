@@ -141,6 +141,14 @@
             educationList.textContent = "";
             addEntryRow(experienceList, tplExperience);
             addEntryRow(educationList, tplEducation);
+            /* Languages are rows too, so clearing [data-bind] controls does
+               not reach them -- they have to be emptied by hand like the two
+               lists above, or the sample's three languages survive a blank
+               start. */
+            if (languageList && tplLanguage) {
+                languageList.textContent = "";
+                addEntryRow(languageList, tplLanguage);
+            }
             /* Starting blank clears the CONTENT, not the design. The template
                stays selected and its own accent comes back, so "Start blank"
                on a template chosen from a catalog card does not silently
@@ -167,8 +175,10 @@
 
     const experienceList = document.getElementById("experience-list");
     const educationList = document.getElementById("education-list");
+    const languageList = document.getElementById("language-list");
     const tplExperience = document.getElementById("tpl-experience");
     const tplEducation = document.getElementById("tpl-education");
+    const tplLanguage = document.getElementById("tpl-language");
     const swatchRow = document.getElementById("swatch-row");
     const docNameInput = document.getElementById("doc-name");
     const templateRow = document.getElementById("template-row");
@@ -310,6 +320,89 @@
         });
     }
 
+    /* ----------------------------------------------------------------------
+       Languages.
+
+       Stored as it always was -- one "Name: Level" line per language in
+       fields.languages -- but no longer TYPED that way. The field used to be a
+       textarea with a hint explaining that a CEFR band or a percentage drew
+       the proficiency bar and other wording did not, which put the rule in a
+       sentence and left the visitor guessing. It is a row per language now:
+       a name, a level chosen from the levels that actually draw a bar, and an
+       "Other" choice that reveals a free-text box for anything else.
+
+       Keeping the STORED format unchanged is deliberate. The engine's `meters`
+       body and the template's `levels` map both read that string and are
+       already verified against it, and every document saved before this change
+       still loads -- an unrecognised level simply arrives as "Other" with its
+       text intact.
+       ---------------------------------------------------------------------- */
+
+    const LEVEL_CUSTOM = "__custom__";
+
+    /* The known levels, read out of the row template's own <option> values
+       rather than repeated here. Adding a level to resume.html is therefore
+       the whole change; this list follows. */
+    function knownLevels() {
+        if (!tplLanguage) {
+            return [];
+        }
+        return Array.from(tplLanguage.content.querySelectorAll("option"))
+            .map((option) => option.value)
+            .filter((value) => value !== LEVEL_CUSTOM);
+    }
+
+    /* Rows to the one string the template reads. A row with no language name
+       is dropped whatever its level says: a level belonging to no language is
+       not a line anyone meant to write. */
+    function collectLanguages() {
+        if (!languageList) {
+            return "";
+        }
+        return Array.from(languageList.querySelectorAll("[data-entry]")).map((row) => {
+            const field = (name) => row.querySelector('[data-entry-field="' + name + '"]');
+            const name = (field("name") || {}).value || "";
+            const select = field("level");
+            const custom = field("custom");
+            const picked = select ? select.value : "";
+            const level = picked === LEVEL_CUSTOM
+                ? ((custom || {}).value || "").trim()
+                : picked;
+            if (!name.trim()) {
+                return "";
+            }
+            return level ? name.trim() + ": " + level : name.trim();
+        }).filter(Boolean).join("\n");
+    }
+
+    /* The string back to rows, for hydrating a saved document. A level the
+       option list does not carry becomes the "Other" selection with its own
+       wording preserved, so nothing a visitor typed before this change is
+       lost or silently rewritten. */
+    function parseLanguages(value) {
+        const known = knownLevels();
+        return TB.desanitize(value || "").split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => {
+                const cut = line.indexOf(":");
+                const name = (cut < 0 ? line : line.slice(0, cut)).trim();
+                const level = cut < 0 ? "" : line.slice(cut + 1).trim();
+                return known.indexOf(level) !== -1
+                    ? { name: name, level: level, custom: "" }
+                    : { name: name, level: LEVEL_CUSTOM, custom: level };
+            });
+    }
+
+    /* The free-text box exists only while "Other" is the choice. */
+    function syncLanguageRow(row) {
+        const select = row.querySelector('[data-entry-field="level"]');
+        const box = row.querySelector("[data-language-custom]");
+        if (select && box) {
+            box.hidden = select.value !== LEVEL_CUSTOM;
+        }
+    }
+
     function collectState() {
         const state = {
             accent: currentAccent,
@@ -324,6 +417,9 @@
         form.querySelectorAll("[data-bind]").forEach((input) => {
             state.fields[input.getAttribute("data-bind")] = TB.sanitize(input.value);
         });
+        /* After the [data-bind] sweep: languages is composed from its rows,
+           not bound to a single control. */
+        state.fields.languages = TB.sanitize(collectLanguages());
         return state;
     }
 
@@ -353,6 +449,9 @@
         /* A cloned row carries the conditional fields of every template, so
            it has to be reconciled with the current one before it is shown. */
         syncTemplateFields(row);
+        /* A language row also has to agree with its own level choice, or a
+           hydrated "Other" row appears with its wording box still hidden. */
+        syncLanguageRow(row);
         listEl.appendChild(row);
     }
 
@@ -585,9 +684,32 @@
         experience.forEach((entry) => addEntryRow(experienceList, tplExperience, entry));
         education.forEach((entry) => addEntryRow(educationList, tplEducation, entry));
 
+        /* Languages hydrate from the saved string rather than from a bound
+           control, and an empty one still opens with a blank row so the
+           section is visibly there to fill in, matching the two lists above. */
+        if (languageList && tplLanguage) {
+            const languages = parseLanguages(state.fields.languages);
+            if (languages.length) {
+                languages.forEach((row) => addEntryRow(languageList, tplLanguage, row));
+            } else {
+                addEntryRow(languageList, tplLanguage);
+            }
+        }
+
         /* Real-time binding: one delegated listener covers every current and
-           future input inside the form, including cloned entry rows. */
-        form.addEventListener("input", persistAndRender);
+           future input inside the form, including cloned entry rows.
+
+           A <select> fires `input` as well as `change`, so one listener still
+           covers the level picker -- but the row it belongs to has to be
+           reconciled BEFORE the state is collected, or choosing "Other"
+           collects the level from a box that is still hidden. */
+        form.addEventListener("input", (event) => {
+            const row = event.target.closest("[data-entry]");
+            if (row) {
+                syncLanguageRow(row);
+            }
+            persistAndRender();
+        });
 
         if (docNameInput) {
             docNameInput.addEventListener("input", persistAndRender);
@@ -601,6 +723,13 @@
             addEntryRow(educationList, tplEducation);
             persistAndRender();
         });
+        const addLanguage = document.getElementById("add-language");
+        if (addLanguage) {
+            addLanguage.addEventListener("click", () => {
+                addEntryRow(languageList, tplLanguage);
+                persistAndRender();
+            });
+        }
 
         if (!hasSaved) {
             showSampleNotice();

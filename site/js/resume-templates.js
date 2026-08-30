@@ -437,8 +437,27 @@ window.TB_RESUME_TEMPLATES = [
                one, and a bare percentage always works. */
             { column: "main", kind: "section", label: "Languages",
               body: { kind: "meters", field: "languages", split: "\n",
+                      /* EVERY fixed option in the Languages fieldset of
+                         resume.html must be recognised here, or the picker
+                         offers a level that silently draws no bar. The band
+                         codes cover six of the seven because each option's
+                         text carries its code in brackets; "Native" is the
+                         seventh and has no CEFR code, which is why it is a
+                         key of its own.
+
+                         ORDER MATTERS: meterFraction returns the FIRST key
+                         that matches, so the codes come first. Were the word
+                         "Intermediate" a key ahead of them, "Upper
+                         intermediate (B2)" would match it and draw 0.5
+                         instead of 0.66. That is also why no other word is a
+                         key: bare words invite exactly that collision, and
+                         "Not fluent" matching "Fluent" would draw a FULL bar
+                         for the opposite of what was typed. Anything not
+                         listed sets the level as plain text with no bar,
+                         which is the safe answer. */
                       levels: { "A1": 0.17, "A2": 0.33, "B1": 0.5,
-                                "B2": 0.66, "C1": 0.83, "C2": 1 },
+                                "B2": 0.66, "C1": 0.83, "C2": 1,
+                                "Native": 1 },
                       bar: { height: 7, track: "meterTrack", fill: "ink",
                              gapBefore: 11.7, gapAfter: 18.1 },
                       itemGap: 24 } },

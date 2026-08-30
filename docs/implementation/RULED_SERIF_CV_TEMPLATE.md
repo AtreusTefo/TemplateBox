@@ -168,6 +168,46 @@ field, split on newlines into bullets by this template and reflowed as prose by
 Classic. The shipped sample content is written one complete sentence per line so
 it reads correctly in both.
 
+## Languages: the Rule Is the Control
+
+`languages` shipped as a textarea taking `Name: Level` lines, under a hint
+explaining that a CEFR band or a percentage drew the proficiency bar and other
+wording did not. Reported as confusing, and rightly: that puts the rule in a
+sentence and leaves the visitor guessing which wordings count. **The levels that
+draw a bar are the choices now**, in a row per language -- a name, a `<select>`,
+and an "Other" option that reveals a free-text box for anything else.
+
+**The stored format did not change.** `fields.languages` is still one
+`Name: Level` line per language; the rows compose it on collect and parse it
+back on load. That keeps the engine's `meters` body, the template's `levels` map
+and everything already verified against them untouched, and it means every
+document saved before the change still loads -- a level the option list does not
+carry simply arrives as "Other" with its wording intact. Verified against a
+seeded legacy string: `German: Upper intermediate` and `Italian: 40%` both come
+back as "Other" with their text, `Zulu` comes back with no level, and the
+round-tripped string is byte-identical.
+
+Three things worth knowing:
+
+- **The option list is the single source of the known levels.** `js/resume.js`
+  reads the `<option>` values back out of the row `<template>` rather than
+  repeating them, so adding a level is an HTML-only change.
+- **Every fixed option must be recognised by the template's `levels` map**, or
+  the picker offers a level that silently draws nothing. Six of the seven carry
+  their CEFR code in brackets; `Native` has no code and is a key of its own,
+  added for this. Verified: all seven draw bars at 1, 1, 0.83, 0.66, 0.5, 0.33
+  and 0.17.
+- **`levels` keys are matched in order and bare words are avoided on purpose.**
+  `meterFraction` returns the first key that matches, so the codes come first --
+  were `Intermediate` a key ahead of them, `Upper intermediate (B2)` would match
+  it and draw 0.5. Bare words are also a trap in the other direction: `Not
+  fluent` would match a `Fluent` key and draw a FULL bar for the opposite of
+  what was typed. Verified that it draws none.
+
+The custom field's hint says a percentage still draws a bar, because it does --
+`meterFraction` matches one before it consults the level names, and claiming
+otherwise would have replaced one inaccurate hint with another.
+
 ## The Accent Swatches Stay Live
 
 Every non-ink colour role in the descriptor resolves to `accent` rather than to
@@ -322,6 +362,10 @@ Driven against `npx serve` through the Browser pane, plus the full
 | Saved template survives reload | yes |
 | Template survives reload with nothing typed | yes, sample notice intact |
 | Saved document's template beats the fallback key | yes |
+| Every fixed language level draws a bar | 7/7, at 1, 1, 0.83, 0.66, 0.5, 0.33, 0.17 |
+| Custom level wording draws no bar | "Conversational" and "Not fluent" both none |
+| Language rows round-trip through storage | custom row survives reload with its wording |
+| Legacy free-text languages still load | hydrate as "Other", string byte-identical |
 | Two-page document reads as two pages | 49px mat band, per-page border and lift, "Page 1 of 2" |
 | One-page document carries no page chrome | 0 label elements |
 | Classic unaffected by the page chrome | no `.is-engine`, white sheet, 32px padding, 0 labels |

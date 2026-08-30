@@ -246,16 +246,17 @@
                         </div>
                     </fieldset>
 
+                    <!-- One row per language, not a free-text block. It WAS a
+                         textarea taking "Name: Level" lines, with a hint
+                         explaining that a CEFR band or a percentage drew the
+                         proficiency bar and anything else did not. That put
+                         the rule in a sentence and left the visitor guessing
+                         which wordings counted. The levels that draw a bar
+                         are the choices now, so the rule is the control. -->
                     <fieldset data-templates="ruled-serif">
                         <legend>Languages</legend>
-                        <div class="field">
-                            <label for="f-languages">Languages (one per line, as "Name: Level")</label>
-                            <textarea id="f-languages" data-bind="languages" maxlength="300" rows="3" placeholder="English: Upper intermediate (B2)"></textarea>
-                            <!-- .upload-hint is the site's field-hint class
-                                 despite the name; docs.html already reuses it
-                                 for a non-upload field. -->
-                            <p class="upload-hint">A CEFR band in the level (A1 to C2) draws the proficiency bar, and so does a percentage. Any other wording sets the level as text with no bar.</p>
-                        </div>
+                        <div id="language-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-language">Add Language</button>
                     </fieldset>
 
                     <fieldset data-templates="ruled-serif">
@@ -323,6 +324,50 @@
                 <p class="upload-hint" data-templates="ruled-serif">One bullet per line.</p>
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <!-- A language row. The option VALUES are the level text written onto the
+         sheet, so each carries its CEFR code in brackets and the template's
+         `levels` map in js/resume-templates.js recognises every one of them --
+         change either and the other must move with it, or the picker offers a
+         level that draws no bar. "Native" has no CEFR code and is a key of its
+         own there.
+
+         This markup is also the single source of the known-level list:
+         js/resume.js reads these option values back out of the template rather
+         than repeating them, so a level added here needs no script change.
+         __custom__ is the sentinel that reveals the free-text field; it is
+         deliberately not a plausible level anyone would type. -->
+    <template id="tpl-language">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Language</label>
+                <input type="text" data-entry-field="name" maxlength="40" placeholder="English">
+            </div>
+            <div class="field">
+                <label>Level</label>
+                <select data-entry-field="level">
+                    <option value="">Select a level</option>
+                    <option value="Native">Native</option>
+                    <option value="Fluent (C2)">Fluent (C2)</option>
+                    <option value="Advanced (C1)">Advanced (C1)</option>
+                    <option value="Upper intermediate (B2)">Upper intermediate (B2)</option>
+                    <option value="Intermediate (B1)">Intermediate (B1)</option>
+                    <option value="Elementary (A2)">Elementary (A2)</option>
+                    <option value="Beginner (A1)">Beginner (A1)</option>
+                    <option value="__custom__">Other (write your own)</option>
+                </select>
+            </div>
+            <div class="field" data-language-custom hidden>
+                <label>Your own wording</label>
+                <input type="text" data-entry-field="custom" maxlength="40" placeholder="Conversational">
+                <!-- A percentage genuinely does draw a bar -- meterFraction in
+                     js/resume-engine.js matches one before it consults the
+                     template's level names -- so the hint has to say so. -->
+                <p class="upload-hint">Written on the sheet as typed. A percentage such as 70% still draws a bar; any other wording sets the level with no bar.</p>
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Language</button>
         </div>
     </template>
 
