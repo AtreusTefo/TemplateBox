@@ -3632,6 +3632,31 @@ body.has-site-anchor {
            export bar inside it stick to the pane rather than the page. */
         max-height: calc(100vh - 7rem);
         overflow-y: auto;
+        /* Reserve the scrollbar's width whether or not one is showing.
+
+           Without this the pane is BISTABLE, and measurably so. The document
+           inside it is an SVG at `width: 100%; height: auto`, so its height is
+           locked to the pane's content width -- and `overflow-y: auto` makes
+           that width depend on whether a scrollbar is present. At an
+           ads-blocked 1200px the two states are a closed loop: content
+           measures 791 against a 788 cap, so a scrollbar appears; the 17px it
+           takes shrinks the sheet from 480.5 to 465.5 wide and therefore from
+           679.1 to 657.9 tall; content is now 770, the overflow is gone and
+           the scrollbar can go with it, which puts it back at 791.
+
+           Which of the two the browser settles in is a timing coin-flip, so
+           the same page measured 788 in one run and 771.5 in the next. That
+           surfaced as a flaky failure in section 4 of tests/verify-layout.js,
+           where the working tree and a byte-identical HEAD copy disagreed and
+           the two values SWAPPED between runs -- but the test was reporting
+           real instability, not inventing it. A visitor at that width gets a
+           document rendered 15px narrower on the losing toss.
+
+           Reserving the gutter unconditionally makes the content width a
+           constant, which breaks the loop at its only circular link. Safari
+           below 18.2 ignores the property and keeps the old behaviour; that is
+           the pre-existing bug, not a new one. */
+        scrollbar-gutter: stable;
     }
 }
 
