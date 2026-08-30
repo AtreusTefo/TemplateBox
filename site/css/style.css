@@ -2973,19 +2973,32 @@ body.is-nav-hidden .site-header:focus-within {
 /* The editor page's width with NO rail in play. These two tiers widened the
    page so the old in-flow rail was added beside the panes rather than taken
    out of them. The rail is out of flow now (see the Photopea-layout note
-   below), so what these describe is only the layout a visitor sees when the
-   zone is dormant, the script is blocked, or an ad blocker is running -- and
-   that layout is precisely the one that must not change. Left untouched for
-   that reason; the override once a rail does mount is further down. */
-@media (min-width: 84rem) {
-    main:has(.editor-shell) {
-        max-width: 84rem;
-    }
-}
+   below), so what these describe is the layout a visitor sees when the zone is
+   dormant, the script is blocked, or an ad blocker is running.
 
-@media (min-width: 93rem) {
+   ONE tier since August 30, 2026, at 100rem, replacing an 84rem/93rem ladder.
+   That reverses this block's own previous instruction to leave it alone: it
+   was left alone because the August 10 rail work must not have altered the
+   no-rail layout, which was a correct constraint for THAT change rather than a
+   permanent freeze.
+
+   Two reasons it moved. First, the rule below now lets the editors fill the
+   width beside a mounted rail, and had this stayed at 93rem then turning an ad
+   blocker ON would have made the workspace NARROWER than turning it off, which
+   is backwards; at 1920 the panes measure 764px here against 754px with a
+   rail, so the two agree to within ten pixels. Second, the ladder left the
+   editors capped by the site-wide `main { max-width: 72rem }` all the way up
+   to 1344px -- and that is a CONTENT-page cap, there to hold a line of prose
+   to a readable measure. An editor is a workspace, not an article. It produced
+   the same centred dead space the rail rule has just stopped producing, one
+   band lower: at a 1165px tablet the workspace sat in 1152px with the slack
+   split either side, and at 1343px it wasted 191px.
+
+   Gated at 72rem because that is where the base cap starts to bind; below it
+   the viewport decides the width and this rule would do nothing. */
+@media (min-width: 72rem) {
     main:has(.editor-shell) {
-        max-width: 93rem;
+        max-width: 100rem;
     }
 }
 
@@ -3255,9 +3268,42 @@ body.is-nav-hidden .site-header:focus-within {
    there -- the body padding is, and the panes absorb it. That is the
    accepted cost of the lower floor, not an oversight; a cap cannot give
    back width the viewport does not have. */
+/* REVISED August 30, 2026: the editors FILL the width beside the rail rather
+   than sitting in a 72.75rem column with the slack split either side.
+
+   Reported as dead space on the far left of laptop and desktop screens, and it
+   measured worse than it looked. At 1920 the old cap put a 1164px column in
+   the 1581px left of the rail and centred it, so the workspace carried 209px
+   of nothing on its left AND 232px on its right -- 441px, nearly a quarter of
+   the window, on a page that is a two-pane workspace rather than an article.
+
+   Two changes, and both are needed. `max-width: 100rem` is generous enough
+   that the viewport decides the width at every laptop and desktop size (it
+   only binds past about 2100px, where it holds the panes at roughly 764px
+   instead of letting them sprawl). `margin-left: 0` then puts the slack in ONE
+   place instead of two: the rail owns the right edge of the window, so the
+   workspace belongs against the left, and the freed width becomes a single
+   gutter before the column rather than a gap on each side.
+
+   Left-aligning is right HERE and would be wrong on the no-rail rule above,
+   which stays centred -- with no rail there is nothing owning the right edge
+   for the workspace to sit away from.
+
+   It also lands the panes where they belong: `main`'s 1.5rem padding matches
+   `.site-header`'s, so the form pane's left edge is now flush under the site
+   mark in the bar rather than 209px adrift of it.
+
+   What this gives up is the note this rule used to carry: 72.75rem was 93rem
+   minus the 324px three-slot column, chosen so no pane was narrower than the
+   pre-rail tiered layout (546px). That guarantee is kept and beaten -- panes
+   measure 754px at 1920 rather than 546px -- but the arithmetic tying the cap
+   to the rail width is gone, so a future change to --ad-rail-w no longer needs
+   a matching edit here. The body padding already reserves the column, which is
+   the only coupling that has to hold. */
 @media (min-width: 75rem) {
     body.has-ad-rail main:has(.editor-shell) {
-        max-width: 72.75rem;
+        max-width: 100rem;
+        margin-left: 0;
     }
 }
 
@@ -3438,25 +3484,34 @@ body.has-site-anchor {
         padding-bottom: 7.25rem;
     }
 
-    /* 8.25rem, not the 7.25rem the reservation uses, and the extra 1rem is
-       measured rather than padding-by-feel.
+    /* The lift matches the reservation exactly here, because in THIS part of
+       the tablet tier the preview pane is not sticky.
 
-       In this band -- and only in this band -- .preview-pane is
-       position: sticky (its rule starts at 48.0625rem), and with a sticky
-       pane the export bar's stuck position comes out a consistent 12px lower
-       than its `bottom` nominally asks for: at 1024x768 a `bottom: 116px`
-       bar sits with its foot at 664 where the arithmetic says 652, and the
-       same 12px appears at 769px and 1199px. Below 48.0625rem the pane is
-       not sticky and the offset lands exactly on its nominal value (measured
-       724 against 724 at 400x800), which is why the phone tier above needs
-       no such allowance and must not copy this one.
+       It used to be 8.25rem across the whole tier. That extra 1rem is a
+       measured allowance for stickiness: with a sticky pane the export bar's
+       stuck position comes out a consistent 12px lower than its `bottom`
+       nominally asks for -- at 1024x768 a `bottom: 116px` bar sits with its
+       foot at 664 where the arithmetic says 652 -- and at 7.25rem the bar
+       finished 11.4px INSIDE the 115.4px-tall anchor, which is z-index 30
+       against the bar's 5 and so painted over the export control.
 
-       At 7.25rem the bar therefore finished 11.4px INSIDE the 115.4px-tall
-       anchor on all four editors at every tablet width -- the anchor is
-       z-index 30 against the bar's 5, so it painted over the export control.
-       8.25rem clears it by 4.6px. `${tag}: export bar clears the anchor` in
-       tests/verify-layout.js is what stops this silently regressing if the
-       pane's stickiness or the anchor's height ever changes. */
+       The pane's sticky rule moved from 48.0625rem to 64rem on
+       August 30, 2026 when the split view did, so 48.0625-64rem is now a
+       NON-sticky band and the offset lands exactly on its nominal value, the
+       same as the phone tier above. Applying the sticky allowance here would
+       now lift the bar 16px clear of an anchor it no longer touches.
+       `${tag}: export bar clears the anchor` in tests/verify-layout.js is
+       what stops either half of this silently regressing. */
+    body.has-ad-anchor .preview-actions {
+        bottom: 7.25rem;
+    }
+}
+
+/* The sticky half of the tablet tier: same 728x90 anchor and the same 7.25rem
+   reservation, but the pane IS sticky from 64rem, so the export bar needs
+   the measured 1rem allowance described above. Splitting the tier in two is
+   what keeps the lift tracking the PANE rather than the anchor. */
+@media (min-width: 64rem) and (max-width: 74.9375rem) {
     body.has-ad-anchor .preview-actions {
         bottom: 8.25rem;
     }
@@ -3503,7 +3558,15 @@ body.has-site-anchor {
    fill the track and have nowhere to move.
    -------------------------------------------------------------------------- */
 
-@media (min-width: 48.0625rem) {
+/* Gated at 64rem since August 30, 2026, not 48.0625rem. Sticky only makes
+   sense once the preview sits BESIDE a scrolling form, and the split now
+   starts at 64rem rather than 48rem -- between the two the editor is a single
+   tabbed column, where a sticky pane would pin the document to the top of the
+   viewport while the form scrolled underneath it. The two boundaries are one
+   decision: move the split and this has to move with it, along with the export
+   bar's lift below, which carries an allowance that exists only because the
+   pane is sticky. */
+@media (min-width: 64rem) {
     .preview-pane {
         position: sticky;
         top: 5.75rem;
@@ -7230,6 +7293,47 @@ main:has(.mockup-layout) .editor-head {
    Responsive rules (layouts verified down to a 320px viewport)
    -------------------------------------------------------------------------- */
 
+/* The editor split collapses at 64rem, not at the 48rem the rest of this
+   section uses, which is why it is its own block rather than part of the one
+   below (August 30, 2026).
+
+   It collapsed at 48rem until then, and that made 769px the worst width on the
+   site for an editor: at 768px the visitor had one pane 705px wide, and one
+   pixel later two panes of 367px each -- the split engaged the moment the
+   layout stopped being a phone, on a viewport with nowhere near the room for
+   it. A resume preview rendered into 317px of inner width. 64rem is where two
+   panes stop being cramped: 469px each at 1024px, against 975px for the single
+   pane just below it.
+
+   Three rules move together and a fourth follows: the grid, the tab row and
+   the two pane-hiding rules here; `.preview-pane`'s sticky rule at 64rem; and
+   the export bar's anchor lift, which carries a measured 1rem allowance that
+   applies only where the pane is sticky. Move one and the others have to move
+   with it.
+
+   63.9375rem rather than the 64rem this section's other blocks would use, so
+   that 1024px itself SPLITS. An iPad in landscape is exactly 1024 CSS pixels
+   with no classic scrollbar to take width off it, and `max-width: 64rem` is
+   inclusive -- it would have handed the device this boundary was chosen for
+   the single-column layout meant for the tablet below it. */
+@media (max-width: 63.9375rem) {
+    .editor-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-tabs {
+        display: flex;
+    }
+
+    .editor-layout.show-edit .preview-pane {
+        display: none;
+    }
+
+    .editor-layout.show-preview .editor-pane {
+        display: none;
+    }
+}
+
 @media (max-width: 48rem) {
     .hero h1 {
         font-size: 1.875rem;
@@ -7277,23 +7381,6 @@ main:has(.mockup-layout) .editor-head {
     .ad-row {
         flex-direction: column;
         align-items: center;
-    }
-
-    /* Editor split view collapses into a tabbed single-column layout */
-    .editor-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .mobile-tabs {
-        display: flex;
-    }
-
-    .editor-layout.show-edit .preview-pane {
-        display: none;
-    }
-
-    .editor-layout.show-preview .editor-pane {
-        display: none;
     }
 
     .countdown {
