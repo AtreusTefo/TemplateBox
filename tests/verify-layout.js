@@ -69,7 +69,23 @@ const PAGES = [
        that matters most here. */
     ["search", "/search.html"]
 ];
-const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 768, 320];
+/* 880 joined on August 30, 2026, and it is the only entry here that is not a
+   band edge or a real device width.
+
+   This list jumped 1024 to 768, which left the whole 769-1023 band untested --
+   every tablet in portrait. That was tolerable while nothing distinguished it
+   from 1024, and stopped being so when the editors' split view was moved to
+   collapse at 63.9375rem: 769-1023 is now a layout no other width in this list
+   produces, a single tabbed column with a NON-sticky preview pane, and the
+   export bar's anchor lift is a different value there for exactly that reason
+   (the sticky allowance applies only where the pane is sticky). Both halves of
+   that split were unverified by this suite and were measured by hand instead,
+   which is the gap this closes.
+
+   Confirmed to bite before being kept: setting the non-sticky tier's lift to
+   the phone tier's 4.75rem makes `poster @880: export bar clears the anchor`
+   fail here and nowhere else. */
+const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 880, 768, 320];
 
 /* Pages that show NO band in some width range, keyed by page name, as
    [minPxExclusive, maxPxExclusive).
