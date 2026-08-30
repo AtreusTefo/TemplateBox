@@ -522,6 +522,43 @@
                     </div>
                 </article>
 
+                <!-- The first resume card carrying a data-doc. The three above
+                     it launch the editor with no preset, so they open whatever
+                     template was last used; this one names a descriptor in
+                     js/resume-templates.js and the editor selects it on
+                     arrival. Its miniature needs the .ruled modifier because
+                     centred serif headings between two rules are the whole
+                     signature of the design. -->
+                <article class="template-card" data-category="resumes">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc ruled accent-green">
+                                <p class="mk-name">Calling Johnson</p>
+                                <p class="mk-contact">Gaborone, Botswana &#9670; +267 72654256 &#9670; callingjohnson@mail.com</p>
+                                <p class="mk-h">Professional Summary</p>
+                                <p class="mk-p">Strong foundation in computer science with hands-on experience in Java and SQL.</p>
+                                <p class="mk-h">Skills</p>
+                                <div class="mk-two">
+                                    <p class="mk-p">Problem-solving</p>
+                                    <p class="mk-p">Teamwork</p>
+                                    <p class="mk-p">Attention to detail</p>
+                                    <p class="mk-p">Flexible and adaptable</p>
+                                </div>
+                                <p class="mk-h">Experience</p>
+                                <p class="mk-t">GTA Auto Spares (Pty) Ltd</p>
+                                <p class="mk-s">Graphic Designer, Gaborone</p>
+                                <div class="mk-fill"></div>
+                                <p class="mk-h">Education</p>
+                                <p class="mk-s">BSc (Hons) Software Engineering</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Resumes</p>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="ruled-serif">Ruled Serif CV</a></h3>
+                    </div>
+                </article>
+
                 <!-- A real poster image in place of the drawn miniature. This
                      card sat inside .card-preview.framed until August 23, 2026,
                      which composited a photographed wood frame around the
@@ -733,7 +770,7 @@
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 20.
+                Try a broader term, or clear the search to see all 21.
             </p>
         </section>
 

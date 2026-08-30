@@ -1398,6 +1398,7 @@ body + '\n' +
         { id: "executive-resume", title: "Executive Resume", category: "resumes", doc: null },
         { id: "modern-professional-cv", title: "Modern Professional CV", category: "resumes", doc: null },
         { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: null },
+        { id: "ruled-serif", title: "Ruled Serif CV", category: "resumes", doc: "ruled-serif" },
         /* These three carried a `framed: true` flag until August 23, 2026,
            when the wood-a4 hover composite was removed at the owner's
            request. They are ordinary photo cards now: two thumbnails, the

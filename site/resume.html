@@ -159,11 +159,25 @@
 
             <!-- Left pane: input form -->
             <section class="editor-pane" aria-label="Resume form">
+                <h2>Template</h2>
+                <!-- Built by js/resume.js from the registry in
+                     js/resume-templates.js, never hand-listed here, so adding
+                     a template stays the data-only edit that file promises.
+                     Empty in the served markup and filled on load; with no
+                     script it stays empty and the editor renders Classic,
+                     which is what it did before a picker existed. -->
+                <div class="template-row" id="template-row" role="group" aria-label="Resume template"></div>
+
                 <h2>Accent Color</h2>
                 <div class="swatch-row" id="swatch-row" aria-label="Accent color choices">
                     <button type="button" class="swatch is-active" data-accent="#1A1A1A" style="background-color:#1A1A1A" aria-label="Charcoal accent"></button>
                     <button type="button" class="swatch" data-accent="#1F4E79" style="background-color:#1F4E79" aria-label="Navy accent"></button>
                     <button type="button" class="swatch" data-accent="#2E5E4E" style="background-color:#2E5E4E" aria-label="Forest accent"></button>
+                    <!-- The Ruled Serif template's own green. It is here so
+                         that template's colour is reachable again after the
+                         visitor has changed it: the picker applies it once,
+                         on selection, and never re-applies. -->
+                    <button type="button" class="swatch" data-accent="#327B3C" style="background-color:#327B3C" aria-label="Green accent"></button>
                     <button type="button" class="swatch" data-accent="#7A2E2E" style="background-color:#7A2E2E" aria-label="Burgundy accent"></button>
                     <button type="button" class="swatch" data-accent="#8A6D1D" style="background-color:#8A6D1D" aria-label="Gold accent"></button>
                 </div>
@@ -179,7 +193,14 @@
                             <label for="f-name">Full Name</label>
                             <input type="text" id="f-name" data-bind="name" maxlength="50" required>
                         </div>
-                        <div class="field">
+                        <!-- data-templates lists the templates that DRAW a
+                             field. Anything not listed is hidden for the
+                             current template but still collected and saved,
+                             deliberately, so switching templates never
+                             discards what the visitor typed -- the same
+                             judgement js/docs.js makes for its [data-for]
+                             fields. -->
+                        <div class="field" data-templates="classic">
                             <label for="f-title">Professional Title</label>
                             <input type="text" id="f-title" data-bind="title" maxlength="60">
                         </div>
@@ -222,6 +243,26 @@
                         <div class="field">
                             <label for="f-skills">Skills (comma separated)</label>
                             <input type="text" id="f-skills" data-bind="skills" maxlength="300">
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-templates="ruled-serif">
+                        <legend>Languages</legend>
+                        <div class="field">
+                            <label for="f-languages">Languages (one per line, as "Name: Level")</label>
+                            <textarea id="f-languages" data-bind="languages" maxlength="300" rows="3" placeholder="English: Upper intermediate (B2)"></textarea>
+                            <!-- .upload-hint is the site's field-hint class
+                                 despite the name; docs.html already reuses it
+                                 for a non-upload field. -->
+                            <p class="upload-hint">A CEFR band in the level (A1 to C2) draws the proficiency bar, and so does a percentage. Any other wording sets the level as text with no bar.</p>
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-templates="ruled-serif">
+                        <legend>Accomplishments</legend>
+                        <div class="field">
+                            <label for="f-accomplishments">Accomplishments (one per line)</label>
+                            <textarea id="f-accomplishments" data-bind="accomplishments" maxlength="600" rows="4"></textarea>
                         </div>
                     </fieldset>
                 </form>
@@ -268,6 +309,10 @@
                 <label>Company</label>
                 <input type="text" data-entry-field="company" maxlength="60">
             </div>
+            <div class="field" data-templates="ruled-serif">
+                <label>Location</label>
+                <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone, Botswana">
+            </div>
             <div class="field">
                 <label>Dates</label>
                 <input type="text" data-entry-field="dates" maxlength="40" placeholder="2022 - Present">
@@ -275,6 +320,7 @@
             <div class="field">
                 <label>Description</label>
                 <textarea data-entry-field="description" maxlength="400" rows="3"></textarea>
+                <p class="upload-hint" data-templates="ruled-serif">One bullet per line.</p>
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
         </div>
@@ -289,6 +335,10 @@
             <div class="field">
                 <label>Institution</label>
                 <input type="text" data-entry-field="school" maxlength="80">
+            </div>
+            <div class="field" data-templates="ruled-serif">
+                <label>Location</label>
+                <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone">
             </div>
             <div class="field">
                 <label>Dates</label>
@@ -306,6 +356,11 @@
 
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
+    <!-- Registry then engine then editor, in that order and without defer:
+         resume.js reads window.TB_RESUME_TEMPLATES while building the picker,
+         so both must have executed first. -->
+    <script src="js/resume-templates.js"></script>
+    <script src="js/resume-engine.js"></script>
     <script src="js/resume.js"></script>
 </body>
 </html>

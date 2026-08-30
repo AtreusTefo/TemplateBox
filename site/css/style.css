@@ -1781,6 +1781,7 @@ body.is-nav-hidden .site-header:focus-within {
 .mock-doc.accent-navy { --mk-accent: #1F4E79; }
 .mock-doc.accent-forest { --mk-accent: #2E5E4E; }
 .mock-doc.accent-brand { --mk-accent: #8A5A2B; }
+.mock-doc.accent-green { --mk-accent: #327B3C; }
 
 /* Resume miniature */
 
@@ -1828,6 +1829,42 @@ body.is-nav-hidden .site-header:focus-within {
 .mk-p {
     font-size: 0.3125rem;
     color: var(--color-muted);
+}
+
+/* Ruled Serif CV miniature. Centred serif headings sandwiched between two
+   full-width rules ARE the visual signature of that template, so the default
+   miniature -- left-aligned headings on a single accent underline -- would
+   depict a different document on its card. Only the rules, the centring and
+   the two-up skills grid are added here; every other .mk- class is shared, so
+   the two resume miniatures cannot drift apart in anything else. */
+
+.mock-doc.ruled .mk-name,
+.mock-doc.ruled .mk-contact {
+    text-align: center;
+}
+
+.mock-doc.ruled .mk-name {
+    border-top: 1.5px solid var(--color-text);
+    padding-top: 0.1875rem;
+}
+
+.mock-doc.ruled .mk-h {
+    font-family: var(--font-serif);
+    font-size: 0.4375rem;
+    letter-spacing: 0.04em;
+    text-align: center;
+    /* The rules are ink, not accent: in the source artwork only the heading
+       TEXT is green and the rules stay black. */
+    border-top: 1.5px solid var(--color-text);
+    border-bottom: 1.5px solid var(--color-text);
+    padding: 0.0625rem 0;
+    margin-top: 0.125rem;
+}
+
+.mock-doc.ruled .mk-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 0.25rem;
 }
 
 /* Shared: document title, ruled label/value rows, spacer */
@@ -4528,9 +4565,55 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
-   Resume document preview (the html2pdf.js capture target)
+   Resume template picker (resume.html)
+   Built from the registry by js/resume.js, so this styles a row of unknown
+   length. Text buttons rather than the swatch row's colour discs: a template
+   has no single colour to show, and a miniature small enough to sit in the
+   form pane would be unreadable.
    -------------------------------------------------------------------------- */
 
+.template-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.template-pick {
+    padding: 0.4375rem 0.875rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.template-pick:hover {
+    border-color: var(--color-text);
+}
+
+/* Matches .swatch.is-active, so the two controls under the same heading read
+   as the same kind of choice. */
+.template-pick.is-active {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+    border-color: var(--color-text);
+}
+
+/* --------------------------------------------------------------------------
+   Resume document preview
+   -------------------------------------------------------------------------- */
+
+/* The bare container is the PRE-PAINT state now, not a document.
+
+   It used to be the Classic resume itself -- an HTML sheet whose .rs-* type
+   rules lived directly below this one. Classic became a descriptor on
+   August 30, 2026 and the engine draws every template, so those rules were
+   deleted with the renderer they were sized for. What is left is what the
+   pane shows before the first paint lands, or when the engine could not be
+   loaded at all: a blank sheet of the right size, so the pane never collapses
+   and never jumps. */
 .resume-sheet {
     background-color: #FFFFFF;
     border: 1px solid var(--color-border);
@@ -4541,57 +4624,68 @@ legend {
     min-height: 28rem;
 }
 
-.resume-sheet .rs-name {
-    font-family: var(--font-serif);
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--accent);
+/* Shown only when the engine or the registry failed to load. Deliberately
+   plain: it is a fault report, not part of any document. */
+.sheet-message {
+    color: var(--color-muted);
+    text-align: center;
+    max-width: 22rem;
+    margin: 4rem auto;
 }
 
-.resume-sheet .rs-title {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
+/* An engine-drawn preview is a STACK OF PAGES, not one long sheet.
+
+   The first version of this rule made the container carry the paper: it kept
+   its own white ground and border while each <svg> page had neither, and the
+   gap between pages was therefore white on white. A two-page CV rendered as a
+   single 1116px white column with an invisible seam -- an A4 document that
+   looked like one impossibly long page, with nothing to tell the visitor
+   their resume had run over.
+
+   The container is a workspace MAT now and the paper moved onto the pages:
+   each <svg> gets its own white ground, its own edge and a soft lift, and the
+   band of mat between them is what makes the page break unmissable.
+
+   The mat inherits the light palette from the paper-surfaces rule near the
+   top of this file, so it stays light grey in dark mode rather than going
+   dark. That is deliberate: it is how every document editor presents paper --
+   a light mat under white pages, whatever the surrounding chrome is doing --
+   and it keeps the page labels legible against it in both themes.
+
+   .is-engine is added by js/resume.js only once a page has actually been
+   painted; applied to an empty container it would collapse the pane to
+   nothing. line-height: 0 removes the inline descender gap under the <svg>. */
+.resume-sheet.is-engine {
+    padding: 0.75rem;
+    min-height: 0;
+    line-height: 0;
+    background-color: var(--color-bg);
 }
 
-.resume-sheet .rs-contact {
+.resume-sheet .rt-sheet {
+    display: block;
+    width: 100%;
+    height: auto;
+    background-color: #FFFFFF;
+    border: 1px solid var(--color-border-strong);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* "Page 1 of 2", set on the mat under each page. js/resume.js adds these only
+   when there IS more than one page, so a single-page CV carries no chrome at
+   all. The bottom margin is what opens the band of mat between two pages, so
+   the last label -- which has no page after it -- drops it. */
+.resume-sheet .rt-page-label {
+    margin: 0.5rem 0 1.5rem;
+    text-align: center;
     font-size: 0.75rem;
-    color: #6B6B66;
-    margin-bottom: 1rem;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
 }
 
-.resume-sheet .rs-section {
-    margin-top: 1.25rem;
-}
-
-.resume-sheet .rs-heading {
-    font-family: var(--font-serif);
-    font-size: 0.9375rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--accent);
-    border-bottom: 2px solid var(--accent);
-    padding-bottom: 0.25rem;
-    margin-bottom: 0.625rem;
-}
-
-.resume-sheet .rs-entry {
-    margin-bottom: 0.75rem;
-}
-
-.resume-sheet .rs-entry-head {
-    font-weight: 600;
-}
-
-.resume-sheet .rs-entry-meta {
-    font-size: 0.75rem;
-    color: #6B6B66;
-    margin-bottom: 0.25rem;
-}
-
-.resume-sheet ul {
-    padding-left: 1.125rem;
+.resume-sheet .rt-page-label:last-child {
+    margin-bottom: 0;
 }
 
 /* --------------------------------------------------------------------------

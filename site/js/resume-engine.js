@@ -135,11 +135,31 @@ window.TBResume = (() => {
         }
         if (body.kind === "entries") {
             const rows = state[body.source] || [];
-            return rows.some((row) =>
-                buildRuns(body.head || {}, row).length > 0 ||
-                (body.bullets && splitList(row[body.bullets.field], body.bullets.split).length));
+            return rows.some((row) => entryHasContent(body, row));
         }
         return false;
+    }
+
+    /* Normalizes `sub`, which is one line spec or an array of them. Kept a
+       function rather than inlined twice, because the section gate and the
+       row loop below must reach the same answer about what a row draws. */
+    function subSpecs(body) {
+        if (!body.sub) return [];
+        return Array.isArray(body.sub) ? body.sub : [body.sub];
+    }
+
+    /* Does one entry row draw anything at all? Every part of the row counts,
+       not just the head: an entry whose company is blank but whose role,
+       place or dates are typed used to vanish silently, taking the visitor's
+       text with it. The section gate and the row loop share this so they can
+       never disagree -- a drift between them renders a heading over nothing,
+       or hides a heading over something. */
+    function entryHasContent(body, row) {
+        if (buildRuns(body.head || {}, row).length) return true;
+        if (subSpecs(body).some((spec) => buildRuns(spec, row).length)) return true;
+        if (body.aside && buildRuns(body.aside, row).length) return true;
+        return Boolean(body.bullets &&
+            splitList(row[body.bullets.field], body.bullets.split).length);
     }
 
     /* ----------------------------------------------------------------------
@@ -326,6 +346,34 @@ window.TBResume = (() => {
             return;
         }
 
+        /* A paragraph that belongs to no section: the professional title and
+           the contact line of a plain single-column CV, which sit under the
+           name with no heading over them.
+
+           `field` reads one value; `fields` joins several with `separator`,
+           dropping the separator around values that are empty, so a visitor
+           who filled in only a phone number gets no dangling bars. Unlike
+           `display` -- which is the one-line masthead and never wraps -- this
+           wraps to the column, and it leaves the cursor on its LAST baseline,
+           which is the convention every other body in this engine follows. */
+        if (block.kind === "text") {
+            const t = T[block.type || "body"];
+            const value = block.fields
+                ? joinFields(block, ctx.state.fields)
+                : readField(ctx.state.fields, block.field);
+            if (!value) return;
+
+            cursor[key] += block.gapBefore || 0;
+            ctx.wrap(value, t, col.width).forEach((line, i) => {
+                if (i) cursor[key] += t.lineHeight || t.size;
+                ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
+                text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], line, t);
+            });
+            cursor[key] += block.gapAfter || 0;
+            started[key] = true;
+            return;
+        }
+
         /* A rule that belongs to no heading -- the hairline above the name
            on a fully ruled sheet. Kept a block rather than another optional
            key on `display`, because it is page furniture in its own right and
@@ -493,10 +541,10 @@ window.TBResume = (() => {
             const rows = ctx.state[body.source] || [];
             let emitted = 0;
             rows.forEach((row) => {
+                if (!entryHasContent(body, row)) return;
                 const headRuns = buildRuns(body.head || {}, row, ctx.template);
                 const bullets = body.bullets
                     ? splitList(row[body.bullets.field], body.bullets.split) : [];
-                if (!headRuns.length && !bullets.length) return;
 
                 if (emitted) cursor[key] += body.entryGap || 20;
                 ensureRoom(ctx, key, cursor, pageOf, 40);
@@ -513,15 +561,30 @@ window.TBResume = (() => {
                     }
                 }
 
-                const subRuns = body.sub ? buildRuns(body.sub, row, ctx.template) : [];
-                if (subRuns.length) {
-                    cursor[key] += (body.sub.gapBefore || 13);
+                /* `sub` is one line, or an ARRAY of them. Three-line entry
+                   heads -- company, then role, then place, each on its own
+                   baseline -- are common enough in CV artwork that folding
+                   them into one comma-joined line misrepresents the design.
+                   Each element keeps its own runs and its own gapBefore, and
+                   a line whose every field is empty is skipped without
+                   consuming its gap. A plain object still means exactly what
+                   it did, so no existing descriptor changes. */
+                subSpecs(body).forEach((spec) => {
+                    const subRuns = buildRuns(spec, row, ctx.template);
+                    if (!subRuns.length) return;
+                    cursor[key] += (spec.gapBefore || 13);
                     ensureRoom(ctx, key, cursor, pageOf, 14);
                     layoutRuns(ctx, subRuns, key, cursor, pageOf);
-                }
+                });
 
                 if (bullets.length) {
-                    const t = T["bullet"];
+                    /* The entry body names its own type. It used to be hard
+                       wired to T.bullet, which forces every template's entry
+                       description to be a bulleted list -- but a plain CV sets
+                       the description as PROSE while still wanting markers on
+                       its skills, and one role cannot be both. Defaults to
+                       "bullet", so no existing descriptor changes. */
+                    const t = T[body.bullets.type || "bullet"];
                     cursor[key] += (body.bullets.gapBefore || 16);
                     bullets.forEach((item, i) => {
                         if (i) cursor[key] += t.itemGap || t.lineHeight;
@@ -641,7 +704,12 @@ window.TBResume = (() => {
     function layoutBulletItem(ctx, item, t, key, cursor, pageOf, box) {
         const col = box || ctx.cols[key];
         const inset = t.inset || 0;
-        const indent = t.indent || 8;
+        /* `=== undefined`, not `||`: an explicit `indent: 0` is a real value
+           and `0 || 8` silently becomes 8. That is how an unmarked prose body
+           -- an entry description that is not a list -- came out indented 8pt
+           from the margin AND wrapped to a column 8pt narrower than it should
+           have been. Found by the Classic equivalence check, not by eye. */
+        const indent = t.indent === undefined ? 8 : t.indent;
         const x = col.x + inset;
         const lines = ctx.wrap(item, t, col.width - inset - indent);
         lines.forEach((line, i) => {
