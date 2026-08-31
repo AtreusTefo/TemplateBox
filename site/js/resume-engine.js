@@ -118,7 +118,10 @@ window.TBResume = (() => {
             if (!text) return;
             /* A pending separator is only kept once real text follows it. */
             out.forEach((r) => { r.pending = false; });
-            out.push({ text: text, type: run.type });
+            /* `field` rides along so the painters can say which control drew
+               this run. Literals above deliberately carry none -- a ", " is
+               punctuation the template owns, not the visitor's text. */
+            out.push({ text: text, type: run.type, field: run.field });
         });
         return out.filter((r) => !r.pending);
     }
@@ -312,13 +315,48 @@ window.TBResume = (() => {
         });
     }
 
-    function text(ctx, page, x, y, str, t, widthForAlign) {
-        ctx.ops.push({
+    /* `edit` is PROVENANCE: which form control produced this run, so the
+       preview can be clicked into. It is carried on the display list and read
+       only by paintSvg, which writes it onto the <text> node; paintPdf reads
+       named keys and never sees it, so an exported file cannot carry editing
+       metadata. Call sites that omit it produce text nobody can click --
+       section headings are template labels, not the visitor's words.
+
+       Shape, and both forms may carry `part` to address one item inside a
+       multi-value field:
+         { bind: "name" }                        a [data-bind] control
+         { entry: { list, index, key } }         a row in a repeating list
+         { part: { split: ",", index: 2 } }      one segment of that value
+         { inline: false }                       clickable, but hands off to
+                                                 the form instead of taking an
+                                                 overlay -- wrapped prose,
+                                                 joined lines, <select>s */
+    function text(ctx, page, x, y, str, t, widthForAlign, edit) {
+        const op = {
             op: "text", page: page, x: x, y: y, text: str,
             family: t.family, size: t.size, weight: t.weight,
             color: colorOf(t.color, ctx.template, ctx.state),
             align: t.align || "left", boxWidth: widthForAlign
-        });
+        };
+        if (edit) op.edit = edit;
+        ctx.ops.push(op);
+    }
+
+    /* Provenance for a field named by a descriptor. `inline` defaults to true
+       and is turned off by the caller for anything an overlay cannot honestly
+       sit on top of. */
+    function fieldEdit(name, extra) {
+        if (!name) return null;
+        return Object.assign({ bind: name }, extra || {});
+    }
+
+    /* Provenance for one field of one row in a repeating list. `index` is the
+       row's position in the STATE array, which is also its position in the
+       DOM: rows that render nothing are skipped by the painter but still
+       occupy their slot in both, so the two cannot slide apart. */
+    function entryEdit(ref, key) {
+        if (!ref || !key) return null;
+        return { entry: { list: ref.list, index: ref.index, key: key } };
     }
 
     function layoutBlock(ctx, block, key, cursor, started, pageOf) {
@@ -337,9 +375,18 @@ window.TBResume = (() => {
                 const i = value.indexOf(" ");
                 lines = i > 0 ? [value.slice(0, i), value.slice(i + 1)] : [value];
             }
+            /* A split name is two lines showing halves of ONE field, and an
+               overlay over half a value would let the visitor edit a fragment
+               that does not exist in the form. Those hand off; an unsplit name
+               takes the overlay. The uppercase transform is the same story --
+               the sheet shows CALLING JOHNSON and the field holds Calling
+               Johnson -- but the overlay carries the field's value, not the
+               drawn one, so that stays honest either way. */
+            const nameEdit = fieldEdit(block.field,
+                lines.length > 1 ? { inline: false } : null);
             const nameX = anchorX(col, t.align);
             lines.forEach((line, idx) => {
-                text(ctx, page, nameX, cursor[key], line, t);
+                text(ctx, page, nameX, cursor[key], line, t, undefined, nameEdit);
                 if (idx < lines.length - 1) cursor[key] += t.lineHeight || t.size;
             });
             if (block.rule) {
@@ -375,10 +422,20 @@ window.TBResume = (() => {
             if (!value) return;
 
             cursor[key] += block.gapBefore || 0;
-            ctx.wrap(value, t, col.width).forEach((line, i) => {
+            const wrapped = ctx.wrap(value, t, col.width);
+            /* Two reasons to hand off rather than overlay: a joined line is
+               several fields sharing one run, so there is no single control to
+               put a caret in; and a wrapped one is several runs sharing one
+               field, so an overlay would sit on a fragment. A single field on
+               a single line -- the professional title -- takes the overlay. */
+            const textEdit = block.fields
+                ? fieldEdit(block.fields[0], { inline: false })
+                : fieldEdit(block.field, wrapped.length > 1 ? { inline: false } : null);
+            wrapped.forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
                 ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
-                text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], line, t);
+                text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], line, t,
+                     undefined, textEdit);
             });
             cursor[key] += block.gapAfter || 0;
             started[key] = true;
@@ -452,10 +509,12 @@ window.TBResume = (() => {
             const t = T[body.type || "body"];
             const value = readField(ctx.state.fields, body.field);
             if (!value) return;
+            /* Prose, always several runs to one field: hands off to the form. */
+            const edit = fieldEdit(body.field, { inline: false });
             ctx.wrap(value, t, col.width).forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
                 ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
-                text(ctx, pageOf[key], col.x, cursor[key], line, t);
+                text(ctx, pageOf[key], col.x, cursor[key], line, t, undefined, edit);
             });
             return;
         }
@@ -464,12 +523,14 @@ window.TBResume = (() => {
             const t = T[body.type || "bullet"];
             const items = splitList((ctx.state.fields || {})[body.field], body.split);
             if (body.columns) {
-                layoutListColumns(ctx, items, t, body.columns, key, cursor, pageOf);
+                layoutListColumns(ctx, items, t, body.columns, key, cursor, pageOf,
+                                  body.field, body.split);
                 return;
             }
             items.forEach((item, i) => {
                 if (i) cursor[key] += t.itemGap || t.lineHeight;
-                layoutBulletItem(ctx, item, t, key, cursor, pageOf);
+                layoutBulletItem(ctx, item, t, key, cursor, pageOf, undefined,
+                    fieldEdit(body.field, { part: { split: body.split, index: i } }));
             });
             return;
         }
@@ -522,7 +583,20 @@ window.TBResume = (() => {
 
                 ensureRoom(ctx, key, cursor, pageOf, lh * 3);
                 const page = pageOf[key];
-                text(ctx, page, col.x, cursor[key], name + (level ? ":" : ""), t);
+                /* `meters` reads one composed string, but the FORM behind it is
+                   a list of rows, so provenance is an entry reference. The
+                   index counts rendered rows, and the composer drops any row
+                   with no language name -- the resolver in js/resume.js closes
+                   that gap by counting only named rows, which is the same rule
+                   from the other end. The level is a <select> plus an optional
+                   free-text box, which no single overlay can stand in for, so
+                   it hands off. */
+                const langName = entryEdit({ list: "language", index: i }, "name");
+                const langLevel = Object.assign(
+                    entryEdit({ list: "language", index: i }, "level"),
+                    { inline: false });
+                text(ctx, page, col.x, cursor[key], name + (level ? ":" : ""), t,
+                     undefined, langName);
 
                 if (fraction === null) {
                     if (level) cursor[key] += lh;
@@ -543,7 +617,10 @@ window.TBResume = (() => {
                     cursor[key] += bar.gapAfter === undefined ? 16 : bar.gapAfter;
                 }
 
-                if (level) text(ctx, pageOf[key], col.x, cursor[key], level, t);
+                if (level) {
+                    text(ctx, pageOf[key], col.x, cursor[key], level, t,
+                         undefined, langLevel);
+                }
             });
             return;
         }
@@ -551,8 +628,9 @@ window.TBResume = (() => {
         if (body.kind === "entries") {
             const rows = ctx.state[body.source] || [];
             let emitted = 0;
-            rows.forEach((row) => {
+            rows.forEach((row, rowIndex) => {
                 if (!entryHasContent(body, row)) return;
+                const entryRef = { list: body.source, index: rowIndex };
                 const headRuns = buildRuns(body.head || {}, row, ctx.template);
                 const bullets = body.bullets
                     ? splitList(row[body.bullets.field], body.bullets.split) : [];
@@ -560,7 +638,7 @@ window.TBResume = (() => {
                 if (emitted) cursor[key] += body.entryGap || 20;
                 ensureRoom(ctx, key, cursor, pageOf, 40);
 
-                if (headRuns.length) layoutRuns(ctx, headRuns, key, cursor, pageOf);
+                if (headRuns.length) layoutRuns(ctx, headRuns, key, cursor, pageOf, entryRef);
 
                 /* Dates set flush right on the head's OWN baseline, so the
                    cursor must not have moved yet -- that is why this is laid
@@ -568,7 +646,7 @@ window.TBResume = (() => {
                 if (body.aside) {
                     const asideRuns = buildRuns(body.aside, row, ctx.template);
                     if (asideRuns.length) {
-                        layoutRunsRight(ctx, asideRuns, key, cursor[key], pageOf[key]);
+                        layoutRunsRight(ctx, asideRuns, key, cursor[key], pageOf[key], entryRef);
                     }
                 }
 
@@ -585,7 +663,7 @@ window.TBResume = (() => {
                     if (!subRuns.length) return;
                     cursor[key] += (spec.gapBefore || 13);
                     ensureRoom(ctx, key, cursor, pageOf, 14);
-                    layoutRuns(ctx, subRuns, key, cursor, pageOf);
+                    layoutRuns(ctx, subRuns, key, cursor, pageOf, entryRef);
                 });
 
                 if (bullets.length) {
@@ -599,7 +677,11 @@ window.TBResume = (() => {
                     cursor[key] += (body.bullets.gapBefore || 16);
                     bullets.forEach((item, i) => {
                         if (i) cursor[key] += t.itemGap || t.lineHeight;
-                        layoutBulletItem(ctx, item, t, key, cursor, pageOf);
+                        layoutBulletItem(ctx, item, t, key, cursor, pageOf, undefined,
+                            entryEdit(entryRef, body.bullets.field)
+                                ? Object.assign(entryEdit(entryRef, body.bullets.field),
+                                    { part: { split: body.bullets.split, index: i } })
+                                : null);
                     });
                 }
                 emitted += 1;
@@ -610,13 +692,14 @@ window.TBResume = (() => {
     /* One baseline, several fonts. Each run is measured and the pen advances,
        which is how a PDF draws mixed weights -- a single text call cannot
        change font mid-string. */
-    function layoutRuns(ctx, runs, key, cursor, pageOf) {
+    function layoutRuns(ctx, runs, key, cursor, pageOf, entryRef) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
         let x = col.x;
         runs.forEach((run) => {
             const t = T[run.type];
-            text(ctx, pageOf[key], x, cursor[key], run.text, t);
+            text(ctx, pageOf[key], x, cursor[key], run.text, t, undefined,
+                 entryEdit(entryRef, run.field));
             x += ctx.measure(run.text, t);
         });
     }
@@ -625,7 +708,7 @@ window.TBResume = (() => {
        to right from an x that lands its last glyph on the column's right
        edge. Right-anchoring each run on its own would stack them all at the
        same place, so the measurement has to finish before anything is drawn. */
-    function layoutRunsRight(ctx, runs, key, y, page) {
+    function layoutRunsRight(ctx, runs, key, y, page, entryRef) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
         let total = 0;
@@ -633,7 +716,7 @@ window.TBResume = (() => {
         let x = col.x + col.width - total;
         runs.forEach((run) => {
             const t = T[run.type];
-            text(ctx, page, x, y, run.text, t);
+            text(ctx, page, x, y, run.text, t, undefined, entryEdit(entryRef, run.field));
             x += ctx.measure(run.text, t);
         });
     }
@@ -648,7 +731,7 @@ window.TBResume = (() => {
        mid-column would leave its two halves on different pages, which reads
        as a rendering fault rather than a longer document -- the same
        judgement the sidebar's single-page rule already makes. */
-    function layoutListColumns(ctx, items, t, spec, key, cursor, pageOf) {
+    function layoutListColumns(ctx, items, t, spec, key, cursor, pageOf, field, split) {
         const col = ctx.cols[key];
         const count = Math.max(2, spec.count || 2);
         const gutter = spec.gutter === undefined ? 12 : spec.gutter;
@@ -680,7 +763,11 @@ window.TBResume = (() => {
             const subPage = { col: pageOf[key] };
             slice.forEach((item, i) => {
                 if (i) sub.col += t.itemGap || lh;
-                layoutBulletItem(ctx, item, t, "col", sub, subPage, box);
+                /* The index within the WHOLE field, not within this
+                   sub-column: editing the right-hand column would otherwise
+                   rewrite the wrong comma-separated segment. */
+                layoutBulletItem(ctx, item, t, "col", sub, subPage, box,
+                    fieldEdit(field, { part: { split: split, index: ci * perColumn + i } }));
             });
             if (slice.length) deepest = Math.max(deepest, sub.col);
         });
@@ -712,7 +799,7 @@ window.TBResume = (() => {
     /* `box` overrides the column, for sub-column layout; `t.inset` moves the
        whole item in from the column edge, which is how bullets sit indented
        under a full-width heading. */
-    function layoutBulletItem(ctx, item, t, key, cursor, pageOf, box) {
+    function layoutBulletItem(ctx, item, t, key, cursor, pageOf, box, edit) {
         const col = box || ctx.cols[key];
         const inset = t.inset || 0;
         /* `=== undefined`, not `||`: an explicit `indent: 0` is a real value
@@ -723,13 +810,22 @@ window.TBResume = (() => {
         const indent = t.indent === undefined ? 8 : t.indent;
         const x = col.x + inset;
         const lines = ctx.wrap(item, t, col.width - inset - indent);
+        /* One item that WRAPPED is several runs to one value, so it hands off
+           for the same reason a paragraph does. An item on one line takes the
+           overlay, and `part` is what lets the caret land on that item alone
+           inside a comma- or newline-separated field. The marker carries the
+           same provenance as its text, so clicking the bullet does what
+           clicking the words does rather than nothing. */
+        const itemEdit = (edit && lines.length > 1)
+            ? Object.assign({}, edit, { inline: false })
+            : edit;
         lines.forEach((line, i) => {
             if (i) cursor[key] += t.lineHeight || t.size;
             ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
             if (i === 0 && t.marker) {
-                text(ctx, pageOf[key], x, cursor[key], t.marker, t);
+                text(ctx, pageOf[key], x, cursor[key], t.marker, t, undefined, itemEdit);
             }
-            text(ctx, pageOf[key], x + indent, cursor[key], line, t);
+            text(ctx, pageOf[key], x + indent, cursor[key], line, t, undefined, itemEdit);
         });
     }
 
@@ -783,9 +879,14 @@ window.TBResume = (() => {
         const size = sep.size || 7;
         const gap = sep.gap === undefined ? 12 : sep.gap;
 
-        const values = (block.fields || [])
-            .map((n) => readField(ctx.state.fields, n))
-            .filter(Boolean);
+        /* Field names ride along with their values through the empty-filter.
+           Mapping `values[i]` back to `block.fields[i]` afterwards would be
+           off by one for every empty field before it, which is how a caret
+           lands in the wrong box. */
+        const pairs = (block.fields || [])
+            .map((n) => ({ field: n, value: readField(ctx.state.fields, n) }))
+            .filter((p) => p.value);
+        const values = pairs.map((p) => p.value);
         if (!values.length) return;
 
         cursor[key] += block.gapBefore || 0;
@@ -806,7 +907,7 @@ window.TBResume = (() => {
 
         const glyph = colorOf(sep.color || "body", ctx.template, ctx.state);
         values.forEach((value, i) => {
-            text(ctx, page, x, y, value, t);
+            text(ctx, page, x, y, value, t, undefined, fieldEdit(pairs[i].field));
             x += widths[i];
             if (i < values.length - 1) {
                 drawSeparator(ctx, page, sep.shape, x + gap + size / 2,
@@ -936,6 +1037,17 @@ window.TBResume = (() => {
                so the symptom is a glyph sitting flush against the previous
                run rather than a shifted line. */
             n.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+            /* Provenance for click-to-edit, PREVIEW ONLY. paintPdf reads named
+               keys and never looks at `edit`, so an exported file cannot carry
+               it. Serialized rather than spread across attributes so the node
+               carries one self-describing value; js/resume.js parses it back.
+               Text with no `edit` gets no attribute and no cursor, which is
+               how section headings stay inert -- they are the template's
+               words, not the visitor's. */
+            if (o.edit) {
+                n.setAttribute("data-edit", JSON.stringify(o.edit));
+                n.setAttribute("class", "rt-editable");
+            }
             /* textContent only: no markup path for document data. */
             n.textContent = o.text;
         }

@@ -4856,6 +4856,54 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
+   Click-to-edit on the preview.
+
+   The engine marks every run it drew from the visitor's own words with
+   .rt-editable; template labels like the section headings get no class and
+   stay inert, which is the whole affordance: if it takes an I-beam, it is
+   yours to change.
+   -------------------------------------------------------------------------- */
+
+/* Positions the overlay, which is a child of the sheet. */
+.resume-sheet.is-engine {
+    position: relative;
+}
+
+.rt-editable {
+    cursor: text;
+}
+
+/* A wash rather than a box: the sheet is a document, and a bordered hit area
+   around every phrase would read as a form. Painted behind the glyphs so the
+   text never loses contrast. */
+.rt-editable:hover {
+    fill-opacity: 1;
+    paint-order: stroke fill;
+    stroke: var(--color-brand);
+    stroke-width: 6px;
+    stroke-opacity: 0.16;
+    stroke-linejoin: round;
+}
+
+/* The floating input. It stands in for one run while it is open, so it carries
+   no chrome of its own beyond a thin ring -- anything heavier and the document
+   visibly turns into a form under the cursor. Padding and border are zeroed
+   because its box is positioned from the run's measured screen box; any
+   inherited box model would shift the text off the baseline it replaces. */
+.rt-inline-editor {
+    position: absolute;
+    z-index: 4;
+    margin: 0;
+    padding: 0 2px;
+    border: 0;
+    border-radius: 2px;
+    outline: 2px solid var(--color-brand);
+    background-color: var(--color-card);
+    line-height: 1.15;
+    letter-spacing: inherit;
+}
+
+/* --------------------------------------------------------------------------
    Business document preview (docs.html)
    One sheet component with three layout modifiers: is-receipt (rent and cash
    receipts), is-itemized (business receipts, sales receipts, invoices) and

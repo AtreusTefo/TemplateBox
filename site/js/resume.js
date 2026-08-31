@@ -483,6 +483,12 @@
        ---------------------------------------------------------------------- */
 
     function renderPreview(state) {
+        /* A repaint replaces the sheet's children, which takes any open
+           overlay with it. Drop the stale reference rather than leaving a
+           handle to a detached input that a later blur would try to commit. */
+        if (openEditor && !sheet.contains(openEditor.input)) {
+            openEditor = null;
+        }
         const tpl = engineTemplate(state.template);
         if (!tpl) {
             /* The registry or the engine failed to load. Nothing can be drawn,
@@ -564,6 +570,216 @@
 
        renderPreview() calls replaceChildren() first, so these are rebuilt from
        scratch on every keystroke and cannot accumulate. */
+
+    /* ----------------------------------------------------------------------
+       Click-to-edit on the preview.
+
+       The sheet is an SVG, which cannot host a caret -- that is the price of
+       painting the preview and the PDF from one display list, and it is not
+       negotiable. So the engine tags every run it drew with the control that
+       produced it (`data-edit`), and this layer does one of two things with a
+       click:
+
+         inline   float a real <input> exactly over the run, matched for font,
+                  size, weight, colour and alignment. The visitor types on the
+                  document; the sheet re-renders when they leave.
+         hand off focus and reveal the form control instead. Used wherever an
+                  overlay would be a lie: wrapped prose (many runs, one field),
+                  a joined contact line (one run, many fields), a split name
+                  (half a value), and <select>s.
+
+       Nothing here can reach the PDF: it edits form controls, and the export
+       is built from those. The overlay is removed before any re-render.
+       ---------------------------------------------------------------------- */
+
+    /* The control a `data-edit` descriptor points at, or null. */
+    function controlFor(edit) {
+        if (!edit) {
+            return null;
+        }
+        if (edit.bind) {
+            return form.querySelector('[data-bind="' + edit.bind + '"]');
+        }
+        if (!edit.entry) {
+            return null;
+        }
+        const list = document.getElementById(edit.entry.list + "-list");
+        if (!list) {
+            return null;
+        }
+        let rows = Array.from(list.querySelectorAll("[data-entry]"));
+        /* Languages are composed into one string by collectLanguages(), which
+           DROPS any row with no language name -- so the engine's row index
+           counts named rows only. Filtering the same way here is what keeps
+           the two ends agreeing; using the raw DOM index would put the caret
+           in the wrong row as soon as one above it was left unnamed. */
+        if (edit.entry.list === "language") {
+            rows = rows.filter((row) => {
+                const name = row.querySelector('[data-entry-field="name"]');
+                return name && name.value.trim();
+            });
+        }
+        const row = rows[edit.entry.index];
+        return row
+            ? row.querySelector('[data-entry-field="' + edit.entry.key + '"]')
+            : null;
+    }
+
+    /* The text the caret should start on. For a `part` descriptor that is one
+       segment of a multi-value field, not the whole of it. */
+    function valueFor(control, edit) {
+        const whole = TB.desanitize(control.value || "");
+        if (!edit.part) {
+            return whole;
+        }
+        const seg = whole.split(edit.part.split === "\n" ? /\r?\n/ : edit.part.split);
+        return (seg[edit.part.index] || "").trim();
+    }
+
+    /* Writes an edited value back, splicing it into place when the descriptor
+       addresses one segment. The separator is re-used verbatim so a
+       comma-separated field keeps its ", " and a newline field keeps its
+       lines. */
+    function writeValue(control, edit, next) {
+        if (!edit.part) {
+            control.value = next;
+            return;
+        }
+        const isNewline = edit.part.split === "\n";
+        const whole = TB.desanitize(control.value || "");
+        const seg = whole.split(isNewline ? /\r?\n/ : edit.part.split);
+        if (edit.part.index >= seg.length) {
+            return;
+        }
+        seg[edit.part.index] = isNewline ? next : " " + next;
+        control.value = seg.join(isNewline ? "\n" : ",").replace(/^\s+/, "");
+    }
+
+    /* The open overlay, if any. At most one at a time. */
+    let openEditor = null;
+
+    function closeEditor(commit) {
+        if (!openEditor) {
+            return;
+        }
+        const { input, control, edit, target } = openEditor;
+        openEditor = null;
+        if (target) {
+            target.style.removeProperty("visibility");
+        }
+        const next = input.value;
+        input.remove();
+        if (!commit) {
+            renderPreview(collectState());
+            return;
+        }
+        writeValue(control, edit, next);
+        /* Through the form's own listener, so the edit takes exactly the path
+           a keystroke in the form takes: sanitize, persist, re-render. */
+        control.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    /* Focus a control and bring it into view, for the descriptors an overlay
+       cannot honestly represent. */
+    function revealControl(control) {
+        const fieldset = control.closest("fieldset");
+        if (fieldset && fieldset.hidden) {
+            return;
+        }
+        control.scrollIntoView({ block: "center", behavior: "smooth" });
+        control.focus({ preventScroll: true });
+        if (control.select && control.type !== "email") {
+            try { control.select(); } catch (err) { /* selects cannot */ }
+        }
+    }
+
+    /* Float an input over the run that was clicked.
+
+       Sizing comes from the run's own screen box and the SVG's scale, so the
+       overlay matches whatever width the pane happens to be -- the sheet is
+       laid out in points on a 595-wide viewBox and displayed at whatever CSS
+       width the pane gives it. */
+    function openInlineEditor(target, control, edit) {
+        const svg = target.ownerSVGElement;
+        const sheetBox = sheet.getBoundingClientRect();
+        const box = target.getBoundingClientRect();
+        const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "rt-inline-editor";
+        input.value = valueFor(control, edit);
+        if (control.maxLength > 0) {
+            input.maxLength = control.maxLength;
+        }
+        input.setAttribute("aria-label", "Edit this text");
+
+        const cs = window.getComputedStyle(target);
+        const pad = 2;
+        input.style.left = (box.left - sheetBox.left - pad) + "px";
+        input.style.top = (box.top - sheetBox.top - pad) + "px";
+        /* A generous minimum so a short value is still comfortable to type in,
+           and room to grow past the text it replaces. */
+        input.style.width = Math.max(box.width + 24, 90) + "px";
+        input.style.height = (box.height + pad * 2) + "px";
+        input.style.fontFamily = cs.fontFamily;
+        input.style.fontSize = (parseFloat(target.getAttribute("font-size")) * scale) + "px";
+        input.style.fontWeight = cs.fontWeight;
+        input.style.color = target.getAttribute("fill") || "inherit";
+        if (target.getAttribute("text-anchor") === "middle") {
+            input.style.textAlign = "center";
+            input.style.left = (box.left - sheetBox.left - 12) + "px";
+        }
+
+        /* Hide the painted run while its overlay stands in for it, so the two
+           are never legible at once and half-overlapping. */
+        target.style.visibility = "hidden";
+        sheet.appendChild(input);
+        openEditor = { input: input, control: control, edit: edit, target: target };
+
+        input.focus();
+        input.select();
+
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") { event.preventDefault(); closeEditor(true); }
+            else if (event.key === "Escape") { event.preventDefault(); closeEditor(false); }
+        });
+        input.addEventListener("blur", () => closeEditor(true));
+        /* The sheet's own click handler must not treat a click inside the
+           overlay as a click on the document underneath it. */
+        input.addEventListener("mousedown", (event) => event.stopPropagation());
+    }
+
+    function bindPreviewEditing() {
+        sheet.addEventListener("mousedown", (event) => {
+            const target = event.target.closest(".rt-editable");
+            if (!target) {
+                closeEditor(true);
+                return;
+            }
+            if (openEditor && openEditor.target === target) {
+                return;
+            }
+            let edit = null;
+            try {
+                edit = JSON.parse(target.getAttribute("data-edit"));
+            } catch (err) {
+                return;
+            }
+            const control = controlFor(edit);
+            if (!control) {
+                return;
+            }
+            event.preventDefault();
+            closeEditor(true);
+            if (edit.inline === false) {
+                revealControl(control);
+                return;
+            }
+            openInlineEditor(target, control, edit);
+        });
+    }
+
     function labelPages() {
         const pages = sheet.querySelectorAll("svg.rt-sheet");
         if (pages.length < 2) {
@@ -740,6 +956,8 @@
                 persistAndRender();
             });
         }
+
+        bindPreviewEditing();
 
         if (!hasSaved) {
             showSampleNotice();

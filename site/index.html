@@ -468,7 +468,15 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume">Executive Resume</a></h3>
+                        <!-- data-doc is REQUIRED on every card, even one that
+                             launches the default template. Without it
+                             bindLaunchControls stores no preset and clears
+                             none, so the editor falls through to the last
+                             template the visitor used and this card opens
+                             whatever they happened to look at before it. The
+                             id names the CARD; the editor resolves an id it
+                             has no descriptor for to Classic. -->
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="executive-resume">Executive Resume</a></h3>
                     </div>
                 </article>
 
@@ -535,7 +543,7 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume">Minimalist ATS Resume</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="minimalist-ats-resume">Minimalist ATS Resume</a></h3>
                     </div>
                 </article>
 
