@@ -117,7 +117,8 @@
 
    <category> is a nested taxonomy path, and the SAME path is used in both
    trees -- apparel/t-shirts, apparel/hats/baseball-caps, drinkware/mugs,
-   packaging/boxes, print/posters-and-frames, and so on. The admin tool takes
+   packaging/boxes, print/posters-and-frames, print/business-cards,
+   print/signage, and so on. The admin tool takes
    it once and writes it into both. It carries no runtime meaning: nothing
    parses these strings, and the catalog card's data-category is what filters
    the grid. The folders exist so a collection of hundreds of source photos,
@@ -438,6 +439,59 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 1868, y: 578 },
             { x: 1868, y: 1397 },
             { x: 529, y: 1397 }
+        ]
+    },
+    {
+        id: "banner-rollup-white",
+        title: "Roll-Up Banner Stand",
+        thumb: "assets/thumbnails/product-mockups/print/signage/banner-rollup-white-thumb.jpg",
+        base: "assets/mockups/print/signage/banner-rollup-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/print/signage/banner-rollup-white-displace.png",
+        shade: "assets/mockups/print/signage/banner-rollup-white-shade.png",
+        light: "assets/mockups/print/signage/banner-rollup-white-light.png",
+        /* 0.3, as everywhere else, but here it was checked rather than copied.
+           This face has the narrowest headroom in the catalog (median 237
+           against a 248.9 ceiling, so 11.9 luma levels normalised across the
+           full range), which pushed a navy fill's p95 to 81.6 against the
+           business card's 59.3. That looked like the washout that forced 0.3
+           in the first place, so blue identity was measured directly: 0.00% of
+           pixels lose it at 0.15, 0.2, 0.25, 0.3 or even 0.4. The lift is
+           uniform brightening, not a hue wash -- which is what a highlight on
+           vinyl should be -- so the shared value stands. */
+        lightGain: 0.3,
+        /* FOUR maps, not seven, and the first template to ship fewer. Blank
+           banner vinyl has no colour variant worth offering and a design
+           covers the entire face, so there are no colourways for a `garment`
+           mask or a `tone` map to serve, and `grain` has no fibre blend to
+           model. Declaring no garmentColors is what turns the colour field
+           off. The whole template is 1.5MB against the paper bag's 11.3MB. */
+        displaceStrength: 10,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency -- all four corners read alpha 0 and 48.2%
+           of the image is clear -- so a Background fill lands behind the
+           stand. The generated file looked white-backed in a preview, which
+           is only the viewer compositing onto white; the alpha channel is
+           real. */
+        background: true,
+        /* The face measured x 205..819, y 128..1346, inset 6: still
+           100.0000% pure with zero impure pixels, and clear of the edge
+           feather. Zero blown pixels anywhere inside it, the only base in the
+           catalog with none.
+
+           The dark hardware is what makes this work. A brushed aluminium
+           cassette measures roughly 5 saturation and 150-200 luma and would
+           sail through both classifier gates while being physically joined to
+           the face, dragging the median and the specular ceiling that `shade`
+           and `light` normalise against. Anthracite fails the luma gate: the
+           rail, cassette and feet measured p50 56-68, and the face holds
+           99.83% of every classified pixel in the image. */
+        warpZone: [
+            { x: 211, y: 134 },
+            { x: 813, y: 134 },
+            { x: 813, y: 1340 },
+            { x: 211, y: 1340 }
         ]
     }
 ];

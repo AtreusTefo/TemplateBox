@@ -1614,9 +1614,18 @@
         /* The full-width upload button is the empty state; once a stack
            exists the "+" in the section header is the way to extend it.
            Scoped to the surface, so an empty back card offers the same
-           first-run affordance the front did. */
+           first-run affordance the front did.
+
+           The CAP is not scoped, though, and both controls have to honour it.
+           It bounds render cost, and every surface is drawn in one shader
+           pass, so the total is what matters -- but with the list scoped, a
+           full front card used to leave the back showing an empty list, a
+           disabled "+", and an ENABLED upload button that dead-ended in an
+           error message. Disabling both makes the state legible. */
+        const atCap = layers.length >= MAX_LAYERS;
         uploadDesignBtn.hidden = shown.length > 0;
-        addDesignBtn.disabled = layers.length >= MAX_LAYERS;
+        uploadDesignBtn.disabled = atCap;
+        addDesignBtn.disabled = atCap;
     }
 
     function syncLayerActions() {
@@ -1690,7 +1699,12 @@
         }
 
         if (uploadIntent.mode === "add" && layers.length >= MAX_LAYERS) {
-            fileError.textContent = "That is the maximum number of designs on one mockup.";
+            /* "on one mockup", not "on this card": the cap is across every
+               surface, and on a two-card template the visitor is looking at
+               one of them. */
+            fileError.textContent = zoneCount() > 1
+                ? "That is the maximum number of designs on one mockup, counted across both surfaces."
+                : "That is the maximum number of designs on one mockup.";
             fileInput.value = "";
             return;
         }
@@ -1791,6 +1805,52 @@
         return color ? color.hex : customHex;
     }
 
+    /* The product's own colourways, for the picker's preset grid.
+
+       These are here for the same reason the background's Transparent chip is:
+       a state no hex can express would otherwise have no way back. `original`
+       SKIPS the tint rather than painting a colour, so typing #E9E9EC is not
+       "As photographed" -- it dyes the garment its own photographed shade,
+       which is a different render. A heather is not a hex at all: the dye is
+       mixed toward undyed fibre and the weave is screened back over it.
+
+       Before this existed the colourway row had been removed (August 25, 2026)
+       and nothing replaced it, so every route into the picker went through
+       setCustomColor and set currentColor to CUSTOM. The eight colourways the
+       shirt declares were unreachable, "As photographed" was one-way, and the
+       heather fractions -- and the grain maps that serve them, 2.3MB across
+       the shirt and the cap -- were shipped code that nothing could run. */
+    function colorwayList() {
+        const config = PRODUCTS[currentProduct];
+        if (!config || !config.colors) {
+            return [];
+        }
+        return Object.keys(config.colors).map((key) => {
+            const c = config.colors[key];
+            const heather = typeof c.heather === "number" ? clamp(c.heather, 0, 1) : 0;
+            return {
+                key: key,
+                name: c.name || key,
+                /* The chip shows what the visitor will GET. A heather swatch
+                   painted at full dye strength would promise a colour the
+                   render never produces. */
+                swatch: heather > 0 ? mixToward(c.hex, NATURAL_FIBRE, heather) : c.hex
+            };
+        });
+    }
+
+    function setColorway(key) {
+        const config = PRODUCTS[currentProduct];
+        if (!config || !config.colors || !config.colors[key]) {
+            return false;
+        }
+        currentColor = key;
+        syncColorUI();
+        persist();
+        draw();
+        return true;
+    }
+
     /* The colourway swatch row this used to build is gone (August 25, 2026);
        what is left is the one job that could not go with it. A photographic
        template has no colorway concept, so the whole field disappears rather
@@ -1872,6 +1932,10 @@
 
     function createColorPicker(nodes, options) {
         let hue = 0;
+        /* Rebuilt only by buildPresets(); sync() just re-marks which is
+           active, because sync() runs on every pointermove of the hue track
+           and tearing down 36 buttons per move would be gratuitous. */
+        let colorwayChips = [];
 
         /* Two strips, one hue. The popover's, and -- on the product picker --
            the one standing in the panel where the swatch row used to be. They
@@ -1892,6 +1956,7 @@
            names an input the visitor is currently typing in, which must not be
            rewritten underneath the caret. */
         function sync(skip) {
+            markActiveColorway();
             const hex = options.getHex();
             /* No colour at all (the background's Transparent state): the
                gradients keep their last position rather than snapping, and
@@ -1978,6 +2043,21 @@
                 nodes.presets.appendChild(drop);
             }
 
+            /* The product's own colourways first, named, ahead of the
+               generic hexes. Only the product picker supplies these. */
+            colorwayChips = [];
+            (options.colorways ? options.colorways() : []).forEach((cw) => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "color-preset color-colorway";
+                btn.style.backgroundColor = cw.swatch;
+                btn.setAttribute("aria-label", cw.name);
+                btn.setAttribute("title", cw.name);
+                btn.addEventListener("click", () => options.setColorway(cw.key));
+                colorwayChips.push({ btn: btn, key: cw.key });
+                nodes.presets.appendChild(btn);
+            });
+
             COLOR_PRESETS.forEach((hex) => {
                 const btn = document.createElement("button");
                 btn.type = "button";
@@ -1987,6 +2067,17 @@
                 btn.setAttribute("title", hex);
                 btn.addEventListener("click", () => commit(hex));
                 nodes.presets.appendChild(btn);
+            });
+            markActiveColorway();
+        }
+
+        /* Which colourway is selected, if any. A custom hex selects none, so
+           the grid correctly shows nothing pressed once the visitor picks a
+           colour of their own. */
+        function markActiveColorway() {
+            const active = options.activeColorway ? options.activeColorway() : null;
+            colorwayChips.forEach((chip) => {
+                chip.btn.setAttribute("aria-pressed", String(chip.key === active));
             });
         }
 
@@ -2089,7 +2180,12 @@
         inHex: inHex, inR: inR, inG: inG, inB: inB, presets: presetGrid
     }, {
         getHex: () => activeHex(),
-        setHex: (hex, skip) => setCustomColor(hex, skip)
+        setHex: (hex, skip) => setCustomColor(hex, skip),
+        /* Only the product picker has named colourways; the background is a
+           plain colour with a Transparent state and no palette of its own. */
+        colorways: () => colorwayList(),
+        setColorway: (key) => setColorway(key),
+        activeColorway: () => currentColor
     });
 
     /* Repaints the whole colourway UI: the picker's own nodes, plus the two
@@ -2557,6 +2653,13 @@
             offsetY: layer.offsetY,
             rotation: layer.rotation,
             visible: layer.visible,
+            /* The surface the layer belongs to. Omitting it here silently
+               collapsed a two-card mockup onto card 1 on reopen: the tray
+               round-trips through this function, layerZone() reads a missing
+               value as 0, and the back design landed on top of the front one.
+               persist() and the restore path both carry it; this was the one
+               copy that did not. */
+            zone: layerZone(layer),
             rect: null
         }));
     }

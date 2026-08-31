@@ -754,9 +754,23 @@ function startServer(cwd, port) {
     return proc;
 }
 
+/* 60 seconds, not the 20 this used to allow. `npx serve` prints nothing while
+   it resolves and can take well over 20s to bind on a loaded machine -- measured
+   on August 31, 2026: not listening at 8s, serving 200s by 50s, with an empty
+   log throughout. At 20s the suite gave up and reported "could not start `npx
+   serve`", which reads like the server is broken when it is only slow, and cost
+   two false failures in one session.
+
+   This is a budget that was too tight, not a symptom being masked: the server
+   does bind and does serve. A genuinely dead server still fails, 40 seconds
+   later than before, and the message below now says how long it actually
+   waited so the next person can tell the two apart. */
+const SERVER_WAIT_MS = 60000;
+
 async function waitForServer(port) {
-    for (let i = 0; i < 80; i += 1) {
-        await new Promise((r) => setTimeout(r, 250));
+    const step = 250;
+    for (let i = 0; i < SERVER_WAIT_MS / step; i += 1) {
+        await new Promise((r) => setTimeout(r, step));
         try {
             const res = await fetch(`http://localhost:${port}/`);
             if (res.ok) { return true; }
@@ -2661,7 +2675,7 @@ async function main() {
             const server = startServer(ROOT, PORT);
             if (!await waitForServer(PORT)) {
                 server.killTree();
-                throw new Error(`could not start \`npx serve\` on port ${PORT} from the repository root`);
+                throw new Error(`could not start \`npx serve\` on port ${PORT} from the repository root (waited ${SERVER_WAIT_MS / 1000}s)`);
             }
             const page = await connect(browserPath, CDP_PORT);
             try {

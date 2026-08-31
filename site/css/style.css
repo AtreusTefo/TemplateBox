@@ -5961,6 +5961,16 @@ main:has(.mockup-layout) .editor-head {
     cursor: pointer;
 }
 
+/* The product's own colourways, rendered ahead of the generic hexes in the
+   same grid. They carry a selected state because, unlike a hex, they ARE a
+   state: "As photographed" skips the tint entirely and a heather mixes toward
+   undyed fibre, so the visitor needs to see which one is live. A custom hex
+   marks none of them, which is correct -- it is not one of them. */
+.color-colorway[aria-pressed="true"] {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 1px;
+}
+
 .color-eyedropper {
     display: inline-flex;
     align-items: center;
