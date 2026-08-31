@@ -3653,10 +3653,33 @@ body.has-site-anchor {
            document rendered 15px narrower on the losing toss.
 
            Reserving the gutter unconditionally makes the content width a
-           constant, which breaks the loop at its only circular link. Safari
-           below 18.2 ignores the property and keeps the old behaviour; that is
-           the pre-existing bug, not a new one. */
+           constant, which breaks the loop at its only circular link. The
+           @supports block below covers the engines that do not have this
+           property. */
         scrollbar-gutter: stable;
+    }
+}
+
+/* The same guarantee for engines without scrollbar-gutter -- Safari before
+   18.2, and anything older. `overflow-y: scroll` reserves the width in every
+   engine ever shipped, so the content width is constant there too and the loop
+   above cannot form.
+
+   Why not just use `overflow-y: scroll` everywhere and drop the property? On a
+   classic-scrollbar platform it paints a visible empty track even when nothing
+   overflows, which is exactly the sort of dead furniture this project strips
+   out elsewhere; `scrollbar-gutter: stable` reserves the same width and paints
+   nothing. So the pretty version leads and this is the floor beneath it.
+
+   Note this costs nothing on macOS and iOS. Their scrollbars are overlays that
+   never take layout width, so the circular dependency cannot exist there at
+   all, and `scroll` reserves nothing. The whole problem, and therefore both
+   halves of the fix, only ever concerned platforms with classic scrollbars. */
+@supports not (scrollbar-gutter: stable) {
+    @media (min-width: 64rem) {
+        .preview-pane {
+            overflow-y: scroll;
+        }
     }
 }
 
