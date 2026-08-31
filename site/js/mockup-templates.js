@@ -493,5 +493,75 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 813, y: 1340 },
             { x: 211, y: 1340 }
         ]
+    },
+    {
+        id: "hoodie-model-white",
+        title: "White Hoodie on Model",
+        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-thumb.jpg",
+        base: "assets/mockups/apparel/hoodies/hoodie-model-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/hoodies/hoodie-model-white-displace.png",
+        shade: "assets/mockups/apparel/hoodies/hoodie-model-white-shade.png",
+        light: "assets/mockups/apparel/hoodies/hoodie-model-white-light.png",
+        /* 0.3, and on this garment the check bites rather than merely passing:
+           at gain 1.0 a #12305C navy fill loses 6.47% of its blue identity and
+           p95 luma reaches 180 against a source of 44 -- the same failure that
+           set this value on the shirt. At 0.3 the loss is 0.00%. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/hoodies/hoodie-model-white-garment.png",
+        tone: "assets/mockups/apparel/hoodies/hoodie-model-white-tone.png",
+        /* Fleece has the second-highest weave in the catalog, 4.11 luma levels
+           against the shirt's 3.78, so heather reads well here. This is also
+           the first template built AFTER the colourway chips landed: the
+           heather fractions below and this map are reachable from the editor
+           from day one, which was not true of the shirt or the cap. */
+        grain: "assets/mockups/apparel/hoodies/hoodie-model-white-grain.png",
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* 10, against the shirt's 16 on an identically sized base. Gradient
+           p99 measured 28.51 here to the shirt's 41.5, so matching the shirt's
+           PHYSICAL bend would be about 11 -- and heavy fleece should bend a
+           print less than jersey, not more, so at or below that. The grid
+           agrees: 14 has more character than the fabric earns and 20 wanders.
+           0.98% of base width, sitting just under the cap's 1.03% and well
+           under the shirt's 1.56%. */
+        displaceStrength: 10,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency: all four corners read alpha 0 and 16.0% of
+           the image is clear. */
+        background: true,
+        /* 432px square -- 12in at this garment's scale (neckline y=280 to hem
+           y=1338 is 1058px over roughly 29in, about 36.5 px/in), starting 3in
+           below the neckline. A hoodie's print is shorter than a shirt's
+           because the kangaroo pocket takes the lower half: the pocket's top
+           seam is the strongest horizontal step in the whole photograph
+           (+16.24 in the central columns at y=895), and this zone stops 64px
+           above it. Centred on the torso's own centreline, 520.5, measured
+           from the sleeve seams at x=223 and x=818 rather than from the frame.
+           Verified 100.0000% surface with zero impure pixels.
+
+           The two hazards a hoodie has and a shirt does not were kept out of
+           the photograph rather than worked around: drawstrings would hang
+           straight through this zone and be painted over, and the model's
+           trousers are dark charcoal so they fail the luma gate outright
+           (measured p50 39, 0.0% classified). White joggers would have been
+           the cap's white-tee problem again, and worse -- touching the hem,
+           they would be CONNECTED to the garment, so the connected-region
+           restriction could not have saved it. */
+        warpZone: [
+            { x: 305, y: 390 },
+            { x: 737, y: 390 },
+            { x: 737, y: 822 },
+            { x: 305, y: 822 }
+        ]
     }
 ];
