@@ -1,0 +1,213 @@
+/* ==========================================================================
+   TemplateBox - Admin Stylesheet
+   Loaded by admin.html and tools/og-image.html ONLY, after css/style.css.
+
+   Why this file exists (September 1, 2026): both pages are private operator
+   tools -- admin.html is the blog and catalog-thumbnail workspace, and
+   tools/og-image.html is the Open Graph card generator, kept out of the index
+   by netlify.toml. Their styles were shipping to every public page, which is
+   weight no visitor can ever use.
+
+   Rules for editing this file:
+
+   - It carries NO tokens, reset, buttons, header or form styling of its own.
+     Everything it needs comes from css/style.css, which both pages load
+     first. Adding a copy of a shared rule here is the drift this split was
+     careful to avoid -- change the global sheet instead.
+   - It is loaded AFTER the global sheet, so anything here wins on order at
+     equal specificity. .admin-thumb-preview depends on that: it overrides
+     .catalog-grid's column ladder, and media queries carry no specificity, so
+     being declared later is the whole mechanism.
+   - A class used by ANY public page does not belong here. Two rules that look
+     like they should have moved deliberately did not -- .btn-small (applied
+     by js/docs.js and js/resume.js) and .radio-option (in docs.html's
+     markup) -- and they are commented as such where they now live in
+     css/style.css.
+
+   See docs/implementation/STYLESHEET_STRUCTURE.md.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Blog admin panel (admin.html)
+   -------------------------------------------------------------------------- */
+
+.admin-main {
+    max-width: 56rem;
+}
+
+.admin-intro {
+    margin-bottom: 2rem;
+}
+
+.admin-intro h1 {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+}
+
+.admin-intro p {
+    color: var(--color-muted);
+    max-width: 44rem;
+}
+
+.admin-panel {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.admin-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.admin-panel-head h2 {
+    font-size: 1.25rem;
+}
+
+.admin-sync {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+}
+
+.admin-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.admin-status {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    margin-top: 0.75rem;
+    min-height: 1.25rem;
+}
+
+.admin-help {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+}
+
+.admin-help summary {
+    cursor: pointer;
+    font-weight: 600;
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+}
+
+.admin-help ol,
+.admin-help ul {
+    padding-left: 1.375rem;
+    margin: 0.5rem 0;
+}
+
+.admin-help li {
+    margin-bottom: 0.375rem;
+}
+
+.admin-empty {
+    color: var(--color-muted);
+    font-size: 0.9375rem;
+    padding: 1rem 0;
+}
+
+.admin-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border: 1px solid var(--color-border);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.admin-row-title {
+    font-weight: 600;
+}
+
+.admin-row-meta {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+}
+
+.admin-row-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.radio-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.admin-cover-preview {
+    margin-top: 0.5rem;
+}
+
+.admin-cover-preview img {
+    max-width: 18rem;
+    border: 1px solid var(--color-border);
+    margin-bottom: 0.75rem;
+}
+
+.admin-preview {
+    max-width: none;
+}
+
+.mono {
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 0.875em;
+    background-color: var(--color-bg);
+    padding: 0.125rem 0.375rem;
+    border: 1px solid var(--color-border);
+}
+
+/* --------------------------------------------------------------------------
+   Catalog thumbnail workspace (admin.html)
+
+   The preview is the homepage's own markup -- .catalog-grid > .template-card
+   > .card-preview.photo -- so the 4:5 window, the hover crossfade and the
+   card chrome are inherited rather than reimplemented. Only two things are
+   admin-specific: the grid is capped to one card's width, and the hover image
+   needs a real hide.
+   -------------------------------------------------------------------------- */
+
+/* One card, at roughly the width the homepage gives a card on a laptop. The
+   column override has to sit here rather than beside .catalog-grid: media
+   queries carry no specificity, so it beats the grid's 2/3/4-column ladder
+   only by being declared after it. */
+.admin-thumb-preview {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 15rem;
+    margin-top: 0.5rem;
+}
+
+/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`.
+   Both of these carry one: .catalog-grid sets display: grid on the wrapper,
+   and .card-preview.photo .card-thumb sets display: block on the images.
+   Without the second rule the hover slot would paint over the default image
+   whenever an item has no hover thumbnail -- which is the optional case, so
+   it is the common one. */
+.admin-thumb-preview[hidden] {
+    display: none;
+}
+
+.admin-thumb-preview .card-thumb[hidden] {
+    display: none;
+}
+
+.admin-thumb-paths {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    word-break: break-all;
+}

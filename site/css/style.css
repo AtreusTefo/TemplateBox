@@ -16,6 +16,79 @@
    square corners. No gradients, no drop shadows anywhere.
    ========================================================================== */
 
+/* ==========================================================================
+   HOW THIS FILE IS ORGANISED
+   ==========================================================================
+
+   One stylesheet serves all 26 public pages. That is deliberate, not
+   legacy: the site has no build step (netlify.toml runs an empty build
+   command), the shared surface below -- tokens, header, buttons, forms, the
+   ad rails, print, dark mode -- is the majority of this file, and splitting
+   it per page would mean either duplicating those rules or serving several
+   blocking requests per page on a multi-page flow. It compresses to roughly
+   51 KB and is cached once for the whole session.
+
+   ONE exception: css/admin.css, loaded only by admin.html and
+   tools/og-image.html. Those are private operator tools, so their chrome
+   has no reason to ship to visitors. Nothing else may be split out on the
+   same reasoning without re-reading docs/implementation/STYLESHEET_STRUCTURE.md.
+
+   NAVIGATING: every section below opens with a banner carrying a bracketed
+   tag. Search for the tag -- [S09] -- to jump straight to it. Tags are used
+   instead of line numbers on purpose: line numbers rot on the first edit
+   and then actively mislead, and a tag survives any amount of insertion.
+
+   TWO CONVENTIONS THAT ARE LOAD-BEARING, not style preferences:
+
+   1. When two page families need the same component, they share ONE
+      selector list -- `.editor-rail, .home-rail, .content-rail { ... }` --
+      never two similar blocks. Two blocks drift the first time either is
+      touched, and the drift is silent. Copying a rule to "keep the pages
+      independent" is the specific mistake this rule exists to prevent.
+
+   2. Retiring a component deletes the rules sized for it, in the same
+      change. A live rule for a dead element has twice caused measurable
+      bugs here -- a reservation for a retired ad unit that went on holding
+      116px under a 50px bar, and a button row that outlived its buttons.
+
+   Media queries carry NO specificity. A rule written inside one does not
+   beat an equally specific rule outside it -- only declaration order
+   decides. Several places in this file depend on that; they say so.
+
+   ==========================================================================
+   CONTENTS
+   ==========================================================================
+
+   [S01]  DESIGN TOKENS AND THEME
+   [S02]  RESET AND BASE ELEMENTS
+   [S03]  SITE SHELL: HEADER, NAV, MEGA-MENU, SEARCH
+   [S04]  PAGE HEADINGS AND THE CONTINUE STRIP
+   [S05]  HOMEPAGE CATALOG FEED
+   [S06]  BUTTONS
+   [S07]  LOADING INTERSTITIAL
+   [S08]  EDITORS: SHARED SHELL
+   [S09]  ADVERTISING: RAILS, ANCHORS AND RESERVATIONS
+   [S10]  EDITORS: PANES AND FORM NAVIGATION
+   [S11]  EDITOR TOOLBARS AND THE DOWNLOAD PANEL
+   [S12]  FORM CONTROLS
+   [S13]  RESUME EDITOR
+   [S14]  BUSINESS DOCUMENT EDITOR
+   [S15]  POSTER EDITOR
+   [S16]  MOCKUP EDITOR
+   [S17]  GUIDES STRIP AND SEARCH PAGE
+   [S18]  CONTENT PAGES: LANDING, STATIC, BLOG, POST
+   [S19]  RESPONSIVE RULES
+   [S20]  PRINT
+
+   ========================================================================== */
+
+/* ==========================================================================
+   [S01]  DESIGN TOKENS AND THEME
+   ==========================================================================
+   The --l-* / --d-* source pairs, the --color-* aliases every rule reads,
+   spacing and motion tokens, dark mode, reduced motion.
+   ========================================================================== */
+
 :root {
     /* ----------------------------------------------------------------------
        Source palettes. Each colour is written ONCE here, in an --l-* (light)
@@ -225,6 +298,13 @@
     }
 }
 
+/* ==========================================================================
+   [S02]  RESET AND BASE ELEMENTS
+   ==========================================================================
+   Box sizing, html/body, headings, links, images, focus treatment,
+   .sr-only, the skip link.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Reset and base
    -------------------------------------------------------------------------- */
@@ -328,6 +408,14 @@ button {
     left: var(--space-xs);
     top: var(--space-xs);
 }
+
+/* ==========================================================================
+   [S03]  SITE SHELL: HEADER, NAV, MEGA-MENU, SEARCH
+   ==========================================================================
+   The sticky .site-header shared by every page: wordmark, nav links,
+   hamburger and search toggles, theme toggle, header search field, the
+   More mega-menu.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Layout shell
@@ -1133,6 +1221,13 @@ main {
     fill: currentColor;
 }
 
+/* ==========================================================================
+   [S04]  PAGE HEADINGS AND THE CONTINUE STRIP
+   ==========================================================================
+   Section headings used across page families, and the
+   continue-where-you-left-off band.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Hero and section headings
    -------------------------------------------------------------------------- */
@@ -1248,6 +1343,14 @@ main {
     gap: var(--space-xs);
     flex-wrap: wrap;
 }
+
+/* ==========================================================================
+   [S05]  HOMEPAGE CATALOG FEED
+   ==========================================================================
+   index.html only: the category tabs, hide-on-scroll, the CSS Grid card
+   ladder, the CSS document miniatures, card titles as links, hover zoom
+   and hover previews.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Homepage: a feed, not a landing page.
@@ -2469,6 +2572,12 @@ body.is-nav-hidden .site-header:focus-within {
     }
 }
 
+/* ==========================================================================
+   [S06]  BUTTONS
+   ==========================================================================
+   The .btn family. 44px / 2.75rem minimum touch targets throughout.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Buttons (44px / 2.75rem minimum touch targets throughout)
    -------------------------------------------------------------------------- */
@@ -2518,6 +2627,23 @@ body.is-nav-hidden .site-header:focus-within {
     width: 100%;
     margin-top: 0.75rem;
 }
+
+/* Lived in the admin section until September 1, 2026, purely because
+   admin.html needed it first. It is applied by js/docs.js and js/resume.js
+   -- the sample-notice "Start blank" button -- so it could not follow the
+   admin rules into css/admin.css. */
+.btn-small {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    font-size: 0.8125rem;
+}
+
+/* ==========================================================================
+   [S07]  LOADING INTERSTITIAL
+   ==========================================================================
+   loading.html only: progress bar, numeric countdown, the two isolated
+   banner slots.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Loading page (loading.html)
@@ -2997,6 +3123,13 @@ body.is-nav-hidden .site-header:focus-within {
     overflow-x: auto;
 }
 
+/* ==========================================================================
+   [S08]  EDITORS: SHARED SHELL
+   ==========================================================================
+   The two-pane .editor-shell / .editor-layout grid shared by all four
+   editors.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Editor shell (shared by the resume and poster editors)
    -------------------------------------------------------------------------- */
@@ -3016,6 +3149,15 @@ body.is-nav-hidden .site-header:focus-within {
        Same containment fix as the grid panes below. */
     min-width: 0;
 }
+
+/* ==========================================================================
+   [S09]  ADVERTISING: RAILS, ANCHORS AND RESERVATIONS
+   ==========================================================================
+   The fixed full-height rail shared by the editors, homepage and content
+   pages as ONE selector list; the site-wide foot anchor; the body padding
+   that reserves each. Read CLAUDE.md before changing a band gate: the
+   reservation and the mounted creative must move together.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Editor advertising
@@ -3598,6 +3740,12 @@ body.has-site-anchor {
     margin-bottom: 1rem;
 }
 
+/* ==========================================================================
+   [S10]  EDITORS: PANES AND FORM NAVIGATION
+   ==========================================================================
+   The sticky live-preview pane and the form section jump list.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Sticky live preview (split view only)
 
@@ -3834,6 +3982,15 @@ body.has-site-anchor {
 .save-state.is-unavailable::before {
     background-color: var(--color-warn);
 }
+
+/* ==========================================================================
+   [S11]  EDITOR TOOLBARS AND THE DOWNLOAD PANEL
+   ==========================================================================
+   The .editor-bar controls: the mark, the document name, .editor-actions,
+   the mockup bar's wordmark and search, the text formatting toolbar, the
+   caption and emoji picker, the .dl / .dl-toggle / .dl-panel download
+   shell.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Poster editor toolbar (poster.html)
@@ -4611,6 +4768,13 @@ body.has-site-anchor {
     text-decoration: underline;
 }
 
+/* ==========================================================================
+   [S12]  FORM CONTROLS
+   ==========================================================================
+   Fields, labels, inputs, selects, checkboxes, entry rows. Shared by every
+   editor.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Form controls
    -------------------------------------------------------------------------- */
@@ -4687,6 +4851,26 @@ legend {
     border-color: var(--color-text);
     color: var(--color-text);
 }
+
+/* Also left behind by the September 1, 2026 admin split: docs.html's "Blank
+   printable form" checkbox is a .radio-option, so this is a public form
+   control that happened to be written where admin.html first used it.
+   .radio-row, the flex row that pairs with it, IS admin-only and did move. */
+.radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    font-size: 0.9375rem;
+    cursor: pointer;
+}
+
+/* ==========================================================================
+   [S13]  RESUME EDITOR
+   ==========================================================================
+   resume.html: accent swatches, the template picker, the rendered resume
+   sheet, click-to-edit on the preview.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Accent color swatches (resume builder)
@@ -4902,6 +5086,12 @@ legend {
     line-height: 1.15;
     letter-spacing: inherit;
 }
+
+/* ==========================================================================
+   [S14]  BUSINESS DOCUMENT EDITOR
+   ==========================================================================
+   docs.html: the rendered document sheet for all six document types.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Business document preview (docs.html)
@@ -5291,6 +5481,12 @@ legend {
     margin-bottom: 1rem;
 }
 
+/* ==========================================================================
+   [S15]  POSTER EDITOR
+   ==========================================================================
+   poster.html: the canvas stage and its controls.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Poster creator
    -------------------------------------------------------------------------- */
@@ -5314,6 +5510,14 @@ legend {
     color: var(--color-muted);
     margin-top: 0.375rem;
 }
+
+/* ==========================================================================
+   [S16]  MOCKUP EDITOR
+   ==========================================================================
+   mockup.html: both viewport-height panes, the sidebar sections, the
+   design layer list, the HSV colour picker, the action row, the preview
+   tabs, the size control.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Product mockup generator
@@ -6465,6 +6669,12 @@ main:has(.mockup-layout) .editor-head {
     min-height: 1.25rem;
 }
 
+/* ==========================================================================
+   [S17]  GUIDES STRIP AND SEARCH PAGE
+   ==========================================================================
+   The homepage guides band and search.html.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Homepage guides strip
    Surfaces the most recent blog posts on the homepage. The blog previously
@@ -6704,6 +6914,13 @@ main:has(.mockup-layout) .editor-head {
         flex-basis: 13rem;
     }
 }
+
+/* ==========================================================================
+   [S18]  CONTENT PAGES: LANDING, STATIC, BLOG, POST
+   ==========================================================================
+   The nine landing pages, about/terms/privacy, blog.html, post.html and
+   the generated blog/<slug>.html pages.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Document landing pages
@@ -7288,205 +7505,12 @@ main:has(.mockup-layout) .editor-head {
     text-align: center;
 }
 
-/* --------------------------------------------------------------------------
-   Blog admin panel (admin.html)
-   -------------------------------------------------------------------------- */
-
-.admin-main {
-    max-width: 56rem;
-}
-
-.admin-intro {
-    margin-bottom: 2rem;
-}
-
-.admin-intro h1 {
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
-}
-
-.admin-intro p {
-    color: var(--color-muted);
-    max-width: 44rem;
-}
-
-.admin-panel {
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.admin-panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-}
-
-.admin-panel-head h2 {
-    font-size: 1.25rem;
-}
-
-.admin-sync {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-}
-
-.admin-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 0.5rem;
-}
-
-.admin-status {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    margin-top: 0.75rem;
-    min-height: 1.25rem;
-}
-
-.admin-help {
-    margin-top: 0.75rem;
-    font-size: 0.875rem;
-    color: var(--color-muted);
-}
-
-.admin-help summary {
-    cursor: pointer;
-    font-weight: 600;
-    min-height: 2.75rem;
-    display: flex;
-    align-items: center;
-}
-
-.admin-help ol,
-.admin-help ul {
-    padding-left: 1.375rem;
-    margin: 0.5rem 0;
-}
-
-.admin-help li {
-    margin-bottom: 0.375rem;
-}
-
-.admin-empty {
-    color: var(--color-muted);
-    font-size: 0.9375rem;
-    padding: 1rem 0;
-}
-
-.admin-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    border: 1px solid var(--color-border);
-    padding: 1rem;
-    margin-bottom: 0.75rem;
-}
-
-.admin-row-title {
-    font-weight: 600;
-}
-
-.admin-row-meta {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-}
-
-.admin-row-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.btn-small {
-    min-height: 2.75rem;
-    padding: 0 1rem;
-    font-size: 0.8125rem;
-}
-
-.radio-row {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.radio-option {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 2.75rem;
-    font-size: 0.9375rem;
-    cursor: pointer;
-}
-
-.admin-cover-preview {
-    margin-top: 0.5rem;
-}
-
-.admin-cover-preview img {
-    max-width: 18rem;
-    border: 1px solid var(--color-border);
-    margin-bottom: 0.75rem;
-}
-
-.admin-preview {
-    max-width: none;
-}
-
-.mono {
-    font-family: "Consolas", "Menlo", monospace;
-    font-size: 0.875em;
-    background-color: var(--color-bg);
-    padding: 0.125rem 0.375rem;
-    border: 1px solid var(--color-border);
-}
-
-/* --------------------------------------------------------------------------
-   Catalog thumbnail workspace (admin.html)
-
-   The preview is the homepage's own markup -- .catalog-grid > .template-card
-   > .card-preview.photo -- so the 4:5 window, the hover crossfade and the
-   card chrome are inherited rather than reimplemented. Only two things are
-   admin-specific: the grid is capped to one card's width, and the hover image
-   needs a real hide.
-   -------------------------------------------------------------------------- */
-
-/* One card, at roughly the width the homepage gives a card on a laptop. The
-   column override has to sit here rather than beside .catalog-grid: media
-   queries carry no specificity, so it beats the grid's 2/3/4-column ladder
-   only by being declared after it. */
-.admin-thumb-preview {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 15rem;
-    margin-top: 0.5rem;
-}
-
-/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`.
-   Both of these carry one: .catalog-grid sets display: grid on the wrapper,
-   and .card-preview.photo .card-thumb sets display: block on the images.
-   Without the second rule the hover slot would paint over the default image
-   whenever an item has no hover thumbnail -- which is the optional case, so
-   it is the common one. */
-.admin-thumb-preview[hidden] {
-    display: none;
-}
-
-.admin-thumb-preview .card-thumb[hidden] {
-    display: none;
-}
-
-.admin-thumb-paths {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    word-break: break-all;
-}
+/* ==========================================================================
+   [S19]  RESPONSIVE RULES
+   ==========================================================================
+   Everything viewport-gated that is not declared beside its own component.
+   Layouts are verified down to 320px.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Responsive rules (layouts verified down to a 320px viewport)
@@ -7673,6 +7697,13 @@ main:has(.mockup-layout) .editor-head {
         font-size: 1rem;
     }
 }
+
+/* ==========================================================================
+   [S20]  PRINT
+   ==========================================================================
+   Strips the site shell so a document sheet prints on its own page. Print
+   output stays light regardless of the on-screen theme.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Print: strip the site shell so the document sheet prints on its own page.

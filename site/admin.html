@@ -35,6 +35,11 @@
         })();
     </script>
     <link rel="stylesheet" href="css/style.css">
+    <!-- Operator-only styles, split out of the global sheet on September 1,
+         2026 so they stop shipping to every public page. MUST load after
+         style.css: .admin-thumb-preview beats .catalog-grid's column ladder
+         by declaration order, not specificity. See css/admin.css. -->
+    <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
 
