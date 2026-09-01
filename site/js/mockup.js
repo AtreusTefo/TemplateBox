@@ -19,6 +19,11 @@
 
     const STORAGE_KEY = "tb_mockup_v1";
 
+    /* Upper bound on printable surfaces per template, used only to bound a
+       restored layer's zone index before the live template is known. Nothing
+       stops a template declaring fewer; layerZone() clamps to the real count. */
+    const MAX_ZONES = 8;
+
     /* Internal resolution for the vector products: the visible element
        scales via CSS while exports render at full 1000 x 1000 quality.
        Photographic templates instead resize the canvas to the base
@@ -299,13 +304,26 @@
        "source-over" for a conventional pre-masked transparent PNG. */
     const OVERLAY_BLENDS = ["multiply", "screen", "source-over"];
 
+    /* One quad of four numeric corners. */
+    function validQuad(zone) {
+        return Array.isArray(zone) && zone.length === 4 &&
+            zone.every((p) => p && typeof p.x === "number" && typeof p.y === "number");
+    }
+
     PHOTO_REGISTRY.forEach((tpl) => {
         const valid = tpl &&
             typeof tpl.id === "string" && tpl.id &&
             !Object.prototype.hasOwnProperty.call(PRODUCTS, tpl.id) &&
             typeof tpl.base === "string" &&
-            Array.isArray(tpl.warpZone) && tpl.warpZone.length === 4 &&
-            tpl.warpZone.every((p) => p && typeof p.x === "number" && typeof p.y === "number");
+            validQuad(tpl.warpZone) &&
+            /* `warpZones` is optional and additive: a template that declares
+               it carries one printable surface per entry, and `warpZone` stays
+               the first of them so every existing path keeps working. An
+               invalid extra zone rejects the whole template rather than
+               silently printing on one card and not the other. */
+            (!Object.prototype.hasOwnProperty.call(tpl, "warpZones") ||
+                (Array.isArray(tpl.warpZones) && tpl.warpZones.length > 0 &&
+                    tpl.warpZones.every(validQuad)));
         if (!valid) {
             return;
         }
@@ -326,6 +344,37 @@
     });
 
     /* Axis-aligned bounding box of a four-corner warp zone. */
+    /* Every printable surface on a template, in order. Single-zone templates
+       -- which is all of them except the business card pair -- return their
+       one `warpZone`, so callers never branch on which kind they have. */
+    function zonesOf(tpl) {
+        return (tpl && Array.isArray(tpl.warpZones) && tpl.warpZones.length)
+            ? tpl.warpZones
+            : [tpl.warpZone];
+    }
+
+    /* Which surface new uploads land on, and which the layer list shows. Only
+       ever non-zero on a multi-zone template; clamped whenever the product
+       changes so switching from the two-card mockup to a t-shirt cannot leave
+       it pointing at a surface that no longer exists. */
+    let activeZone = 0;
+
+    function zoneCount() {
+        const config = PRODUCTS[currentProduct];
+        return (config && config.template) ? zonesOf(config.template).length : 1;
+    }
+
+    function clampActiveZone() {
+        activeZone = clamp(Math.round(activeZone) || 0, 0, zoneCount() - 1);
+    }
+
+    /* A layer belongs to exactly one surface. Absent or corrupt values read as
+       surface 0, which is what every layer saved before this existed has. */
+    function layerZone(layer) {
+        const z = Math.round(layer && layer.zone);
+        return (isFinite(z) && z >= 0 && z < zoneCount()) ? z : 0;
+    }
+
     function zoneBounds(zone) {
         const xs = zone.map((p) => p.x);
         const ys = zone.map((p) => p.y);
@@ -455,7 +504,7 @@
     /* The flattened artwork sheet handed to the warp, sized to the zone's
        bounding box so layer placement carries across unchanged. The white
        fill is the paper backing the previous single-design path drew. */
-    function renderSheet(area) {
+    function renderSheet(area, zoneIndex) {
         const w = Math.max(1, Math.round(area.w));
         const h = Math.max(1, Math.round(area.h));
         if (!sheetCanvas) {
@@ -469,7 +518,7 @@
         sctx.clearRect(0, 0, w, h);
         sctx.fillStyle = "#FFFFFF";
         sctx.fillRect(0, 0, w, h);
-        paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, false);
+        paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, false, zoneIndex);
         return sheetCanvas;
     }
 
@@ -482,7 +531,11 @@
        perspective warp this path keeps drag-to-position working. */
     let fabricSheet = null;
 
-    function renderFabricSheet(area) {
+    /* Every surface is painted into ONE canvas-sized sheet, so the shader
+       still runs a single pass no matter how many cards a template has: the
+       displacement, shading and specular maps already cover the whole
+       photograph, and the pass discards wherever the sheet is empty. */
+    function renderFabricSheet(zones) {
         if (!fabricSheet) {
             fabricSheet = document.createElement("canvas");
         }
@@ -492,21 +545,24 @@
         }
         const sctx = fabricSheet.getContext("2d");
         sctx.clearRect(0, 0, fabricSheet.width, fabricSheet.height);
-        sctx.save();
-        sctx.beginPath();
-        sctx.rect(area.x, area.y, area.w, area.h);
-        sctx.clip();
-        paintLayers(sctx, area, true);
-        sctx.restore();
+        zones.forEach((zone, index) => {
+            const area = zoneBounds(zone);
+            sctx.save();
+            sctx.beginPath();
+            sctx.rect(area.x, area.y, area.w, area.h);
+            sctx.clip();
+            paintLayers(sctx, area, true, index);
+            sctx.restore();
+        });
         return fabricSheet;
     }
 
-    function drawWarpedDesign(zone) {
+    function drawWarpedDesign(zone, zoneIndex) {
         const area = zoneBounds(zone);
         if (warpLibState === "ready") {
             try {
                 fxCanvas = fxCanvas || window.fx.canvas();
-                const texture = fxCanvas.texture(renderSheet(area));
+                const texture = fxCanvas.texture(renderSheet(area, zoneIndex));
                 fxCanvas.draw(texture, canvas.width, canvas.height).perspective(
                     [0, 0, canvas.width, 0, canvas.width, canvas.height, 0, canvas.height],
                     [
@@ -525,7 +581,9 @@
                    canvas is grabbable and the sidebar controls are the only
                    way to place artwork here. */
                 layers.forEach((layer) => {
-                    layer.rect = null;
+                    if (typeof zoneIndex !== "number" || layerZone(layer) === zoneIndex) {
+                        layer.rect = null;
+                    }
                 });
                 return;
             } catch (err) {
@@ -534,7 +592,7 @@
         } else {
             ensureWarpLib();
         }
-        drawLayersInArea(area, 0);
+        drawLayersInArea(area, 0, zoneIndex);
     }
 
     /* ----------------------------------------------------------------------
@@ -662,6 +720,7 @@
     const fileInput = document.getElementById("m-design");
     const fileError = document.getElementById("m-design-error");
     const layerList = document.getElementById("m-layer-list");
+    const zoneSwitch = document.getElementById("m-zone-switch");
     const layerActions = document.getElementById("m-layer-actions");
     const addDesignBtn = document.getElementById("m-add-design");
     const uploadDesignBtn = document.getElementById("m-upload-design");
@@ -767,8 +826,17 @@
     /* Paints every layer into `area` of `context`. Hit rectangles are recorded
        only for the real canvas: the offscreen warp sheet shares this painter
        but its coordinates mean nothing to a pointer. */
-    function paintLayers(context, area, recordRects) {
+    function paintLayers(context, area, recordRects, zoneIndex) {
+        /* `zoneIndex` absent means "every layer, one surface" -- the vector
+           products and the flattened export sheet. When it is given, a layer
+           belonging to another surface is skipped entirely, INCLUDING its hit
+           rectangle: the caller loops the surfaces and each pass must leave
+           the other surfaces' rectangles alone rather than nulling them. */
+        const scoped = typeof zoneIndex === "number";
         layers.forEach((layer) => {
+            if (scoped && layerZone(layer) !== zoneIndex) {
+                return;
+            }
             if (recordRects) {
                 layer.rect = null;
             }
@@ -809,14 +877,22 @@
         });
     }
 
-    function drawLayersInArea(area, cornerRadius) {
+    function drawLayersInArea(area, cornerRadius, zoneIndex) {
         const r = typeof cornerRadius === "number" ? cornerRadius : 16;
         /* Placeholder styling scales with the canvas, which runs at 1000px
            for vector products but at the base photograph's native size for
            photographic templates. */
         const k = canvas.width / CANVAS_W;
 
-        if (!readyLayers().length) {
+        /* Emptiness is per surface: on the two-card template a design on the
+           front must not suppress the "Upload your design" prompt on the back,
+           or the second card silently looks like part of the photograph. */
+        const scoped = typeof zoneIndex === "number";
+        const mine = scoped
+            ? layers.filter((layer) => layer.img && layerZone(layer) === zoneIndex)
+            : readyLayers();
+
+        if (!mine.length) {
             ctx.save();
             roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
             ctx.fillStyle = "#F4F3EF";
@@ -833,7 +909,9 @@
             ctx.fillText("Upload your design", area.x + area.w / 2, area.y + area.h / 2, area.w - 40 * k);
             ctx.restore();
             layers.forEach((layer) => {
-                layer.rect = null;
+                if (!scoped || layerZone(layer) === zoneIndex) {
+                    layer.rect = null;
+                }
             });
             return;
         }
@@ -841,7 +919,7 @@
         ctx.save();
         roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
         ctx.clip();
-        paintLayers(ctx, area, true);
+        paintLayers(ctx, area, true, zoneIndex);
         ctx.restore();
     }
 
@@ -1059,8 +1137,11 @@
         paintBackground();
 
         const tpl = config.template;
-        const rectZone = zoneIsRect(tpl.warpZone);
-        const area = zoneBounds(tpl.warpZone);
+        const zones = zonesOf(tpl);
+        /* Every surface has to be a rectangle for the shading pass to run:
+           the perspective warp is checked first and returns, so one tilted
+           card would cost BOTH cards their displacement and lighting. */
+        const rectZone = zones.every(zoneIsRect);
 
         /* A paper sheet sits behind artwork that does not fill a frame's
            window, and keeps exports opaque behind a transparent base. A
@@ -1073,16 +1154,17 @@
 
         const paintDesign = () => {
             if (readyLayers().length && !rectZone) {
-                drawWarpedDesign(tpl.warpZone);
+                zones.forEach(drawWarpedDesign);
                 return;
             }
             /* Fabric: displace the artwork around the folds and shade it
                with the garment's own light, in one GPU pass. Returning null
                means no WebGL, which is a quality loss and not an error -- the
-               flat draw below is exactly what shipped before this existed. */
+               flat draw below is exactly what shipped before this existed.
+               One pass covers every surface: the sheet carries them all. */
             if (readyLayers().length && assets.displace && window.TB_Displace) {
                 const out = window.TB_Displace.render(
-                    renderFabricSheet(area),
+                    renderFabricSheet(zones),
                     assets.displace,
                     assets.shade,
                     tpl.displaceStrength,
@@ -1094,11 +1176,14 @@
                     return;
                 }
             }
-            if (backing) {
-                ctx.fillStyle = backing;
-                ctx.fillRect(area.x, area.y, area.w, area.h);
-            }
-            drawLayersInArea(area, 0);
+            zones.forEach((zone, index) => {
+                const area = zoneBounds(zone);
+                if (backing) {
+                    ctx.fillStyle = backing;
+                    ctx.fillRect(area.x, area.y, area.w, area.h);
+                }
+                drawLayersInArea(area, 0, index);
+            });
         };
 
         if (tpl.mode === "surface") {
@@ -1395,14 +1480,72 @@
         return btn;
     }
 
+    /* One button per printable surface, built from the registry's own labels.
+       Hidden and emptied below two surfaces, so every existing template is
+       byte-identical to having no switch at all. */
+    function renderZoneSwitch() {
+        const count = zoneCount();
+        while (zoneSwitch.firstChild) {
+            zoneSwitch.removeChild(zoneSwitch.firstChild);
+        }
+        zoneSwitch.hidden = count < 2;
+        if (count < 2) {
+            return;
+        }
+        const config = PRODUCTS[currentProduct];
+        const labels = (config && config.template && Array.isArray(config.template.zoneLabels))
+            ? config.template.zoneLabels
+            : [];
+        for (let i = 0; i < count; i += 1) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "zone-tab";
+            btn.setAttribute("aria-pressed", String(i === activeZone));
+            /* textContent, never innerHTML -- the project's DOM-XSS rule
+               applies to registry strings the same as to visitor input. */
+            btn.textContent = (typeof labels[i] === "string" && labels[i])
+                ? labels[i]
+                : ("Card " + (i + 1));
+            btn.addEventListener("click", (function (index) {
+                return function () {
+                    if (activeZone === index) {
+                        return;
+                    }
+                    activeZone = index;
+                    /* The selected layer lives on the surface being left, and
+                       leaving it selected would point the size and rotation
+                       controls at a row the list no longer shows. */
+                    selectedId = null;
+                    renderLayerList();
+                    syncScaleControls();
+                    syncLayerActions();
+                    drawOverlay();
+                };
+            }(i)));
+            zoneSwitch.appendChild(btn);
+        }
+    }
+
     function renderLayerList() {
+        /* Both run here rather than at every product-change site: this is
+           already called on init, on every layer edit and on a tray restore,
+           so the switch cannot drift out of step with the template. */
+        clampActiveZone();
+        renderZoneSwitch();
+
         while (layerList.firstChild) {
             layerList.removeChild(layerList.firstChild);
         }
 
+        /* The list is scoped to the surface being edited. Both surfaces still
+           RENDER -- this is which one the controls act on. */
+        const shown = zoneCount() < 2
+            ? layers.slice()
+            : layers.filter((layer) => layerZone(layer) === activeZone);
+
         /* Front-most first: the list reads top-to-bottom as front-to-back,
            the reverse of the paint order. */
-        layers.slice().reverse().forEach((layer) => {
+        shown.slice().reverse().forEach((layer) => {
             const readable = TB.desanitize(layer.name);
             const li = document.createElement("li");
             li.className = "layer-row" +
@@ -1467,11 +1610,22 @@
             layerList.appendChild(li);
         });
 
-        layerList.hidden = layers.length === 0;
+        layerList.hidden = shown.length === 0;
         /* The full-width upload button is the empty state; once a stack
-           exists the "+" in the section header is the way to extend it. */
-        uploadDesignBtn.hidden = layers.length > 0;
-        addDesignBtn.disabled = layers.length >= MAX_LAYERS;
+           exists the "+" in the section header is the way to extend it.
+           Scoped to the surface, so an empty back card offers the same
+           first-run affordance the front did.
+
+           The CAP is not scoped, though, and both controls have to honour it.
+           It bounds render cost, and every surface is drawn in one shader
+           pass, so the total is what matters -- but with the list scoped, a
+           full front card used to leave the back showing an empty list, a
+           disabled "+", and an ENABLED upload button that dead-ended in an
+           error message. Disabling both makes the state legible. */
+        const atCap = layers.length >= MAX_LAYERS;
+        uploadDesignBtn.hidden = shown.length > 0;
+        uploadDesignBtn.disabled = atCap;
+        addDesignBtn.disabled = atCap;
     }
 
     function syncLayerActions() {
@@ -1480,6 +1634,13 @@
 
     function selectLayer(id) {
         selectedId = id;
+        /* A canvas click can land on a layer belonging to the other surface.
+           Following it keeps the list, the controls and the selection talking
+           about the same thing. */
+        const picked = selectedLayer();
+        if (picked) {
+            activeZone = layerZone(picked);
+        }
         renderLayerList();
         syncScaleControls();
         syncLayerActions();
@@ -1502,6 +1663,9 @@
             offsetY: step,
             rotation: 0,
             visible: true,
+            /* The surface being edited. Always 0 on a single-zone template,
+               so this is inert everywhere except the two-card mockup. */
+            zone: activeZone,
             rect: null
         });
         selectedId = layers[layers.length - 1].id;
@@ -1535,7 +1699,12 @@
         }
 
         if (uploadIntent.mode === "add" && layers.length >= MAX_LAYERS) {
-            fileError.textContent = "That is the maximum number of designs on one mockup.";
+            /* "on one mockup", not "on this card": the cap is across every
+               surface, and on a two-card template the visitor is looking at
+               one of them. */
+            fileError.textContent = zoneCount() > 1
+                ? "That is the maximum number of designs on one mockup, counted across both surfaces."
+                : "That is the maximum number of designs on one mockup.";
             fileInput.value = "";
             return;
         }
@@ -1636,6 +1805,52 @@
         return color ? color.hex : customHex;
     }
 
+    /* The product's own colourways, for the picker's preset grid.
+
+       These are here for the same reason the background's Transparent chip is:
+       a state no hex can express would otherwise have no way back. `original`
+       SKIPS the tint rather than painting a colour, so typing #E9E9EC is not
+       "As photographed" -- it dyes the garment its own photographed shade,
+       which is a different render. A heather is not a hex at all: the dye is
+       mixed toward undyed fibre and the weave is screened back over it.
+
+       Before this existed the colourway row had been removed (August 25, 2026)
+       and nothing replaced it, so every route into the picker went through
+       setCustomColor and set currentColor to CUSTOM. The eight colourways the
+       shirt declares were unreachable, "As photographed" was one-way, and the
+       heather fractions -- and the grain maps that serve them, 2.3MB across
+       the shirt and the cap -- were shipped code that nothing could run. */
+    function colorwayList() {
+        const config = PRODUCTS[currentProduct];
+        if (!config || !config.colors) {
+            return [];
+        }
+        return Object.keys(config.colors).map((key) => {
+            const c = config.colors[key];
+            const heather = typeof c.heather === "number" ? clamp(c.heather, 0, 1) : 0;
+            return {
+                key: key,
+                name: c.name || key,
+                /* The chip shows what the visitor will GET. A heather swatch
+                   painted at full dye strength would promise a colour the
+                   render never produces. */
+                swatch: heather > 0 ? mixToward(c.hex, NATURAL_FIBRE, heather) : c.hex
+            };
+        });
+    }
+
+    function setColorway(key) {
+        const config = PRODUCTS[currentProduct];
+        if (!config || !config.colors || !config.colors[key]) {
+            return false;
+        }
+        currentColor = key;
+        syncColorUI();
+        persist();
+        draw();
+        return true;
+    }
+
     /* The colourway swatch row this used to build is gone (August 25, 2026);
        what is left is the one job that could not go with it. A photographic
        template has no colorway concept, so the whole field disappears rather
@@ -1717,6 +1932,10 @@
 
     function createColorPicker(nodes, options) {
         let hue = 0;
+        /* Rebuilt only by buildPresets(); sync() just re-marks which is
+           active, because sync() runs on every pointermove of the hue track
+           and tearing down 36 buttons per move would be gratuitous. */
+        let colorwayChips = [];
 
         /* Two strips, one hue. The popover's, and -- on the product picker --
            the one standing in the panel where the swatch row used to be. They
@@ -1737,6 +1956,7 @@
            names an input the visitor is currently typing in, which must not be
            rewritten underneath the caret. */
         function sync(skip) {
+            markActiveColorway();
             const hex = options.getHex();
             /* No colour at all (the background's Transparent state): the
                gradients keep their last position rather than snapping, and
@@ -1823,6 +2043,21 @@
                 nodes.presets.appendChild(drop);
             }
 
+            /* The product's own colourways first, named, ahead of the
+               generic hexes. Only the product picker supplies these. */
+            colorwayChips = [];
+            (options.colorways ? options.colorways() : []).forEach((cw) => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "color-preset color-colorway";
+                btn.style.backgroundColor = cw.swatch;
+                btn.setAttribute("aria-label", cw.name);
+                btn.setAttribute("title", cw.name);
+                btn.addEventListener("click", () => options.setColorway(cw.key));
+                colorwayChips.push({ btn: btn, key: cw.key });
+                nodes.presets.appendChild(btn);
+            });
+
             COLOR_PRESETS.forEach((hex) => {
                 const btn = document.createElement("button");
                 btn.type = "button";
@@ -1832,6 +2067,17 @@
                 btn.setAttribute("title", hex);
                 btn.addEventListener("click", () => commit(hex));
                 nodes.presets.appendChild(btn);
+            });
+            markActiveColorway();
+        }
+
+        /* Which colourway is selected, if any. A custom hex selects none, so
+           the grid correctly shows nothing pressed once the visitor picks a
+           colour of their own. */
+        function markActiveColorway() {
+            const active = options.activeColorway ? options.activeColorway() : null;
+            colorwayChips.forEach((chip) => {
+                chip.btn.setAttribute("aria-pressed", String(chip.key === active));
             });
         }
 
@@ -1934,7 +2180,12 @@
         inHex: inHex, inR: inR, inG: inG, inB: inB, presets: presetGrid
     }, {
         getHex: () => activeHex(),
-        setHex: (hex, skip) => setCustomColor(hex, skip)
+        setHex: (hex, skip) => setCustomColor(hex, skip),
+        /* Only the product picker has named colourways; the background is a
+           plain colour with a Transparent state and no palette of its own. */
+        colorways: () => colorwayList(),
+        setColorway: (key) => setColorway(key),
+        activeColorway: () => currentColor
     });
 
     /* Repaints the whole colourway UI: the picker's own nodes, plus the two
@@ -2262,7 +2513,8 @@
                 offsetX: layer.offsetX,
                 offsetY: layer.offsetY,
                 rotation: layer.rotation,
-                visible: layer.visible
+                visible: layer.visible,
+                zone: layerZone(layer)
             })),
             label: TB.sanitize(labelInput.value)
         });
@@ -2401,6 +2653,13 @@
             offsetY: layer.offsetY,
             rotation: layer.rotation,
             visible: layer.visible,
+            /* The surface the layer belongs to. Omitting it here silently
+               collapsed a two-card mockup onto card 1 on reopen: the tray
+               round-trips through this function, layerZone() reads a missing
+               value as 0, and the back design landed on top of the front one.
+               persist() and the restore path both carry it; this was the one
+               copy that did not. */
+            zone: layerZone(layer),
             rect: null
         }));
     }
@@ -2710,6 +2969,11 @@
                 offsetY: numberIn(row.offsetY, -5000, 5000, 0),
                 rotation: numberIn(row.rotation, -Math.PI * 4, Math.PI * 4, 0),
                 visible: row.visible !== false,
+                /* Clamped against MAX_ZONES rather than the current
+                   template's count: the product is restored separately and
+                   may not be resolved yet, and layerZone() re-checks against
+                   the live count on every read anyway. */
+                zone: numberIn(row.zone, 0, MAX_ZONES - 1, 0),
                 rect: null
             });
         });

@@ -176,8 +176,13 @@
             <p class="hint">A hard grid is the diagnostic case: straight lines have nowhere to hide, so the right strength is the largest one where the grid still reads as printed rather than melted.</p>
             <label for="strength">displaceStrength: <span id="strength-val">16</span> px</label>
             <input type="range" id="strength" min="0" max="40" step="1" value="16">
-            <label for="light-gain">Specular gain: <span id="light-gain-val">1.0</span></label>
-            <input type="range" id="light-gain" min="0" max="2" step="0.1" value="1">
+            <!-- Defaults to 0.3, not 1. The light map is the brighter half of a
+                 WHITE garment's diffuse range, not true surface reflection, so
+                 at full strength it destroys dark ink: a navy fill measured p95
+                 luma 159 against a source of 44. Raise it only for a genuinely
+                 glossy surface. -->
+            <label for="light-gain">Specular gain: <span id="light-gain-val">0.3</span></label>
+            <input type="range" id="light-gain" min="0" max="2" step="0.05" value="0.3">
             <div class="row" style="margin-top:0.5rem;">
                 <div>
                     <label for="test-design">Test design</label>
@@ -219,8 +224,9 @@
             <label for="tpl-title">Title</label>
             <input type="text" id="tpl-title" value="" placeholder="White T-Shirt on Model">
 
-            <label for="tpl-category">Thumbnail category folder</label>
-            <input type="text" id="tpl-category" value="apparel">
+            <label for="tpl-category">Category folder</label>
+            <input type="text" id="tpl-category" value="apparel" placeholder="apparel/hats/baseball-caps">
+            <p class="hint">A taxonomy path, and the same one is written into both trees: assets/mockups/&lt;category&gt;/ for the maps and assets/thumbnails/product-mockups/&lt;category&gt;/ for the thumbnail. Nest as deep as the product needs -- apparel/t-shirts, apparel/hats/baseball-caps, drinkware/mugs, packaging/boxes, print/business-cards, print/signage. Lowercase and hyphenated; slashes are kept, everything else is slugged. Leave the word "mockup" out of the segments, the tree is already under assets/mockups/.</p>
 
             <label for="tpl-mode">Mode</label>
             <select id="tpl-mode">
@@ -244,8 +250,9 @@
             <p class="status" id="copy-status"></p>
 
             <ol id="checklist">
-                <li>Save the downloads into site/assets/mockups/ and the thumbnail into site/assets/thumbnails/product-mockups/&lt;category&gt;/.</li>
-                <li>Save the base photograph itself as &lt;id&gt;-base.png in the same folder.</li>
+                <li>Create site/assets/mockups/&lt;category&gt;/ and site/assets/thumbnails/product-mockups/&lt;category&gt;/ if this is the first template in that category -- git tracks files, not directories, so a category folder only exists once it holds something.</li>
+                <li>Save the map downloads into the first and the thumbnail into the second.</li>
+                <li>Save the base photograph itself as &lt;id&gt;-base.png beside the maps.</li>
                 <li>Paste the entry into js/mockup-templates.js.</li>
                 <li>Add a catalog card in index.html with data-target="mockup" data-doc="&lt;id&gt;".</li>
                 <li>Run node tests/verify-layout.js.</li>
@@ -411,10 +418,148 @@
         el.getContext("2d").drawImage(source, 0, 0, el.width, el.height);
     }
 
+    /* Reduces `fabric` in place to a single connected region: the one under
+       the print zone, or the largest if no zone is marked yet. Returns how
+       many pixels were discarded so the caller can say so. */
+    /* Connectivity is computed on a DILATED copy of the classified mask and
+       then intersected back, rather than on the mask itself.
+
+       The reason is thin dark detail INSIDE one surface. A paper bag's twisted
+       rope handles carry 1-3px grooves that fall below the luma gate, and an
+       undilated flood treats each groove as the end of the region: it climbed
+       25% of one handle and stopped, so recolour dyed the bag and left white
+       handles with a partial gradient where the flood died. That is an
+       artifact, not a design choice, and it is invisible until someone picks a
+       colour.
+
+       Radius 6 is the measured minimum that carries a rope handle (25.2% of
+       the handle band to 98.9%). It does not weaken the separation this
+       function exists for, which was the cap photograph's problem -- the model
+       wears a white tee that classifies as the same surface. Re-measured
+       against that image at radii 0, 1, 2, 3, 4 and 6, the tee stays at 0.0%
+       and the cap zone at 100%: the gap across the face is orders of magnitude
+       wider than a groove, so bridging grooves cannot bridge that. Raising
+       this further trades away real separation for nothing, since 6 already
+       closes the handles. */
+    const CONNECT_DILATE = 6;
+
+    function restrictToPrintedGarment(fabric, W, H) {
+        const N = W * H;
+        let before = 0;
+        for (let i = 0; i < N; i++) { before += fabric[i]; }
+        if (!before) { return { dropped: 0 }; }
+
+        /* Separable dilation: a horizontal pass, then a vertical one. */
+        const rowPass = new Uint8Array(N), dil = new Uint8Array(N);
+        for (let y = 0; y < H; y++) {
+            const row = y * W;
+            for (let x = 0; x < W; x++) {
+                let v = 0;
+                for (let k = -CONNECT_DILATE; k <= CONNECT_DILATE; k++) {
+                    const xx = x + k;
+                    if (xx >= 0 && xx < W && fabric[row + xx]) { v = 1; break; }
+                }
+                rowPass[row + x] = v;
+            }
+        }
+        for (let x = 0; x < W; x++) {
+            for (let y = 0; y < H; y++) {
+                let v = 0;
+                for (let k = -CONNECT_DILATE; k <= CONNECT_DILATE; k++) {
+                    const yy = y + k;
+                    if (yy >= 0 && yy < H && rowPass[yy * W + x]) { v = 1; break; }
+                }
+                dil[y * W + x] = v;
+            }
+        }
+
+        const label = new Int32Array(N).fill(-1);
+        let best = -1, bestCount = 0;
+        const zoneLabels = [];
+
+        /* One seed per print zone. This picker only ever supplies one, but a
+           template can declare several -- `warpZones` in the registry, which
+           the business card pair uses -- and there the zones are SEPARATE
+           regions with bare background between them. Seeding from one would
+           keep that card and discard the other, and the discarded one renders
+           its design with no shading and stays undyed on recolour. Dilation
+           cannot rescue it either: it bridges a groove, not a deliberate gap.
+           So this takes a list, and a second zone added by hand to the
+           registry must be added to the derive as a second seed. */
+        const seeds = [];
+        if (points.length === 4) {
+            const a = zoneRect();
+            const cx = Math.round(a.x + a.w / 2), cy = Math.round(a.y + a.h / 2);
+            if (cx >= 0 && cy >= 0 && cx < W && cy < H) { seeds.push(cy * W + cx); }
+        }
+
+        let next = 0;
+        const stack = [];
+        for (let start = 0; start < N; start++) {
+            if (!dil[start] || label[start] !== -1) { continue; }
+            const id = next++;
+            /* Counted in ORIGINAL fabric pixels, not dilated ones, so "largest
+               region" still means the most actual surface. Dilation inflates
+               every region, and a thin sprawling one gains proportionally
+               more than a compact one. */
+            let count = 0;
+            stack.length = 0;
+            stack.push(start);
+            label[start] = id;
+            while (stack.length) {
+                const i = stack.pop();
+                if (fabric[i]) { count++; }
+                const x = i % W;
+                if (x > 0 && dil[i - 1] && label[i - 1] === -1) { label[i - 1] = id; stack.push(i - 1); }
+                if (x < W - 1 && dil[i + 1] && label[i + 1] === -1) { label[i + 1] = id; stack.push(i + 1); }
+                if (i >= W && dil[i - W] && label[i - W] === -1) { label[i - W] = id; stack.push(i - W); }
+                if (i < N - W && dil[i + W] && label[i + W] === -1) { label[i + W] = id; stack.push(i + W); }
+            }
+            if (count > bestCount) { bestCount = count; best = id; }
+        }
+
+        /* A seed only has to land in the dilated region, not on a classified
+           pixel: a zone centre sitting on a groove is exactly the case the
+           dilation exists to survive. */
+        seeds.forEach((seed) => {
+            if (seed >= 0 && dil[seed] && label[seed] !== -1 && zoneLabels.indexOf(label[seed]) === -1) {
+                zoneLabels.push(label[seed]);
+            }
+        });
+        const keep = zoneLabels.length ? zoneLabels : (best === -1 ? [] : [best]);
+        if (!keep.length) { return { dropped: 0 }; }
+
+        let after = 0;
+        for (let i = 0; i < N; i++) {
+            if (fabric[i] && keep.indexOf(label[i]) === -1) { fabric[i] = 0; } else { after += fabric[i]; }
+        }
+        return { dropped: before - after };
+    }
+
     function derive() {
         const W = baseImage.naturalWidth, H = baseImage.naturalHeight, N = W * H;
         const t = thresholds();
         const { luma, fabric } = classify(baseData.data, W, H, t);
+
+        /* Keep only the garment actually being printed on. A photograph can
+           hold more than one piece of the same cloth -- a cap on a model
+           wearing a white tee is two disconnected regions of identical
+           fabric, and the tee measured 22% of the classified pixels. Left in,
+           it drags the tone/shade percentiles and, far more visibly, joins
+           the garment mask, so choosing Navy would dye the model's shirt too.
+
+           Flood from the print zone where one is marked, which is the correct
+           test (the garment you are printing on); fall back to the largest
+           region when it is not, so Analyse still works before the corners
+           are set. Regions are 4-connected -- a diagonal thread of stray
+           pixels should not bridge two garments. */
+        const keptRegion = restrictToPrintedGarment(fabric, W, H);
+        if (keptRegion.dropped > 0) {
+            $("derive-status").textContent =
+                "Kept the garment region under the print area; discarded " +
+                keptRegion.dropped + " px of other same-coloured cloth.";
+            $("derive-status").className = "status";
+        }
 
         let fmean = 0, fn = 0;
         for (let i = 0; i < N; i++) { if (fabric[i]) { fmean += luma[i]; fn++; } }
@@ -812,6 +957,20 @@
         return cleaned || fallback;
     }
 
+    /* The category is a taxonomy PATH, not one segment, so slug() alone would
+       flatten apparel/hats/baseball-caps into apparel-hats-baseball-caps and
+       silently emit a filename where a folder was meant. Slug each segment,
+       keep the separators, and drop empty ones -- a stray leading, trailing or
+       doubled separator would otherwise produce "assets/mockups//x-base.png",
+       which resolves on a server but not from the filesystem. Backslashes are
+       accepted because the operator is on Windows and will paste one. */
+    function slugPath(value, fallback) {
+        const parts = String(value || "").split(/[\\/]+/)
+            .map((part) => slug(part, ""))
+            .filter(Boolean);
+        return parts.join("/") || fallback;
+    }
+
     function save(blob, name) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -834,7 +993,7 @@
             return;
         }
         const id = slug($("tpl-id").value, "my-mockup");
-        const category = slug($("tpl-category").value, "apparel");
+        const category = slugPath($("tpl-category").value, "apparel");
         const title = ($("tpl-title").value || "").trim() || id;
         const fabric = $("fabric-on").checked;
         const corners = points.map((p) =>
@@ -846,18 +1005,18 @@
             "        id: \"" + id + "\",\n" +
             "        title: \"" + title.replace(/\\/g, "").replace(/"/g, "'") + "\",\n" +
             "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "-thumb.jpg\",\n" +
-            "        base: \"assets/mockups/" + id + "-base.png\",\n";
+            "        base: \"assets/mockups/" + category + "/" + id + "-base.png\",\n";
 
         if (fabric) {
             body +=
                 "        overlay: null,\n" +
-                "        displace: \"assets/mockups/" + id + "-displace.png\",\n" +
-                "        shade: \"assets/mockups/" + id + "-shade.png\",\n" +
-                "        light: \"assets/mockups/" + id + "-light.png\",\n" +
+                "        displace: \"assets/mockups/" + category + "/" + id + "-displace.png\",\n" +
+                "        shade: \"assets/mockups/" + category + "/" + id + "-shade.png\",\n" +
+                "        light: \"assets/mockups/" + category + "/" + id + "-light.png\",\n" +
                 "        lightGain: " + Number($("light-gain").value) + ",\n" +
-                "        garment: \"assets/mockups/" + id + "-garment.png\",\n" +
-                "        tone: \"assets/mockups/" + id + "-tone.png\",\n" +
-                "        grain: \"assets/mockups/" + id + "-grain.png\",\n" +
+                "        garment: \"assets/mockups/" + category + "/" + id + "-garment.png\",\n" +
+                "        tone: \"assets/mockups/" + category + "/" + id + "-tone.png\",\n" +
+                "        grain: \"assets/mockups/" + category + "/" + id + "-grain.png\",\n" +
                 "        garmentColors: {\n" +
                 "            original: { name: \"As photographed\", hex: \"#E9E9EC\", original: true },\n" +
                 "            black: { name: \"Black\", hex: \"#1A1A1A\" },\n" +
@@ -873,7 +1032,7 @@
                 "        backing: null,\n";
         } else {
             body +=
-                "        overlay: \"assets/mockups/" + id + "-overlay.png\",\n" +
+                "        overlay: \"assets/mockups/" + category + "/" + id + "-overlay.png\",\n" +
                 "        overlayBlend: \"" + $("tpl-blend").value + "\",\n" +
                 "        mode: \"" + $("tpl-mode").value + "\",\n";
         }
@@ -961,7 +1120,7 @@
     $("dl-grain").addEventListener("click", () => saveCanvas(grainCanvas, "-grain.png"));
 
     $("light-gain").addEventListener("input", () => {
-        $("light-gain-val").textContent = Number($("light-gain").value).toFixed(1);
+        $("light-gain-val").textContent = Number($("light-gain").value).toFixed(2);
         renderPreview();
         buildEntry();
     });

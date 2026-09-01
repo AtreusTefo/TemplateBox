@@ -458,7 +458,7 @@ and the disabled-hover-upload behaviour. The hover input accepts a second
 thumbnail on these cards again, and the generator emits the standard two-image
 block.
 
-**`assets/mockups/wood-a4-base.png` and `wood-a4-overlay.png` stay.** They are
+**`assets/mockups/print/posters-and-frames/wood-a4-base.png` and `wood-a4-overlay.png` stay.** They are
 the mockup editor's own template assets, registered in `js/mockup-templates.js`
 and used by `mockup.html`. Only the homepage's use of them as a hover
 background is gone.

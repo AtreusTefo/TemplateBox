@@ -1781,6 +1781,8 @@ body.is-nav-hidden .site-header:focus-within {
 .mock-doc.accent-navy { --mk-accent: #1F4E79; }
 .mock-doc.accent-forest { --mk-accent: #2E5E4E; }
 .mock-doc.accent-brand { --mk-accent: #8A5A2B; }
+.mock-doc.accent-green { --mk-accent: #327B3C; }
+.mock-doc.accent-graphite { --mk-accent: #4A4A4A; }
 
 /* Resume miniature */
 
@@ -1828,6 +1830,97 @@ body.is-nav-hidden .site-header:focus-within {
 .mk-p {
     font-size: 0.3125rem;
     color: var(--color-muted);
+}
+
+/* Ruled Serif CV miniature. Centred serif headings sandwiched between two
+   full-width rules ARE the visual signature of that template, so the default
+   miniature -- left-aligned headings on a single accent underline -- would
+   depict a different document on its card. Only the rules, the centring and
+   the two-up skills grid are added here; every other .mk- class is shared, so
+   the two resume miniatures cannot drift apart in anything else. */
+
+.mock-doc.ruled .mk-name,
+.mock-doc.ruled .mk-contact {
+    text-align: center;
+}
+
+.mock-doc.ruled .mk-name {
+    border-top: 1.5px solid var(--color-text);
+    padding-top: 0.1875rem;
+}
+
+.mock-doc.ruled .mk-h {
+    font-family: var(--font-serif);
+    font-size: 0.4375rem;
+    letter-spacing: 0.04em;
+    text-align: center;
+    /* The rules are ink, not accent: in the source artwork only the heading
+       TEXT is green and the rules stay black. */
+    border-top: 1.5px solid var(--color-text);
+    border-bottom: 1.5px solid var(--color-text);
+    padding: 0.0625rem 0;
+    margin-top: 0.125rem;
+}
+
+.mock-doc.ruled .mk-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 0.25rem;
+}
+
+/* Modern Professional CV miniature: the site's only TWO-COLUMN resume, whose
+   whole signature is a full-bleed rail down the right edge carrying the
+   contact details and skills in white. The container drops its own padding so
+   the rail can reach all four edges -- a rail inset from them would read as a
+   panel rather than as the edge of the sheet -- and each column carries its
+   own padding instead. */
+
+.mock-doc.railed {
+    flex-direction: row;
+    padding: 0;
+    gap: 0;
+}
+
+.mock-doc.railed .mk-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1875rem;
+    padding: 0.625rem 0.5rem;
+}
+
+/* 37.65% is the descriptor's own sidebar fraction (224 of 595), so the card
+   depicts the proportion the export actually produces. */
+.mock-doc.railed .mk-rail {
+    flex: 0 0 37.65%;
+    background-color: var(--mk-accent);
+    color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.625rem 0.375rem;
+}
+
+.mock-doc.railed .mk-rail-h {
+    font-size: 0.3125rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+    padding-bottom: 0.0625rem;
+    margin-top: 0.1875rem;
+}
+
+.mock-doc.railed .mk-rail-line {
+    font-size: 0.28125rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+/* The name stacks onto two lines in this design, one word per line. */
+.mock-doc.railed .mk-name {
+    line-height: 1.05;
 }
 
 /* Shared: document title, ruled label/value rows, spacer */
@@ -2936,19 +3029,32 @@ body.is-nav-hidden .site-header:focus-within {
 /* The editor page's width with NO rail in play. These two tiers widened the
    page so the old in-flow rail was added beside the panes rather than taken
    out of them. The rail is out of flow now (see the Photopea-layout note
-   below), so what these describe is only the layout a visitor sees when the
-   zone is dormant, the script is blocked, or an ad blocker is running -- and
-   that layout is precisely the one that must not change. Left untouched for
-   that reason; the override once a rail does mount is further down. */
-@media (min-width: 84rem) {
-    main:has(.editor-shell) {
-        max-width: 84rem;
-    }
-}
+   below), so what these describe is the layout a visitor sees when the zone is
+   dormant, the script is blocked, or an ad blocker is running.
 
-@media (min-width: 93rem) {
+   ONE tier since August 30, 2026, at 100rem, replacing an 84rem/93rem ladder.
+   That reverses this block's own previous instruction to leave it alone: it
+   was left alone because the August 10 rail work must not have altered the
+   no-rail layout, which was a correct constraint for THAT change rather than a
+   permanent freeze.
+
+   Two reasons it moved. First, the rule below now lets the editors fill the
+   width beside a mounted rail, and had this stayed at 93rem then turning an ad
+   blocker ON would have made the workspace NARROWER than turning it off, which
+   is backwards; at 1920 the panes measure 764px here against 754px with a
+   rail, so the two agree to within ten pixels. Second, the ladder left the
+   editors capped by the site-wide `main { max-width: 72rem }` all the way up
+   to 1344px -- and that is a CONTENT-page cap, there to hold a line of prose
+   to a readable measure. An editor is a workspace, not an article. It produced
+   the same centred dead space the rail rule has just stopped producing, one
+   band lower: at a 1165px tablet the workspace sat in 1152px with the slack
+   split either side, and at 1343px it wasted 191px.
+
+   Gated at 72rem because that is where the base cap starts to bind; below it
+   the viewport decides the width and this rule would do nothing. */
+@media (min-width: 72rem) {
     main:has(.editor-shell) {
-        max-width: 93rem;
+        max-width: 100rem;
     }
 }
 
@@ -3218,9 +3324,42 @@ body.is-nav-hidden .site-header:focus-within {
    there -- the body padding is, and the panes absorb it. That is the
    accepted cost of the lower floor, not an oversight; a cap cannot give
    back width the viewport does not have. */
+/* REVISED August 30, 2026: the editors FILL the width beside the rail rather
+   than sitting in a 72.75rem column with the slack split either side.
+
+   Reported as dead space on the far left of laptop and desktop screens, and it
+   measured worse than it looked. At 1920 the old cap put a 1164px column in
+   the 1581px left of the rail and centred it, so the workspace carried 209px
+   of nothing on its left AND 232px on its right -- 441px, nearly a quarter of
+   the window, on a page that is a two-pane workspace rather than an article.
+
+   Two changes, and both are needed. `max-width: 100rem` is generous enough
+   that the viewport decides the width at every laptop and desktop size (it
+   only binds past about 2100px, where it holds the panes at roughly 764px
+   instead of letting them sprawl). `margin-left: 0` then puts the slack in ONE
+   place instead of two: the rail owns the right edge of the window, so the
+   workspace belongs against the left, and the freed width becomes a single
+   gutter before the column rather than a gap on each side.
+
+   Left-aligning is right HERE and would be wrong on the no-rail rule above,
+   which stays centred -- with no rail there is nothing owning the right edge
+   for the workspace to sit away from.
+
+   It also lands the panes where they belong: `main`'s 1.5rem padding matches
+   `.site-header`'s, so the form pane's left edge is now flush under the site
+   mark in the bar rather than 209px adrift of it.
+
+   What this gives up is the note this rule used to carry: 72.75rem was 93rem
+   minus the 324px three-slot column, chosen so no pane was narrower than the
+   pre-rail tiered layout (546px). That guarantee is kept and beaten -- panes
+   measure 754px at 1920 rather than 546px -- but the arithmetic tying the cap
+   to the rail width is gone, so a future change to --ad-rail-w no longer needs
+   a matching edit here. The body padding already reserves the column, which is
+   the only coupling that has to hold. */
 @media (min-width: 75rem) {
     body.has-ad-rail main:has(.editor-shell) {
-        max-width: 72.75rem;
+        max-width: 100rem;
+        margin-left: 0;
     }
 }
 
@@ -3401,25 +3540,34 @@ body.has-site-anchor {
         padding-bottom: 7.25rem;
     }
 
-    /* 8.25rem, not the 7.25rem the reservation uses, and the extra 1rem is
-       measured rather than padding-by-feel.
+    /* The lift matches the reservation exactly here, because in THIS part of
+       the tablet tier the preview pane is not sticky.
 
-       In this band -- and only in this band -- .preview-pane is
-       position: sticky (its rule starts at 48.0625rem), and with a sticky
-       pane the export bar's stuck position comes out a consistent 12px lower
-       than its `bottom` nominally asks for: at 1024x768 a `bottom: 116px`
-       bar sits with its foot at 664 where the arithmetic says 652, and the
-       same 12px appears at 769px and 1199px. Below 48.0625rem the pane is
-       not sticky and the offset lands exactly on its nominal value (measured
-       724 against 724 at 400x800), which is why the phone tier above needs
-       no such allowance and must not copy this one.
+       It used to be 8.25rem across the whole tier. That extra 1rem is a
+       measured allowance for stickiness: with a sticky pane the export bar's
+       stuck position comes out a consistent 12px lower than its `bottom`
+       nominally asks for -- at 1024x768 a `bottom: 116px` bar sits with its
+       foot at 664 where the arithmetic says 652 -- and at 7.25rem the bar
+       finished 11.4px INSIDE the 115.4px-tall anchor, which is z-index 30
+       against the bar's 5 and so painted over the export control.
 
-       At 7.25rem the bar therefore finished 11.4px INSIDE the 115.4px-tall
-       anchor on all four editors at every tablet width -- the anchor is
-       z-index 30 against the bar's 5, so it painted over the export control.
-       8.25rem clears it by 4.6px. `${tag}: export bar clears the anchor` in
-       tests/verify-layout.js is what stops this silently regressing if the
-       pane's stickiness or the anchor's height ever changes. */
+       The pane's sticky rule moved from 48.0625rem to 64rem on
+       August 30, 2026 when the split view did, so 48.0625-64rem is now a
+       NON-sticky band and the offset lands exactly on its nominal value, the
+       same as the phone tier above. Applying the sticky allowance here would
+       now lift the bar 16px clear of an anchor it no longer touches.
+       `${tag}: export bar clears the anchor` in tests/verify-layout.js is
+       what stops either half of this silently regressing. */
+    body.has-ad-anchor .preview-actions {
+        bottom: 7.25rem;
+    }
+}
+
+/* The sticky half of the tablet tier: same 728x90 anchor and the same 7.25rem
+   reservation, but the pane IS sticky from 64rem, so the export bar needs
+   the measured 1rem allowance described above. Splitting the tier in two is
+   what keeps the lift tracking the PANE rather than the anchor. */
+@media (min-width: 64rem) and (max-width: 74.9375rem) {
     body.has-ad-anchor .preview-actions {
         bottom: 8.25rem;
     }
@@ -3466,7 +3614,15 @@ body.has-site-anchor {
    fill the track and have nowhere to move.
    -------------------------------------------------------------------------- */
 
-@media (min-width: 48.0625rem) {
+/* Gated at 64rem since August 30, 2026, not 48.0625rem. Sticky only makes
+   sense once the preview sits BESIDE a scrolling form, and the split now
+   starts at 64rem rather than 48rem -- between the two the editor is a single
+   tabbed column, where a sticky pane would pin the document to the top of the
+   viewport while the form scrolled underneath it. The two boundaries are one
+   decision: move the split and this has to move with it, along with the export
+   bar's lift below, which carries an allowance that exists only because the
+   pane is sticky. */
+@media (min-width: 64rem) {
     .preview-pane {
         position: sticky;
         top: 5.75rem;
@@ -3476,6 +3632,54 @@ body.has-site-anchor {
            export bar inside it stick to the pane rather than the page. */
         max-height: calc(100vh - 7rem);
         overflow-y: auto;
+        /* Reserve the scrollbar's width whether or not one is showing.
+
+           Without this the pane is BISTABLE, and measurably so. The document
+           inside it is an SVG at `width: 100%; height: auto`, so its height is
+           locked to the pane's content width -- and `overflow-y: auto` makes
+           that width depend on whether a scrollbar is present. At an
+           ads-blocked 1200px the two states are a closed loop: content
+           measures 791 against a 788 cap, so a scrollbar appears; the 17px it
+           takes shrinks the sheet from 480.5 to 465.5 wide and therefore from
+           679.1 to 657.9 tall; content is now 770, the overflow is gone and
+           the scrollbar can go with it, which puts it back at 791.
+
+           Which of the two the browser settles in is a timing coin-flip, so
+           the same page measured 788 in one run and 771.5 in the next. That
+           surfaced as a flaky failure in section 4 of tests/verify-layout.js,
+           where the working tree and a byte-identical HEAD copy disagreed and
+           the two values SWAPPED between runs -- but the test was reporting
+           real instability, not inventing it. A visitor at that width gets a
+           document rendered 15px narrower on the losing toss.
+
+           Reserving the gutter unconditionally makes the content width a
+           constant, which breaks the loop at its only circular link. The
+           @supports block below covers the engines that do not have this
+           property. */
+        scrollbar-gutter: stable;
+    }
+}
+
+/* The same guarantee for engines without scrollbar-gutter -- Safari before
+   18.2, and anything older. `overflow-y: scroll` reserves the width in every
+   engine ever shipped, so the content width is constant there too and the loop
+   above cannot form.
+
+   Why not just use `overflow-y: scroll` everywhere and drop the property? On a
+   classic-scrollbar platform it paints a visible empty track even when nothing
+   overflows, which is exactly the sort of dead furniture this project strips
+   out elsewhere; `scrollbar-gutter: stable` reserves the same width and paints
+   nothing. So the pretty version leads and this is the floor beneath it.
+
+   Note this costs nothing on macOS and iOS. Their scrollbars are overlays that
+   never take layout width, so the circular dependency cannot exist there at
+   all, and `scroll` reserves nothing. The whole problem, and therefore both
+   halves of the fix, only ever concerned platforms with classic scrollbars. */
+@supports not (scrollbar-gutter: stable) {
+    @media (min-width: 64rem) {
+        .preview-pane {
+            overflow-y: scroll;
+        }
     }
 }
 
@@ -4528,9 +4732,55 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
-   Resume document preview (the html2pdf.js capture target)
+   Resume template picker (resume.html)
+   Built from the registry by js/resume.js, so this styles a row of unknown
+   length. Text buttons rather than the swatch row's colour discs: a template
+   has no single colour to show, and a miniature small enough to sit in the
+   form pane would be unreadable.
    -------------------------------------------------------------------------- */
 
+.template-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.template-pick {
+    padding: 0.4375rem 0.875rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.template-pick:hover {
+    border-color: var(--color-text);
+}
+
+/* Matches .swatch.is-active, so the two controls under the same heading read
+   as the same kind of choice. */
+.template-pick.is-active {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+    border-color: var(--color-text);
+}
+
+/* --------------------------------------------------------------------------
+   Resume document preview
+   -------------------------------------------------------------------------- */
+
+/* The bare container is the PRE-PAINT state now, not a document.
+
+   It used to be the Classic resume itself -- an HTML sheet whose .rs-* type
+   rules lived directly below this one. Classic became a descriptor on
+   August 30, 2026 and the engine draws every template, so those rules were
+   deleted with the renderer they were sized for. What is left is what the
+   pane shows before the first paint lands, or when the engine could not be
+   loaded at all: a blank sheet of the right size, so the pane never collapses
+   and never jumps. */
 .resume-sheet {
     background-color: #FFFFFF;
     border: 1px solid var(--color-border);
@@ -4541,57 +4791,116 @@ legend {
     min-height: 28rem;
 }
 
-.resume-sheet .rs-name {
-    font-family: var(--font-serif);
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--accent);
+/* Shown only when the engine or the registry failed to load. Deliberately
+   plain: it is a fault report, not part of any document. */
+.sheet-message {
+    color: var(--color-muted);
+    text-align: center;
+    max-width: 22rem;
+    margin: 4rem auto;
 }
 
-.resume-sheet .rs-title {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
+/* An engine-drawn preview is a STACK OF PAGES, not one long sheet.
+
+   The first version of this rule made the container carry the paper: it kept
+   its own white ground and border while each <svg> page had neither, and the
+   gap between pages was therefore white on white. A two-page CV rendered as a
+   single 1116px white column with an invisible seam -- an A4 document that
+   looked like one impossibly long page, with nothing to tell the visitor
+   their resume had run over.
+
+   The container is a workspace MAT now and the paper moved onto the pages:
+   each <svg> gets its own white ground, its own edge and a soft lift, and the
+   band of mat between them is what makes the page break unmissable.
+
+   The mat inherits the light palette from the paper-surfaces rule near the
+   top of this file, so it stays light grey in dark mode rather than going
+   dark. That is deliberate: it is how every document editor presents paper --
+   a light mat under white pages, whatever the surrounding chrome is doing --
+   and it keeps the page labels legible against it in both themes.
+
+   .is-engine is added by js/resume.js only once a page has actually been
+   painted; applied to an empty container it would collapse the pane to
+   nothing. line-height: 0 removes the inline descender gap under the <svg>. */
+.resume-sheet.is-engine {
+    padding: 0.75rem;
+    min-height: 0;
+    line-height: 0;
+    background-color: var(--color-bg);
 }
 
-.resume-sheet .rs-contact {
+.resume-sheet .rt-sheet {
+    display: block;
+    width: 100%;
+    height: auto;
+    background-color: #FFFFFF;
+    border: 1px solid var(--color-border-strong);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* "Page 1 of 2", set on the mat under each page. js/resume.js adds these only
+   when there IS more than one page, so a single-page CV carries no chrome at
+   all. The bottom margin is what opens the band of mat between two pages, so
+   the last label -- which has no page after it -- drops it. */
+.resume-sheet .rt-page-label {
+    margin: 0.5rem 0 1.5rem;
+    text-align: center;
     font-size: 0.75rem;
-    color: #6B6B66;
-    margin-bottom: 1rem;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
 }
 
-.resume-sheet .rs-section {
-    margin-top: 1.25rem;
+.resume-sheet .rt-page-label:last-child {
+    margin-bottom: 0;
 }
 
-.resume-sheet .rs-heading {
-    font-family: var(--font-serif);
-    font-size: 0.9375rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--accent);
-    border-bottom: 2px solid var(--accent);
-    padding-bottom: 0.25rem;
-    margin-bottom: 0.625rem;
+/* --------------------------------------------------------------------------
+   Click-to-edit on the preview.
+
+   The engine marks every run it drew from the visitor's own words with
+   .rt-editable; template labels like the section headings get no class and
+   stay inert, which is the whole affordance: if it takes an I-beam, it is
+   yours to change.
+   -------------------------------------------------------------------------- */
+
+/* Positions the overlay, which is a child of the sheet. */
+.resume-sheet.is-engine {
+    position: relative;
 }
 
-.resume-sheet .rs-entry {
-    margin-bottom: 0.75rem;
+.rt-editable {
+    cursor: text;
 }
 
-.resume-sheet .rs-entry-head {
-    font-weight: 600;
+/* A wash rather than a box: the sheet is a document, and a bordered hit area
+   around every phrase would read as a form. Painted behind the glyphs so the
+   text never loses contrast. */
+.rt-editable:hover {
+    fill-opacity: 1;
+    paint-order: stroke fill;
+    stroke: var(--color-brand);
+    stroke-width: 6px;
+    stroke-opacity: 0.16;
+    stroke-linejoin: round;
 }
 
-.resume-sheet .rs-entry-meta {
-    font-size: 0.75rem;
-    color: #6B6B66;
-    margin-bottom: 0.25rem;
-}
-
-.resume-sheet ul {
-    padding-left: 1.125rem;
+/* The floating input. It stands in for one run while it is open, so it carries
+   no chrome of its own beyond a thin ring -- anything heavier and the document
+   visibly turns into a form under the cursor. Padding and border are zeroed
+   because its box is positioned from the run's measured screen box; any
+   inherited box model would shift the text off the baseline it replaces. */
+.rt-inline-editor {
+    position: absolute;
+    z-index: 4;
+    margin: 0;
+    padding: 0 2px;
+    border: 0;
+    border-radius: 2px;
+    outline: 2px solid var(--color-brand);
+    background-color: var(--color-card);
+    line-height: 1.15;
+    letter-spacing: inherit;
 }
 
 /* --------------------------------------------------------------------------
@@ -5317,6 +5626,43 @@ main:has(.mockup-layout) .editor-head {
     display: none;
 }
 
+/* Surface switch, shown only on a template with more than one printable
+   surface (the two-card business card mockup). Sits directly above the layer
+   list because it scopes it: the list shows the selected surface's layers.
+   Styled off .layer-row's vocabulary so the two read as one control group. */
+.zone-switch {
+    display: flex;
+    gap: var(--space-3xs);
+    margin-bottom: var(--space-2xs);
+}
+
+.zone-switch[hidden] {
+    display: none;
+}
+
+.zone-tab {
+    flex: 1 1 0;
+    min-height: 2.25rem;
+    padding: 0 var(--space-2xs);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-muted);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) var(--ease),
+        color var(--motion-fast) var(--ease);
+}
+
+.zone-tab:hover {
+    color: var(--color-text);
+}
+
+.zone-tab[aria-pressed="true"] {
+    color: var(--color-text);
+    border-color: var(--color-brand);
+}
+
 .layer-row {
     display: flex;
     align-items: center;
@@ -5661,6 +6007,16 @@ main:has(.mockup-layout) .editor-head {
     padding: 0;
     border: 1px solid var(--color-border-strong);
     cursor: pointer;
+}
+
+/* The product's own colourways, rendered ahead of the generic hexes in the
+   same grid. They carry a selected state because, unlike a hex, they ARE a
+   state: "As photographed" skips the tint entirely and a heather mixes toward
+   undyed fibre, so the visitor needs to see which one is live. A custom hex
+   marks none of them, which is correct -- it is not one of them. */
+.color-colorway[aria-pressed="true"] {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 1px;
 }
 
 .color-eyedropper {
@@ -7136,6 +7492,47 @@ main:has(.mockup-layout) .editor-head {
    Responsive rules (layouts verified down to a 320px viewport)
    -------------------------------------------------------------------------- */
 
+/* The editor split collapses at 64rem, not at the 48rem the rest of this
+   section uses, which is why it is its own block rather than part of the one
+   below (August 30, 2026).
+
+   It collapsed at 48rem until then, and that made 769px the worst width on the
+   site for an editor: at 768px the visitor had one pane 705px wide, and one
+   pixel later two panes of 367px each -- the split engaged the moment the
+   layout stopped being a phone, on a viewport with nowhere near the room for
+   it. A resume preview rendered into 317px of inner width. 64rem is where two
+   panes stop being cramped: 469px each at 1024px, against 975px for the single
+   pane just below it.
+
+   Three rules move together and a fourth follows: the grid, the tab row and
+   the two pane-hiding rules here; `.preview-pane`'s sticky rule at 64rem; and
+   the export bar's anchor lift, which carries a measured 1rem allowance that
+   applies only where the pane is sticky. Move one and the others have to move
+   with it.
+
+   63.9375rem rather than the 64rem this section's other blocks would use, so
+   that 1024px itself SPLITS. An iPad in landscape is exactly 1024 CSS pixels
+   with no classic scrollbar to take width off it, and `max-width: 64rem` is
+   inclusive -- it would have handed the device this boundary was chosen for
+   the single-column layout meant for the tablet below it. */
+@media (max-width: 63.9375rem) {
+    .editor-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-tabs {
+        display: flex;
+    }
+
+    .editor-layout.show-edit .preview-pane {
+        display: none;
+    }
+
+    .editor-layout.show-preview .editor-pane {
+        display: none;
+    }
+}
+
 @media (max-width: 48rem) {
     .hero h1 {
         font-size: 1.875rem;
@@ -7183,23 +7580,6 @@ main:has(.mockup-layout) .editor-head {
     .ad-row {
         flex-direction: column;
         align-items: center;
-    }
-
-    /* Editor split view collapses into a tabbed single-column layout */
-    .editor-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .mobile-tabs {
-        display: flex;
-    }
-
-    .editor-layout.show-edit .preview-pane {
-        display: none;
-    }
-
-    .editor-layout.show-preview .editor-pane {
-        display: none;
     }
 
     .countdown {

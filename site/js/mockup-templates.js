@@ -109,11 +109,28 @@
    data-target="mockup" data-doc="<id>". No other code changes are needed.
 
    Asset conventions:
-     site/assets/mockups/<id>-base.png / <id>-overlay.png
-     site/assets/mockups/<id>-displace.png / <id>-shade.png   (fabric only)
+     site/assets/mockups/<category>/<id>-base.png / <id>-overlay.png
+     site/assets/mockups/<category>/<id>-displace.png / <id>-shade.png  (fabric)
      site/assets/thumbnails/product-mockups/<category>/<id>-thumb.jpg
    Paths must stay URL-safe: lowercase, hyphenated, no spaces. The admin tool
    derives every filename from the id, so the id and the assets cannot drift.
+
+   <category> is a nested taxonomy path, and the SAME path is used in both
+   trees -- apparel/t-shirts, apparel/hats/baseball-caps, drinkware/mugs,
+   packaging/boxes, print/posters-and-frames, print/business-cards,
+   print/signage, and so on. The admin tool takes
+   it once and writes it into both. It carries no runtime meaning: nothing
+   parses these strings, and the catalog card's data-category is what filters
+   the grid. The folders exist so a collection of hundreds of source photos,
+   seven maps apiece, stays navigable on disk -- and so the eventual move to
+   object storage (see the scale note below) is a prefix swap rather than a
+   sort. Segment names omit the word "mockup": the tree is already under
+   assets/mockups/, so apparel/hats/baseball-caps, never
+   "apparel mockups/hats Mockups/baseball cap mockups".
+
+   Empty category folders are not in git -- git tracks files, not directories
+   -- so a fresh clone has only the folders that hold assets. Creating one is
+   part of adding the first template that needs it, not a separate step.
 
    Scale note: assets are local while the catalog is small. When the
    collection outgrows the repository (roughly 1GB), move base/overlay
@@ -128,9 +145,9 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "wood-a4",
         title: "Leaning Wood Frame Poster",
-        thumb: "assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.webp",
-        base: "assets/mockups/wood-a4-base.png",
-        overlay: "assets/mockups/wood-a4-overlay.png",
+        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4-thumb.webp",
+        base: "assets/mockups/print/posters-and-frames/wood-a4-base.png",
+        overlay: "assets/mockups/print/posters-and-frames/wood-a4-overlay.png",
         /* Measured: inside the print window this overlay averages alpha 193
            over a near-white body (mean luma 211), so it is a luminance map,
            not a shadow cut-out. */
@@ -148,30 +165,38 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "tshirt-model-white",
         title: "White T-Shirt on Model",
-        thumb: "assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb.webp",
-        base: "assets/mockups/tshirt-model-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-thumb.webp",
+        base: "assets/mockups/apparel/t-shirts/tshirt-model-white-base.png",
         /* Fabric, not glass: the artwork is bent and shaded by the two maps
            below during the displacement pass, so this template carries no
            full-canvas overlay at all. */
         overlay: null,
-        displace: "assets/mockups/tshirt-model-white-displace.png",
-        shade: "assets/mockups/tshirt-model-white-shade.png",
+        displace: "assets/mockups/apparel/t-shirts/tshirt-model-white-displace.png",
+        shade: "assets/mockups/apparel/t-shirts/tshirt-model-white-shade.png",
         /* 2.8% of this garment sits above its own reference white -- the
            light catching the fold ridges. Multiply clamps that away, so it
            is split into its own screen layer. */
-        light: "assets/mockups/tshirt-model-white-light.png",
-        lightGain: 1,
+        light: "assets/mockups/apparel/t-shirts/tshirt-model-white-light.png",
+        /* 0.3, not 1. The light map is "everything above the fabric's
+           median" on a WHITE garment, which is mostly bright DIFFUSE, not
+           surface reflection -- the same confusion that washed dark dyes out
+           in recolour before the tone map split them apart. Screened at full
+           strength onto dark ink it destroys it: a #12305C navy fill measured
+           p95 luma 159 against a source of 44, and a quarter of the print
+           lost its blue identity outright. At 0.3 the highlight still models
+           the surface and the ink stays the colour it was. */
+        lightGain: 0.3,
         /* Alpha mask of the garment, hole-filled and feathered. Recolour is
            confined to it, so the tint cannot creep onto skin or background. */
-        garment: "assets/mockups/tshirt-model-white-garment.png",
+        garment: "assets/mockups/apparel/t-shirts/tshirt-model-white-garment.png",
         /* Diffuse response normalised to the garment's own peak, used ONLY by
            recolour. Distinct from `shade` on purpose: shade is median-split
            for the print pass and pairs with `light`, which would wash a dye
            out. */
-        tone: "assets/mockups/tshirt-model-white-tone.png",
+        tone: "assets/mockups/apparel/t-shirts/tshirt-model-white-tone.png",
         /* High-pass of the weave, centred at 128. Screened back over a
            heather colourway as the undyed fibre; unused by solid dyes. */
-        grain: "assets/mockups/tshirt-model-white-grain.png",
+        grain: "assets/mockups/apparel/t-shirts/tshirt-model-white-grain.png",
         /* Declaring both `garment` and `garmentColors` is what turns the
            colour field on for a photographic template. The first entry is the
            photographed garment itself and is never tinted. */
@@ -221,6 +246,322 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 729, y: 548 },
             { x: 729, y: 1105 },
             { x: 311, y: 1105 }
+        ]
+    },
+    {
+        id: "cap-model-white",
+        title: "White Baseball Cap on Model",
+        thumb: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb.jpg",
+        base: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-displace.png",
+        shade: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-shade.png",
+        light: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-light.png",
+        /* 0.3, not 1. The light map is "everything above the fabric's
+           median" on a WHITE garment, which is mostly bright DIFFUSE, not
+           surface reflection -- the same confusion that washed dark dyes out
+           in recolour before the tone map split them apart. Screened at full
+           strength onto dark ink it destroys it: a #12305C navy fill measured
+           p95 luma 159 against a source of 44, and a quarter of the print
+           lost its blue identity outright. At 0.3 the highlight still models
+           the surface and the ink stays the colour it was. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-garment.png",
+        tone: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-tone.png",
+        grain: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-grain.png",
+        /* Higher than the shirt's 16 because this base is 1939px wide against
+           the shirt's 1024, and displaceStrength is in base-image pixels. It
+           is NOT scaled proportionally (that would be ~30): a structured cap
+           front is buckram-stiffened and barely moves, and its gradient p99
+           measured 22.1 against the shirt's 32.2. What bends the print here is
+           the crown's curvature and the two seams, not folds. */
+        displaceStrength: 20,
+        mode: "surface",
+        backing: null,
+        /* The cap is a cut-out on transparency, like the shirt, so the
+           Background colour panel applies. */
+        background: true,
+        /* The model also wears a white tee, which classifies as the same
+           fabric -- 299,506px, 22.6% of the mask. The factory now keeps only
+           the region connected to the print zone, so recolour dyes the cap
+           and leaves the shirt alone. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* Front panel, clear of the brim seam (measured at y~740 on the
+           centreline) and of the eyelets above. 2:1, the ratio of a standard
+           4.5x2.25in cap embroidery area. Verified 99.9% fabric; the 141
+           stray pixels are isolated specks, not an edge. */
+        warpZone: [
+            { x: 600, y: 300 },
+            { x: 1340, y: 300 },
+            { x: 1340, y: 670 },
+            { x: 600, y: 670 }
+        ]
+    },
+    {
+        id: "bag-paper-white",
+        title: "White Paper Shopping Bag",
+        thumb: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-white-thumb.jpg",
+        base: "assets/mockups/packaging/bags/bag-paper-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/packaging/bags/bag-paper-white-displace.png",
+        shade: "assets/mockups/packaging/bags/bag-paper-white-shade.png",
+        light: "assets/mockups/packaging/bags/bag-paper-white-light.png",
+        lightGain: 0.3,
+        garment: "assets/mockups/packaging/bags/bag-paper-white-garment.png",
+        tone: "assets/mockups/packaging/bags/bag-paper-white-tone.png",
+        /* No `grain`, and that is a property of the material rather than an
+           omission. The map exists to screen undyed fibre back over a heather
+           blend, and paper has no blend -- there are no heather colourways
+           below for it to serve. The weave measured 2.55 luma levels, above
+           the 2.0 floor, so a map COULD have been derived; it would have been
+           1.5MB that `ensurePhotoAssets` loads and nothing ever samples,
+           because renderGarmentTint reads it only when a colourway declares a
+           heather fraction. The extras list filters on presence, so leaving
+           the key out drops the request. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            /* The colourway that makes a white base the right choice: the
+               classifier gates on sat < 14, so a photographed kraft bag
+               (measured around 70) could never have been derived at all.
+               Dyeing white to kraft gets the same product from a base the
+               pipeline can actually read. */
+            kraft: { name: "Kraft Brown", hex: "#C29A6B" },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" }
+        },
+        /* 8, against the shirt's 16 at 1024px and the cap's 20 at 1939px --
+           0.39% of base width where those are 1.56% and 1.03%. Paper is the
+           stiffest of the three surfaces, so it belongs at the bottom of that
+           ordering, but the number was picked off the test grid rather than
+           derived: at 12 the ruled lines start reading as cloth and at 18
+           they wander outright. The displacement map is normalised to its own
+           p99 (9.94 here, against the shirt's 41.5), so a nearly flat surface
+           has its gentle creases stretched across the full encoded range --
+           which is exactly why the strength has to come down to compensate,
+           not up to match the larger base. */
+        displaceStrength: 8,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency like the shirt and the cap: all four
+           corners read alpha 0 and 38.0% of the image is clear, so a
+           Background fill lands behind the product, not behind the artwork. */
+        background: true,
+        /* The front panel is one plane, bounded by the two folds that show up
+           as the only strong horizontal steps in the row-mean scan: the rim
+           at y=868 and the base gusset at y=2600. No vertical crease exists
+           between them -- the column means fall smoothly 230 to 220 across
+           the full width, which is the left-hand key light, not a gusset --
+           so the whole panel width is usable and the four corners sit on one
+           surface. 1150 square, centred on the panel (x 192..1858), verified
+           100.00% surface: no alpha, no dark pixels, no saturated pixels. */
+        warpZone: [
+            { x: 450, y: 1150 },
+            { x: 1600, y: 1150 },
+            { x: 1600, y: 2300 },
+            { x: 450, y: 2300 }
+        ]
+    },
+    {
+        id: "card-white-walnut",
+        title: "Business Cards on Walnut",
+        thumb: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut-thumb.jpg",
+        base: "assets/mockups/print/business-cards/card-white-walnut-base.png",
+        overlay: null,
+        displace: "assets/mockups/print/business-cards/card-white-walnut-displace.png",
+        shade: "assets/mockups/print/business-cards/card-white-walnut-shade.png",
+        light: "assets/mockups/print/business-cards/card-white-walnut-light.png",
+        lightGain: 0.3,
+        garment: "assets/mockups/print/business-cards/card-white-walnut-garment.png",
+        tone: "assets/mockups/print/business-cards/card-white-walnut-tone.png",
+        /* No `grain`, for the same reason the paper bag has none: the map
+           exists to screen undyed fibre back over a heather blend, and card
+           stock has no blend. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            ivory: { name: "Ivory", hex: "#EDE6D6" },
+            kraft: { name: "Kraft Brown", hex: "#C29A6B" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            black: { name: "Black", hex: "#1A1A1A" }
+        },
+        /* 4, the lowest in the catalog: 0.17% of base width where the bag is
+           0.39%, the cap 1.03% and the shirt 1.56%. A printed card lying flat
+           on a desk is the stiffest surface here and belongs at the bottom of
+           that ordering. Its gradient p99 measured 4.54 against the bag's
+           10.32, so the map is normalising something very close to paper
+           noise -- on the test grid 7 already reads as a buckled card and 12
+           ripples outright, while 2 is indistinguishable from a flat paste. */
+        displaceStrength: 4,
+        mode: "surface",
+        /* Opaque scene, so NO `background` flag. The walnut is the product,
+           not a backdrop to be filled: a colour fill would have nothing to
+           land on and the Background panel correctly never appears. This is
+           the first template whose base needs no alpha channel at all, which
+           is also why it is written as RGB rather than RGBA. */
+        warpZones: [
+            [
+                { x: 529, y: 578 },
+                { x: 1868, y: 578 },
+                { x: 1868, y: 1397 },
+                { x: 529, y: 1397 }
+            ],
+            [
+                { x: 529, y: 1567 },
+                { x: 1868, y: 1567 },
+                { x: 1868, y: 2386 },
+                { x: 529, y: 2386 }
+            ]
+        ],
+        zoneLabels: ["Front", "Back"],
+        /* The first zone again. Every path that predates multi-zone reads
+           this one, and the validator requires it, so the two must not drift:
+           it is warpZones[0], not an independent value.
+
+           Both are 1340x820 and identical to the pixel, so a design renders
+           at the same scale whichever card it is on. Measured from the
+           photograph's modal card edges (x 526..1871 on both, y 575..1400 and
+           y 1564..2390) inset by 3 and trimmed to a common height; verified
+           100.0000% surface with zero impure pixels on both. The 163px of
+           bare wood between them is what keeps the two cards separable -- and
+           is also why the mask has to be flooded from BOTH zone centres. */
+        warpZone: [
+            { x: 529, y: 578 },
+            { x: 1868, y: 578 },
+            { x: 1868, y: 1397 },
+            { x: 529, y: 1397 }
+        ]
+    },
+    {
+        id: "banner-rollup-white",
+        title: "Roll-Up Banner Stand",
+        thumb: "assets/thumbnails/product-mockups/print/signage/banner-rollup-white-thumb.jpg",
+        base: "assets/mockups/print/signage/banner-rollup-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/print/signage/banner-rollup-white-displace.png",
+        shade: "assets/mockups/print/signage/banner-rollup-white-shade.png",
+        light: "assets/mockups/print/signage/banner-rollup-white-light.png",
+        /* 0.3, as everywhere else, but here it was checked rather than copied.
+           This face has the narrowest headroom in the catalog (median 237
+           against a 248.9 ceiling, so 11.9 luma levels normalised across the
+           full range), which pushed a navy fill's p95 to 81.6 against the
+           business card's 59.3. That looked like the washout that forced 0.3
+           in the first place, so blue identity was measured directly: 0.00% of
+           pixels lose it at 0.15, 0.2, 0.25, 0.3 or even 0.4. The lift is
+           uniform brightening, not a hue wash -- which is what a highlight on
+           vinyl should be -- so the shared value stands. */
+        lightGain: 0.3,
+        /* FOUR maps, not seven, and the first template to ship fewer. Blank
+           banner vinyl has no colour variant worth offering and a design
+           covers the entire face, so there are no colourways for a `garment`
+           mask or a `tone` map to serve, and `grain` has no fibre blend to
+           model. Declaring no garmentColors is what turns the colour field
+           off. The whole template is 1.5MB against the paper bag's 11.3MB. */
+        displaceStrength: 10,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency -- all four corners read alpha 0 and 48.2%
+           of the image is clear -- so a Background fill lands behind the
+           stand. The generated file looked white-backed in a preview, which
+           is only the viewer compositing onto white; the alpha channel is
+           real. */
+        background: true,
+        /* The face measured x 205..819, y 128..1346, inset 6: still
+           100.0000% pure with zero impure pixels, and clear of the edge
+           feather. Zero blown pixels anywhere inside it, the only base in the
+           catalog with none.
+
+           The dark hardware is what makes this work. A brushed aluminium
+           cassette measures roughly 5 saturation and 150-200 luma and would
+           sail through both classifier gates while being physically joined to
+           the face, dragging the median and the specular ceiling that `shade`
+           and `light` normalise against. Anthracite fails the luma gate: the
+           rail, cassette and feet measured p50 56-68, and the face holds
+           99.83% of every classified pixel in the image. */
+        warpZone: [
+            { x: 211, y: 134 },
+            { x: 813, y: 134 },
+            { x: 813, y: 1340 },
+            { x: 211, y: 1340 }
+        ]
+    },
+    {
+        id: "hoodie-model-white",
+        title: "White Hoodie on Model",
+        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-thumb.jpg",
+        base: "assets/mockups/apparel/hoodies/hoodie-model-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/hoodies/hoodie-model-white-displace.png",
+        shade: "assets/mockups/apparel/hoodies/hoodie-model-white-shade.png",
+        light: "assets/mockups/apparel/hoodies/hoodie-model-white-light.png",
+        /* 0.3, and on this garment the check bites rather than merely passing:
+           at gain 1.0 a #12305C navy fill loses 6.47% of its blue identity and
+           p95 luma reaches 180 against a source of 44 -- the same failure that
+           set this value on the shirt. At 0.3 the loss is 0.00%. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/hoodies/hoodie-model-white-garment.png",
+        tone: "assets/mockups/apparel/hoodies/hoodie-model-white-tone.png",
+        /* Fleece has the second-highest weave in the catalog, 4.11 luma levels
+           against the shirt's 3.78, so heather reads well here. This is also
+           the first template built AFTER the colourway chips landed: the
+           heather fractions below and this map are reachable from the editor
+           from day one, which was not true of the shirt or the cap. */
+        grain: "assets/mockups/apparel/hoodies/hoodie-model-white-grain.png",
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* 10, against the shirt's 16 on an identically sized base. Gradient
+           p99 measured 28.51 here to the shirt's 41.5, so matching the shirt's
+           PHYSICAL bend would be about 11 -- and heavy fleece should bend a
+           print less than jersey, not more, so at or below that. The grid
+           agrees: 14 has more character than the fabric earns and 20 wanders.
+           0.98% of base width, sitting just under the cap's 1.03% and well
+           under the shirt's 1.56%. */
+        displaceStrength: 10,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency: all four corners read alpha 0 and 16.0% of
+           the image is clear. */
+        background: true,
+        /* 432px square -- 12in at this garment's scale (neckline y=280 to hem
+           y=1338 is 1058px over roughly 29in, about 36.5 px/in), starting 3in
+           below the neckline. A hoodie's print is shorter than a shirt's
+           because the kangaroo pocket takes the lower half: the pocket's top
+           seam is the strongest horizontal step in the whole photograph
+           (+16.24 in the central columns at y=895), and this zone stops 64px
+           above it. Centred on the torso's own centreline, 520.5, measured
+           from the sleeve seams at x=223 and x=818 rather than from the frame.
+           Verified 100.0000% surface with zero impure pixels.
+
+           The two hazards a hoodie has and a shirt does not were kept out of
+           the photograph rather than worked around: drawstrings would hang
+           straight through this zone and be painted over, and the model's
+           trousers are dark charcoal so they fail the luma gate outright
+           (measured p50 39, 0.0% classified). White joggers would have been
+           the cap's white-tee problem again, and worse -- touching the hem,
+           they would be CONNECTED to the garment, so the connected-region
+           restriction could not have saved it. */
+        warpZone: [
+            { x: 305, y: 390 },
+            { x: 737, y: 390 },
+            { x: 737, y: 822 },
+            { x: 305, y: 822 }
         ]
     }
 ];

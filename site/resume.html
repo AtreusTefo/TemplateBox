@@ -101,7 +101,16 @@
 <body>
 
     <header class="site-header editor-bar">
-        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
+        <!-- Left edge: the site mark on its own, matching docs.html (August
+             27, 2026). It replaces the four controls this bar used to carry
+             here -- the house icon, the mark-plus-wordmark, the hamburger and
+             the search link -- so the two document editors present one
+             identity in the same place. Ungated for the same reason it is on
+             docs.html: .editor-brand is gated at 75rem because mockup.html
+             hands the narrow band back to .editor-home, and with no
+             .editor-home left on this page a gate would leave a band with no
+             identity at all. -->
+        <a class="editor-mark" href="index.html" title="TemplateBox home" aria-label="TemplateBox home, all templates"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg></a>
 
         <label class="sr-only" for="doc-name">Resume name</label>
         <input type="text" class="doc-name" id="doc-name" title="Names the file you download" maxlength="80" value="Untitled resume" aria-label="Resume name">
@@ -112,7 +121,12 @@
                 <span class="sr-only" data-save-label>Saves automatically</span>
             </span>
 
-            <button type="button" class="btn dl-toggle" id="download-pdf"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>Download PDF</button>
+            <!-- Deliberately NOT wrapped in .bar-label, unlike docs.html. That
+                 class exists because docs carries three labelled buttons that
+                 overflow a 320px bar and must drop to icons; this bar has one,
+                 so borrowing the rule would hide "Download PDF" on a phone to
+                 solve an overflow that cannot happen here. -->
+            <button type="button" class="btn dl-toggle" id="download-pdf" title="Download PDF"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg><span>Download PDF</span></button>
         </div>
 
         <nav class="site-nav" aria-label="Primary">
@@ -145,11 +159,34 @@
 
             <!-- Left pane: input form -->
             <section class="editor-pane" aria-label="Resume form">
+                <h2>Template</h2>
+                <!-- Built by js/resume.js from the registry in
+                     js/resume-templates.js, never hand-listed here, so adding
+                     a template stays the data-only edit that file promises.
+                     Empty in the served markup and filled on load; with no
+                     script it stays empty and the editor renders Classic,
+                     which is what it did before a picker existed. -->
+                <div class="template-row" id="template-row" role="group" aria-label="Resume template"></div>
+
                 <h2>Accent Color</h2>
                 <div class="swatch-row" id="swatch-row" aria-label="Accent color choices">
+                    <!-- INVARIANT: every template's `defaultAccent` must be a
+                         swatch on this row. applyAccent() marks a swatch
+                         active by matching its hex exactly, so a default that
+                         is not here opens the editor with the row showing
+                         nothing selected and the colour unreachable again once
+                         changed. Two of the four templates rely on this: the
+                         green below is Ruled Serif's, the graphite is the
+                         two-column template's. -->
                     <button type="button" class="swatch is-active" data-accent="#1A1A1A" style="background-color:#1A1A1A" aria-label="Charcoal accent"></button>
+                    <button type="button" class="swatch" data-accent="#4A4A4A" style="background-color:#4A4A4A" aria-label="Graphite accent"></button>
                     <button type="button" class="swatch" data-accent="#1F4E79" style="background-color:#1F4E79" aria-label="Navy accent"></button>
                     <button type="button" class="swatch" data-accent="#2E5E4E" style="background-color:#2E5E4E" aria-label="Forest accent"></button>
+                    <!-- The Ruled Serif template's own green. It is here so
+                         that template's colour is reachable again after the
+                         visitor has changed it: the picker applies it once,
+                         on selection, and never re-applies. -->
+                    <button type="button" class="swatch" data-accent="#327B3C" style="background-color:#327B3C" aria-label="Green accent"></button>
                     <button type="button" class="swatch" data-accent="#7A2E2E" style="background-color:#7A2E2E" aria-label="Burgundy accent"></button>
                     <button type="button" class="swatch" data-accent="#8A6D1D" style="background-color:#8A6D1D" aria-label="Gold accent"></button>
                 </div>
@@ -165,7 +202,14 @@
                             <label for="f-name">Full Name</label>
                             <input type="text" id="f-name" data-bind="name" maxlength="50" required>
                         </div>
-                        <div class="field">
+                        <!-- data-templates lists the templates that DRAW a
+                             field. Anything not listed is hidden for the
+                             current template but still collected and saved,
+                             deliberately, so switching templates never
+                             discards what the visitor typed -- the same
+                             judgement js/docs.js makes for its [data-for]
+                             fields. -->
+                        <div class="field" data-templates="classic">
                             <label for="f-title">Professional Title</label>
                             <input type="text" id="f-title" data-bind="title" maxlength="60">
                         </div>
@@ -180,6 +224,29 @@
                         <div class="field">
                             <label for="f-location">Location</label>
                             <input type="text" id="f-location" data-bind="location" maxlength="60">
+                        </div>
+                        <!-- The four the two-column template needs for its
+                             sidebar contact block. It sets the address across
+                             three lines and offers a second phone, where the
+                             single-column templates run one joined line off
+                             `location` and `phone`. Hidden for those, and
+                             still collected, like every other conditional
+                             field here. -->
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-address">Street Address</label>
+                            <input type="text" id="f-address" data-bind="address" maxlength="80">
+                        </div>
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-city">City</label>
+                            <input type="text" id="f-city" data-bind="city" maxlength="60">
+                        </div>
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-postcode">Postcode</label>
+                            <input type="text" id="f-postcode" data-bind="postcode" maxlength="20">
+                        </div>
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-phone-alt">Second Phone</label>
+                            <input type="tel" id="f-phone-alt" data-bind="phoneAlt" maxlength="30">
                         </div>
                     </fieldset>
 
@@ -210,6 +277,27 @@
                             <input type="text" id="f-skills" data-bind="skills" maxlength="300">
                         </div>
                     </fieldset>
+
+                    <!-- One row per language, not a free-text block. It WAS a
+                         textarea taking "Name: Level" lines, with a hint
+                         explaining that a CEFR band or a percentage drew the
+                         proficiency bar and anything else did not. That put
+                         the rule in a sentence and left the visitor guessing
+                         which wordings counted. The levels that draw a bar
+                         are the choices now, so the rule is the control. -->
+                    <fieldset data-templates="ruled-serif">
+                        <legend>Languages</legend>
+                        <div id="language-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-language">Add Language</button>
+                    </fieldset>
+
+                    <fieldset data-templates="ruled-serif">
+                        <legend>Accomplishments</legend>
+                        <div class="field">
+                            <label for="f-accomplishments">Accomplishments (one per line)</label>
+                            <textarea id="f-accomplishments" data-bind="accomplishments" maxlength="600" rows="4"></textarea>
+                        </div>
+                    </fieldset>
                 </form>
             </section>
 
@@ -217,11 +305,15 @@
             <section class="preview-pane" aria-label="Live resume preview">
                 <h2>Live Preview</h2>
                 <div class="resume-sheet" id="resume-sheet"></div>
-                <!-- Download moved into the editor-bar toolbar above, to match
-                     the other editors. -->
-                <div class="preview-actions">
-                    <p class="upload-hint">Exports locally as selectable vector text via jsPDF. No file ever leaves your device.</p>
-                </div>
+                <!-- No .preview-actions bar here any more (August 27, 2026).
+                     Download moved into the editor-bar toolbar above, and the
+                     export note that was the bar's last remaining content has
+                     been dropped, so the container went with it: the class
+                     carries a border-top, padding and a background, and an
+                     empty one paints a stray rule across the foot of the pane.
+                     Same resolution mockup.html reached when its actions moved
+                     to the toolbar. With no bar, the ad anchor has nothing to
+                     lift on this page. -->
             </section>
 
         </div>
@@ -250,6 +342,10 @@
                 <label>Company</label>
                 <input type="text" data-entry-field="company" maxlength="60">
             </div>
+            <div class="field" data-templates="ruled-serif">
+                <label>Location</label>
+                <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone, Botswana">
+            </div>
             <div class="field">
                 <label>Dates</label>
                 <input type="text" data-entry-field="dates" maxlength="40" placeholder="2022 - Present">
@@ -257,8 +353,53 @@
             <div class="field">
                 <label>Description</label>
                 <textarea data-entry-field="description" maxlength="400" rows="3"></textarea>
+                <p class="upload-hint" data-templates="ruled-serif">One bullet per line.</p>
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <!-- A language row. The option VALUES are the level text written onto the
+         sheet, so each carries its CEFR code in brackets and the template's
+         `levels` map in js/resume-templates.js recognises every one of them --
+         change either and the other must move with it, or the picker offers a
+         level that draws no bar. "Native" has no CEFR code and is a key of its
+         own there.
+
+         This markup is also the single source of the known-level list:
+         js/resume.js reads these option values back out of the template rather
+         than repeating them, so a level added here needs no script change.
+         __custom__ is the sentinel that reveals the free-text field; it is
+         deliberately not a plausible level anyone would type. -->
+    <template id="tpl-language">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Language</label>
+                <input type="text" data-entry-field="name" maxlength="40" placeholder="English">
+            </div>
+            <div class="field">
+                <label>Level</label>
+                <select data-entry-field="level">
+                    <option value="">Select a level</option>
+                    <option value="Native">Native</option>
+                    <option value="Fluent (C2)">Fluent (C2)</option>
+                    <option value="Advanced (C1)">Advanced (C1)</option>
+                    <option value="Upper intermediate (B2)">Upper intermediate (B2)</option>
+                    <option value="Intermediate (B1)">Intermediate (B1)</option>
+                    <option value="Elementary (A2)">Elementary (A2)</option>
+                    <option value="Beginner (A1)">Beginner (A1)</option>
+                    <option value="__custom__">Other (write your own)</option>
+                </select>
+            </div>
+            <div class="field" data-language-custom hidden>
+                <label>Your own wording</label>
+                <input type="text" data-entry-field="custom" maxlength="40" placeholder="Conversational">
+                <!-- A percentage genuinely does draw a bar -- meterFraction in
+                     js/resume-engine.js matches one before it consults the
+                     template's level names -- so the hint has to say so. -->
+                <p class="upload-hint">Written on the sheet as typed. A percentage such as 70% still draws a bar; any other wording sets the level with no bar.</p>
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Language</button>
         </div>
     </template>
 
@@ -271,6 +412,10 @@
             <div class="field">
                 <label>Institution</label>
                 <input type="text" data-entry-field="school" maxlength="80">
+            </div>
+            <div class="field" data-templates="ruled-serif">
+                <label>Location</label>
+                <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone">
             </div>
             <div class="field">
                 <label>Dates</label>
@@ -288,6 +433,11 @@
 
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
+    <!-- Registry then engine then editor, in that order and without defer:
+         resume.js reads window.TB_RESUME_TEMPLATES while building the picker,
+         so both must have executed first. -->
+    <script src="js/resume-templates.js"></script>
+    <script src="js/resume-engine.js"></script>
     <script src="js/resume.js"></script>
 </body>
 </html>

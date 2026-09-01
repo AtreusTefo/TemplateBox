@@ -69,7 +69,23 @@ const PAGES = [
        that matters most here. */
     ["search", "/search.html"]
 ];
-const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 768, 320];
+/* 880 joined on August 30, 2026, and it is the only entry here that is not a
+   band edge or a real device width.
+
+   This list jumped 1024 to 768, which left the whole 769-1023 band untested --
+   every tablet in portrait. That was tolerable while nothing distinguished it
+   from 1024, and stopped being so when the editors' split view was moved to
+   collapse at 63.9375rem: 769-1023 is now a layout no other width in this list
+   produces, a single tabbed column with a NON-sticky preview pane, and the
+   export bar's anchor lift is a different value there for exactly that reason
+   (the sticky allowance applies only where the pane is sticky). Both halves of
+   that split were unverified by this suite and were measured by hand instead,
+   which is the gap this closes.
+
+   Confirmed to bite before being kept: setting the non-sticky tier's lift to
+   the phone tier's 4.75rem makes `poster @880: export bar clears the anchor`
+   fail here and nowhere else. */
+const WIDTHS = [1920, 1600, 1488, 1440, 1366, 1344, 1336, 1335, 1280, 1200, 1199, 1024, 880, 768, 320];
 
 /* Pages that show NO band in some width range, keyed by page name, as
    [minPxExclusive, maxPxExclusive).
@@ -738,9 +754,23 @@ function startServer(cwd, port) {
     return proc;
 }
 
+/* 60 seconds, not the 20 this used to allow. `npx serve` prints nothing while
+   it resolves and can take well over 20s to bind on a loaded machine -- measured
+   on August 31, 2026: not listening at 8s, serving 200s by 50s, with an empty
+   log throughout. At 20s the suite gave up and reported "could not start `npx
+   serve`", which reads like the server is broken when it is only slow, and cost
+   two false failures in one session.
+
+   This is a budget that was too tight, not a symptom being masked: the server
+   does bind and does serve. A genuinely dead server still fails, 40 seconds
+   later than before, and the message below now says how long it actually
+   waited so the next person can tell the two apart. */
+const SERVER_WAIT_MS = 60000;
+
 async function waitForServer(port) {
-    for (let i = 0; i < 80; i += 1) {
-        await new Promise((r) => setTimeout(r, 250));
+    const step = 250;
+    for (let i = 0; i < SERVER_WAIT_MS / step; i += 1) {
+        await new Promise((r) => setTimeout(r, step));
         try {
             const res = await fetch(`http://localhost:${port}/`);
             if (res.ok) { return true; }
@@ -2645,7 +2675,7 @@ async function main() {
             const server = startServer(ROOT, PORT);
             if (!await waitForServer(PORT)) {
                 server.killTree();
-                throw new Error(`could not start \`npx serve\` on port ${PORT} from the repository root`);
+                throw new Error(`could not start \`npx serve\` on port ${PORT} from the repository root (waited ${SERVER_WAIT_MS / 1000}s)`);
             }
             const page = await connect(browserPath, CDP_PORT);
             try {

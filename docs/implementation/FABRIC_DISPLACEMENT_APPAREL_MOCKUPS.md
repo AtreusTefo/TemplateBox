@@ -22,14 +22,14 @@ The first template using it is `tshirt-model-white`.
 | File | Purpose |
 |---|---|
 | `site/js/mockup-displace.js` | `window.TB_Displace`: WebGL displacement + shading pass. One draw call, no dependencies, no CDN. |
-| `site/assets/mockups/tshirt-model-white-base.png` | Base photograph, 1024x1536 RGBA, garment at alpha 253 with a soft cut-out edge. Transparent-region RGB zeroed (see the audit). |
-| `site/assets/mockups/tshirt-model-white-displace.png` | Displacement map. |
-| `site/assets/mockups/tshirt-model-white-shade.png` | Shading map, multiplied into the artwork. |
-| `site/assets/mockups/tshirt-model-white-light.png` | Specular map, screened onto the artwork. |
-| `site/assets/mockups/tshirt-model-white-tone.png` | Diffuse response, multiplied by the dye colour on recolour. |
-| `site/assets/mockups/tshirt-model-white-garment.png` | Feathered, hole-filled garment mask confining recolour. |
-| `site/assets/mockups/tshirt-model-white-grain.png` | High-pass of the weave, screened back on for heather colourways. |
-| `site/assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb.jpg` | Catalog thumbnail, 600x750, 46KB. |
+| `site/assets/mockups/apparel/t-shirts/tshirt-model-white-base.png` | Base photograph, 1024x1536 RGBA, garment at alpha 253 with a soft cut-out edge. Transparent-region RGB zeroed (see the audit). |
+| `site/assets/mockups/apparel/t-shirts/tshirt-model-white-displace.png` | Displacement map. |
+| `site/assets/mockups/apparel/t-shirts/tshirt-model-white-shade.png` | Shading map, multiplied into the artwork. |
+| `site/assets/mockups/apparel/t-shirts/tshirt-model-white-light.png` | Specular map, screened onto the artwork. |
+| `site/assets/mockups/apparel/t-shirts/tshirt-model-white-tone.png` | Diffuse response, multiplied by the dye colour on recolour. |
+| `site/assets/mockups/apparel/t-shirts/tshirt-model-white-garment.png` | Feathered, hole-filled garment mask confining recolour. |
+| `site/assets/mockups/apparel/t-shirts/tshirt-model-white-grain.png` | High-pass of the weave, screened back on for heather colourways. |
+| `site/assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-thumb.jpg` | Catalog thumbnail, 600x750, 46KB. |
 
 ## Files Modified
 

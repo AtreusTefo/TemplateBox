@@ -261,6 +261,22 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                        </ul>\n' +
 '                    </div>\n' +
 '                    <div>\n' +
+'                        <h2>Product Mockups</h2>\n' +
+'                        <ul>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>\n' +
+'                        </ul>\n' +
+'                    </div>\n' +
+'                    <div>\n' +
 '                        <h2>Editors</h2>\n' +
 '                        <ul>\n' +
 '                            <li><a href="../resume.html" data-target="resume">Resume Builder</a></li>\n' +
@@ -1382,9 +1398,10 @@ body + '\n' +
         { id: "sales-receipt", title: "Sales and Cash Receipt Form", category: "documents", doc: "sales-receipt" },
         { id: "invoice", title: "Professional Invoice", category: "documents", doc: "invoice" },
         { id: "warning-notice", title: "Employee Warning Notice", category: "documents", doc: "warning-notice" },
-        { id: "executive-resume", title: "Executive Resume", category: "resumes", doc: null },
-        { id: "modern-professional-cv", title: "Modern Professional CV", category: "resumes", doc: null },
-        { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: null },
+        { id: "executive-resume", title: "Executive Resume", category: "resumes", doc: "executive-resume" },
+        { id: "grey-rail", title: "Modern Professional CV", category: "resumes", doc: "grey-rail" },
+        { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: "minimalist-ats-resume" },
+        { id: "ruled-serif", title: "Ruled Serif CV", category: "resumes", doc: "ruled-serif" },
         /* These three carried a `framed: true` flag until August 23, 2026,
            when the wood-a4 hover composite was removed at the owner's
            request. They are ordinary photo cards now: two thumbnails, the
@@ -1398,11 +1415,31 @@ body + '\n' +
         { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },
         {
             id: "wood-a4", title: "Leaning Wood Frame Poster Mockup", category: "mockups", doc: "wood-a4",
-            folder: "assets/thumbnails/product-mockups/posters-frames-canvas-billboards"
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames"
         },
         {
             id: "tshirt-model-white", title: "White T-Shirt on Model Mockup", category: "mockups", doc: "tshirt-model-white",
-            folder: "assets/thumbnails/product-mockups/apparel"
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
+        },
+        {
+            id: "cap-model-white", title: "White Baseball Cap Mockup", category: "mockups", doc: "cap-model-white",
+            folder: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps"
+        },
+        {
+            id: "bag-paper-white", title: "White Paper Bag Mockup", category: "mockups", doc: "bag-paper-white",
+            folder: "assets/thumbnails/product-mockups/packaging/bags"
+        },
+        {
+            id: "card-white-walnut", title: "Business Card Mockup", category: "mockups", doc: "card-white-walnut",
+            folder: "assets/thumbnails/product-mockups/print/business-cards"
+        },
+        {
+            id: "banner-rollup-white", title: "Roll-Up Banner Mockup", category: "mockups", doc: "banner-rollup-white",
+            folder: "assets/thumbnails/product-mockups/print/signage"
+        },
+        {
+            id: "hoodie-model-white", title: "White Hoodie Mockup", category: "mockups", doc: "hoodie-model-white",
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies"
         }
     ];
 

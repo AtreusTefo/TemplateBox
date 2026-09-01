@@ -203,6 +203,28 @@
                         </ul>
                     </div>
                     <div>
+                        <h2>Product Mockups</h2>
+                        <!-- Each carries data-target and data-doc, so
+                             js/app.js's bindLaunchControls routes the click
+                             through loading.html with the variant preset
+                             written, exactly as the catalog cards do. The
+                             href is a real page so a crawler still follows
+                             it -- do not swap these for buttons. -->
+                        <ul>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>
+                        </ul>
+                    </div>
+                    <div>
                         <h2>Editors</h2>
                         <ul>
                             <li><a href="resume.html" data-target="resume">Resume Builder</a></li>
@@ -446,34 +468,56 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume">Executive Resume</a></h3>
+                        <!-- data-doc is REQUIRED on every card, even one that
+                             launches the default template. Without it
+                             bindLaunchControls stores no preset and clears
+                             none, so the editor falls through to the last
+                             template the visitor used and this card opens
+                             whatever they happened to look at before it. The
+                             id names the CARD; the editor resolves an id it
+                             has no descriptor for to Classic. -->
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="executive-resume">Executive Resume</a></h3>
                     </div>
                 </article>
 
                 <article class="template-card" data-category="resumes">
+                    <!-- Repointed at the grey-rail descriptor on August 30,
+                         2026. This card carried no data-doc and so launched
+                         the editor with no preset, meaning it rendered
+                         whichever template was last used -- three cards here
+                         promised three designs and delivered one, and after
+                         Ruled Serif shipped they delivered it inconsistently.
+                         The miniature is rebuilt to depict what the card now
+                         actually produces: a two-column sheet with a rail. -->
                     <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc accent-navy">
-                                <p class="mk-name">Tomas Lindqvist</p>
-                                <p class="mk-role">Product Designer</p>
-                                <p class="mk-contact">tomas.l@mail.com | +46 70 555 0192 | Stockholm</p>
-                                <p class="mk-h">Profile</p>
-                                <p class="mk-p">Designer focused on design systems and accessible interface patterns.</p>
-                                <p class="mk-h">Experience</p>
-                                <p class="mk-t">Senior Product Designer, Fjord Labs</p>
-                                <p class="mk-s">2021 - Present</p>
-                                <p class="mk-p">Owned the component library used by four product teams.</p>
-                                <p class="mk-t">Product Designer, Almen Studio</p>
-                                <p class="mk-s">2018 - 2021</p>
-                                <div class="mk-fill"></div>
-                                <p class="mk-h">Skills</p>
-                                <p class="mk-s">Design systems, prototyping, user research, WCAG</p>
+                            <div class="mock-doc railed accent-graphite">
+                                <div class="mk-main">
+                                    <p class="mk-name">Tomas<br>Lindqvist</p>
+                                    <p class="mk-h">Professional Summary</p>
+                                    <p class="mk-p">Designer focused on design systems and accessible interface patterns.</p>
+                                    <p class="mk-h">Work History</p>
+                                    <p class="mk-t">Senior Product Designer, 2021</p>
+                                    <p class="mk-s">Fjord Labs, Stockholm</p>
+                                    <div class="mk-fill"></div>
+                                    <p class="mk-h">Education</p>
+                                    <p class="mk-s">BA Design, Konstfack</p>
+                                </div>
+                                <div class="mk-rail">
+                                    <p class="mk-rail-line">Sveavagen 12, Stockholm</p>
+                                    <p class="mk-rail-line">+46 70 555 0192</p>
+                                    <p class="mk-rail-line">tomas.l@mail.com</p>
+                                    <p class="mk-rail-h">Skills</p>
+                                    <p class="mk-rail-line">Design systems</p>
+                                    <p class="mk-rail-line">Prototyping</p>
+                                    <p class="mk-rail-line">User research</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume">Modern Professional CV</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="grey-rail">Modern Professional CV</a></h3>
                     </div>
                 </article>
 
@@ -499,7 +543,44 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume">Minimalist ATS Resume</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="minimalist-ats-resume">Minimalist ATS Resume</a></h3>
+                    </div>
+                </article>
+
+                <!-- The first resume card carrying a data-doc. The three above
+                     it launch the editor with no preset, so they open whatever
+                     template was last used; this one names a descriptor in
+                     js/resume-templates.js and the editor selects it on
+                     arrival. Its miniature needs the .ruled modifier because
+                     centred serif headings between two rules are the whole
+                     signature of the design. -->
+                <article class="template-card" data-category="resumes">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc ruled accent-green">
+                                <p class="mk-name">Calling Johnson</p>
+                                <p class="mk-contact">Gaborone, Botswana &#9670; +267 72654256 &#9670; callingjohnson@mail.com</p>
+                                <p class="mk-h">Professional Summary</p>
+                                <p class="mk-p">Strong foundation in computer science with hands-on experience in Java and SQL.</p>
+                                <p class="mk-h">Skills</p>
+                                <div class="mk-two">
+                                    <p class="mk-p">Problem-solving</p>
+                                    <p class="mk-p">Teamwork</p>
+                                    <p class="mk-p">Attention to detail</p>
+                                    <p class="mk-p">Flexible and adaptable</p>
+                                </div>
+                                <p class="mk-h">Experience</p>
+                                <p class="mk-t">GTA Auto Spares (Pty) Ltd</p>
+                                <p class="mk-s">Graphic Designer, Gaborone</p>
+                                <div class="mk-fill"></div>
+                                <p class="mk-h">Education</p>
+                                <p class="mk-s">BSc (Hons) Software Engineering</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Resumes</p>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="ruled-serif">Ruled Serif CV</a></h3>
                     </div>
                 </article>
 
@@ -648,8 +729,8 @@
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb-blank.webp" alt="" width="800" height="1000" loading="lazy">
-                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/posters-frames-canvas-billboards/wood-a4-thumb.webp" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4-thumb-blank.webp" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4-thumb.webp" alt="" width="800" height="1000" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -664,8 +745,8 @@
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
-                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/tshirt-model-white-thumb.webp" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-thumb.webp" alt="" width="800" height="1000" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -674,12 +755,101 @@
                     </div>
                 </article>
 
+                <!-- The first template whose photograph holds two pieces of
+                     the same cloth: the model also wears a white tee, which
+                     classifies identically to the cap. The factory keeps only
+                     the region connected to the print zone, so recolour dyes
+                     the cap and leaves the shirt alone. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- Paper, not cloth. The same seven-map pipeline reads it
+                     because the classifier gates on neutrality and brightness
+                     rather than on any property of fabric -- a white bag
+                     passes, a kraft one could not. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/packaging/bags/bag-paper-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/packaging/bags/bag-paper-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- The first template with TWO printable surfaces: the
+                     registry declares warpZones, the editor gains a
+                     Front/Back switch, and each card carries its own design
+                     stack. Also the first whose base is an opaque scene, so
+                     it has no Background panel -- the walnut is the product,
+                     not a backdrop to be recoloured. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/business-cards/card-white-walnut-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/business-cards/card-white-walnut-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- The first template to ship FOUR maps instead of seven:
+                     blank banner vinyl has no colour variant and a design
+                     covers the whole face, so there is nothing for a garment
+                     mask, a tone map or a grain map to serve. 1.5MB against
+                     the paper bag's 11.3MB. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/signage/banner-rollup-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/signage/banner-rollup-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- Heavy fleece, and the first template built after the
+                     colourway chips landed: its heather fractions and its
+                     grain map are reachable from the editor on day one, which
+                     was not true of the shirt or the cap. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></h3>
+                    </div>
+                </article>
+
             </div>
 
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 18.
+                Try a broader term, or clear the search to see all 24.
             </p>
         </section>
 

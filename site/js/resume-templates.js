@@ -33,8 +33,170 @@
 
 window.TB_RESUME_TEMPLATES = [
     {
+        /* The editor's original layout, migrated onto this engine from the
+           hand-written preview and jsPDF writer that used to live in
+           js/resume.js. Those two agreed about content and about nothing else
+           -- different fonts, different sizes, different spacing -- so the
+           live preview never showed what the download would contain, and a
+           resume that ran to two pages said so nowhere.
+
+           Every type size, colour and margin below is the number the old
+           jsPDF writer used, converted from millimetres at 72/25.4. The
+           SPACING is uniform where the old writer's was incidental; see
+           docs/implementation/CLASSIC_TEMPLATE_MIGRATION.md for the
+           measured drift and why each difference is the better answer.
+
+           It declares no defaultAccent on purpose: this template has no
+           opinion about colour, so arriving on one of its catalog cards must
+           not reset the accent a returning visitor chose. */
+        id: "classic",
+        title: "Classic",
+        catalog: true,
+
+        page: { width: 595, height: 842 },
+
+        layout: {
+            kind: "single-column",
+            /* 18mm margins and a 174mm text column, to the point. `right` is
+               the 0.27pt smaller remainder rather than another 51.02, so the
+               column measures EXACTLY the old writer's 174mm and line breaks
+               therefore fall in the same places. */
+            main: {
+                left: 51.02, right: 50.75,
+                firstBaseline: 62.36,
+                bottom: 790.87
+            }
+        },
+
+        palette: {
+            ink:   "#1A1A1A",
+            muted: "#6B6B66"
+        },
+
+        /* Line heights are the old writer's `size * 0.3528 * 1.3`, which is
+           exactly 1.3x the point size once the millimetre round trip cancels
+           out. */
+        type: {
+            displayName: { family: "serif", weight: "bold",   size: 24,
+                           lineHeight: 31.2, color: "accent" },
+            titleLine:   { family: "sans",  weight: "bold",   size: 11,
+                           lineHeight: 14.3, color: "ink" },
+            contactLine: { family: "sans",  weight: "normal", size: 9,
+                           lineHeight: 11.7, color: "muted" },
+
+            heading:     { family: "serif", weight: "bold", size: 12,
+                           color: "accent", uppercase: true,
+                           gapBefore: 27, gapAfter: 15.59,
+                           rule: { color: "accent", width: 1.42, offset: 4.25 } },
+
+            body:        { family: "sans", weight: "normal", size: 9.5,
+                           lineHeight: 12.35, color: "ink" },
+            entryHead:   { family: "sans", weight: "bold",   size: 10.5,
+                           lineHeight: 13.65, color: "ink" },
+            entryMeta:   { family: "sans", weight: "normal", size: 8.5,
+                           lineHeight: 11.05, color: "muted" },
+
+            /* An entry description is PROSE here, not a list: no marker and no
+               indent, so it sets flush like the summary above it. Skills are
+               the only marked list on this template, which is why the two are
+               separate roles rather than one. */
+            entryBody:   { family: "sans", weight: "normal", size: 9.5,
+                           lineHeight: 12.35, color: "ink",
+                           marker: "", indent: 0, itemGap: 12.35 },
+            /* 8.64pt is the MEASURED width of the old writer's "•  " prefix
+               in Helvetica 9.5, so the skill text starts on the same x it
+               always did. It drew marker and text as one string; the engine
+               draws two runs, which is why the indent has to be measured
+               rather than guessed. */
+            bullet:      { family: "sans", weight: "normal", size: 9.5,
+                           lineHeight: 12.35, color: "ink",
+                           marker: "•", indent: 8.64, itemGap: 13.77 }
+        },
+
+        blocks: [
+            { column: "main", kind: "display", field: "name", type: "displayName",
+              fallback: "Your Name", gapAfter: 35.45 },
+
+            /* gapAfter carries a line height as well as the gap, because the
+               cursor is left ON the last baseline drawn. The contact line
+               below adds none: the first heading's own gapBefore covers it. */
+            { column: "main", kind: "text", field: "title", type: "titleLine",
+              gapAfter: 17.14 },
+
+            { column: "main", kind: "text", type: "contactLine",
+              fields: ["email", "phone", "location"], separator: "  |  " },
+
+            { column: "main", kind: "section", label: "Summary",
+              body: { kind: "paragraph", field: "summary" } },
+
+            { column: "main", kind: "section", label: "Work Experience",
+              body: { kind: "entries", source: "experience",
+                      head: { runs: [
+                          { field: "role",    type: "entryHead" },
+                          { literal: " - ",   type: "entryHead" },
+                          { field: "company", type: "entryHead" }
+                      ]},
+                      sub: [
+                          { runs: [{ field: "dates", type: "entryMeta" }],
+                            gapBefore: 15.07 }
+                      ],
+                      bullets: { field: "description", split: "\n",
+                                 type: "entryBody", gapBefore: 12.47 },
+                      entryGap: 20.85 } },
+
+            { column: "main", kind: "section", label: "Education",
+              body: { kind: "entries", source: "education",
+                      head: { runs: [
+                          { field: "degree", type: "entryHead" },
+                          { literal: " - ",  type: "entryHead" },
+                          { field: "school", type: "entryHead" }
+                      ]},
+                      sub: [
+                          { runs: [{ field: "dates", type: "entryMeta" }],
+                            gapBefore: 15.07 }
+                      ],
+                      entryGap: 16.72 } },
+
+            { column: "main", kind: "section", label: "Skills",
+              body: { kind: "list", field: "skills", split: "," } }
+        ]
+    },
+
+    {
+        /* SHIPPED August 30, 2026. Built and verified on August 2 but held
+           back from the picker because it reads address, city, postcode and
+           phoneAlt, none of which the editor form collected -- offering it
+           would have presented a template that silently dropped half its
+           sidebar. The form collects all four now, so the only thing that was
+           keeping it internal is gone.
+
+           Named for the card it serves rather than for its rail, so the picker
+           button and the catalog card say the same thing. It is the site's
+           only TWO-COLUMN resume, which is a real ATS trade: parsers handle a
+           single column more reliably. It ships as design-led, with the other
+           three carrying the unqualified ATS claim -- there is no photograph
+           and extraction order is deterministic, which are the two mitigations
+           that matter. See docs/implementation/RESUME_TEMPLATE_ENGINE_IMPLEMENTATION.md,
+           "ATS Position".
+
+           It still reads `education[].field`, which the form does NOT collect.
+           That is deliberate and safe rather than an oversight: buildRuns drops
+           an empty field along with the separator that would dangle after it,
+           so the head reads "Degree, Dates" instead of "Degree, , Dates". A
+           visitor who wants the field of study types it into the degree, which
+           is what the sample content has always done. */
         id: "grey-rail",
-        title: "Grey Rail Resume",
+        title: "Modern Professional CV",
+        catalog: true,
+
+        /* The rail and the display ink are ONE colour and both resolve to
+           accent, so the swatch row is live here as it is on Ruled Serif
+           rather than being a control that changes nothing. Every swatch on
+           the row is dark enough to carry the rail's white sidebar text --
+           that is the constraint any new swatch has to meet, not a
+           coincidence. defaultAccent is the artwork's own grey, so the
+           template still opens exactly as it was verified. */
+        defaultAccent: "#4A4A4A",
 
         /* A4 in points. */
         page: { width: 595, height: 842 },
@@ -59,9 +221,9 @@ window.TB_RESUME_TEMPLATES = [
         },
 
         palette: {
-            railBg:     "#4A4A4A",
+            railBg:     "accent",    /* the rail block, and the icon glyphs */
             sidebarInk: "#FFFFFF",
-            display:    "#4A4A4A",   /* name, section headings, rules */
+            display:    "accent",    /* name, section headings, rules */
             ink:        "#000000",   /* entry heads and company lines */
             body:       "#46464D"    /* prose and bullets */
         },
@@ -155,6 +317,185 @@ window.TB_RESUME_TEMPLATES = [
             { column: "sidebar", kind: "section", label: "Skills",
               headingType: "sidebarHeading",
               body: { kind: "list", field: "skills", split: ",", type: "sidebarItem" } }
+        ]
+    },
+
+    {
+        id: "ruled-serif",
+        title: "Ruled Serif CV",
+
+        /* `catalog` is what separates a template a VISITOR may pick from one
+           that exists only for the internal harness at
+           tools/resume-template-preview.html. grey-rail above carries no
+           flag on purpose: it reads address/city/postcode/phoneAlt, none of
+           which the editor form collects, so offering it would present a
+           picker entry that silently drops half the sidebar. */
+        catalog: true,
+
+        /* Every colour role that is not ink resolves to `accent`, so the
+           editor's swatch row is live on this template rather than being a
+           control that changes nothing. `defaultAccent` is what the picker
+           applies when this template is CHOSEN, which is how the sheet comes
+           up in the artwork's green without freezing the swatches out. */
+        defaultAccent: "#327B3C",
+
+        /* A4 in points, matching the 595.28x841.89 artboard of the source
+           artwork one-to-one, so every measurement below is the artwork's own
+           number rather than a conversion. */
+        page: { width: 595, height: 842 },
+
+        layout: {
+            kind: "single-column",
+            /* The full-width rules in the source run x=36.7 to x=555.85.
+               Those two numbers ARE the column, so the text block and the
+               rules cannot drift apart. */
+            /* `bottom` is a RESERVATION boundary, not the last baseline:
+               ensureRoom breaks the page when baseline + lineHeight passes
+               it, so the deepest line this template can set is 830 - 16.8 =
+               813.2 -- which is where the source artwork's last baseline
+               sits. Setting it to the baseline itself costs a whole line and
+               pushes the final wrap onto a second page. */
+            main: {
+                left: 36.7, right: 39.15,
+                firstBaseline: 22.94,
+                bottom: 830
+            }
+        },
+
+        palette: {
+            ink:        "#231F20",   /* body text, rules, meter fill */
+            meterTrack: "#D1D3D4"
+        },
+
+        type: {
+            displayName: { family: "serif", weight: "bold", size: 25,
+                           lineHeight: 28, color: "accent", align: "center" },
+
+            /* One size for every section heading. The source artwork sets
+               PROFESSIONAL SUMMARY at 21pt and the other five at 24pt, which
+               is the designer having scaled the longest label by eye rather
+               than a design rule -- it fits at 24pt with 260pt to spare. A
+               heading that is smaller than its neighbours for no expressible
+               reason is a defect to inherit, not a feature. */
+            heading:     { family: "serif", weight: "bold", size: 24,
+                           color: "accent", align: "center", uppercase: true,
+                           gapBefore: 18, gapAfter: 27,
+                           ruleBefore: { color: "ink", width: 2, gapAfter: 27.5 },
+                           rule: { color: "ink", width: 2, offset: 11 } },
+
+            body:        { family: "serif", weight: "normal", size: 14,
+                           lineHeight: 16.8, color: "ink" },
+            entryHead:   { family: "serif", weight: "bold",   size: 14, color: "ink" },
+            entryMeta:   { family: "serif", weight: "normal", size: 14, color: "ink" },
+            entrySub:    { family: "serif", weight: "normal", size: 14, color: "ink" },
+
+            /* Experience and accomplishment bullets are inset from the column
+               edge in the source; skills bullets sit flush against it. That
+               is the only difference between the two roles, and it is why
+               they are two roles rather than one. */
+            bullet:      { family: "serif", weight: "normal", size: 14,
+                           lineHeight: 16.8, color: "ink",
+                           marker: "•", indent: 8, inset: 29.8, itemGap: 16.8 },
+            skillItem:   { family: "serif", weight: "normal", size: 14,
+                           lineHeight: 16.8, color: "ink",
+                           marker: "•", indent: 7.6, itemGap: 16.8 }
+        },
+
+        blocks: [
+            /* The hairline above the name. A block rather than a key on the
+               display below it, because in this design the sheet opens with a
+               rule whether or not a name has been typed. */
+            { column: "main", kind: "rule", color: "ink", width: 2, gapAfter: 35.1 },
+
+            { column: "main", kind: "display", field: "name", type: "displayName",
+              uppercase: true, fallback: "Your Name", gapAfter: 35.1 },
+
+            /* Location, phone and email on one centred line, separated by the
+               source's small filled diamonds. Fields that are empty drop out
+               with their separator, so a two-value row still centres. */
+            { column: "main", kind: "contactRow", type: "body", align: "center",
+              fields: ["location", "phone", "email"],
+              separator: { shape: "diamond", size: 7.2, gap: 8, color: "ink" } },
+
+            { column: "main", kind: "section", label: "Professional Summary",
+              body: { kind: "paragraph", field: "summary" } },
+
+            /* Two-up, splitting at 0.615 of the column: the source's second
+               skills column starts at x=355.85 against a 519.15pt column. */
+            { column: "main", kind: "section", label: "Skills",
+              body: { kind: "list", field: "skills", split: ",",
+                      type: "skillItem",
+                      columns: { count: 2, split: 0.615, gutter: 12 } } },
+
+            /* Entry lists sit closer under their rule than prose does, which
+               is a property of the body rather than of the heading -- hence
+               the per-block gapAfter here and on Education. */
+            { column: "main", kind: "section", label: "Experience",
+              gapAfter: 20.5,
+              body: { kind: "entries", source: "experience",
+                      head:  { runs: [{ field: "company", type: "entryHead" }] },
+                      aside: { runs: [{ field: "dates",   type: "entryMeta" }] },
+                      /* Three baselines, not one comma-joined line: company
+                         in bold, then the role, then the place, exactly as
+                         the artwork stacks them. */
+                      sub: [
+                          { runs: [{ field: "role",  type: "entrySub" }], gapBefore: 16.8 },
+                          { runs: [{ field: "place", type: "entrySub" }], gapBefore: 16.8 }
+                      ],
+                      bullets: { field: "description", split: "\n", gapBefore: 16.2 },
+                      entryGap: 22 } },
+
+            { column: "main", kind: "section", label: "Education",
+              gapAfter: 20.5,
+              body: { kind: "entries", source: "education",
+                      /* Regular weight, not bold: this design sets the degree
+                         in the same face as its body copy. */
+                      head:  { runs: [{ field: "degree", type: "entryMeta" }] },
+                      aside: { runs: [{ field: "dates",  type: "entryMeta" }] },
+                      sub: [
+                          { runs: [
+                              { field: "school", type: "entrySub" },
+                              { literal: " - ",  type: "entrySub" },
+                              { field: "place",  type: "entrySub" }
+                          ], gapBefore: 16.8 }
+                      ],
+                      entryGap: 20 } },
+
+            /* "English: Upper intermediate (B2)" draws a proficiency bar
+               between the two lines. The CEFR bands are the template's, not
+               the engine's: B2 fills 0.66 of the track, which is where the
+               source artwork's fill stops (x=373.94 of a 38.06..546.28 bar).
+               A level outside the scale draws no bar rather than a guessed
+               one, and a bare percentage always works. */
+            { column: "main", kind: "section", label: "Languages",
+              body: { kind: "meters", field: "languages", split: "\n",
+                      /* EVERY fixed option in the Languages fieldset of
+                         resume.html must be recognised here, or the picker
+                         offers a level that silently draws no bar. The band
+                         codes cover six of the seven because each option's
+                         text carries its code in brackets; "Native" is the
+                         seventh and has no CEFR code, which is why it is a
+                         key of its own.
+
+                         ORDER MATTERS: meterFraction returns the FIRST key
+                         that matches, so the codes come first. Were the word
+                         "Intermediate" a key ahead of them, "Upper
+                         intermediate (B2)" would match it and draw 0.5
+                         instead of 0.66. That is also why no other word is a
+                         key: bare words invite exactly that collision, and
+                         "Not fluent" matching "Fluent" would draw a FULL bar
+                         for the opposite of what was typed. Anything not
+                         listed sets the level as plain text with no bar,
+                         which is the safe answer. */
+                      levels: { "A1": 0.17, "A2": 0.33, "B1": 0.5,
+                                "B2": 0.66, "C1": 0.83, "C2": 1,
+                                "Native": 1 },
+                      bar: { height: 7, track: "meterTrack", fill: "ink",
+                             gapBefore: 11.7, gapAfter: 18.1 },
+                      itemGap: 24 } },
+
+            { column: "main", kind: "section", label: "Accomplishments",
+              body: { kind: "list", field: "accomplishments", split: "\n" } }
         ]
     }
 ];
