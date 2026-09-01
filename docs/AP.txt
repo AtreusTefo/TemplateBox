@@ -36,4 +36,8 @@ on this web app and analyze all errors, make plans to fix them then implement th
 
 13. explain like you are explaining to a on technical personal so that its easier to understand
 
-14. create a good prompt for me, this is what i want: 
+14. create a good prompt for me, this is what i want:
+
+15. i dont understand, explain like your are explaining to a non technical person what you recommend
+
+16. how long is this supposed to take?
