@@ -82,6 +82,20 @@
                reads as melted fabric, too low as a sticker; judge it on a
                straight-lined design, which is where the eye is least
                forgiving.
+     designScale
+               What the FIRST upload opens at, as a fraction of the
+               contain-fit inside the print zone. Omitted means 0.75, which
+               suits artwork printed ON a product -- a chest graphic filling
+               its print area edge to edge does not read as a t-shirt. Set 1
+               where the artwork IS the product, so a poster fills its frame
+               and a banner fills its face. The string "cover" goes further
+               and fills the opening whatever the artwork's aspect, cropping
+               the overflow against the zone clip -- which is what a frame
+               wants, since a landscape photo letterboxed inside a portrait
+               frame reads as a mistake. Only the STARTING scale changes
+               either way; the fit underneath stays contain and Design Size
+               scales back down to reveal the whole image, so nothing an
+               uploader supplied is lost.
      warpZone  Four corners of the print area in base-image pixels, ordered
                TL, TR, BR, BL. Axis-aligned rectangles render with the fast
                2D path; non-rectangular quads trigger the perspective warp
@@ -153,6 +167,11 @@ window.TB_PHOTO_MOCKUPS = [
            not a shadow cut-out. */
         overlayBlend: "multiply",
         mode: "window",
+        /* A poster fills its frame here too. The white `backing` behind the
+           artwork means a smaller design reads as matted rather than broken,
+           so this was less obviously wrong than on the interior frame -- but
+           it was still a margin nobody asked for. */
+        designScale: "cover",
         /* Measured from the base's alpha channel: the fully transparent
            window spans x 655-1461, y 224-1583 in the 2000x2000 source. */
         warpZone: [
@@ -403,23 +422,39 @@ window.TB_PHOTO_MOCKUPS = [
            ripples outright, while 2 is indistinguishable from a flat paste. */
         displaceStrength: 4,
         mode: "surface",
+        /* Business cards print full bleed, so the first upload fills the card
+           it is dropped on rather than opening at the shared 0.75. With two
+           surfaces this covers whichever one is being edited, because
+           firstLayerScale measures against the ACTIVE zone. */
+        designScale: "cover",
         /* Opaque scene, so NO `background` flag. The walnut is the product,
            not a backdrop to be filled: a colour fill would have nothing to
            land on and the Background panel correctly never appears. This is
            the first template whose base needs no alpha channel at all, which
            is also why it is written as RGB rather than RGBA. */
+        /* The cards' true edges, not the classifier's: walking outward from
+           each card's centre finds x 525..1871 with A at y 575..1400 and B at
+           y 1563..2390. The mask-derived zones sat 3-4px inside that, which
+           showed as a white rim once the design filled. Each zone sits exactly
+           ON its card and never past it -- the surround is walnut, so artwork
+           a pixel wide of the card would print onto the desk.
+
+           A is 826 tall and B is 828. That 2px is antialiasing at the card
+           edges rather than a real difference, and 0.24% of the height is far
+           below anything visible; matching them would have meant either
+           overshooting one card or leaving a rim on the other. */
         warpZones: [
             [
-                { x: 529, y: 578 },
-                { x: 1868, y: 578 },
-                { x: 1868, y: 1397 },
-                { x: 529, y: 1397 }
+                { x: 525, y: 575 },
+                { x: 1872, y: 575 },
+                { x: 1872, y: 1401 },
+                { x: 525, y: 1401 }
             ],
             [
-                { x: 529, y: 1567 },
-                { x: 1868, y: 1567 },
-                { x: 1868, y: 2386 },
-                { x: 529, y: 2386 }
+                { x: 525, y: 1563 },
+                { x: 1872, y: 1563 },
+                { x: 1872, y: 2391 },
+                { x: 525, y: 2391 }
             ]
         ],
         zoneLabels: ["Front", "Back"],
@@ -435,10 +470,10 @@ window.TB_PHOTO_MOCKUPS = [
            bare wood between them is what keeps the two cards separable -- and
            is also why the mask has to be flooded from BOTH zone centres. */
         warpZone: [
-            { x: 529, y: 578 },
-            { x: 1868, y: 578 },
-            { x: 1868, y: 1397 },
-            { x: 529, y: 1397 }
+            { x: 525, y: 575 },
+            { x: 1872, y: 575 },
+            { x: 1872, y: 1401 },
+            { x: 525, y: 1401 }
         ]
     },
     {
@@ -487,11 +522,21 @@ window.TB_PHOTO_MOCKUPS = [
            and `light` normalise against. Anthracite fails the luma gate: the
            rail, cassette and feet measured p50 56-68, and the face holds
            99.83% of every classified pixel in the image. */
+        /* A banner's artwork IS the banner: it prints edge to edge, so the
+           first upload fills rather than opening at the shared 0.75. */
+        designScale: "cover",
+        /* The vinyl's true edge, not the classifier's. Walking outward from
+           the face centre until alpha or luma drops finds x 205..819,
+           y 128..1346; the mask-derived zone stopped 6px short on every side,
+           which showed as a rim of bare white vinyl once the design filled.
+           This sits exactly ON the edge and never past it: the surround here
+           is transparent, so a zone even a pixel wide of the vinyl would
+           paint artwork into empty space beside the banner. */
         warpZone: [
-            { x: 211, y: 134 },
-            { x: 813, y: 134 },
-            { x: 813, y: 1340 },
-            { x: 211, y: 1340 }
+            { x: 205, y: 128 },
+            { x: 820, y: 128 },
+            { x: 820, y: 1347 },
+            { x: 205, y: 1347 }
         ]
     },
     {
@@ -562,6 +607,111 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 737, y: 390 },
             { x: 737, y: 822 },
             { x: 305, y: 822 }
+        ]
+    },
+    {
+        id: "frame-black-interior",
+        title: "Framed Poster in Interior",
+        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior-thumb.jpg",
+        base: "assets/mockups/print/posters-and-frames/frame-black-interior-base.png",
+        overlay: null,
+        displace: "assets/mockups/print/posters-and-frames/frame-black-interior-displace.png",
+        shade: "assets/mockups/print/posters-and-frames/frame-black-interior-shade.png",
+        /* NO `light`, and this is the first template to omit it. The map exists
+           to lift a print where a fold ridge catches the light; a matte poster
+           lit evenly inside a frame has no such feature, and the numbers say so
+           -- the specular headroom here is 3.4 luma levels (median 243.3
+           against a 246.7 ceiling), which the map then normalises across the
+           full 0-255 range. What it encodes is therefore mostly sensor noise.
+
+           Screened onto a FLAT #808080 fill over the zone interior it measured
+           sd 9.35 and a p1-p99 spread of 34 at the 0.3 every other template
+           uses, against a baseline sd of 0.44 with no map at all: visible
+           mottling on exactly the flat-colour artwork a poster tends to carry.
+           Even 0.1 left a spread of 12. Shipping it at any gain would have been
+           shipping noise, so it is not shipped. The shader guards on
+           u_hasLight and skips the screen. `shade` is kept and earns its place
+           -- it bottoms out at 153, the rebate shadow correctly darkening
+           artwork near the frame. */
+        displaceStrength: 2,
+        mode: "surface",
+        backing: null,
+        /* Opaque scene, so NO `background` flag: the room IS the product and
+           there is nothing behind it to fill. This is what it trades away
+           against wood-a4, which is also the template it is least likely to be
+           confused with -- that one is a leaning wood frame in "window" mode
+           with a real transparent print opening and a multiply overlay. */
+        /* Poster opening measured at x 272..849, y 270..1067 with modal edges
+           278 and 844. The zone is NOT taken from that mask, and it is NOT a
+           rectangle, for two separate reasons that both showed as white paper
+           against the frame.
+
+           First, the classifier gates on luma > 110 and the rebate shadow
+           dips under it, so the mask stops short of the paper on every side.
+           Walking raw luma OUTWARD from the opening's centre finds the true
+           transition -- walking inward instead reads the gold stems on the
+           right and the wall on the left, which is how the first measurement
+           got 201 and 948.
+
+           Second: the frame leans back, so the opening is really a TRAPEZOID.
+           Top and bottom are perfectly horizontal at y=270 and y=1067 for
+           every column, but the sides slant -- left runs 280 at the top to 272
+           at the bottom, right 842 to 849, giving 563px of width at the top
+           and 578px at the bottom.
+
+           This zone is nonetheless the smallest RECTANGLE containing all of
+           it, and that is a deliberate reversal. The exact trapezoid was tried
+           and taken back out: a non-rectangular quad routes to the perspective
+           warp, which returns before the shading pass AND leaves every layer
+           without a hit rect. No hit rect means no selection chrome at all --
+           no drag, no resize grip, and no rotate handle. Rotation exists
+           ONLY as a canvas drag; there is no sidebar control for it, so the
+           warp path does not degrade rotation, it removes it. Scale survives
+           because the sidebar has a slider, which is what made the loss easy
+           to understate.
+
+           So the rectangle spans the widest extent, 271..850 by 269..1068.
+           Where the opening is narrower -- at the top, by 8-9px a side,
+           tapering to nothing at the bottom -- the artwork laps very slightly
+           onto the black frame. That reads as a print sitting flush rather
+           than as an error, and it is much less visible than bare white paper
+           against black, which is what any inset rectangle produces along the
+           bottom.
+
+           Two lessons generalise. The classified mask is the right input for
+           deriving MAPS and the wrong one for placing a ZONE wherever a
+           surface meets something dark. And the warp path costs far more than
+           its comment suggests: it is only worth taking where direct
+           manipulation genuinely does not matter.
+
+           The whole gradient lives at that rebate: inside the opening the
+           displacement magnitude measures p50 1.4 and p99 3.2 out of 127,
+           while the outer 60px band saturates at 127. The interior is flat
+           paper and renders identically at every strength from 2 to 14, so 2
+           is chosen for what it does at the EDGE -- a couple of pixels of
+           softening where the paper meets the rebate. The map exists mainly
+           because the shading pass is gated on it; without a displace map,
+           `shade` never runs either.
+
+           This is also the first template where the connected-region
+           restriction is load-bearing by design rather than as a safety net.
+           The whitewashed floor, the cream candles and the skirting all pass
+           the classifier -- 2634 regions in total, and the restriction drops
+           200,272 px of them, 30.56%. What keeps the poster separable is the
+           WIDE black frame: the nearest other classified pixel is 272px away
+           at mid-height, far beyond the 6px dilation. A thin frame here would
+           have let the mask swallow the room. */
+        /* A poster fills its frame, whatever shape the artwork is. Without
+           this the first upload opened at the shared 0.75 and left a quarter
+           of the opening as bare paper, which on this template reads as a
+           mistake rather than a margin -- and a landscape photo dropped in
+           here would have floated in the middle of a portrait frame. */
+        designScale: "cover",
+        warpZone: [
+            { x: 271, y: 269 },
+            { x: 850, y: 269 },
+            { x: 850, y: 1068 },
+            { x: 271, y: 1068 }
         ]
     }
 ];

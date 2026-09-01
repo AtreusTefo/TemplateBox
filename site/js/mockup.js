@@ -1649,16 +1649,58 @@
         drawOverlay();
     }
 
+    /* What the FIRST upload on a template opens at, as a fraction of the
+       contain-fit inside the print zone.
+
+       0.75 is right where the artwork is a print ON a product: a chest graphic
+       that filled the whole print area edge to edge would not read as a
+       t-shirt. It is wrong where the artwork IS the product -- a poster fills
+       its frame, a banner fills its face -- and there the default left a
+       visible margin the visitor had to drag out by hand every time. Templates
+       say which they are with `designScale`; anything without it keeps 0.75.
+
+       `"cover"` goes further and fills the opening whatever the artwork's
+       aspect, which is what a frame actually wants: a landscape photo dropped
+       into a portrait frame should look like a framed print, not a small
+       picture floating in white. Everything downstream is unchanged -- this
+       only picks the STARTING scale, the fit underneath stays contain, and the
+       overflow is cropped by the zone clip that was already there. Nothing is
+       destroyed: Design Size scales back down to reveal the whole image. */
+    function firstLayerScale(img) {
+        const config = PRODUCTS[currentProduct];
+        const tpl = config && config.template;
+        const want = tpl ? tpl.designScale : undefined;
+
+        if (want === "cover" && img && img.width && img.height) {
+            const zones = zonesOf(tpl);
+            const area = zoneBounds(zones[Math.min(activeZone, zones.length - 1)]);
+            const contain = Math.min(area.w / img.width, area.h / img.height);
+            const cover = Math.max(area.w / img.width, area.h / img.height);
+            /* paintLayers multiplies by the contain fit, so the scale that
+               covers is just the ratio between the two. Equal aspects give
+               exactly 1. */
+            return contain > 0 ? clamp(cover / contain, MIN_SCALE, MAX_SCALE) : DEFAULT_SCALE;
+        }
+        return clamp(typeof want === "number" ? want : DEFAULT_SCALE, MIN_SCALE, MAX_SCALE);
+    }
+
     function addLayer(img, name) {
         layerCounter += 1;
+        /* Counted PER SURFACE, not across the mockup. On the two-card
+           template the first design dropped on the back card is layer two
+           overall, so counting globally gave it EXTRA_SCALE and a stagger
+           offset -- it arrived small and off-centre instead of filling the
+           card, which is the opposite of what the surface switch promises.
+           Each surface gets its own first-upload treatment. */
+        const onThisZone = layers.filter((layer) => layerZone(layer) === activeZone).length;
         /* Stagger each addition so a second upload reads as its own object
            instead of hiding exactly behind the first. */
-        const step = (layers.length % 4) * 24;
+        const step = (onThisZone % 4) * 24;
         layers.push({
             id: "L" + layerCounter + "-" + Date.now(),
             name: name,
             img: img,
-            scale: layers.length ? EXTRA_SCALE : DEFAULT_SCALE,
+            scale: onThisZone ? EXTRA_SCALE : firstLayerScale(img),
             offsetX: step,
             offsetY: step,
             rotation: 0,
