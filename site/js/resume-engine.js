@@ -327,10 +327,19 @@ window.TBResume = (() => {
          { bind: "name" }                        a [data-bind] control
          { entry: { list, index, key } }         a row in a repeating list
          { part: { split: ",", index: 2 } }      one segment of that value
-         { inline: false }                       clickable, but hands off to
-                                                 the form instead of taking an
-                                                 overlay -- wrapped prose,
-                                                 joined lines, <select>s */
+         { multi: true }                         several runs, ONE value: the
+                                                 overlay covers the group, not
+                                                 the line that was clicked
+         { inline: false }                       no overlay can be honest --
+                                                 half a value, a joined line,
+                                                 a <select>, a composed row
+
+       `multi` and `inline: false` were one flag until the editing layer could
+       cover a group. Everything that wrapped was handed to the form, which
+       meant clicking your own summary scrolled the sheet out from under you
+       -- the two are separate now because they are separate problems: `multi`
+       is "this value is bigger than the run you clicked", `inline: false` is
+       "this run is not the whole of any one value". */
     function text(ctx, page, x, y, str, t, widthForAlign, edit) {
         const op = {
             op: "text", page: page, x: x, y: y, text: str,
@@ -423,14 +432,14 @@ window.TBResume = (() => {
 
             cursor[key] += block.gapBefore || 0;
             const wrapped = ctx.wrap(value, t, col.width);
-            /* Two reasons to hand off rather than overlay: a joined line is
-               several fields sharing one run, so there is no single control to
-               put a caret in; and a wrapped one is several runs sharing one
-               field, so an overlay would sit on a fragment. A single field on
-               a single line -- the professional title -- takes the overlay. */
+            /* A joined line is several FIELDS sharing one run, so there is no
+               single control to put a caret in and it hands off. A wrapped one
+               is several RUNS sharing one field, which the overlay can cover
+               as a group. A single field on a single line -- the professional
+               title, nearly always -- is the plain case. */
             const textEdit = block.fields
                 ? fieldEdit(block.fields[0], { inline: false })
-                : fieldEdit(block.field, wrapped.length > 1 ? { inline: false } : null);
+                : fieldEdit(block.field, wrapped.length > 1 ? { multi: true } : null);
             wrapped.forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
                 ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
@@ -476,9 +485,22 @@ window.TBResume = (() => {
             if (started[key]) cursor[key] += t.gapBefore || 0;
 
             const label = t.uppercase ? block.label.toUpperCase() : block.label;
-            /* Enough room for the whole heading assembly, so a page never
-               breaks between a rule and the heading it belongs to. */
-            ensureRoom(ctx, key, cursor, pageOf, t.ruleBefore ? 72 : 40);
+            /* Enough room for the whole heading assembly AND the first line of
+               what it introduces, so a page can break neither between a rule
+               and its heading nor between a heading and its body.
+
+               The body half was missing until September 1, 2026, and it left a
+               heading alone at the foot of a page: the assembly fitted, then
+               the body's own reservation did not, so the body moved to the
+               next page and the heading stayed behind. It took a document with
+               enough sections to land a heading in that narrow band before it
+               showed -- adding Projects and References did, and Classic ended
+               page one on a bare REFERENCES.
+
+               The body minimum is READ from the body rather than guessed, so
+               the two reservations cannot drift: see bodyFirstLine. */
+            ensureRoom(ctx, key, cursor, pageOf,
+                       (t.ruleBefore ? 72 : 40) + bodyFirstLine(block.body, T));
 
             if (t.ruleBefore) {
                 emitRule(ctx, pageOf[key], col, t.ruleBefore, cursor[key]);
@@ -501,6 +523,21 @@ window.TBResume = (() => {
         }
     }
 
+    /* What layoutBody below will reserve for the FIRST thing it draws. Every
+       number here is the one its own branch passes to ensureRoom, which is the
+       point: a section heading reserves room for its body by asking the body,
+       not by carrying a second copy of the body's arithmetic. */
+    function bodyFirstLine(body, T) {
+        if (!body) return 0;
+        if (body.kind === "entries") return 40;
+        if (body.kind === "meters") {
+            const t = T[body.type || "body"];
+            return (t.lineHeight || t.size) * 3;
+        }
+        const t = T[body.type || (body.kind === "list" ? "bullet" : "body")];
+        return t ? (t.lineHeight || t.size) : 14;
+    }
+
     function layoutBody(ctx, body, key, cursor, pageOf) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
@@ -509,8 +546,10 @@ window.TBResume = (() => {
             const t = T[body.type || "body"];
             const value = readField(ctx.state.fields, body.field);
             if (!value) return;
-            /* Prose, always several runs to one field: hands off to the form. */
-            const edit = fieldEdit(body.field, { inline: false });
+            /* Prose is always several runs to one field, so the overlay has
+               to cover all of them; it is NOT a hand-off, because the field
+               behind it is a textarea holding exactly this value. */
+            const edit = fieldEdit(body.field, { multi: true });
             ctx.wrap(value, t, col.width).forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
                 ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
@@ -529,8 +568,20 @@ window.TBResume = (() => {
             }
             items.forEach((item, i) => {
                 if (i) cursor[key] += t.itemGap || t.lineHeight;
+                /* `entryList` is for a field the FORM keeps as rows and the
+                   engine reads as one composed string -- languages. One item
+                   is then "English: Native", two controls' worth of value in
+                   a single run, so it hands off to the form rather than
+                   taking an overlay that could only write back half of it.
+                   The index counts rendered items and the composer drops
+                   unnamed rows; the resolver in js/resume.js filters the same
+                   way, which is what keeps the two ends on the same row. */
                 layoutBulletItem(ctx, item, t, key, cursor, pageOf, undefined,
-                    fieldEdit(body.field, { part: { split: body.split, index: i } }));
+                    body.entryList
+                        ? Object.assign(
+                            entryEdit({ list: body.entryList, index: i }, "name"),
+                            { inline: false })
+                        : fieldEdit(body.field, { part: { split: body.split, index: i } }));
             });
             return;
         }
@@ -810,14 +861,17 @@ window.TBResume = (() => {
         const indent = t.indent === undefined ? 8 : t.indent;
         const x = col.x + inset;
         const lines = ctx.wrap(item, t, col.width - inset - indent);
-        /* One item that WRAPPED is several runs to one value, so it hands off
-           for the same reason a paragraph does. An item on one line takes the
-           overlay, and `part` is what lets the caret land on that item alone
-           inside a comma- or newline-separated field. The marker carries the
-           same provenance as its text, so clicking the bullet does what
-           clicking the words does rather than nothing. */
+        /* One item that WRAPPED is several runs to one value, so the overlay
+           covers the group -- the same answer a paragraph gets. `part` is what
+           keeps the caret on that item alone inside a comma- or
+           newline-separated field, and it survives the group because the whole
+           group addresses the same segment. An item that already hands off
+           (a composed language row) keeps doing so: Object.assign leaves an
+           existing `inline: false` in place. The marker carries the same
+           provenance as its text, so clicking the bullet does what clicking
+           the words does rather than nothing. */
         const itemEdit = (edit && lines.length > 1)
-            ? Object.assign({}, edit, { inline: false })
+            ? Object.assign({}, edit, { multi: true })
             : edit;
         lines.forEach((line, i) => {
             if (i) cursor[key] += t.lineHeight || t.size;
@@ -840,8 +894,15 @@ window.TBResume = (() => {
         const T = ctx.template.type;
         const t = T.sidebarContact;
         const r = (block.iconSize || 15) / 2;
-        const disc = colorOf(block.disc, ctx.template, ctx.state);
+        /* `disc` is optional: omit it and the glyphs sit straight on the
+           column's background at full size. `knockout` is then what fills the
+           hollows in them -- name the column's own background role, or the
+           pin's hole comes out the wrong colour. It defaults to the disc so
+           a template that draws one needs no second key. */
+        const disc = block.disc ? colorOf(block.disc, ctx.template, ctx.state) : null;
         const glyph = colorOf(block.glyph, ctx.template, ctx.state);
+        const knock = block.knockout
+            ? colorOf(block.knockout, ctx.template, ctx.state) : disc;
         const page = pageOf[key];
 
         let emitted = 0;
@@ -856,7 +917,7 @@ window.TBResume = (() => {
 
             const lines = ctx.wrap(value, t, col.width - (block.textOffset || 28));
             const cy = cursor[key] - t.size * 0.32;
-            drawIcon(ctx, page, row.icon, col.x + r, cy, r, disc, glyph);
+            drawIcon(ctx, page, row.icon, col.x + r, cy, r, disc, glyph, knock);
 
             lines.forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
@@ -934,33 +995,121 @@ window.TBResume = (() => {
         ctx.ops.push({ op: "circle", page: page, cx: cx, cy: cy, r: r, fill: color });
     }
 
-    function drawIcon(ctx, page, kind, cx, cy, r, disc, glyph) {
-        const P = ctx.ops;
-        P.push({ op: "circle", page: page, cx: cx, cy: cy, r: r, fill: disc });
+    /* Contact glyphs, drawn from primitives so the export stays vector and
+       the template needs no image asset.
 
+       `disc` is OPTIONAL. With one, the glyph is knocked out of a filled
+       circle; without one it sits directly on the column's own background,
+       which is what a dark rail wants and what lets the glyph use the whole
+       icon box instead of the ~62% a disc leaves it. `knock` is the colour
+       BEHIND the glyph either way -- the disc where there is a disc, the rail
+       where there is not -- and it is what cuts the hole out of the pin and
+       the crease out of the envelope. Getting it wrong is invisible on a
+       white disc and glaring on a rail, which is why it is passed in rather
+       than assumed to be the disc.
+
+       Every coordinate below is a multiple of `u`, the glyph's own half
+       extent, so the three shapes are written once and scale together. */
+    function drawIcon(ctx, page, kind, cx, cy, r, disc, glyph, knock) {
+        const P = ctx.ops;
+        if (disc) {
+            P.push({ op: "circle", page: page, cx: cx, cy: cy, r: r, fill: disc });
+        }
+        const u = disc ? r * 0.62 : r;
+        const hole = knock || disc || "#FFFFFF";
+
+        /* Map pin: a disc and a tapering body that share an edge, so the two
+           primitives union into one teardrop rather than reading as a circle
+           sitting on a triangle. The triangle's top edge is the disc's
+           DIAMETER, at the centre line -- any higher and the join shows. */
         if (kind === "pin") {
-            P.push({ op: "circle", page: page, cx: cx, cy: cy - 0.16 * r, r: 0.30 * r, fill: glyph });
+            P.push({ op: "circle", page: page,
+                     cx: cx, cy: cy - 0.30 * u, r: 0.62 * u, fill: glyph });
             P.push({ op: "poly", page: page, fill: glyph, points: [
-                [cx - 0.28 * r, cy + 0.02 * r],
-                [cx + 0.28 * r, cy + 0.02 * r],
-                [cx, cy + 0.60 * r]
+                [cx - 0.62 * u, cy - 0.30 * u],
+                [cx + 0.62 * u, cy - 0.30 * u],
+                [cx, cy + 0.95 * u]
             ]});
+            P.push({ op: "circle", page: page,
+                     cx: cx, cy: cy - 0.30 * u, r: 0.26 * u, fill: hole });
             return;
         }
+
+        /* Handset: a crescent that thickens into a cup at each end, tilted the
+           way a receiver is held. Sampled off an arc rather than written out
+           as vertices, because the two things that make it read as a phone at
+           13pt -- the bow of the handle and the flare of the cups -- are both
+           curves, and a polygon written by hand can only approximate them at
+           one size.
+
+           There is no rotate operation in the display list, deliberately:
+           jsPDF and SVG express rotation differently and a display list that
+           carried one would have to be interpreted twice. The tilt is applied
+           to the sampled points instead, so ONE set of numbers describes the
+           glyph however it is angled. `k` scales the arc to the icon box; the
+           radii below are in units of that box's half extent before it.
+
+           WHICH WAY IT FACES is the sign of TILT, and it is easy to get
+           backwards because the arc is symmetrical -- a mirrored handset is
+           still a plausible drawing, just not the one anybody recognises. The
+           earpiece belongs at the TOP LEFT and the mouthpiece at the bottom
+           right, so the cord would leave toward the lower left; the hollow of
+           the crescent faces up and to the right. A negative tilt runs it the
+           other way, lower left to upper right, which is what this drew
+           first. */
         if (kind === "phone") {
-            P.push({ op: "roundrect", page: page, fill: glyph,
-                     x: cx - 0.26 * r, y: cy - 0.50 * r, w: 0.52 * r, h: 1.00 * r, r: 0.12 * r });
-            P.push({ op: "line", page: page, color: disc, width: Math.max(0.4, 0.10 * r),
-                     x1: cx - 0.10 * r, y1: cy - 0.34 * r, x2: cx + 0.10 * r, y2: cy - 0.34 * r });
+            const k = 0.72 * u;
+            const RO = 1.62 * k;   /* outer radius of the crescent     */
+            const RI = 1.30 * k;   /* inner radius: the gap is the bar */
+            const OY = -1.05 * k;  /* arc centre, above the glyph      */
+            /* Deep enough that the cups read as cups at 13pt rather than as a
+               bar that happens to thicken. Their thickness is the handle plus
+               twice this, so 0.40 puts them at three and a half times it. */
+            const FLARE = 0.40 * k;
+            const A0 = 46 * Math.PI / 180;
+            const A1 = 134 * Math.PI / 180;
+            const TILT = 40 * Math.PI / 180;
+            const ct = Math.cos(TILT);
+            const st = Math.sin(TILT);
+            const N = 16;
+            const pts = [];
+            /* Ramps from 0 across the middle of the arc to 1 at either end, so
+               the cups grow out of the handle instead of being butted onto
+               it. Squared, which is what stops the join showing as a corner. */
+            const edge = (s) => {
+                const d = Math.max(0, 1 - Math.min(s, 1 - s) / 0.26);
+                return d * d;
+            };
+            const put = (s, radius) => {
+                const ang = A0 + (A1 - A0) * s;
+                const lx = Math.cos(ang) * radius;
+                const ly = OY + Math.sin(ang) * radius;
+                pts.push([cx + lx * ct - ly * st, cy + lx * st + ly * ct]);
+            };
+            for (let i = 0; i <= N; i += 1) {
+                put(i / N, RO + FLARE * edge(i / N));
+            }
+            for (let i = N; i >= 0; i -= 1) {
+                put(i / N, RI - FLARE * edge(i / N));
+            }
+            P.push({ op: "poly", page: page, fill: glyph, points: pts });
             return;
         }
-        /* envelope */
+
+        /* Envelope: a solid body with the flap cut back out of it as a
+           chevron that runs corner to corner. A knocked-out triangle was the
+           obvious alternative and is what this drew before; it removes the
+           top two thirds of the body and leaves a shape that reads as an
+           arrow, not an envelope. */
         P.push({ op: "rect", page: page, fill: glyph,
-                 x: cx - 0.44 * r, y: cy - 0.32 * r, w: 0.88 * r, h: 0.64 * r });
-        P.push({ op: "poly", page: page, fill: disc, points: [
-            [cx - 0.44 * r, cy - 0.32 * r],
-            [cx + 0.44 * r, cy - 0.32 * r],
-            [cx, cy + 0.06 * r]
+                 x: cx - 0.90 * u, y: cy - 0.62 * u, w: 1.80 * u, h: 1.24 * u });
+        P.push({ op: "poly", page: page, fill: hole, points: [
+            [cx - 0.90 * u, cy - 0.62 * u],
+            [cx,            cy + 0.06 * u],
+            [cx + 0.90 * u, cy - 0.62 * u],
+            [cx + 0.90 * u, cy - 0.38 * u],
+            [cx,            cy + 0.30 * u],
+            [cx - 0.90 * u, cy - 0.38 * u]
         ]});
     }
 

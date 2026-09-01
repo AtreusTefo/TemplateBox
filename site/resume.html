@@ -209,7 +209,12 @@
                              discards what the visitor typed -- the same
                              judgement js/docs.js makes for its [data-for]
                              fields. -->
-                        <div class="field" data-templates="classic">
+                        <!-- Every template draws a professional title now, so
+                             this one carries no data-templates gate. It was
+                             classic-only while it was the only descriptor with
+                             a titleLine role, which meant switching template
+                             hid a field the visitor had already filled in. -->
+                        <div class="field">
                             <label for="f-title">Professional Title</label>
                             <input type="text" id="f-title" data-bind="title" maxlength="60">
                         </div>
@@ -264,6 +269,18 @@
                         <button type="button" class="btn btn-secondary btn-block" id="add-experience">Add Experience Entry</button>
                     </fieldset>
 
+                    <!-- Directly after Work Experience, which is where all
+                         three templates draw it and where a reader expects it:
+                         projects are what the experience above did not have
+                         room for, not an appendix. Ungated, like every other
+                         section since the title and languages were ungated on
+                         September 1 -- all three descriptors render it. -->
+                    <fieldset>
+                        <legend>Projects</legend>
+                        <div id="projects-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-project">Add Project</button>
+                    </fieldset>
+
                     <fieldset>
                         <legend>Education</legend>
                         <div id="education-list"></div>
@@ -285,7 +302,13 @@
                          the rule in a sentence and left the visitor guessing
                          which wordings counted. The levels that draw a bar
                          are the choices now, so the rule is the control. -->
-                    <fieldset data-templates="ruled-serif">
+                    <!-- Ungated for the same reason as the title above: all
+                         three templates render languages now. They render them
+                         DIFFERENTLY -- Ruled Serif draws proficiency bars from
+                         the level, the other two set "English: Native" as a
+                         bullet -- which is a property of each design, not a
+                         reason to withhold the field. -->
+                    <fieldset>
                         <legend>Languages</legend>
                         <div id="language-list"></div>
                         <button type="button" class="btn btn-secondary btn-block" id="add-language">Add Language</button>
@@ -297,6 +320,21 @@
                             <label for="f-accomplishments">Accomplishments (one per line)</label>
                             <textarea id="f-accomplishments" data-bind="accomplishments" maxlength="600" rows="4"></textarea>
                         </div>
+                    </fieldset>
+                    <!-- Last, because a reference is the last thing a reader
+                         reaches and every template draws it there. A row is
+                         five fields and any of them may be left out: the
+                         engine's buildRuns drops an empty field together with
+                         the separator that would dangle after it, so a
+                         reference with only a name and a phone sets as
+                         "Jane Adeyemi" over "+267 71 000 000" rather than
+                         carrying two stray commas. That is what makes a
+                         "Available on request" reference -- name alone -- a
+                         supported entry rather than a broken one. -->
+                    <fieldset>
+                        <legend>References</legend>
+                        <div id="references-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-reference">Add Reference</button>
                     </fieldset>
                 </form>
             </section>
@@ -342,7 +380,11 @@
                 <label>Company</label>
                 <input type="text" data-entry-field="company" maxlength="60">
             </div>
-            <div class="field" data-templates="ruled-serif">
+            <!-- grey-rail's entry sub is "Company, Place" and Ruled Serif
+                 stacks the place on its own baseline, so BOTH draw this. It
+                 was gated to Ruled Serif alone, which meant the two-column
+                 template rendered a field the form gave no way to fill. -->
+            <div class="field" data-templates="ruled-serif grey-rail">
                 <label>Location</label>
                 <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone, Botswana">
             </div>
@@ -353,7 +395,12 @@
             <div class="field">
                 <label>Description</label>
                 <textarea data-entry-field="description" maxlength="400" rows="3"></textarea>
-                <p class="upload-hint" data-templates="ruled-serif">One bullet per line.</p>
+                <!-- Only where the description is actually MARKED. Classic
+                     sets it as prose -- its entryBody role carries marker ""
+                     and indent 0 -- so a line there is a paragraph, and
+                     telling that visitor they are writing bullets is a lie
+                     the preview immediately contradicts. -->
+                <p class="upload-hint" data-templates="ruled-serif grey-rail">One bullet per line.</p>
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
         </div>
@@ -413,13 +460,71 @@
                 <label>Institution</label>
                 <input type="text" data-entry-field="school" maxlength="80">
             </div>
-            <div class="field" data-templates="ruled-serif">
+            <!-- As in the experience row above: grey-rail's education sub
+                 sets "School - Place". -->
+            <div class="field" data-templates="ruled-serif grey-rail">
                 <label>Location</label>
                 <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone">
             </div>
             <div class="field">
                 <label>Dates</label>
                 <input type="text" data-entry-field="dates" maxlength="40" placeholder="2018 - 2022">
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <template id="tpl-project">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Project Name</label>
+                <input type="text" data-entry-field="name" maxlength="70" placeholder="Depot Routing Rebuild">
+            </div>
+            <!-- Deliberately open-ended rather than a "Role" box: on a project
+                 the useful second line is as often the stack or the client as
+                 the job title, and one label that admits all three beats three
+                 fields where two are always empty. -->
+            <div class="field">
+                <label>Your Role or Stack</label>
+                <input type="text" data-entry-field="role" maxlength="70" placeholder="Lead engineer - Python, PostgreSQL">
+            </div>
+            <div class="field">
+                <label>Dates</label>
+                <input type="text" data-entry-field="dates" maxlength="40" placeholder="2023">
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <textarea data-entry-field="description" maxlength="400" rows="3"></textarea>
+                <!-- Gated exactly as the experience row's hint is, and for the
+                     same reason: Classic sets a description as prose, so a
+                     line there is a paragraph and not a bullet. -->
+                <p class="upload-hint" data-templates="ruled-serif grey-rail">One bullet per line.</p>
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <template id="tpl-reference">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Name</label>
+                <input type="text" data-entry-field="name" maxlength="60" placeholder="Jane Adeyemi">
+            </div>
+            <div class="field">
+                <label>Job Title</label>
+                <input type="text" data-entry-field="title" maxlength="60" placeholder="Operations Manager">
+            </div>
+            <div class="field">
+                <label>Company</label>
+                <input type="text" data-entry-field="company" maxlength="60" placeholder="Northwind Logistics">
+            </div>
+            <div class="field">
+                <label>Email</label>
+                <input type="email" data-entry-field="email" maxlength="100">
+            </div>
+            <div class="field">
+                <label>Phone</label>
+                <input type="tel" data-entry-field="phone" maxlength="30">
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
         </div>

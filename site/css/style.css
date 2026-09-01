@@ -5069,14 +5069,19 @@ legend {
     stroke-linejoin: round;
 }
 
-/* The floating input. It stands in for one run while it is open, so it carries
-   no chrome of its own beyond a thin ring -- anything heavier and the document
-   visibly turns into a form under the cursor. Padding and border are zeroed
-   because its box is positioned from the run's measured screen box; any
-   inherited box model would shift the text off the baseline it replaces. */
+/* The floating editor. It stands in for one run -- or, over a paragraph, for
+   the whole group of runs the engine drew from one value -- while it is open,
+   so it carries no chrome of its own beyond a thin ring; anything heavier and
+   the document visibly turns into a form under the cursor. Padding and border
+   are zeroed because the box is positioned from the runs' measured screen
+   boxes, and any inherited box model would shift the text off the baseline it
+   replaces. The same reason box-sizing is pinned here: js/resume.js sets width
+   and height as the CONTENT box it measured, and the site-wide border-box
+   default would eat the padding out of them. */
 .rt-inline-editor {
     position: absolute;
     z-index: 4;
+    box-sizing: content-box;
     margin: 0;
     padding: 0 2px;
     border: 0;
@@ -5085,6 +5090,18 @@ legend {
     background-color: var(--color-card);
     line-height: 1.15;
     letter-spacing: inherit;
+}
+
+/* The multi-line form of the same overlay, used where the field behind the run
+   is a textarea: a summary, or an entry description. It is sized to the
+   engine's own leading and line count, so it must not carry a scrollbar or a
+   resize grip -- either one would change the width the text wraps to and the
+   overlay would stop matching the sheet under it. */
+textarea.rt-inline-editor {
+    display: block;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
 }
 
 /* ==========================================================================
@@ -7739,6 +7756,14 @@ main:has(.mockup-layout) .editor-head {
 
     body {
         background-color: #FFFFFF;
+    }
+
+    /* The click-to-edit overlay is a real form control floating over the
+       sheet. It closes on blur, and a print dialog usually takes focus first
+       -- but "usually" is not a guarantee, and an input box printed across a
+       resume is not a defect anyone would think to test for. */
+    .rt-inline-editor {
+        display: none;
     }
 
     .site-header,

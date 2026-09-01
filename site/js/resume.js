@@ -69,7 +69,9 @@
             phoneAlt: ""
         },
         experience: [{ role: "", company: "", place: "", dates: "", description: "" }],
-        education: [{ degree: "", school: "", place: "", dates: "" }]
+        education: [{ degree: "", school: "", place: "", dates: "" }],
+        projects: [{ name: "", role: "", dates: "", description: "" }],
+        references: [{ name: "", title: "", company: "", email: "", phone: "" }]
     };
 
     /* First-run sample content.
@@ -86,11 +88,17 @@
             email: "adaeze.nwosu@example.com",
             phone: "+1 (555) 014-8820",
             location: "Chicago, IL",
-            summary: "Operations leader with fifteen years running supply chain and fulfilment teams across three continents. Known for turning underperforming depots into reliable, measurable operations without expanding headcount.",
+            /* SIZED TO ONE PAGE. Every length in this object is load-bearing:
+               Classic finishes at y=741.7 against a 790.87 boundary and
+               grey-rail at 721 against 800, so roughly four lines of slack
+               on the tighter of the two. Adding to any field here can cost
+               a whole page, and not gradually -- see the note on references
+               below. Re-measure rather than eyeball it. */
+            summary: "Operations leader with fifteen years running supply chain and fulfilment teams across three continents. Known for turning underperforming depots into reliable, measurable operations.",
             /* No commas INSIDE a skill: the field splits on commas, so
                "Friendly, positive attitude" would become two skills. */
             skills: "Supply chain strategy, Vendor negotiation, Lean process design, Demand forecasting, Team leadership, SAP, Power BI",
-            languages: "English: Native\nSpanish: Upper intermediate (B2)\nFrench: Intermediate (B1)",
+            languages: "English: Native\nSpanish: Upper intermediate (B2)",
             accomplishments: "Named Operations Leader of the Year by the Midwest Logistics Council.\nSpeaker on depot automation at the 2024 Supply Chain Summit.",
             /* Only the two-column template draws these; the others compose
                their contact line from `location` and `phone` above. */
@@ -115,12 +123,40 @@
                 company: "Cardinal Freight",
                 place: "Milwaukee, WI",
                 dates: "2014 - 2019",
-                description: "Scaled a single warehouse operation into four sites during a period of 3x order growth.\nHeld on-time dispatch above 97% throughout the expansion."
+                description: "Scaled a single warehouse operation into four sites during a period of 3x order growth."
             }
         ],
         education: [
             { degree: "MBA, Operations Management", school: "Kellogg School of Management", place: "Evanston, IL", dates: "2012 - 2014" },
             { degree: "BSc Industrial Engineering", school: "University of Lagos", place: "Lagos", dates: "2005 - 2009" }
+        ],
+        /* One project, not three. The sample exists to show what the preview
+           does with a section, and every extra row is a row the visitor has to
+           delete before typing their own. */
+        projects: [
+            {
+                name: "Depot Routing Rebuild",
+                role: "Programme lead - nine sites, twelve carriers",
+                dates: "2023",
+                description: "Replaced a manual routing spreadsheet with a rules engine the depot managers maintain themselves.\nCut empty-mile running 22% in the first quarter after rollout."
+            }
+        ],
+        /* ONE referee, and it is the section that decides whether the sample
+           paginates. A second one costs Classic a whole page rather than a few
+           lines: References is the last section, so its heading lands near the
+           foot of the page, and a heading now reserves its own assembly plus
+           its body's first line -- 80pt for an entries body. Miss that window
+           and the entire section moves down, taking 98pt of usable page with
+           it. Classic measured 692 of 790.87 with two referees and still
+           paginated, which is why the fit was checked by rendering rather than
+           by counting lines.
+
+           No phone on purpose: an omitted field still has to leave no dangling
+           separator, and this is what keeps that demonstrated now that the
+           second referee -- which used to carry the other half of it -- is
+           gone. */
+        references: [
+            { name: "Marcus Ellery", title: "VP Supply Chain", company: "Northwind Logistics", email: "m.ellery@example.com", phone: "" }
         ]
     };
 
@@ -159,6 +195,15 @@
                 languageList.textContent = "";
                 addEntryRow(languageList, tplLanguage);
             }
+            /* Same story for projects and references: rows, not [data-bind]
+               controls, so the sweep above does not reach them and the
+               sample's entries would survive a blank start. */
+            [[projectsList, tplProject], [referencesList, tplReference]]
+                .forEach(([listEl, template]) => {
+                    if (!listEl || !template) return;
+                    listEl.textContent = "";
+                    addEntryRow(listEl, template);
+                });
             /* Starting blank clears the CONTENT, not the design. The template
                stays selected and its own accent comes back, so "Start blank"
                on a template chosen from a catalog card does not silently
@@ -186,9 +231,13 @@
     const experienceList = document.getElementById("experience-list");
     const educationList = document.getElementById("education-list");
     const languageList = document.getElementById("language-list");
+    const projectsList = document.getElementById("projects-list");
+    const referencesList = document.getElementById("references-list");
     const tplExperience = document.getElementById("tpl-experience");
     const tplEducation = document.getElementById("tpl-education");
     const tplLanguage = document.getElementById("tpl-language");
+    const tplProject = document.getElementById("tpl-project");
+    const tplReference = document.getElementById("tpl-reference");
     const swatchRow = document.getElementById("swatch-row");
     const docNameInput = document.getElementById("doc-name");
     const templateRow = document.getElementById("template-row");
@@ -320,6 +369,11 @@
        ---------------------------------------------------------------------- */
 
     function collectEntries(listEl, fieldNames) {
+        /* A missing list means the markup and this file have gone out of step,
+           which is a deploy fault rather than a runtime one. Returning nothing
+           keeps the editor working in every other respect; throwing here would
+           take collectState with it, and with it the save AND the render. */
+        if (!listEl) return [];
         return Array.from(listEl.querySelectorAll("[data-entry]")).map((row) => {
             const entry = {};
             fieldNames.forEach((name) => {
@@ -422,7 +476,14 @@
             experience: collectEntries(experienceList,
                 ["role", "company", "place", "dates", "description"]),
             education: collectEntries(educationList,
-                ["degree", "school", "place", "dates"])
+                ["degree", "school", "place", "dates"]),
+            /* The field NAMES here are the contract with the descriptors: a
+               block reads `row.name`, so a rename in one place without the
+               other silently empties the section rather than erroring. */
+            projects: collectEntries(projectsList,
+                ["name", "role", "dates", "description"]),
+            references: collectEntries(referencesList,
+                ["name", "title", "company", "email", "phone"])
         };
         form.querySelectorAll("[data-bind]").forEach((input) => {
             state.fields[input.getAttribute("data-bind")] = TB.sanitize(input.value);
@@ -463,6 +524,27 @@
            hydrated "Other" row appears with its wording box still hidden. */
         syncLanguageRow(row);
         listEl.appendChild(row);
+    }
+
+    /* Wires an "Add" button to its list. Guarded like hydrateList below, so a
+       page served without one of these sections degrades to not offering it
+       rather than throwing on load and taking the whole editor down. */
+    function bindAdd(buttonId, listEl, template) {
+        const button = document.getElementById(buttonId);
+        if (!button || !listEl || !template) return;
+        button.addEventListener("click", () => {
+            addEntryRow(listEl, template);
+            persistAndRender();
+        });
+    }
+
+    /* Fills one repeating list from saved rows, falling back to a single
+       blank row. Guarded on the list and its template because a section added
+       later than a saved document is exactly the case this has to survive. */
+    function hydrateList(listEl, template, rows, fallback) {
+        if (!listEl || !template) return;
+        const source = (rows && rows.length) ? rows : (fallback || []);
+        source.forEach((entry) => addEntryRow(listEl, template, entry));
     }
 
     /* ----------------------------------------------------------------------
@@ -655,6 +737,63 @@
         control.value = seg.join(isNewline ? "\n" : ",").replace(/^\s+/, "");
     }
 
+    /* Every run drawn from the SAME descriptor, in document order. A wrapped
+       paragraph is many runs to one value, and unioning them is what lets one
+       overlay stand in for the whole of it instead of for whichever line
+       happened to be under the cursor.
+
+       Compared as serialised descriptors because that is exactly what the
+       engine wrote: two runs of one field carry an identical string by
+       construction. Scoped to the run's own <svg>, so a paragraph that broke
+       across a page boundary edits the half that was clicked -- one
+       absolutely positioned box cannot span two sheets with a band of mat
+       between them. */
+    function runsSharing(target) {
+        const key = target.getAttribute("data-edit");
+        const page = target.ownerSVGElement;
+        if (!page || !key) {
+            return [target];
+        }
+        return Array.from(page.querySelectorAll(".rt-editable"))
+            .filter((n) => n.getAttribute("data-edit") === key);
+    }
+
+    /* Union of the runs' screen boxes, in the sheet's own coordinates -- the
+       overlay is a child of the sheet, which is the positioned ancestor. */
+    function unionBox(nodes) {
+        const origin = sheet.getBoundingClientRect();
+        let l = Infinity;
+        let t = Infinity;
+        let r = -Infinity;
+        let b = -Infinity;
+        nodes.forEach((n) => {
+            const box = n.getBoundingClientRect();
+            l = Math.min(l, box.left);
+            t = Math.min(t, box.top);
+            r = Math.max(r, box.right);
+            b = Math.max(b, box.bottom);
+        });
+        return { left: l - origin.left, top: t - origin.top,
+                 width: r - l, height: b - t };
+    }
+
+    /* One entry per DESCRIPTOR, in document order: the Tab order of the sheet.
+       A wrapped paragraph is one stop rather than one stop per line, which is
+       the same grouping the overlay uses. */
+    function editableStops() {
+        const seen = Object.create(null);
+        const stops = [];
+        Array.from(sheet.querySelectorAll(".rt-editable")).forEach((n) => {
+            const key = n.getAttribute("data-edit");
+            if (!key || seen[key]) {
+                return;
+            }
+            seen[key] = true;
+            stops.push(n);
+        });
+        return stops;
+    }
+
     /* The open overlay, if any. At most one at a time. */
     let openEditor = null;
 
@@ -662,11 +801,9 @@
         if (!openEditor) {
             return;
         }
-        const { input, control, edit, target } = openEditor;
+        const { input, control, edit, group } = openEditor;
         openEditor = null;
-        if (target) {
-            target.style.removeProperty("visibility");
-        }
+        group.forEach((n) => n.style.removeProperty("visibility"));
         const next = input.value;
         input.remove();
         if (!commit) {
@@ -693,20 +830,29 @@
         }
     }
 
-    /* Float an input over the run that was clicked.
+    /* Float an editor over the run -- or the group of runs -- that was
+       clicked.
 
-       Sizing comes from the run's own screen box and the SVG's scale, so the
-       overlay matches whatever width the pane happens to be -- the sheet is
+       Sizing comes from the runs' own screen boxes and the SVG's scale, so
+       the overlay matches whatever width the pane happens to be: the sheet is
        laid out in points on a 595-wide viewBox and displayed at whatever CSS
        width the pane gives it. */
     function openInlineEditor(target, control, edit) {
         const svg = target.ownerSVGElement;
-        const sheetBox = sheet.getBoundingClientRect();
-        const box = target.getBoundingClientRect();
         const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+        const group = edit.multi ? runsSharing(target) : [target];
+        /* A textarea only where the value behind the run really is multi-line,
+           which means a whole textarea field. A `part` descriptor addresses
+           ONE line of one, so it takes a single-line input: a textarea there
+           would let a newline split one bullet into two silently. */
+        const multiline = control.tagName === "TEXTAREA" && !edit.part;
+        const box = unionBox(group);
+        const pad = 2;
 
-        const input = document.createElement("input");
-        input.type = "text";
+        const input = document.createElement(multiline ? "textarea" : "input");
+        if (!multiline) {
+            input.type = "text";
+        }
         input.className = "rt-inline-editor";
         input.value = valueFor(control, edit);
         if (control.maxLength > 0) {
@@ -715,39 +861,168 @@
         input.setAttribute("aria-label", "Edit this text");
 
         const cs = window.getComputedStyle(target);
-        const pad = 2;
-        input.style.left = (box.left - sheetBox.left - pad) + "px";
-        input.style.top = (box.top - sheetBox.top - pad) + "px";
-        /* A generous minimum so a short value is still comfortable to type in,
-           and room to grow past the text it replaces. */
-        input.style.width = Math.max(box.width + 24, 90) + "px";
-        input.style.height = (box.height + pad * 2) + "px";
-        input.style.fontFamily = cs.fontFamily;
-        input.style.fontSize = (parseFloat(target.getAttribute("font-size")) * scale) + "px";
-        input.style.fontWeight = cs.fontWeight;
-        input.style.color = target.getAttribute("fill") || "inherit";
-        if (target.getAttribute("text-anchor") === "middle") {
-            input.style.textAlign = "center";
-            input.style.left = (box.left - sheetBox.left - 12) + "px";
+        const fontPx = parseFloat(target.getAttribute("font-size")) * scale;
+        /* The engine's OWN leading, read off the gap between two runs of the
+           group rather than guessed from the font size -- every template sets
+           its own lineHeight and none of them is a fixed multiple of the
+           size. With one run there is no gap to read, and none is needed. */
+        let leading = fontPx * 1.3;
+        if (group.length > 1) {
+            leading = (parseFloat(group[1].getAttribute("y"))
+                       - parseFloat(group[0].getAttribute("y"))) * scale;
         }
 
-        /* Hide the painted run while its overlay stands in for it, so the two
-           are never legible at once and half-overlapping. */
-        target.style.visibility = "hidden";
+        input.style.left = (box.left - pad) + "px";
+        input.style.top = (box.top - pad) + "px";
+        input.style.fontFamily = cs.fontFamily;
+        input.style.fontSize = fontPx + "px";
+        input.style.fontWeight = cs.fontWeight;
+        input.style.color = target.getAttribute("fill") || "inherit";
+
+        if (multiline) {
+            /* Height from the LEADING and the line count, not from the union
+               of the ink boxes: those measure glyph extents, so three lines of
+               prose union to about two leadings plus a cap height and the last
+               line would be clipped. */
+            input.style.lineHeight = leading + "px";
+            input.style.width = (box.width + pad * 2 + 6) + "px";
+            input.style.height = (leading * group.length + pad * 2) + "px";
+            input.rows = group.length;
+        } else {
+            input.style.lineHeight = "1.15";
+            /* A generous minimum so a short value is still comfortable to type
+               in, and room to grow past the text it replaces. */
+            input.style.width = Math.max(box.width + 24, 90) + "px";
+            input.style.height = (box.height + pad * 2) + "px";
+        }
+
+        if (target.getAttribute("text-anchor") === "middle") {
+            input.style.textAlign = "center";
+            input.style.left =
+                (box.left - (parseFloat(input.style.width) - box.width) / 2) + "px";
+        }
+
+        /* Hide the painted runs while the overlay stands in for them, so the
+           two are never legible at once and half-overlapping. */
+        group.forEach((n) => { n.style.visibility = "hidden"; });
         sheet.appendChild(input);
-        openEditor = { input: input, control: control, edit: edit, target: target };
+        openEditor = { input: input, control: control, edit: edit, group: group };
 
         input.focus();
         input.select();
 
+        /* Grow with the text rather than clipping it. An overlay that stops at
+           the width of the words it replaced feels full the moment anything is
+           added to it. */
+        if (!multiline) {
+            const floor = parseFloat(input.style.width);
+            input.addEventListener("input", () => {
+                input.style.width = "0px";
+                input.style.width = Math.max(floor, input.scrollWidth + 8) + "px";
+            });
+        }
+
         input.addEventListener("keydown", (event) => {
-            if (event.key === "Enter") { event.preventDefault(); closeEditor(true); }
-            else if (event.key === "Escape") { event.preventDefault(); closeEditor(false); }
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeEditor(false);
+                return;
+            }
+            if (event.key === "Tab") {
+                event.preventDefault();
+                stepEditor(event.shiftKey ? -1 : 1);
+                return;
+            }
+            if (event.key !== "Enter") {
+                return;
+            }
+            /* Enter is a newline in a textarea and a commit everywhere else.
+               Ctrl or Cmd commits either way, which is the only way out of a
+               textarea that involves neither the mouse nor Tab. */
+            if (!multiline || event.ctrlKey || event.metaKey) {
+                event.preventDefault();
+                closeEditor(true);
+            }
         });
         input.addEventListener("blur", () => closeEditor(true));
-        /* The sheet's own click handler must not treat a click inside the
-           overlay as a click on the document underneath it. */
+        /* The sheet's own handler must not treat a click inside the overlay as
+           a click on the document underneath it. */
         input.addEventListener("mousedown", (event) => event.stopPropagation());
+    }
+
+    /* The live node for a descriptor, or null. */
+    function nodeFor(key) {
+        return Array.from(sheet.querySelectorAll(".rt-editable"))
+            .filter((n) => n.getAttribute("data-edit") === key)[0] || null;
+    }
+
+    /* Open one run: an overlay where one can stand in for the value, the form
+       control itself where it cannot. */
+    function activate(target) {
+        const key = target.getAttribute("data-edit");
+        let edit = null;
+        try {
+            edit = JSON.parse(key);
+        } catch (err) {
+            return;
+        }
+        /* Commit whatever was open BEFORE measuring anything. That dispatches
+           an input event on the form, and the form's listener re-renders the
+           preview synchronously -- which replaces every node on the sheet,
+           `target` among them. A detached node measures as a zero box, so the
+           overlay that followed came out 14px wide and 4 high: clicking
+           straight from one phrase to the next opened a slot too small to see
+           the text in. Re-resolving by descriptor is what survives the
+           re-render, and it is the same identity Tab traversal uses. */
+        closeEditor(true);
+        const live = target.isConnected ? target : nodeFor(key);
+        if (!live) {
+            return;
+        }
+        const control = controlFor(edit);
+        if (!control) {
+            return;
+        }
+        if (edit.inline === false) {
+            revealControl(control);
+            return;
+        }
+        openInlineEditor(live, control, edit);
+    }
+
+    /* Tab and Shift-Tab walk the sheet in reading order, committing as they
+       go. The next stop is remembered by its DESCRIPTOR rather than by its
+       node or its index: committing re-renders the preview, which replaces
+       every node, and an edit that adds or removes a wrapped line changes how
+       many runs there are. The descriptor is the one identity that survives
+       both. */
+    function stepEditor(delta) {
+        const current = openEditor && openEditor.group[0];
+        if (!current) {
+            closeEditor(true);
+            return;
+        }
+        const key = current.getAttribute("data-edit");
+        const stops = editableStops();
+        let i = -1;
+        stops.forEach((n, idx) => {
+            if (i < 0 && n.getAttribute("data-edit") === key) {
+                i = idx;
+            }
+        });
+        const next = i < 0 ? null : stops[i + delta];
+        const nextKey = next ? next.getAttribute("data-edit") : null;
+        closeEditor(true);
+        if (!nextKey) {
+            return;
+        }
+        /* Looked up after the re-render the commit above triggered, not
+           before it: `next` is one of the nodes that commit just replaced. */
+        const node = nodeFor(nextKey);
+        if (node) {
+            node.scrollIntoView({ block: "nearest" });
+            activate(node);
+        }
     }
 
     function bindPreviewEditing() {
@@ -757,26 +1032,11 @@
                 closeEditor(true);
                 return;
             }
-            if (openEditor && openEditor.target === target) {
-                return;
-            }
-            let edit = null;
-            try {
-                edit = JSON.parse(target.getAttribute("data-edit"));
-            } catch (err) {
-                return;
-            }
-            const control = controlFor(edit);
-            if (!control) {
+            if (openEditor && openEditor.group.indexOf(target) !== -1) {
                 return;
             }
             event.preventDefault();
-            closeEditor(true);
-            if (edit.inline === false) {
-                revealControl(control);
-                return;
-            }
-            openInlineEditor(target, control, edit);
+            activate(target);
         });
     }
 
@@ -910,6 +1170,13 @@
         experience.forEach((entry) => addEntryRow(experienceList, tplExperience, entry));
         education.forEach((entry) => addEntryRow(educationList, tplEducation, entry));
 
+        /* Projects and references hydrate the same way, and an empty one still
+           opens with a blank row so the section is visibly there to fill in --
+           the rule the two lists above and the languages below both follow. */
+        hydrateList(projectsList, tplProject, state.projects, DEFAULT_STATE.projects);
+        hydrateList(referencesList, tplReference, state.references,
+                    DEFAULT_STATE.references);
+
         /* Languages hydrate from the saved string rather than from a bound
            control, and an empty one still opens with a blank row so the
            section is visibly there to fill in, matching the two lists above. */
@@ -956,6 +1223,8 @@
                 persistAndRender();
             });
         }
+        bindAdd("add-project", projectsList, tplProject);
+        bindAdd("add-reference", referencesList, tplReference);
 
         bindPreviewEditing();
 

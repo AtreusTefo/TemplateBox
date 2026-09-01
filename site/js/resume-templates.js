@@ -144,6 +144,25 @@ window.TB_RESUME_TEMPLATES = [
                                  type: "entryBody", gapBefore: 12.47 },
                       entryGap: 20.85 } },
 
+            /* Immediately after Work Experience on all three templates: a
+               project is what the roles above had no room for, not an
+               appendix. The head reads "Name - Role" in the same shape the
+               two sections around it use, so the page keeps one rhythm. */
+            { column: "main", kind: "section", label: "Projects",
+              body: { kind: "entries", source: "projects",
+                      head: { runs: [
+                          { field: "name", type: "entryHead" },
+                          { literal: " - ", type: "entryHead" },
+                          { field: "role", type: "entryHead" }
+                      ]},
+                      sub: [
+                          { runs: [{ field: "dates", type: "entryMeta" }],
+                            gapBefore: 15.07 }
+                      ],
+                      bullets: { field: "description", split: "\n",
+                                 type: "entryBody", gapBefore: 12.47 },
+                      entryGap: 20.85 } },
+
             { column: "main", kind: "section", label: "Education",
               body: { kind: "entries", source: "education",
                       head: { runs: [
@@ -158,7 +177,41 @@ window.TB_RESUME_TEMPLATES = [
                       entryGap: 16.72 } },
 
             { column: "main", kind: "section", label: "Skills",
-              body: { kind: "list", field: "skills", split: "," } }
+              body: { kind: "list", field: "skills", split: "," } },
+
+            /* A plain bulleted list, in the same role Skills above uses. This
+               is the template that carries the unqualified ATS claim, and a
+               proficiency bar is a graphic a parser reads as nothing -- the
+               level has to survive as WORDS, which "English: Native" does and
+               a 66%-filled rectangle does not. Ruled Serif draws the bars
+               because its source artwork does; this one stays legible to a
+               machine. */
+            { column: "main", kind: "section", label: "Languages",
+              body: { kind: "list", field: "languages", split: "\n",
+                      entryList: "language" } },
+
+            /* Last, which is where a reader looks for it. Two lines per
+               referee: the person, then how to reach them. Every run is
+               optional -- buildRuns drops an empty field along with the
+               separator that would dangle after it -- so a referee entered as
+               a name alone sets as one clean line rather than "Jane , , ". */
+            { column: "main", kind: "section", label: "References",
+              body: { kind: "entries", source: "references",
+                      head: { runs: [
+                          { field: "name",    type: "entryHead" },
+                          { literal: " - ",   type: "entryMeta" },
+                          { field: "title",   type: "entryMeta" },
+                          { literal: ", ",    type: "entryMeta" },
+                          { field: "company", type: "entryMeta" }
+                      ]},
+                      sub: [
+                          { runs: [
+                              { field: "email", type: "entryMeta" },
+                              { literal: "  |  ", type: "entryMeta" },
+                              { field: "phone", type: "entryMeta" }
+                          ], gapBefore: 15.07 }
+                      ],
+                      entryGap: 16.72 } }
         ]
     },
 
@@ -231,6 +284,11 @@ window.TB_RESUME_TEMPLATES = [
         type: {
             displayName:    { family: "sans", weight: "bold",   size: 36,
                               lineHeight: 33, color: "display" },
+            /* The professional title, set under the rule that closes the
+               masthead. Regular weight in the body ink rather than a second
+               accent line: two display weights stacked read as two names. */
+            titleLine:      { family: "sans", weight: "normal", size: 12.5,
+                              lineHeight: 15, color: "body" },
             heading:        { family: "sans", weight: "bold",   size: 13.5,
                               color: "display", uppercase: true,
                               gapBefore: 36, gapAfter: 22,
@@ -265,6 +323,15 @@ window.TB_RESUME_TEMPLATES = [
               gapAfterBaseline: 11.5, gapAfter: 10,
               rule: { color: "display", width: 1 } },
 
+            /* Draws nothing at all until a title is typed, so the masthead is
+               still the rule hard against the name for everyone who leaves it
+               empty -- the layout this template was measured against. Only
+               `gapBefore` is set: the summary heading's own gapBefore of 36
+               supplies the space underneath, and adding a gapAfter here would
+               double it. */
+            { column: "main", kind: "text", field: "title", type: "titleLine",
+              gapBefore: 16 },
+
             { column: "main", kind: "section", label: "Professional Summary",
               body: { kind: "paragraph", field: "summary" } },
 
@@ -286,6 +353,21 @@ window.TB_RESUME_TEMPLATES = [
                       bullets: { field: "description", split: "\n", gapBefore: 18 },
                       entryGap: 25 } },
 
+            /* Head is "Name, Dates" in mixed weights, matching Work History
+               directly above it rather than inventing a third entry shape. */
+            { column: "main", kind: "section", label: "Projects",
+              body: { kind: "entries", source: "projects",
+                      head: { runs: [
+                          { field: "name",  type: "entryHead" },
+                          { literal: ", ",  type: "entryMeta" },
+                          { field: "dates", type: "entryMeta" }
+                      ]},
+                      sub: { runs: [{ field: "role", type: "entrySub" }],
+                             gapBefore: 13 },
+                      bullets: { field: "description", split: "\n",
+                                 gapBefore: 18 },
+                      entryGap: 25 } },
+
             { column: "main", kind: "section", label: "Education",
               body: { kind: "entries", source: "education",
                       head: { runs: [
@@ -302,12 +384,45 @@ window.TB_RESUME_TEMPLATES = [
                       ], gapBefore: 13 },
                       entryGap: 22 } },
 
-            /* White disc with the glyph knocked out in the rail colour.
-               Glyphs are drawn from primitives, not an icon font, so the
-               export stays vector and needs no external asset. */
+            /* In the MAIN column, not the rail. The rail is 224pt wide and
+               already carries the contact block, skills and languages; a
+               referee's name, title and email would wrap to three or four
+               lines each in there and read as a second contact list for the
+               wrong person. */
+            { column: "main", kind: "section", label: "References",
+              body: { kind: "entries", source: "references",
+                      head: { runs: [
+                          { field: "name",    type: "entryHead" },
+                          { literal: ", ",    type: "entryMeta" },
+                          { field: "title",   type: "entryMeta" }
+                      ]},
+                      sub: [
+                          { runs: [
+                              { field: "company", type: "entrySub" }
+                          ], gapBefore: 13 },
+                          { runs: [
+                              { field: "email", type: "entrySub" },
+                              { literal: " - ", type: "entrySub" },
+                              { field: "phone", type: "entrySub" }
+                          ], gapBefore: 13 }
+                      ],
+                      entryGap: 22 } },
+
+            /* White glyphs straight on the rail, drawn from primitives
+               rather than an icon font so the export stays vector and needs
+               no external asset.
+
+               They WERE knocked out of a white disc, which is what the source
+               artwork drew. A disc spends the icon box on its own ring and
+               leaves the glyph about 62% of it; at this size that was the
+               difference between a recognisable handset and a grey smudge.
+               `knockout` is the colour behind the glyphs now that no disc
+               provides one -- it fills the pin's hole and the envelope's
+               crease -- and it names the rail ROLE rather than a hex so both
+               stay correct when the accent changes. */
             { column: "sidebar", kind: "contact",
-              iconSize: 15.2, textOffset: 28,
-              disc: "sidebarInk", glyph: "railBg",
+              iconSize: 13.2, textOffset: 25,
+              glyph: "sidebarInk", knockout: "railBg",
               rows: [
                   { icon: "pin",      fields: ["address", "city", "postcode"], separator: ", " },
                   { icon: "phone",    fields: ["phone", "phoneAlt"],           separator: ", " },
@@ -316,7 +431,20 @@ window.TB_RESUME_TEMPLATES = [
 
             { column: "sidebar", kind: "section", label: "Skills",
               headingType: "sidebarHeading",
-              body: { kind: "list", field: "skills", split: ",", type: "sidebarItem" } }
+              body: { kind: "list", field: "skills", split: ",", type: "sidebarItem" } },
+
+            /* A bulleted list rather than the proficiency meters Ruled Serif
+               draws. A meter needs a track colour that reads against the
+               accent, and every accent on the swatch row is a different dark
+               -- one fixed track would be muddy on at least one of them. A
+               bullet needs nothing but the rail's own white. `entryList` is
+               what keeps the item clickable: the form holds languages as
+               rows and the engine reads them as one composed string, so
+               provenance has to name the row rather than the field. */
+            { column: "sidebar", kind: "section", label: "Languages",
+              headingType: "sidebarHeading",
+              body: { kind: "list", field: "languages", split: "\n",
+                      type: "sidebarItem", entryList: "language" } }
         ]
     },
 
@@ -326,10 +454,12 @@ window.TB_RESUME_TEMPLATES = [
 
         /* `catalog` is what separates a template a VISITOR may pick from one
            that exists only for the internal harness at
-           tools/resume-template-preview.html. grey-rail above carries no
-           flag on purpose: it reads address/city/postcode/phoneAlt, none of
-           which the editor form collects, so offering it would present a
-           picker entry that silently drops half the sidebar. */
+           tools/resume-template-preview.html. All three registry entries
+           carry it today; the flag earns its keep the moment a fourth is
+           imported and is being fitted to the form, which is the state
+           grey-rail was in until the editor learned to collect address, city,
+           postcode and phoneAlt. Offering a template the form cannot fill
+           presents a picker entry that silently drops half its own layout. */
         catalog: true,
 
         /* Every colour role that is not ink resolves to `accent`, so the
@@ -371,6 +501,14 @@ window.TB_RESUME_TEMPLATES = [
             displayName: { family: "serif", weight: "bold", size: 25,
                            lineHeight: 28, color: "accent", align: "center" },
 
+            /* The professional title, centred under the name. Ink rather than
+               accent, and two thirds of the display size: the accent belongs
+               to the name and the six section headings on this sheet, and a
+               fourth accent line between them would flatten that hierarchy
+               into a list of coloured text. */
+            titleLine:   { family: "serif", weight: "normal", size: 16,
+                           lineHeight: 19.2, color: "ink", align: "center" },
+
             /* One size for every section heading. The source artwork sets
                PROFESSIONAL SUMMARY at 21pt and the other five at 24pt, which
                is the designer having scaled the longest label by eye rather
@@ -410,6 +548,15 @@ window.TB_RESUME_TEMPLATES = [
             { column: "main", kind: "display", field: "name", type: "displayName",
               uppercase: true, fallback: "Your Name", gapAfter: 35.1 },
 
+            /* Between the name and the contact row, and absent entirely
+               until a title is typed. No gapBefore, deliberately: the display
+               above already carries the artwork's 35.1pt drop, so the title
+               lands on exactly the baseline the diamonds used to sit on and a
+               sheet with no title is byte-identical to the layout this
+               template was measured against. Only the contact row moves. */
+            { column: "main", kind: "text", field: "title", type: "titleLine",
+              gapAfter: 28 },
+
             /* Location, phone and email on one centred line, separated by the
                source's small filled diamonds. Fields that are empty drop out
                with their separator, so a two-value row still centres. */
@@ -443,6 +590,23 @@ window.TB_RESUME_TEMPLATES = [
                           { runs: [{ field: "place", type: "entrySub" }], gapBefore: 16.8 }
                       ],
                       bullets: { field: "description", split: "\n", gapBefore: 16.2 },
+                      entryGap: 22 } },
+
+            /* Company/dates split across the column is this design's entry
+               shape -- head left, aside hard right -- so a project takes it
+               too, with the role on the second baseline where the job title
+               sits in Experience above. */
+            { column: "main", kind: "section", label: "Projects",
+              gapAfter: 20.5,
+              body: { kind: "entries", source: "projects",
+                      head:  { runs: [{ field: "name",  type: "entryHead" }] },
+                      aside: { runs: [{ field: "dates", type: "entryMeta" }] },
+                      sub: [
+                          { runs: [{ field: "role", type: "entrySub" }],
+                            gapBefore: 16.8 }
+                      ],
+                      bullets: { field: "description", split: "\n",
+                                 gapBefore: 16.2 },
                       entryGap: 22 } },
 
             { column: "main", kind: "section", label: "Education",
@@ -495,7 +659,28 @@ window.TB_RESUME_TEMPLATES = [
                       itemGap: 24 } },
 
             { column: "main", kind: "section", label: "Accomplishments",
-              body: { kind: "list", field: "accomplishments", split: "\n" } }
+              body: { kind: "list", field: "accomplishments", split: "\n" } },
+
+            /* Last on every template. The referee's name takes the entry head
+               and the contact line sits right, which is the same head/aside
+               split Experience and Education use on this sheet. */
+            { column: "main", kind: "section", label: "References",
+              gapAfter: 20.5,
+              body: { kind: "entries", source: "references",
+                      head:  { runs: [{ field: "name", type: "entryHead" }] },
+                      aside: { runs: [
+                          { field: "email", type: "entryMeta" },
+                          { literal: " - ", type: "entryMeta" },
+                          { field: "phone", type: "entryMeta" }
+                      ]},
+                      sub: [
+                          { runs: [
+                              { field: "title",   type: "entrySub" },
+                              { literal: ", ",    type: "entrySub" },
+                              { field: "company", type: "entrySub" }
+                          ], gapBefore: 16.8 }
+                      ],
+                      entryGap: 20 } }
         ]
     }
 ];
