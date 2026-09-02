@@ -270,6 +270,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie Back Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>\n' +
@@ -1455,6 +1456,10 @@ body + '\n' +
         {
             id: "tshirt-model-white-back", title: "White T-Shirt Back Mockup", category: "mockups", doc: "tshirt-model-white-back",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
+        },
+        {
+            id: "hoodie-model-white-back", title: "White Hoodie Back Mockup", category: "mockups", doc: "hoodie-model-white-back",
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies"
         }
     ];
 

@@ -703,6 +703,102 @@ window.TB_PHOTO_MOCKUPS = [
         ]
     },
     {
+        /* The hood is the whole problem with a back-view hoodie, and it was
+           solved in the photograph rather than in code: worn down, flat and
+           unbunched, it stops at y=590 and its cast shadow bottoms out in a
+           row-mean trough at y=560 (203.8 against 234.5 for clear back). A
+           raised or piled hood would have taken the print area with it, and
+           there is no occlusion-mask support to paint around one. */
+        id: "hoodie-model-white-back",
+        title: "White Hoodie on Model, Back",
+        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-back-thumb.jpg",
+        base: "assets/mockups/apparel/hoodies/hoodie-model-white-back-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/hoodies/hoodie-model-white-back-displace.png",
+        shade: "assets/mockups/apparel/hoodies/hoodie-model-white-back-shade.png",
+        light: "assets/mockups/apparel/hoodies/hoodie-model-white-back-light.png",
+        /* 0.3, measured on this base: a #12305C navy fill across the zone
+           reaches p95 luma 174.8 at gain 1.0 against a source of 44, and
+           11.99% of the print stops reading as blue. At 0.3, 0.00%. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/hoodies/hoodie-model-white-back-garment.png",
+        tone: "assets/mockups/apparel/hoodies/hoodie-model-white-back-tone.png",
+        /* Weave 2.98 luma levels: above the back shirt's 2.18, below the
+           front hoodie's 4.11. Fleece nap still reads, but this back is lit
+           flatter than the front, so heather models the fibre less strongly
+           than it does on its pair. */
+        grain: "assets/mockups/apparel/hoodies/hoodie-model-white-back-grain.png",
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* 9, and it is the first value here set by measuring the ZONE rather
+           than the whole garment. The global gradient p99 is 22.32 against the
+           front hoodie's 28.51, which by the ratio used until now would give
+           10 x 22.32/28.51 = 8. But the global figure counts the hood roll and
+           the sleeve seams, none of which the print ever touches, so it can
+           under-bend a print whose garment happens to be lumpy elsewhere --
+           exactly this garment. What the eye sees is the offset delivered
+           INSIDE the zone, which is strength x zone_p99 / global_p99:
+
+             template        zone p50   zone p99   peak offset in zone
+             hoodie front      0.58       5.71        2.00px  @ 10
+             hoodie back       0.60       4.82        1.94px  @  9
+
+           The two zones are equally flat surfaces, so the pair should bend a
+           print equally, and 9 matches the front's delivered offset to 3%.
+           The old method's 8 is one unit away, so nothing shipped before this
+           is called into question -- but the zone figure is the one that
+           actually describes the print. */
+        displaceStrength: 9,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency: all four corners read alpha 0 and 32.9% of
+           the image is clear. The source arrived with a dark vignette and a
+           white halo still stored as RGB in 449,932 fully transparent pixels
+           -- invisible in a browser, and zeroed when the base was written. */
+        background: true,
+        /* 382x509: a real 12x16in back print, taller than the front hoodie's
+           12x12 because the back has no kangaroo pocket eating its lower half.
+           It sits 2in below the hood's lower edge and stops 124px (3.9in)
+           above the body/waistband seam, which is the sharpest horizontal
+           feature in the photograph -- vertical roughness spikes to 27.83 at
+           y=1292 against a body reading 1.3 to 2.9.
+
+           31.8 px/in, and this is the one number in the entry that is an
+           estimate rather than a measurement. The front hoodie's 36.5 px/in
+           cannot be reused: the back model is photographed smaller, with the
+           torso running 0.870 of the front's width at five matched offsets
+           above the waistband seam (spread 0.865 to 0.876). The waistband rib
+           agrees to 4% at 0.835, which is the corroboration; a head-width
+           comparison against the back shirt says 35.3 and is the outlier,
+           but it crosses two unrelated photographs and two different people,
+           so the hoodie-to-hoodie figure is the one used. An 11% band on the
+           scale means the print could defensibly be up to 424x565.
+
+           Centred on x=512, which three independent spans agree on to within
+           2.4px: the hood rows read 510.7, the mid back 513.1 and the waist
+           512.8. Verified 100.0000% fabric, zero impure pixels, with 65px of
+           clearance left and 73px right at the narrowest row, and the same
+           purity before and after closing 1-D specks -- unlike the back
+           shirt, this mask has no stray pixel misreporting the margin. The
+           default sat<14 / luma>110 gates are unchanged: hair fails luma, the
+           hands fail saturation (0 of 589 probe pixels classify) and the jeans
+           fail luma, so the mask stops at y=1369 with nothing below it. */
+        warpZone: [
+            { x: 321, y: 654 },
+            { x: 702, y: 654 },
+            { x: 702, y: 1162 },
+            { x: 321, y: 1162 }
+        ]
+    },
+    {
         id: "frame-black-interior",
         title: "Framed Poster in Interior",
         thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior-thumb.jpg",
