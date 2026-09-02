@@ -240,18 +240,11 @@
         context.restore();
     }
 
+    /* The drawn `tshirt` was retired on September 2, 2026, replaced by the
+       photographic `tshirt-hanger-white`. `drawTshirtBody` above STAYS: the
+       drawn hoodie is built on top of it, so deleting the shape with the
+       product would have taken the hoodie's body with it. */
     const PRODUCTS = {
-        tshirt: {
-            label: "T-Shirt",
-            printArea: { x: 360, y: 400, w: 280, h: 300 },
-            drawBase: drawTshirtBody,
-            colors: {
-                white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" },
-                black: { name: "Black", hex: "#1A1A1A", outline: "#000000" },
-                heather: { name: "Heather Gray", hex: "#B9B7B2", outline: "#98968F" },
-                navy: { name: "Navy", hex: "#1F2A44", outline: "#141B2C" }
-            }
-        },
         hoodie: {
             label: "Hoodie",
             printArea: { x: 370, y: 380, w: 260, h: 230 },
@@ -782,7 +775,7 @@
        a real composition never needs this many. */
     const MAX_LAYERS = 12;
 
-    let currentProduct = "tshirt";
+    let currentProduct = "hoodie";
     let currentColor = "black";
     let customHex = "#FFFFFF";
     /* The canvas background, or null for transparent -- which is the default
@@ -945,7 +938,7 @@
     }
 
     function paint() {
-        const product = PRODUCTS[currentProduct] ? currentProduct : "tshirt";
+        const product = PRODUCTS[currentProduct] ? currentProduct : "hoodie";
         currentProduct = product;
         const config = PRODUCTS[currentProduct];
 

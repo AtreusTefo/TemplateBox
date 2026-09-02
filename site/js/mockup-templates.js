@@ -361,6 +361,101 @@ window.TB_PHOTO_MOCKUPS = [
         ]
     },
     {
+        /* The plain product shot, and the template that REPLACED the drawn
+           vector `tshirt` on September 2, 2026. No model: a shirt on a wooden
+           hanger, cut out, so the editor's Background panel supplies whatever
+           backdrop a seller wants.
+
+           The photograph arrived with a chrome clothing rail across the top
+           and down the left, and the rail had to be removed from the image
+           before anything else could be done. Chrome and white cotton are the
+           same thing to the classifier: the rail's specular measured luma 248
+           at saturation 1 -- BRIGHTER and LESS saturated than the shirt's 232
+           at 7 -- so no gate separates them, and raising the luma floor to 190
+           still left 11,110 rail pixels while the shirt began losing its own
+           shading. The connected-region restriction could not save it either,
+           because the left sleeve hangs in front of the post at y 618..647 and
+           joins the two into one region. 37,873 rail pixels sat in the
+           shirt's own region, and every one of them would have turned navy
+           with the shirt. This is the hanger's lesson in reverse: a WOODEN
+           hanger fails the saturation gate at 103 and is safe, which is why
+           the generation prompt asked for one. */
+        id: "tshirt-hanger-white",
+        title: "White T-Shirt on a Hanger",
+        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white-thumb.jpg",
+        /* 1174x1468, and the first base in the catalog that is EXACTLY 4:5 --
+           the catalog card's own ratio -- so its thumbnail is a straight
+           downscale rather than a crop. That is built, not lucky: the frame is
+           the garment's bounding box plus an 80px margin, with the height set
+           from the width. */
+        base: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-displace.png",
+        shade: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-shade.png",
+        light: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-light.png",
+        /* 0.3, measured on this base: a #12305C navy fill reaches p95 luma
+           174.8 at gain 1.0 against a source of 44 and 13.46% of the print
+           stops reading as blue. At 0.3, 0.00%. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-garment.png",
+        tone: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-tone.png",
+        /* 1.92 luma levels, and this is the only map here that ships BELOW its
+           own quality floor: the derive flags anything under 2.0 as too
+           smooth. A shirt on a hanger is lit flat and has no body under it to
+           break the light up, so there is less weave to record than on any
+           worn garment (back shirt 2.18, back hoodie 2.98, front shirt 3.78).
+           The consequence is specific and limited -- the two heather
+           colourways model their undyed fibre faintly here, closer to a plain
+           marl than on the model shots. The solid colours do not use this map
+           at all. */
+        grain: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-grain.png",
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* 16, by the zone measure the back hoodie introduced rather than by
+           the global one. Global p99 is 15.06 and the zone's is 5.59, a ratio
+           of 0.371, so this delivers 5.97px of peak offset inside the print --
+           0.509% of base width, against the back shirt's 0.519% on a print
+           surface of comparable flatness (zone p50 1.39 here, 0.84 there).
+           Judged on the straight bars of the thumbnail lockup: 10 is too
+           clean, and at 26 the ring starts to go out of round at its
+           lower left. */
+        displaceStrength: 16,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency: all four corners read alpha 0, 56.8% of the
+           image is clear, and after the rail was removed ZERO transparent
+           pixels still carry RGB. */
+        background: true,
+        /* 427x570 -- a real 12x16in print at 35.6 px/in, its top 3in below the
+           neckline. Both the scale and the placement follow the same rules
+           `tshirt-model-white` uses, applied to this photograph's own
+           landmarks: the neckline's lowest point on the centreline is y=337,
+           the hem is y=1333, and 996px between them reads as 28in. The zone
+           therefore lands at the same fraction of the garment as the model
+           shot's does (0.429 of collar-to-hem wide, 0.571 tall), so the same
+           artwork reads the same size on both.
+
+           Centred on x=570, which the garment's own row midpoints hold to
+           within 2px from the chest to the hem. Verified 100.0000% fabric,
+           zero impure pixels, with 86px of clearance on both sides, and the
+           hanger stays out of the mask: 3 of 3,106 probe pixels across it
+           classify, which is 0.097%. */
+        warpZone: [
+            { x: 356, y: 444 },
+            { x: 782, y: 444 },
+            { x: 782, y: 1013 },
+            { x: 356, y: 1013 }
+        ]
+    },
+    {
         id: "cap-model-white",
         title: "White Baseball Cap on Model",
         thumb: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb.jpg",
@@ -625,11 +720,23 @@ window.TB_PHOTO_MOCKUPS = [
            This sits exactly ON the edge and never past it: the surround here
            is transparent, so a zone even a pixel wide of the vinyl would
            paint artwork into empty space beside the banner. */
+        /* The bottom edge was 1347 until September 2, 2026 and is 1345 now.
+           Two rows does not sound like a defect, but this template fills its
+           zone (`designScale: "cover"`), and rows 1346 and 1347 are entirely
+           OFF the vinyl -- the face reads 616/616 pixels white at y=1345 and
+           0/616 at y=1346, where luma drops from 229 to 135 as the banner's
+           base begins. So a design was rendering a 616x2 strip of itself
+           below the banner, against the transparent surround, which the
+           Background panel then paints a colour behind. The 1-2px of zone
+           that hangs over the vinyl's antialiased SIDE edges stays: that is
+           the zone sitting flush with the face, which is what a
+           bleed-to-edge banner wants, and pulling it in would trade an
+           invisible overhang for a visible white gutter. */
         warpZone: [
             { x: 205, y: 128 },
             { x: 820, y: 128 },
-            { x: 820, y: 1347 },
-            { x: 205, y: 1347 }
+            { x: 820, y: 1345 },
+            { x: 205, y: 1345 }
         ]
     },
     {
@@ -803,7 +910,30 @@ window.TB_PHOTO_MOCKUPS = [
         title: "Framed Poster in Interior",
         thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior-thumb.jpg",
         base: "assets/mockups/print/posters-and-frames/frame-black-interior-base.png",
-        overlay: null,
+        /* Added September 2, 2026, and it is an OCCLUSION mask rather than the
+           shadow-and-glare sheet this key usually carries: the base with the
+           frame's aperture punched out, so the frame itself is redrawn over
+           the artwork.
+
+           It exists because the print zone deliberately overhangs the window.
+           The frame is photographed in slight perspective, so its aperture is a
+           trapezoid -- 279..843 at the top, 273..849 at the bottom -- while the
+           zone must stay an axis-aligned RECTANGLE, because a non-rectangular
+           quad routes to the perspective warp, which returns before the shading
+           pass and nulls every hit rect. That is how this template lost scale
+           and rotate once already. A rectangle inscribed in a trapezoid has to
+           choose: fall short at the wide end and show a white gutter, or
+           overhang at the narrow end and bleed onto the frame. The zone was
+           widened to 271..850 to kill the gutter, which left 6,341 pixels of
+           artwork sitting on the black border, worst at the top (8px left, 7px
+           right, tapering to 2px and 1px at the bottom).
+
+           This overlay masks exactly those 6,341 pixels. Both faults are gone
+           at once, and the zone stays a rectangle. `source-over`, because it is
+           a pre-masked photograph and not a luminance map -- multiply would
+           darken the whole scene by itself. */
+        overlay: "assets/mockups/print/posters-and-frames/frame-black-interior-overlay.png",
+        overlayBlend: "source-over",
         displace: "assets/mockups/print/posters-and-frames/frame-black-interior-displace.png",
         shade: "assets/mockups/print/posters-and-frames/frame-black-interior-shade.png",
         /* NO `light`, and this is the first template to omit it. The map exists

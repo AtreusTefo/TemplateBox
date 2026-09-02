@@ -273,7 +273,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie Back Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>\n' +
-'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">T-Shirt Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>\n' +
@@ -1413,7 +1413,10 @@ body + '\n' +
         { id: "framed-photo-poster", title: "Framed Photo Poster", category: "canvas", doc: null },
         { id: "matte-wood-canvas", title: "Matte Wood Canvas", category: "canvas", doc: null },
         { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: null },
-        { id: "tshirt", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt" },
+        {
+            id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
+        },
         { id: "hoodie", title: "Hoodie Mockup", category: "mockups", doc: "hoodie" },
         { id: "mug", title: "Mug Mockup", category: "mockups", doc: "mug" },
         { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },

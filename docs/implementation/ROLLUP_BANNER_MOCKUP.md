@@ -172,3 +172,14 @@ note in the registry doc block and the factory's category hint gained
   connected-region restriction.
 - `docs/implementation/MOCKUP_ASSET_FOLDER_STRUCTURE.md` -- why the assets live
   under `print/signage/`.
+
+## Update: September 2, 2026 -- the zone ran two rows past the vinyl
+
+The zone ended at y=1347; the white face ends at y=1345 (616/616 zone pixels on
+the face at 1345, 0/616 at 1346, where luma drops 229 to 135). Since this template
+fills its zone, a 616x2 strip of every design was rendering below the banner
+against the transparent surround. The bottom edge is 1345 now. The 1-2px that
+hangs over the vinyl's antialiased SIDE edges stays: that is the zone sitting flush
+with the face, and pulling it in would trade an invisible overhang for a visible
+gutter. Full measurements:
+`docs/error-fixes/MOCKUP_PRINT_ZONES_OVERHANGING_THEIR_SURFACE.md`.

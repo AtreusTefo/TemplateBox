@@ -139,3 +139,13 @@ as it is, and recorded here rather than silently accepted.
 - `docs/implementation/ROLLUP_BANNER_MOCKUP.md`
 - `docs/implementation/TWO_ZONE_BUSINESS_CARD_MOCKUP.md`
 - `docs/error-fixes/MOCKUP_EDITOR_AUDIT_AUGUST_2026.md`
+
+## Update: September 2, 2026 -- the overhang is masked now
+
+Widening the zone to kill the white gutter left the other half of the trade in
+place: 6,341 pixels of artwork sat on the frame's black border, worst at the top
+(8px left, 7px right, tapering to 2px and 1px at the bottom) because the aperture
+is a trapezoid and the zone has to stay a rectangle. The template now declares an
+`overlay` -- the base with the aperture punched out -- so the frame is redrawn over
+the artwork. Both faults are gone and the zone is unchanged. Full measurements:
+`docs/error-fixes/MOCKUP_PRINT_ZONES_OVERHANGING_THEIR_SURFACE.md`.
