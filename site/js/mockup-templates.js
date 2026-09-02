@@ -713,5 +713,102 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 850, y: 1068 },
             { x: 271, y: 1068 }
         ]
+    },
+    {
+        id: "bucket-hat-white",
+        title: "White Bucket Hat on Model",
+        thumb: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats/bucket-hat-white-thumb.jpg",
+        base: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-displace.png",
+        shade: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-shade.png",
+        light: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-light.png",
+        /* 0.3. At gain 1.0 a #12305C navy fill loses 3.49% of its blue
+           identity and p95 luma reaches 163 against a source of 44; at 0.3 the
+           loss is 0.00%. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-garment.png",
+        tone: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-tone.png",
+        /* Weave measured 5.33 luma levels, second only to the cap's 5.86 and
+           well clear of the 2.0 floor, so the heather colourways below have
+           real fibre to screen back. */
+        grain: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-grain.png",
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* 6, which is 0.53% of base width -- between the paper bag's 0.39% and
+           the hoodie's 0.98%. Gradient p99 measured 14.23 against the hoodie's
+           28.5 and the cap's 30.3: a crown stretched over a head is a smooth
+           cylinder with very little folding, so it bends a print less than
+           fleece drape but more than stiff paper. Matching the hoodie's
+           physical bend works out at 10 x (14.23 / 28.5) x (1122 / 1024) = 5.5,
+           and the grid agrees -- at 10 the ruled lines already read as a loose
+           hat rather than a taut one. */
+        displaceStrength: 6,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency: all four corners read alpha 0 and 34.0% of
+           the image is clear. */
+        background: true,
+        /* THE THRESHOLDS ARE TUNED FOR THIS BASE, and both are raised from the
+           factory defaults of sat < 14 and luma > 110. This is the first
+           template that needed it, and the defaults were wrong here in BOTH
+           directions at once.
+
+           The hat carries a slight colour cast -- its own saturation runs 12
+           to 16 -- so a gate of 14 bisected the crown, leaving it 87.9%
+           classified with holes scattered through the print zone. Raising
+           saturation alone to 20 fixed the crown but pulled 5,930 forehead
+           pixels into the mask, and the connected-region restriction cannot
+           drop those: the brim rests on the forehead, so they are genuinely
+           connected, unlike the cap's separate white tee. The LUMA gate is
+           what separates them, because the hat's p1 is 174 while the face's
+           p50 is 131. Measured:
+
+             gates      face in mask    brim kept   zone purity
+             14 / 110   0.251% (750)    89.51%      87.92%
+             20 / 165   0.119% (355)    99.54%      100.0000%
+
+           Strictly better on every axis. Pushing luma to 175 trims the face
+           further to 0.058% but costs brim coverage (98.90%), and the brim is
+           the product. Re-deriving this template with the factory defaults
+           will silently produce a speckled mask -- set both thresholds. */
+        /* 470x260 on the crown front, centred on the crown's own centreline
+           (x 565, constant to within 3px from y=120 to y=500), stopping 32px
+           above the brim seam. That seam is the strongest horizontal step in
+           the crown's central columns, +4.96 at y=491. Verified 100.0000%
+           surface with zero impure pixels.
+
+           This is deliberately LARGER than a conventional bucket hat print.
+           It started at 320x190, about 11.7 x 6.9cm at this hat's scale, which
+           is what a real embroidered front actually measures; it was doubled
+           in area at the owner's request, and now covers roughly 17 x 9.5cm --
+           a full front-panel graphic rather than a badge.
+
+           What bounds it is not purity, which holds at 100.0000% out to
+           550x280, but CURVATURE. The displacement map is the surface gradient,
+           so its magnitude reports where the cylinder rolls out of view: it
+           runs 3 to 11 across x 240..760, reaches 14.1 at x=800 and spikes to
+           24.3 at x=840. The right edge sits at 799, just short of that spike,
+           and the left mirrors it about the centreline. Pushing to 510 or 550
+           wide stays pure but reaches into the turn, where artwork foreshortens
+           hard against the near-flat middle.
+
+           The seamless front panel the photograph was asked for is what makes a
+           rectangle legitimate here at all: a four-panel crown would have put a
+           vertical seam straight down the middle of this zone. */
+        warpZone: [
+            { x: 330, y: 200 },
+            { x: 800, y: 200 },
+            { x: 800, y: 460 },
+            { x: 330, y: 460 }
+        ]
     }
 ];

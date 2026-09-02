@@ -270,6 +270,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
@@ -1445,6 +1446,10 @@ body + '\n' +
         {
             id: "frame-black-interior", title: "Interior Framed Poster Mockup", category: "mockups", doc: "frame-black-interior",
             folder: "assets/thumbnails/product-mockups/print/posters-and-frames"
+        },
+        {
+            id: "bucket-hat-white", title: "White Bucket Hat Mockup", category: "mockups", doc: "bucket-hat-white",
+            folder: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats"
         }
     ];
 
