@@ -264,6 +264,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                        <h2>Product Mockups</h2>\n' +
 '                        <ul>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-model-white-back">White T-Shirt Back Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>\n' +
@@ -1450,6 +1451,10 @@ body + '\n' +
         {
             id: "bucket-hat-white", title: "White Bucket Hat Mockup", category: "mockups", doc: "bucket-hat-white",
             folder: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats"
+        },
+        {
+            id: "tshirt-model-white-back", title: "White T-Shirt Back Mockup", category: "mockups", doc: "tshirt-model-white-back",
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
         }
     ];
 

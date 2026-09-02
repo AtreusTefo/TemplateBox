@@ -212,6 +212,7 @@
                              it -- do not swap these for buttons. -->
                         <ul>
                             <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white-back">White T-Shirt Back Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>
@@ -881,12 +882,29 @@
                     </div>
                 </article>
 
+                <!-- The first second VIEW of a product already in the catalog
+                     rather than a new product. It is a separate card, not a
+                     variant of the T-Shirt one, because the registry keys
+                     templates by id and data-doc is what opens the editor. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="tshirt-model-white-back">White T-Shirt Back Mockup</a></h3>
+                    </div>
+                </article>
+
             </div>
 
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 26.
+                Try a broader term, or clear the search to see all 27.
             </p>
         </section>
 

@@ -268,6 +268,99 @@ window.TB_PHOTO_MOCKUPS = [
         ]
     },
     {
+        /* The back of the same shirt, and the first template in the catalog
+           that is a second VIEW of a product already here rather than a new
+           product. That is a claim about the photographs, so it was measured
+           before it was relied on: sleeve tip to sleeve tip is 1937px here
+           against 966px on the front, which is 1932 once the front is put in
+           this base's coordinates -- 0.26% apart. The hems agree too (2812
+           here, 1418x2 = 2836 there). The two are the same garment at the same
+           distance, so the front's 34.8 px/in carries over as 69.6 px/in and
+           the print zone below is the same real 12x16in area. */
+        id: "tshirt-model-white-back",
+        title: "White T-Shirt on Model, Back",
+        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back-thumb.jpg",
+        /* 2048x3072 -- twice the linear size of every other garment base here.
+           That matters in exactly one place, `displaceStrength`, which is in
+           base-image pixels; everything else in this entry is a coordinate in
+           the same space. */
+        base: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-displace.png",
+        shade: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-shade.png",
+        light: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-light.png",
+        /* 0.3, measured on this base rather than inherited: a #12305C navy
+           fill across the zone reaches p95 luma 192.1 at gain 1.0 against a
+           source of 44, and 11.90% of the print stops reading as blue. At 0.3
+           the loss is 0.00% and p95 is 88.5. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-garment.png",
+        tone: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-tone.png",
+        /* The lowest weave in the catalog: 2.18 luma levels against the
+           front's 3.78 and the hoodie's 4.11, barely over the 2.0 floor. A
+           back has no chest folds to break the light up, so the heather
+           colourways below model the fibre more faintly here than on any
+           other garment. Real, and not worth faking with a synthetic map. */
+        grain: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-grain.png",
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* 27, and the arithmetic is the only reason it is not the front's 16.
+           Gradient p99 is 17.34 here, but a Sobel measures luma change PER
+           PIXEL, so a base at twice the linear size reads half the gradient
+           for the same physical fold: in the front's coordinates this back is
+           34.7 against its 41.5, a genuinely smoother surface at 0.836. The
+           front spends 16/1024 = 1.56% of base width; 1.56% x 0.836 = 1.31%,
+           which is 26.8px of this base. Judged on the straight bars of the
+           thumbnail lockup: at 16 the edges stay too clean and the print
+           reads as a decal, at 45 the ring is visibly out of round. */
+        displaceStrength: 27,
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency: all four corners read alpha 0 and 40.1% of
+           the image is clear. */
+        background: true,
+        /* A real 12x16in back print at 69.6 px/in (835x1114), its top 3in
+           below the collar seam -- the same 3in rule the front uses, applied
+           to the back's own landmark, which is why this print sits higher in
+           frame than the front's: a crew neck's front scoop is 1.8in below
+           the back collar seam (y=761 here against y=888 for the front in
+           these coordinates).
+
+           Centred on x=1029, interpolated between the two symmetric landmarks
+           rather than taken from the frame: the collar and yoke rows average a
+           midpoint of 1024.0 and the hem rows 1038.1, and the zone's own
+           mid-height falls 37% of the way between them. The frame centre,
+           1024, and the armhole seams, 1008.5, both disagree with that by
+           enough to see.
+
+           Verified 100.0000% fabric, zero impure pixels, with the default
+           sat<14 / luma>110 gates: the model's hair fails luma, the forearms
+           and the back of the neck fail saturation (0 of 2160 probe pixels
+           beside the torso classify), and the charcoal jeans fail luma
+           outright, so the mask stops at y=2815 and none of it is skin.
+
+           The zone's width is bounded by the arms, not the shoulders. From
+           y~1740 down the forearms cut the visible torso to a run of x
+           549..1511 through the centreline, and 835px leaves 63px clear on the
+           left and 65px on the right at the narrowest row. The raw mask
+           suggests 20px, but that is one stray pixel at (591, 1467); closing
+           1-D specks shorter than 8px is what shows the real margin. */
+        warpZone: [
+            { x: 612, y: 970 },
+            { x: 1446, y: 970 },
+            { x: 1446, y: 2083 },
+            { x: 612, y: 2083 }
+        ]
+    },
+    {
         id: "cap-model-white",
         title: "White Baseball Cap on Model",
         thumb: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb.jpg",
