@@ -574,6 +574,63 @@ function staticChecks() {
             broken.length === 0, `missing file(s): ${broken.join(", ")}`);
     });
 
+    /* 1k3. Mockup assets live one folder per mockup, and that folder is named
+            for the template id (September 3, 2026).
+
+            1k and 1k2 above catch a path that points at nothing. Neither can
+            catch a path that RESOLVES but sits in the wrong place, which is
+            what a flat folder invites: ids nest here -- "tshirt-model-white"
+            is a prefix of "tshirt-model-white-back" -- so a file dropped
+            beside its neighbours is claimed by any prefix operation on the
+            shorter id. The folder boundary is what removes that class, and a
+            convention nothing enforces is one bad paste from being over.
+
+            The file name keeps the id too, deliberately, so an asset still
+            identifies itself in a network waterfall or a flat storage bucket
+            where the folder is not visible. Both halves are asserted here,
+            because either one alone would let the other rot.
+
+            Parsed by hand rather than by regex: the file is a flat list of
+            "key: value," lines, and a scanner that tracks the current id is
+            both shorter and harder to get subtly wrong than a pattern. */
+    {
+        const ASSET_KEYS = ["base", "overlay", "displace", "shade", "light",
+            "tone", "grain", "garment", "thumb"];
+        const registry = fs.readFileSync(
+            path.join(SITE, "js", "mockup-templates.js"), "utf8").split("\n");
+        const bad = [];
+        let current = null;
+        let templates = 0;
+        let checked = 0;
+        registry.forEach((raw) => {
+            const line = raw.trim();
+            if (line.startsWith("id: \"")) {
+                current = line.slice(5, line.indexOf("\"", 5));
+                templates += 1;
+                return;
+            }
+            if (!current) { return; }
+            const key = ASSET_KEYS.find((k) => line.startsWith(k + ": \"assets/"));
+            if (!key) { return; }
+            const from = line.indexOf("\"") + 1;
+            const value = line.slice(from, line.indexOf("\"", from));
+            checked += 1;
+            const cut = value.lastIndexOf("/");
+            const file = value.slice(cut + 1);
+            const folder = value.slice(0, cut);
+            const owner = folder.slice(folder.lastIndexOf("/") + 1);
+            if (owner !== current) {
+                bad.push(value + " is not in a folder named " + current);
+            } else if (!file.startsWith(current + "-")) {
+                bad.push(value + " does not carry its id in the file name");
+            }
+        });
+        check("mockup assets sit in <category>/<id>/<id>-* ("
+            + checked + " paths across " + templates + " templates)",
+            bad.length === 0 && checked > 0, bad.slice(0, 4).join("; "));
+    }
+
+
     /* The catalog-empty message names the card count. It said 17 against
        eighteen cards until August 22, 2026, because adding a card does not
        force anyone to touch that sentence. */

@@ -1415,57 +1415,57 @@ body + '\n' +
         { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: null },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
-            folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"
         },
         {
             id: "hoodie-hanger-white", title: "Hoodie Mockup", category: "mockups", doc: "hoodie-hanger-white",
-            folder: "assets/thumbnails/product-mockups/apparel/hoodies"
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-hanger-white"
         },
         { id: "mug", title: "Mug Mockup", category: "mockups", doc: "mug" },
         { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },
         {
             id: "wood-a4", title: "Leaning Wood Frame Poster Mockup", category: "mockups", doc: "wood-a4",
-            folder: "assets/thumbnails/product-mockups/print/posters-and-frames"
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4"
         },
         {
             id: "tshirt-model-white", title: "White T-Shirt on Model Mockup", category: "mockups", doc: "tshirt-model-white",
-            folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white"
         },
         {
             id: "cap-model-white", title: "White Baseball Cap Mockup", category: "mockups", doc: "cap-model-white",
-            folder: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps"
+            folder: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white"
         },
         {
             id: "bag-paper-white", title: "White Paper Bag Mockup", category: "mockups", doc: "bag-paper-white",
-            folder: "assets/thumbnails/product-mockups/packaging/bags"
+            folder: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-white"
         },
         {
             id: "card-white-walnut", title: "Business Card Mockup", category: "mockups", doc: "card-white-walnut",
-            folder: "assets/thumbnails/product-mockups/print/business-cards"
+            folder: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut"
         },
         {
             id: "banner-rollup-white", title: "Roll-Up Banner Mockup", category: "mockups", doc: "banner-rollup-white",
-            folder: "assets/thumbnails/product-mockups/print/signage"
+            folder: "assets/thumbnails/product-mockups/print/signage/banner-rollup-white"
         },
         {
             id: "hoodie-model-white", title: "White Hoodie Mockup", category: "mockups", doc: "hoodie-model-white",
-            folder: "assets/thumbnails/product-mockups/apparel/hoodies"
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white"
         },
         {
             id: "frame-black-interior", title: "Interior Framed Poster Mockup", category: "mockups", doc: "frame-black-interior",
-            folder: "assets/thumbnails/product-mockups/print/posters-and-frames"
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior"
         },
         {
             id: "bucket-hat-white", title: "White Bucket Hat Mockup", category: "mockups", doc: "bucket-hat-white",
-            folder: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats"
+            folder: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats/bucket-hat-white"
         },
         {
             id: "tshirt-model-white-back", title: "White T-Shirt Back Mockup", category: "mockups", doc: "tshirt-model-white-back",
-            folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back"
         },
         {
             id: "hoodie-model-white-back", title: "White Hoodie Back Mockup", category: "mockups", doc: "hoodie-model-white-back",
-            folder: "assets/thumbnails/product-mockups/apparel/hoodies"
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-back"
         }
     ];
 

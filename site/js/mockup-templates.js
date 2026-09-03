@@ -123,11 +123,27 @@
    data-target="mockup" data-doc="<id>". No other code changes are needed.
 
    Asset conventions:
-     site/assets/mockups/<category>/<id>-base.png / <id>-overlay.png
-     site/assets/mockups/<category>/<id>-displace.png / <id>-shade.png  (fabric)
-     site/assets/thumbnails/product-mockups/<category>/<id>-thumb.jpg
+     site/assets/mockups/<category>/<id>/<id>-base.png / <id>-overlay.png
+     site/assets/mockups/<category>/<id>/<id>-displace.png / <id>-shade.png
+     site/assets/thumbnails/product-mockups/<category>/<id>/<id>-thumb.jpg
    Paths must stay URL-safe: lowercase, hyphenated, no spaces. The admin tool
    derives every filename from the id, so the id and the assets cannot drift.
+
+   ONE FOLDER PER MOCKUP since September 3, 2026. The seven maps of a template
+   are only ever loaded together, so they live together; retiring a template is
+   deleting a directory rather than finding seven files by prefix among twenty.
+   The prefix part is the real reason. Ids nest -- `tshirt-model-white` is a
+   PREFIX of `tshirt-model-white-back` -- so in a flat folder no prefix-based
+   operation on the shorter one is safe, and the same hazard had already been
+   met once in js/admin.js, where `<id>-thumb` is a prefix of `<id>-thumb-blank`
+   and a startsWith check deleted the wrong file. A folder boundary removes the
+   whole class.
+
+   The FILE NAMES still carry the id even though the folder already does, and
+   the redundancy is deliberate. It is what lets an asset identify itself where
+   its folder is not visible: a devtools network waterfall, a downloads folder,
+   or the flat object-storage bucket the scale note below anticipates. Thirteen
+   files called base.png would be worse in all three.
 
    <category> is a nested taxonomy path, and the SAME path is used in both
    trees -- apparel/t-shirts, apparel/hats/baseball-caps, drinkware/mugs,
@@ -159,9 +175,9 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "wood-a4",
         title: "Leaning Wood Frame Poster",
-        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4-thumb.webp",
-        base: "assets/mockups/print/posters-and-frames/wood-a4-base.png",
-        overlay: "assets/mockups/print/posters-and-frames/wood-a4-overlay.png",
+        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4/wood-a4-thumb.webp",
+        base: "assets/mockups/print/posters-and-frames/wood-a4/wood-a4-base.png",
+        overlay: "assets/mockups/print/posters-and-frames/wood-a4/wood-a4-overlay.png",
         /* Measured: inside the print window this overlay averages alpha 193
            over a near-white body (mean luma 211), so it is a luminance map,
            not a shadow cut-out. */
@@ -184,18 +200,18 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "tshirt-model-white",
         title: "White T-Shirt on Model",
-        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-thumb.webp",
-        base: "assets/mockups/apparel/t-shirts/tshirt-model-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-thumb.webp",
+        base: "assets/mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-base.png",
         /* Fabric, not glass: the artwork is bent and shaded by the two maps
            below during the displacement pass, so this template carries no
            full-canvas overlay at all. */
         overlay: null,
-        displace: "assets/mockups/apparel/t-shirts/tshirt-model-white-displace.png",
-        shade: "assets/mockups/apparel/t-shirts/tshirt-model-white-shade.png",
+        displace: "assets/mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-displace.png",
+        shade: "assets/mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-shade.png",
         /* 2.8% of this garment sits above its own reference white -- the
            light catching the fold ridges. Multiply clamps that away, so it
            is split into its own screen layer. */
-        light: "assets/mockups/apparel/t-shirts/tshirt-model-white-light.png",
+        light: "assets/mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-light.png",
         /* 0.3, not 1. The light map is "everything above the fabric's
            median" on a WHITE garment, which is mostly bright DIFFUSE, not
            surface reflection -- the same confusion that washed dark dyes out
@@ -207,15 +223,15 @@ window.TB_PHOTO_MOCKUPS = [
         lightGain: 0.3,
         /* Alpha mask of the garment, hole-filled and feathered. Recolour is
            confined to it, so the tint cannot creep onto skin or background. */
-        garment: "assets/mockups/apparel/t-shirts/tshirt-model-white-garment.png",
+        garment: "assets/mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-garment.png",
         /* Diffuse response normalised to the garment's own peak, used ONLY by
            recolour. Distinct from `shade` on purpose: shade is median-split
            for the print pass and pairs with `light`, which would wash a dye
            out. */
-        tone: "assets/mockups/apparel/t-shirts/tshirt-model-white-tone.png",
+        tone: "assets/mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-tone.png",
         /* High-pass of the weave, centred at 128. Screened back over a
            heather colourway as the undyed fibre; unused by solid dyes. */
-        grain: "assets/mockups/apparel/t-shirts/tshirt-model-white-grain.png",
+        grain: "assets/mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-grain.png",
         /* Declaring both `garment` and `garmentColors` is what turns the
            colour field on for a photographic template. The first entry is the
            photographed garment itself and is never tinted. */
@@ -279,29 +295,29 @@ window.TB_PHOTO_MOCKUPS = [
            the print zone below is the same real 12x16in area. */
         id: "tshirt-model-white-back",
         title: "White T-Shirt on Model, Back",
-        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back-thumb.jpg",
+        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-thumb.jpg",
         /* 2048x3072 -- twice the linear size of every other garment base here.
            That matters in exactly one place, `displaceStrength`, which is in
            base-image pixels; everything else in this entry is a coordinate in
            the same space. */
-        base: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-base.png",
+        base: "assets/mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-base.png",
         overlay: null,
-        displace: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-displace.png",
-        shade: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-shade.png",
-        light: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-light.png",
+        displace: "assets/mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-displace.png",
+        shade: "assets/mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-shade.png",
+        light: "assets/mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-light.png",
         /* 0.3, measured on this base rather than inherited: a #12305C navy
            fill across the zone reaches p95 luma 192.1 at gain 1.0 against a
            source of 44, and 11.90% of the print stops reading as blue. At 0.3
            the loss is 0.00% and p95 is 88.5. */
         lightGain: 0.3,
-        garment: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-garment.png",
-        tone: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-tone.png",
+        garment: "assets/mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-garment.png",
+        tone: "assets/mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-tone.png",
         /* The lowest weave in the catalog: 2.18 luma levels against the
            front's 3.78 and the hoodie's 4.11, barely over the 2.0 floor. A
            back has no chest folds to break the light up, so the heather
            colourways below model the fibre more faintly here than on any
            other garment. Real, and not worth faking with a synthetic map. */
-        grain: "assets/mockups/apparel/t-shirts/tshirt-model-white-back-grain.png",
+        grain: "assets/mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-grain.png",
         garmentColors: {
             original: { name: "As photographed", hex: "#E9E9EC", original: true },
             black: { name: "Black", hex: "#1A1A1A" },
@@ -382,23 +398,23 @@ window.TB_PHOTO_MOCKUPS = [
            the generation prompt asked for one. */
         id: "tshirt-hanger-white",
         title: "White T-Shirt on a Hanger",
-        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white-thumb.jpg",
+        thumb: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-thumb.jpg",
         /* 1174x1468, and the first base in the catalog that is EXACTLY 4:5 --
            the catalog card's own ratio -- so its thumbnail is a straight
            downscale rather than a crop. That is built, not lucky: the frame is
            the garment's bounding box plus an 80px margin, with the height set
            from the width. */
-        base: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-base.png",
+        base: "assets/mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-base.png",
         overlay: null,
-        displace: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-displace.png",
-        shade: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-shade.png",
-        light: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-light.png",
+        displace: "assets/mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-displace.png",
+        shade: "assets/mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-shade.png",
+        light: "assets/mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-light.png",
         /* 0.3, measured on this base: a #12305C navy fill reaches p95 luma
            174.8 at gain 1.0 against a source of 44 and 13.46% of the print
            stops reading as blue. At 0.3, 0.00%. */
         lightGain: 0.3,
-        garment: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-garment.png",
-        tone: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-tone.png",
+        garment: "assets/mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-garment.png",
+        tone: "assets/mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-tone.png",
         /* 1.92 luma levels, and this is the only map here that ships BELOW its
            own quality floor: the derive flags anything under 2.0 as too
            smooth. A shirt on a hanger is lit flat and has no body under it to
@@ -408,7 +424,7 @@ window.TB_PHOTO_MOCKUPS = [
            colourways model their undyed fibre faintly here, closer to a plain
            marl than on the model shots. The solid colours do not use this map
            at all. */
-        grain: "assets/mockups/apparel/t-shirts/tshirt-hanger-white-grain.png",
+        grain: "assets/mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-grain.png",
         garmentColors: {
             original: { name: "As photographed", hex: "#E9E9EC", original: true },
             black: { name: "Black", hex: "#1A1A1A" },
@@ -458,12 +474,12 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "cap-model-white",
         title: "White Baseball Cap on Model",
-        thumb: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb.jpg",
-        base: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-thumb.jpg",
+        base: "assets/mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-base.png",
         overlay: null,
-        displace: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-displace.png",
-        shade: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-shade.png",
-        light: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-light.png",
+        displace: "assets/mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-displace.png",
+        shade: "assets/mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-shade.png",
+        light: "assets/mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-light.png",
         /* 0.3, not 1. The light map is "everything above the fabric's
            median" on a WHITE garment, which is mostly bright DIFFUSE, not
            surface reflection -- the same confusion that washed dark dyes out
@@ -473,9 +489,9 @@ window.TB_PHOTO_MOCKUPS = [
            lost its blue identity outright. At 0.3 the highlight still models
            the surface and the ink stays the colour it was. */
         lightGain: 0.3,
-        garment: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-garment.png",
-        tone: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-tone.png",
-        grain: "assets/mockups/apparel/hats/baseball-caps/cap-model-white-grain.png",
+        garment: "assets/mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-garment.png",
+        tone: "assets/mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-tone.png",
+        grain: "assets/mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-grain.png",
         /* Higher than the shirt's 16 because this base is 1939px wide against
            the shirt's 1024, and displaceStrength is in base-image pixels. It
            is NOT scaled proportionally (that would be ~30): a structured cap
@@ -516,15 +532,15 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "bag-paper-white",
         title: "White Paper Shopping Bag",
-        thumb: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-white-thumb.jpg",
-        base: "assets/mockups/packaging/bags/bag-paper-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-white/bag-paper-white-thumb.jpg",
+        base: "assets/mockups/packaging/bags/bag-paper-white/bag-paper-white-base.png",
         overlay: null,
-        displace: "assets/mockups/packaging/bags/bag-paper-white-displace.png",
-        shade: "assets/mockups/packaging/bags/bag-paper-white-shade.png",
-        light: "assets/mockups/packaging/bags/bag-paper-white-light.png",
+        displace: "assets/mockups/packaging/bags/bag-paper-white/bag-paper-white-displace.png",
+        shade: "assets/mockups/packaging/bags/bag-paper-white/bag-paper-white-shade.png",
+        light: "assets/mockups/packaging/bags/bag-paper-white/bag-paper-white-light.png",
         lightGain: 0.3,
-        garment: "assets/mockups/packaging/bags/bag-paper-white-garment.png",
-        tone: "assets/mockups/packaging/bags/bag-paper-white-tone.png",
+        garment: "assets/mockups/packaging/bags/bag-paper-white/bag-paper-white-garment.png",
+        tone: "assets/mockups/packaging/bags/bag-paper-white/bag-paper-white-tone.png",
         /* No `grain`, and that is a property of the material rather than an
            omission. The map exists to screen undyed fibre back over a heather
            blend, and paper has no blend -- there are no heather colourways
@@ -582,15 +598,15 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "card-white-walnut",
         title: "Business Cards on Walnut",
-        thumb: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut-thumb.jpg",
-        base: "assets/mockups/print/business-cards/card-white-walnut-base.png",
+        thumb: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut/card-white-walnut-thumb.jpg",
+        base: "assets/mockups/print/business-cards/card-white-walnut/card-white-walnut-base.png",
         overlay: null,
-        displace: "assets/mockups/print/business-cards/card-white-walnut-displace.png",
-        shade: "assets/mockups/print/business-cards/card-white-walnut-shade.png",
-        light: "assets/mockups/print/business-cards/card-white-walnut-light.png",
+        displace: "assets/mockups/print/business-cards/card-white-walnut/card-white-walnut-displace.png",
+        shade: "assets/mockups/print/business-cards/card-white-walnut/card-white-walnut-shade.png",
+        light: "assets/mockups/print/business-cards/card-white-walnut/card-white-walnut-light.png",
         lightGain: 0.3,
-        garment: "assets/mockups/print/business-cards/card-white-walnut-garment.png",
-        tone: "assets/mockups/print/business-cards/card-white-walnut-tone.png",
+        garment: "assets/mockups/print/business-cards/card-white-walnut/card-white-walnut-garment.png",
+        tone: "assets/mockups/print/business-cards/card-white-walnut/card-white-walnut-tone.png",
         /* No `grain`, for the same reason the paper bag has none: the map
            exists to screen undyed fibre back over a heather blend, and card
            stock has no blend. */
@@ -667,12 +683,12 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "banner-rollup-white",
         title: "Roll-Up Banner Stand",
-        thumb: "assets/thumbnails/product-mockups/print/signage/banner-rollup-white-thumb.jpg",
-        base: "assets/mockups/print/signage/banner-rollup-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/print/signage/banner-rollup-white/banner-rollup-white-thumb.jpg",
+        base: "assets/mockups/print/signage/banner-rollup-white/banner-rollup-white-base.png",
         overlay: null,
-        displace: "assets/mockups/print/signage/banner-rollup-white-displace.png",
-        shade: "assets/mockups/print/signage/banner-rollup-white-shade.png",
-        light: "assets/mockups/print/signage/banner-rollup-white-light.png",
+        displace: "assets/mockups/print/signage/banner-rollup-white/banner-rollup-white-displace.png",
+        shade: "assets/mockups/print/signage/banner-rollup-white/banner-rollup-white-shade.png",
+        light: "assets/mockups/print/signage/banner-rollup-white/banner-rollup-white-light.png",
         /* 0.3, as everywhere else, but here it was checked rather than copied.
            This face has the narrowest headroom in the catalog (median 237
            against a 248.9 ceiling, so 11.9 luma levels normalised across the
@@ -742,25 +758,25 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "hoodie-model-white",
         title: "White Hoodie on Model",
-        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-thumb.jpg",
-        base: "assets/mockups/apparel/hoodies/hoodie-model-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-thumb.jpg",
+        base: "assets/mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-base.png",
         overlay: null,
-        displace: "assets/mockups/apparel/hoodies/hoodie-model-white-displace.png",
-        shade: "assets/mockups/apparel/hoodies/hoodie-model-white-shade.png",
-        light: "assets/mockups/apparel/hoodies/hoodie-model-white-light.png",
+        displace: "assets/mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-displace.png",
+        shade: "assets/mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-shade.png",
+        light: "assets/mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-light.png",
         /* 0.3, and on this garment the check bites rather than merely passing:
            at gain 1.0 a #12305C navy fill loses 6.47% of its blue identity and
            p95 luma reaches 180 against a source of 44 -- the same failure that
            set this value on the shirt. At 0.3 the loss is 0.00%. */
         lightGain: 0.3,
-        garment: "assets/mockups/apparel/hoodies/hoodie-model-white-garment.png",
-        tone: "assets/mockups/apparel/hoodies/hoodie-model-white-tone.png",
+        garment: "assets/mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-garment.png",
+        tone: "assets/mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-tone.png",
         /* Fleece has the second-highest weave in the catalog, 4.11 luma levels
            against the shirt's 3.78, so heather reads well here. This is also
            the first template built AFTER the colourway chips landed: the
            heather fractions below and this map are reachable from the editor
            from day one, which was not true of the shirt or the cap. */
-        grain: "assets/mockups/apparel/hoodies/hoodie-model-white-grain.png",
+        grain: "assets/mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-grain.png",
         garmentColors: {
             original: { name: "As photographed", hex: "#E9E9EC", original: true },
             black: { name: "Black", hex: "#1A1A1A" },
@@ -818,23 +834,23 @@ window.TB_PHOTO_MOCKUPS = [
            there is no occlusion-mask support to paint around one. */
         id: "hoodie-model-white-back",
         title: "White Hoodie on Model, Back",
-        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-back-thumb.jpg",
-        base: "assets/mockups/apparel/hoodies/hoodie-model-white-back-base.png",
+        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-thumb.jpg",
+        base: "assets/mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-base.png",
         overlay: null,
-        displace: "assets/mockups/apparel/hoodies/hoodie-model-white-back-displace.png",
-        shade: "assets/mockups/apparel/hoodies/hoodie-model-white-back-shade.png",
-        light: "assets/mockups/apparel/hoodies/hoodie-model-white-back-light.png",
+        displace: "assets/mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-displace.png",
+        shade: "assets/mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-shade.png",
+        light: "assets/mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-light.png",
         /* 0.3, measured on this base: a #12305C navy fill across the zone
            reaches p95 luma 174.8 at gain 1.0 against a source of 44, and
            11.99% of the print stops reading as blue. At 0.3, 0.00%. */
         lightGain: 0.3,
-        garment: "assets/mockups/apparel/hoodies/hoodie-model-white-back-garment.png",
-        tone: "assets/mockups/apparel/hoodies/hoodie-model-white-back-tone.png",
+        garment: "assets/mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-garment.png",
+        tone: "assets/mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-tone.png",
         /* Weave 2.98 luma levels: above the back shirt's 2.18, below the
            front hoodie's 4.11. Fleece nap still reads, but this back is lit
            flatter than the front, so heather models the fibre less strongly
            than it does on its pair. */
-        grain: "assets/mockups/apparel/hoodies/hoodie-model-white-back-grain.png",
+        grain: "assets/mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-grain.png",
         garmentColors: {
             original: { name: "As photographed", hex: "#E9E9EC", original: true },
             black: { name: "Black", hex: "#1A1A1A" },
@@ -923,28 +939,28 @@ window.TB_PHOTO_MOCKUPS = [
            the garment's shadows before it takes the wall. */
         id: "hoodie-hanger-white",
         title: "White Hoodie on a Hanger",
-        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-hanger-white-thumb.jpg",
+        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-thumb.jpg",
         /* 1122x1402, which is 0.8003 -- 4:5 to within 0.03%, so the catalog
            card is a straight downscale with no crop. */
-        base: "assets/mockups/apparel/hoodies/hoodie-hanger-white-base.png",
+        base: "assets/mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-base.png",
         overlay: null,
-        displace: "assets/mockups/apparel/hoodies/hoodie-hanger-white-displace.png",
-        shade: "assets/mockups/apparel/hoodies/hoodie-hanger-white-shade.png",
-        light: "assets/mockups/apparel/hoodies/hoodie-hanger-white-light.png",
+        displace: "assets/mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-displace.png",
+        shade: "assets/mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-shade.png",
+        light: "assets/mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-light.png",
         /* 0.3. This base is the least sensitive to the value of any garment
            here -- a #12305C navy fill loses only 1.43% of its blue identity
            even at gain 1.0, against 11.99% on the back hoodie -- but 0.3 costs
            nothing (0.00% lost, p95 70.4 against a source of 44) and keeps the
            whole apparel set on one number. */
         lightGain: 0.3,
-        garment: "assets/mockups/apparel/hoodies/hoodie-hanger-white-garment.png",
-        tone: "assets/mockups/apparel/hoodies/hoodie-hanger-white-tone.png",
+        garment: "assets/mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-garment.png",
+        tone: "assets/mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-tone.png",
         /* Weave 4.28 -- the highest in the catalog, past the front hoodie's
            4.11. Directional daylight across brushed fleece records more nap
            than a flat studio key does, which is the same lighting that cost
            this base its 0.252% of blown pixels. The heather colourways read
            better here than anywhere else. */
-        grain: "assets/mockups/apparel/hoodies/hoodie-hanger-white-grain.png",
+        grain: "assets/mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-grain.png",
         garmentColors: {
             original: { name: "As photographed", hex: "#E9E9EC", original: true },
             black: { name: "Black", hex: "#1A1A1A" },
@@ -1006,8 +1022,8 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "frame-black-interior",
         title: "Framed Poster in Interior",
-        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior-thumb.jpg",
-        base: "assets/mockups/print/posters-and-frames/frame-black-interior-base.png",
+        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior/frame-black-interior-thumb.jpg",
+        base: "assets/mockups/print/posters-and-frames/frame-black-interior/frame-black-interior-base.png",
         /* Added September 2, 2026, and it is an OCCLUSION mask rather than the
            shadow-and-glare sheet this key usually carries: the base with the
            frame's aperture punched out, so the frame itself is redrawn over
@@ -1030,10 +1046,10 @@ window.TB_PHOTO_MOCKUPS = [
            at once, and the zone stays a rectangle. `source-over`, because it is
            a pre-masked photograph and not a luminance map -- multiply would
            darken the whole scene by itself. */
-        overlay: "assets/mockups/print/posters-and-frames/frame-black-interior-overlay.png",
+        overlay: "assets/mockups/print/posters-and-frames/frame-black-interior/frame-black-interior-overlay.png",
         overlayBlend: "source-over",
-        displace: "assets/mockups/print/posters-and-frames/frame-black-interior-displace.png",
-        shade: "assets/mockups/print/posters-and-frames/frame-black-interior-shade.png",
+        displace: "assets/mockups/print/posters-and-frames/frame-black-interior/frame-black-interior-displace.png",
+        shade: "assets/mockups/print/posters-and-frames/frame-black-interior/frame-black-interior-shade.png",
         /* NO `light`, and this is the first template to omit it. The map exists
            to lift a print where a fold ridge catches the light; a matte poster
            lit evenly inside a frame has no such feature, and the numbers say so
@@ -1134,22 +1150,22 @@ window.TB_PHOTO_MOCKUPS = [
     {
         id: "bucket-hat-white",
         title: "White Bucket Hat on Model",
-        thumb: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats/bucket-hat-white-thumb.jpg",
-        base: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-base.png",
+        thumb: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-thumb.jpg",
+        base: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-base.png",
         overlay: null,
-        displace: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-displace.png",
-        shade: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-shade.png",
-        light: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-light.png",
+        displace: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-displace.png",
+        shade: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-shade.png",
+        light: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-light.png",
         /* 0.3. At gain 1.0 a #12305C navy fill loses 3.49% of its blue
            identity and p95 luma reaches 163 against a source of 44; at 0.3 the
            loss is 0.00%. */
         lightGain: 0.3,
-        garment: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-garment.png",
-        tone: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-tone.png",
+        garment: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-garment.png",
+        tone: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-tone.png",
         /* Weave measured 5.33 luma levels, second only to the cap's 5.86 and
            well clear of the 2.0 floor, so the heather colourways below have
            real fibre to screen back. */
-        grain: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white-grain.png",
+        grain: "assets/mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-grain.png",
         garmentColors: {
             original: { name: "As photographed", hex: "#E9E9EC", original: true },
             black: { name: "Black", hex: "#1A1A1A" },

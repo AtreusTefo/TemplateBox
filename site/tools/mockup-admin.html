@@ -250,9 +250,10 @@
             <p class="status" id="copy-status"></p>
 
             <ol id="checklist">
-                <li>Create site/assets/mockups/&lt;category&gt;/ and site/assets/thumbnails/product-mockups/&lt;category&gt;/ if this is the first template in that category -- git tracks files, not directories, so a category folder only exists once it holds something.</li>
+                <li>Create site/assets/mockups/&lt;category&gt;/&lt;id&gt;/ and site/assets/thumbnails/product-mockups/&lt;category&gt;/&lt;id&gt;/ -- one folder per mockup, since September 3, 2026. Git tracks files, not directories, so both only exist once they hold something.</li>
                 <li>Save the map downloads into the first and the thumbnail into the second.</li>
                 <li>Save the base photograph itself as &lt;id&gt;-base.png beside the maps.</li>
+                <li>The file names keep the id even though the folder already carries it. That is deliberate: it is what lets an asset identify itself in a network waterfall, a downloads folder or a flat storage bucket, where the folder is not visible.</li>
                 <li>Paste the entry into js/mockup-templates.js.</li>
                 <li>Add a catalog card in index.html with data-target="mockup" data-doc="&lt;id&gt;".</li>
                 <li>Run node tests/verify-layout.js.</li>
@@ -1004,19 +1005,19 @@
             "    {\n" +
             "        id: \"" + id + "\",\n" +
             "        title: \"" + title.replace(/\\/g, "").replace(/"/g, "'") + "\",\n" +
-            "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "-thumb.jpg\",\n" +
-            "        base: \"assets/mockups/" + category + "/" + id + "-base.png\",\n";
+            "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "/" + id + "-thumb.jpg\",\n" +
+            "        base: \"assets/mockups/" + category + "/" + id + "/" + id + "-base.png\",\n";
 
         if (fabric) {
             body +=
                 "        overlay: null,\n" +
-                "        displace: \"assets/mockups/" + category + "/" + id + "-displace.png\",\n" +
-                "        shade: \"assets/mockups/" + category + "/" + id + "-shade.png\",\n" +
-                "        light: \"assets/mockups/" + category + "/" + id + "-light.png\",\n" +
+                "        displace: \"assets/mockups/" + category + "/" + id + "/" + id + "-displace.png\",\n" +
+                "        shade: \"assets/mockups/" + category + "/" + id + "/" + id + "-shade.png\",\n" +
+                "        light: \"assets/mockups/" + category + "/" + id + "/" + id + "-light.png\",\n" +
                 "        lightGain: " + Number($("light-gain").value) + ",\n" +
-                "        garment: \"assets/mockups/" + category + "/" + id + "-garment.png\",\n" +
-                "        tone: \"assets/mockups/" + category + "/" + id + "-tone.png\",\n" +
-                "        grain: \"assets/mockups/" + category + "/" + id + "-grain.png\",\n" +
+                "        garment: \"assets/mockups/" + category + "/" + id + "/" + id + "-garment.png\",\n" +
+                "        tone: \"assets/mockups/" + category + "/" + id + "/" + id + "-tone.png\",\n" +
+                "        grain: \"assets/mockups/" + category + "/" + id + "/" + id + "-grain.png\",\n" +
                 "        garmentColors: {\n" +
                 "            original: { name: \"As photographed\", hex: \"#E9E9EC\", original: true },\n" +
                 "            black: { name: \"Black\", hex: \"#1A1A1A\" },\n" +
@@ -1032,7 +1033,7 @@
                 "        backing: null,\n";
         } else {
             body +=
-                "        overlay: \"assets/mockups/" + category + "/" + id + "-overlay.png\",\n" +
+                "        overlay: \"assets/mockups/" + category + "/" + id + "/" + id + "-overlay.png\",\n" +
                 "        overlayBlend: \"" + $("tpl-blend").value + "\",\n" +
                 "        mode: \"" + $("tpl-mode").value + "\",\n";
         }
