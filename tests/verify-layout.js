@@ -645,6 +645,58 @@ function staticChecks() {
    Browser plumbing
    ========================================================================== */
 
+/* Reap a process AND everything it spawned.
+
+   Two separate children in this file need this and for the same underlying
+   reason: `proc.kill()` signals one process, and both of ours are the root of
+   a tree. `npx serve` runs under a shell, so the shell dies and the server
+   keeps the port. A headless browser forks a renderer, a GPU process and a
+   network service per profile, so the parent dies and those keep running --
+   and a machine carrying several of those is measurably slower to settle a
+   navigation, which is how a leak here turns into "navigation did not settle
+   within 20s" on a page that is perfectly fine (see PROJECT_STATUS.md).
+
+   Kept as one helper so the next child added cannot get this wrong again. */
+function killTree(proc) {
+    if (!proc || !proc.pid) { return; }
+    try {
+        if (process.platform === "win32") {
+            spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+        } else {
+            process.kill(-proc.pid, "SIGKILL");
+        }
+    } catch (err) {
+        /* Already gone. */
+    }
+    try { proc.kill(); } catch (err) { /* already gone */ }
+}
+
+/* Temporary profiles and baseline checkouts, removed on the way out.
+
+   Each run makes a fresh browser profile (tens of MB) and a full `git archive`
+   extraction. Neither was ever deleted, so an interrupted run left both behind
+   and the machine accumulated them silently. Collected here and cleaned in
+   one place, best-effort: a directory the browser still has open on Windows
+   refuses to delete, and failing to tidy up is not a test failure. */
+const TEMP_DIRS = [];
+
+function tempDir(prefix) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+    TEMP_DIRS.push(dir);
+    return dir;
+}
+
+function cleanTempDirs() {
+    while (TEMP_DIRS.length) {
+        const dir = TEMP_DIRS.pop();
+        try {
+            fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+        } catch (err) {
+            /* Still locked, or already gone. Neither is worth a failure. */
+        }
+    }
+}
+
 function findBrowser() {
     const candidates = [
         path.join(process.env.LOCALAPPDATA || "", "ms-playwright", "chromium-1234", "chrome-win64", "chrome.exe"),
@@ -662,9 +714,38 @@ function findBrowser() {
     return candidates.find((p) => p && fs.existsSync(p)) || null;
 }
 
+/* The layout fingerprint the readiness poll waits to stop changing.
+
+   Deliberately cheap and deliberately coarse: the page's own scroll box, the
+   body reservation every ad band writes, how many ad slots have been mounted,
+   and the height of `main`. Every layout property this suite asserts on moves
+   one of those, so a fingerprint that has stopped changing is a page that has
+   stopped moving. It is a settling signal, never an assertion -- nothing here
+   is compared against an expected value. */
+const QUIESCE = `(() => {
+  const de = document.documentElement;
+  const cs = getComputedStyle(document.body);
+  const main = document.querySelector('main');
+  return [
+    de.scrollWidth, de.scrollHeight, de.clientWidth, de.clientHeight,
+    cs.paddingRight, cs.paddingBottom,
+    document.querySelectorAll('.ad-slot').length,
+    main ? Math.round(main.getBoundingClientRect().height) : -1,
+    /* Font loading is part of "has this page stopped moving", because a swap
+       re-lays-out every line of text. It has to be IN the fingerprint rather
+       than only awaited beforehand: index.html fetches its font CSS with
+       media="print" onload="this.media='all'", so until that stylesheet
+       applies there are no pending fonts at all and document.fonts.ready
+       resolves immediately -- before the swap it is meant to wait for is even
+       queued. As a fingerprint entry it cannot be outrun: status flips to
+       "loading" when the CSS lands, which keeps the poll going. */
+    document.fonts ? document.fonts.status : "n/a"
+  ].join('|');
+})()`;
+
 async function connect(browserPath, cdpPort, options) {
     const adsBlocked = !!(options && options.adsBlocked);
-    const userDir = fs.mkdtempSync(path.join(os.tmpdir(), "tb-verify-"));
+    const userDir = tempDir("tb-verify-");
     const proc = spawn(browserPath, [
         "--headless=new", "--remote-debugging-port=" + cdpPort,
         "--user-data-dir=" + userDir, "--no-first-run", "--no-default-browser-check",
@@ -718,7 +799,124 @@ async function connect(browserPath, cdpPort, options) {
        "0 ad bands" failure before this was fixed.
 
        So: drain stale events first, then wait for readiness by polling the
-       page itself rather than trusting a single event. */
+       page itself rather than trusting a single event.
+
+       REVISED September 3, 2026: the poll no longer waits for
+       `readyState === "complete"`, and that is the substance of the fix
+       rather than a tuning tweak. `complete` IS the load event, so waiting
+       for it is waiting for the unreachable ad iframes to time out, and how
+       long that takes is ambient -- which is exactly what killed whole runs
+       with "did not settle within 20s" on a different page each time, and
+       what made section 4 compare a settled page against a
+       partially-rendered one and report the difference as a layout change.
+
+       What replaced it is stronger, not weaker, because `complete` was never
+       what this suite needs:
+
+         - `readyState !== "loading"` means the document is parsed and every
+           deferred script has RUN. Per spec the state flips to "interactive"
+           and DOMContentLoaded fires in the same task, so a poll that
+           observes "interactive" from a later turn has necessarily missed
+           neither -- which matters because js/ads.js mounts every band from
+           its DOMContentLoaded listener, and mountPlacement writes its
+           srcdoc iframes synchronously. Nothing this suite measures depends
+           on a cross-origin ad iframe finishing.
+
+         - Readiness is then not treated as stillness. The page is polled
+           until its layout fingerprint stops changing, which is the "poll
+           for the specific elements each comparison measures" that
+           PROJECT_STATUS.md prescribes, generalised so every section gets it
+           rather than only the one that noticed. This is what makes two
+           measurements of the same tree comparable.
+
+       The old blind 250ms pause is gone: a fixed sleep is a guess about how
+       long a page takes to settle, and the point here is to observe it
+       instead. */
+    /* Wait for the page to stop moving, and say so when it never does.
+
+       Three identical consecutive fingerprints spanning ~200ms: enough to
+       cover the gap between DOMContentLoaded mounting the ad bands and the
+       reflow their reservation causes, short enough that the whole suite does
+       not pay seconds per navigation for it.
+
+       A page that never stabilises is NOT a navigation failure. It means
+       something on it animates or polls, and failing the navigation would
+       turn that into a red check on a page that loaded perfectly. It returns
+       true and prints one line instead, so a page that genuinely never
+       settles is visible in the output rather than silently measured as
+       though it had. */
+    /* Wait for webfonts BEFORE watching for stillness, because stillness is
+       not the same as finished.
+
+       index.html pulls its two families from fonts.googleapis.com with
+       font-display, so text is laid out in the fallback face first and
+       re-laid-out when the real one arrives. Between those two moments the
+       page is perfectly still: the fingerprint below reads the same value
+       three times running, the poll concludes, and the swap lands after the
+       measurement. Nothing about that is a slow page -- it is a page that has
+       not finished, holding still while it waits.
+
+       It shows up as section 4 reporting a layout change on files that are
+       byte-identical, because the two captures happened on opposite sides of
+       the swap. The tell is that a measurement appears on BOTH sides across
+       runs: index @1024's first card was "now 354.9 / HEAD 334.1" in one run
+       and "now 334.1 / HEAD 354.9" in the next. That is one line of a card
+       title wrapping or not -- about 21px of row height -- and at wider
+       column counts the same swap moved main by 60px.
+
+       `document.fonts.ready` is the signal that was missing: per spec it
+       resolves once font loading AND the layout operations that depend on it
+       are complete. Raced against a timeout because a font host unreachable
+       from a test machine must not hang the run -- the same hazard the ad
+       iframes pose, and the reason waiting on the load event was abandoned
+       above. A timeout is reported rather than swallowed: it means every
+       measurement afterwards is in the fallback face, which is consistent and
+       therefore still comparable, but it is not what the site renders.
+
+       This await is the CHEAP half and not the load-bearing one. On its own it
+       is outrunnable: the font CSS arrives via media="print" onload, so before
+       that stylesheet applies there is nothing pending and `ready` resolves at
+       once. What actually closes the hole is `document.fonts.status` sitting
+       in the QUIESCE fingerprint, where a late swap cannot slip past. Both are
+       kept because this one collapses the common case in a single round trip
+       and names a font host that has gone unreachable. */
+    const FONTS_READY = `(() => {
+  if (!document.fonts || !document.fonts.ready) { return Promise.resolve("no-font-api"); }
+  return Promise.race([
+    document.fonts.ready.then(() => "ready"),
+    new Promise((r) => setTimeout(() => r("timeout"), 3000))
+  ]);
+})()`;
+
+    const awaitFonts = async (url, width) => {
+        let state = null;
+        try { state = await evaluate(FONTS_READY); } catch (e) { state = "error"; }
+        if (state === "timeout" || state === "error") {
+            console.log(`      FONTS ${url} @${width} not ready after 3s (${state}); measuring in the fallback face`);
+        }
+    };
+
+    const quiesce = async (url, width) => {
+        await awaitFonts(url, width);
+        const deadline = Date.now() + 5000;
+        let last = null;
+        let matches = 0;
+        while (Date.now() < deadline) {
+            let fp = null;
+            try { fp = await evaluate(QUIESCE); } catch (e) { fp = null; }
+            if (fp !== null && fp === last) {
+                matches += 1;
+                if (matches >= 2) { return true; }
+            } else {
+                matches = 0;
+            }
+            last = fp;
+            await new Promise((r) => setTimeout(r, 100));
+        }
+        console.log(`      UNSETTLED ${url} @${width} still changing after 5s; measuring anyway`);
+        return true;
+    };
+
     const attemptNavigate = async (url, width, height) => {
         await call("Emulation.setDeviceMetricsOverride",
             { width, height: height || 900, deviceScaleFactor: 1, mobile: false }, sessionId);
@@ -742,11 +940,10 @@ async function connect(browserPath, cdpPort, options) {
                               typeof TBAds !== 'undefined'
                 }))()`);
             } catch (e) { continue; }
-            if (!state || state.path !== expected || state.ready !== "complete" || !state.adsReady) {
+            if (!state || state.path !== expected || state.ready === "loading" || !state.adsReady) {
                 continue;
             }
-            await new Promise((r) => setTimeout(r, 250));
-            return true;
+            return await quiesce(url, width);
         }
         return false;
     };
@@ -778,7 +975,10 @@ async function connect(browserPath, cdpPort, options) {
 
     return {
         call, sessionId, navigate, evaluate,
-        close: () => { ws.close(); proc.kill(); }
+        /* killTree, not proc.kill(): a headless browser is the root of a
+           process tree, and the renderers it leaves behind are what make the
+           NEXT run's navigations slow enough to hit the 20s deadline. */
+        close: () => { ws.close(); killTree(proc); }
     };
 }
 
@@ -796,18 +996,7 @@ function startServer(cwd, port) {
        tree, or timed out against it. That surfaced as "navigation did not
        settle within 20s" on an unrelated page, which reads like a site bug and
        is not one. Kill the whole tree instead. */
-    proc.killTree = () => {
-        try {
-            if (process.platform === "win32") {
-                spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
-            } else {
-                process.kill(-proc.pid, "SIGKILL");
-            }
-        } catch (err) {
-            /* Already gone. */
-        }
-        try { proc.kill(); } catch (err) { /* already gone */ }
-    };
+    proc.killTree = () => killTree(proc);
     return proc;
 }
 
@@ -2647,7 +2836,7 @@ const PARITY_SNAPSHOT = `(() => {
 async function parityChecks(browserPath) {
     section("4. Ads blocked: layout identical to the last commit");
 
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tb-baseline-"));
+    const tmp = tempDir("tb-baseline-");
     const archive = spawnSync("git", ["archive", "HEAD", "site"], { cwd: ROOT, maxBuffer: 1 << 28 });
     if (archive.status !== 0) {
         console.log("SKIP  no git HEAD to compare against");
@@ -2680,43 +2869,49 @@ async function parityChecks(browserPath) {
 
     let comparisons = 0;
     let differences = 0;
-    for (const [name, urlPath] of PAGES) {
-        /* A page added since the last commit has no baseline to be identical
-           to, and comparing it against the baseline server's 404 would report
-           every one of its measurements as a difference -- noise that says
-           nothing about whether ads reserve space they have not filled. Skip
-           it, loudly, rather than letting a new page turn this section red
-           until it is committed. It stops being skipped on the next run after
-           the commit, with no edit here. */
-        const inHead = await (async () => {
-            try {
-                const res = await fetch(`http://localhost:${BASELINE_PORT}${urlPath}`,
-                    { method: "HEAD" });
-                return res.ok;
-            } catch (e) {
-                return false;
-            }
-        })();
-        if (!inHead) {
-            console.log(`      SKIP  ${name}: not in HEAD yet, no baseline to compare against`);
-            continue;
-        }
-        for (const width of WIDTHS) {
-            await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
-            const now = await page.evaluate(PARITY_SNAPSHOT);
-            await page.navigate(`http://localhost:${BASELINE_PORT}${urlPath}`, width);
-            const head = await page.evaluate(PARITY_SNAPSHOT);
-            Object.keys(now).forEach((key) => {
-                comparisons += 1;
-                if (JSON.stringify(now[key]) !== JSON.stringify(head[key])) {
-                    differences += 1;
-                    console.log(`      ${name} @${width} ${key}: now ${JSON.stringify(now[key])}, HEAD ${JSON.stringify(head[key])}`);
+    /* Same leak as main(): a navigation timeout inside the loop used to skip
+       both the browser and the baseline server on port 5098. */
+    try {
+        for (const [name, urlPath] of PAGES) {
+            /* A page added since the last commit has no baseline to be
+               identical to, and comparing it against the baseline server's
+               404 would report every one of its measurements as a difference
+               -- noise that says nothing about whether ads reserve space
+               they have not filled. Skip it, loudly, rather than letting a
+               new page turn this section red until it is committed. It stops
+               being skipped on the next run after the commit, with no edit
+               here. */
+            const inHead = await (async () => {
+                try {
+                    const res = await fetch(`http://localhost:${BASELINE_PORT}${urlPath}`,
+                        { method: "HEAD" });
+                    return res.ok;
+                } catch (e) {
+                    return false;
                 }
-            });
+            })();
+            if (!inHead) {
+                console.log(`      SKIP  ${name}: not in HEAD yet, no baseline to compare against`);
+                continue;
+            }
+            for (const width of WIDTHS) {
+                await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
+                const now = await page.evaluate(PARITY_SNAPSHOT);
+                await page.navigate(`http://localhost:${BASELINE_PORT}${urlPath}`, width);
+                const head = await page.evaluate(PARITY_SNAPSHOT);
+                Object.keys(now).forEach((key) => {
+                    comparisons += 1;
+                    if (JSON.stringify(now[key]) !== JSON.stringify(head[key])) {
+                        differences += 1;
+                        console.log(`      ${name} @${width} ${key}: now ${JSON.stringify(now[key])}, HEAD ${JSON.stringify(head[key])}`);
+                    }
+                });
+            }
         }
+    } finally {
+        page.close();
+        server.killTree();
     }
-    page.close();
-    server.killTree();
 
     check(`ads blocked: working tree matches HEAD (${comparisons} measurements)`,
         differences === 0, `${differences} differing measurements, listed above`);
@@ -2739,21 +2934,34 @@ async function main() {
                 server.killTree();
                 throw new Error(`could not start \`npx serve\` on port ${PORT} from the repository root (waited ${SERVER_WAIT_MS / 1000}s)`);
             }
-            const page = await connect(browserPath, CDP_PORT);
+            /* The server was outside the try, so the ONE failure this suite
+               actually suffers -- a navigation timeout out of layoutChecks --
+               skipped killTree and left `npx serve` holding port 5099. The
+               next run then either talked to that stale server from an older
+               working tree or timed out against it, so a single flake
+               poisoned every run after it until someone noticed by hand.
+               That is the compounding half of the nav-timeout report in
+               PROJECT_STATUS.md, and it is a leak, not a race. */
             try {
-                await layoutChecks(page);
-                await launchChecks(page);
-                await mockupChecks(page);
-                await adminThumbnailChecks(page);
-                await adminPersistenceChecks(page);
-                await exportNameChecks(page);
+                const page = await connect(browserPath, CDP_PORT);
+                try {
+                    await layoutChecks(page);
+                    await launchChecks(page);
+                    await mockupChecks(page);
+                    await adminThumbnailChecks(page);
+                    await adminPersistenceChecks(page);
+                    await exportNameChecks(page);
+                } finally {
+                    page.close();
+                }
+                if (!NO_BASELINE) { await parityChecks(browserPath); }
             } finally {
-                page.close();
+                server.killTree();
             }
-            if (!NO_BASELINE) { await parityChecks(browserPath); }
-            server.killTree();
         }
     }
+
+    cleanTempDirs();
 
     console.log(`\n${passed} passed, ${failures.length} failed`);
     if (failures.length) {
@@ -2763,4 +2971,11 @@ async function main() {
     process.exit(failures.length ? 1 : 0);
 }
 
-main().catch((err) => { console.error("\n" + err.stack); process.exit(1); });
+/* A crash must not leave a browser, a server or a profile directory behind:
+   the whole point of the tree-kill above is that the NEXT run starts on a
+   quiet machine, and the run most likely to leak is the one that failed. */
+main().catch((err) => {
+    cleanTempDirs();
+    console.error("\n" + err.stack);
+    process.exit(1);
+});
