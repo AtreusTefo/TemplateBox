@@ -78,81 +78,13 @@
        into.
        ---------------------------------------------------------------------- */
 
-    function drawTshirtBody(context, hex, outline) {
-        context.save();
-        context.fillStyle = hex;
-        context.strokeStyle = outline;
-        context.lineWidth = 6;
-        context.beginPath();
-        context.moveTo(430, 140);
-        context.lineTo(330, 170);
-        context.lineTo(170, 230);
-        context.lineTo(110, 430);
-        context.lineTo(300, 380);
-        context.lineTo(300, 900);
-        context.lineTo(700, 900);
-        context.lineTo(700, 380);
-        context.lineTo(890, 430);
-        context.lineTo(830, 230);
-        context.lineTo(670, 170);
-        context.lineTo(570, 140);
-        context.quadraticCurveTo(500, 210, 430, 140);
-        context.closePath();
-        context.fill();
-        context.stroke();
-
-        /* Collar rib detail */
-        context.beginPath();
-        context.moveTo(450, 150);
-        context.quadraticCurveTo(500, 200, 550, 150);
-        context.lineWidth = 4;
-        context.stroke();
-        context.restore();
-    }
-
-    function drawHoodieBody(context, hex, outline) {
-        drawTshirtBody(context, hex, outline);
-
-        context.save();
-        context.fillStyle = hex;
-        context.strokeStyle = outline;
-        context.lineWidth = 6;
-
-        /* Hood, folded down across the shoulders */
-        context.beginPath();
-        context.moveTo(330, 170);
-        context.quadraticCurveTo(500, 90, 670, 170);
-        context.quadraticCurveTo(650, 230, 500, 250);
-        context.quadraticCurveTo(350, 230, 330, 170);
-        context.closePath();
-        context.fill();
-        context.stroke();
-
-        /* Drawstrings */
-        context.lineWidth = 6;
-        [460, 540].forEach((sx) => {
-            context.beginPath();
-            context.moveTo(sx, 250);
-            context.lineTo(sx, 300);
-            context.stroke();
-            context.beginPath();
-            context.arc(sx, 306, 6, 0, Math.PI * 2);
-            context.fillStyle = outline;
-            context.fill();
-        });
-
-        /* Kangaroo pocket, below the print area */
-        context.fillStyle = hex;
-        roundRectPath(context, 380, 700, 240, 130, 14);
-        context.fill();
-        context.stroke();
-
-        /* Sleeve cuffs, sized to stay within the sleeve silhouette */
-        context.fillStyle = outline;
-        context.fillRect(125, 405, 35, 45);
-        context.fillRect(840, 405, 35, 45);
-        context.restore();
-    }
+    /* `drawTshirtBody` and `drawHoodieBody` stood here until September 3,
+       2026. Both drawn apparel products are photographs now --
+       `tshirt-hanger-white` and `hoodie-hanger-white` -- and the shapes went
+       with them. The tee's outline had outlived its own product by a day:
+       it survived the drawn tee's retirement only because the drawn hoodie
+       drew itself on top of it, so retiring the hoodie is what finally made
+       it dead code. `mug` and `box` are the drawn products that remain. */
 
     function drawMugBody(context, hex, outline) {
         context.save();
@@ -240,22 +172,13 @@
         context.restore();
     }
 
-    /* The drawn `tshirt` was retired on September 2, 2026, replaced by the
-       photographic `tshirt-hanger-white`. `drawTshirtBody` above STAYS: the
-       drawn hoodie is built on top of it, so deleting the shape with the
-       product would have taken the hoodie's body with it. */
+    /* The drawn apparel is gone: `tshirt` on September 2, 2026 and `hoodie` on
+       September 3, replaced by the photographic `tshirt-hanger-white` and
+       `hoodie-hanger-white`. What is left here is drawn goods -- a mug and a
+       box -- which is also what the editor now falls back to, since a fallback
+       has to paint immediately and a photographic template cannot until seven
+       maps have downloaded. */
     const PRODUCTS = {
-        hoodie: {
-            label: "Hoodie",
-            printArea: { x: 370, y: 380, w: 260, h: 230 },
-            drawBase: drawHoodieBody,
-            colors: {
-                black: { name: "Black", hex: "#1A1A1A", outline: "#000000" },
-                heather: { name: "Heather Gray", hex: "#B9B7B2", outline: "#98968F" },
-                navy: { name: "Navy", hex: "#1F2A44", outline: "#141B2C" },
-                white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" }
-            }
-        },
         mug: {
             label: "Mug",
             printArea: { x: 340, y: 400, w: 320, h: 300 },
@@ -775,7 +698,7 @@
        a real composition never needs this many. */
     const MAX_LAYERS = 12;
 
-    let currentProduct = "hoodie";
+    let currentProduct = "mug";
     let currentColor = "black";
     let customHex = "#FFFFFF";
     /* The canvas background, or null for transparent -- which is the default
@@ -938,7 +861,7 @@
     }
 
     function paint() {
-        const product = PRODUCTS[currentProduct] ? currentProduct : "hoodie";
+        const product = PRODUCTS[currentProduct] ? currentProduct : "mug";
         currentProduct = product;
         const config = PRODUCTS[currentProduct];
 

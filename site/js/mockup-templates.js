@@ -906,6 +906,104 @@ window.TB_PHOTO_MOCKUPS = [
         ]
     },
     {
+        /* The plain product shot, and the template that REPLACED the drawn
+           vector `hoodie` on September 3, 2026 -- the day after the drawn tee
+           went the same way. No model: the garment on a hanger against a wall.
+
+           It is the first template here whose scene is a PHOTOGRAPHED
+           BACKGROUND rather than a cut-out, and that is the whole reason it
+           works. The wall is warm plaster and the fleece is white, so luma
+           cannot separate them (wall p50 201 against garment 229, with the
+           garment's own shadows reaching down to 161). SATURATION can, and
+           cleanly: the wall runs p1 14 / p50 20 / p99 30, the garment p1 1 /
+           p50 3 / p99 13. The factory gate of 14 falls exactly in that gap and
+           needs no tuning -- but it has no margin either, and the sweep says
+           so: at 15 the wall leaks 5,506 pixels instead of 1,116, and at 16 it
+           leaks 20,464. Raising the LUMA gate does not help, because it takes
+           the garment's shadows before it takes the wall. */
+        id: "hoodie-hanger-white",
+        title: "White Hoodie on a Hanger",
+        thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-hanger-white-thumb.jpg",
+        /* 1122x1402, which is 0.8003 -- 4:5 to within 0.03%, so the catalog
+           card is a straight downscale with no crop. */
+        base: "assets/mockups/apparel/hoodies/hoodie-hanger-white-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/hoodies/hoodie-hanger-white-displace.png",
+        shade: "assets/mockups/apparel/hoodies/hoodie-hanger-white-shade.png",
+        light: "assets/mockups/apparel/hoodies/hoodie-hanger-white-light.png",
+        /* 0.3. This base is the least sensitive to the value of any garment
+           here -- a #12305C navy fill loses only 1.43% of its blue identity
+           even at gain 1.0, against 11.99% on the back hoodie -- but 0.3 costs
+           nothing (0.00% lost, p95 70.4 against a source of 44) and keeps the
+           whole apparel set on one number. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/hoodies/hoodie-hanger-white-garment.png",
+        tone: "assets/mockups/apparel/hoodies/hoodie-hanger-white-tone.png",
+        /* Weave 4.28 -- the highest in the catalog, past the front hoodie's
+           4.11. Directional daylight across brushed fleece records more nap
+           than a flat studio key does, which is the same lighting that cost
+           this base its 0.252% of blown pixels. The heather colourways read
+           better here than anywhere else. */
+        grain: "assets/mockups/apparel/hoodies/hoodie-hanger-white-grain.png",
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* 12, and it sits deliberately BETWEEN the catalog's two clusters
+           rather than joining either. Measured by the zone method: global p99
+           24.92, zone p99 7.38, so 12 delivers 3.55px of peak offset inside
+           the print, 0.317% of base width. The two model hoodies deliver
+           0.19% and the two hanger/back shirts 0.50%.
+
+           Both arguments apply here and neither wins outright. It is fleece,
+           which is heavier and stiffer than jersey and should bend a print
+           less -- that is what puts the model hoodies at 0.19%. But its print
+           surface is measurably more structured than either of theirs: zone
+           p50 0.99 against 0.58 and 0.60, because a garment hanging free
+           drapes more than one stretched over a body. Splitting them is the
+           honest answer, and the grid agrees: at 8 the bars are too clean for
+           fabric this textured, and at 18 the ring flattens at its lower
+           left. */
+        displaceStrength: 12,
+        mode: "surface",
+        backing: null,
+        /* NO `background` key, and that is the point of the wall. The scene is
+           opaque -- all four corners are alpha 255 and not one pixel of the
+           image is clear -- so there is nothing behind the photograph for a
+           colour to show through. Eligibility is declared rather than
+           detected precisely so this stays off. The backdrop is the
+           photograph's own, which is the trade a scene buys: one good wall
+           instead of any colour the visitor likes. */
+        /* 335x335 -- a 10x10in chest print at 33.5 px/in, centred on x=566 and
+           sitting between the two features that bound it: the hood's V ends at
+           y=440 and the kangaroo pocket's top seam is at y=868, both found as
+           vertical-roughness spikes (16.64 and 11.78 against a body reading
+           1.5 to 3.0). The zone leaves 60px above and 48px below, verified
+           100.0000% fabric with zero impure pixels and 94px of side clearance.
+
+           10in, not the model hoodie's 12in, and that is the garment rather
+           than the scale: this hood is oversized and hangs low, and its pocket
+           sits high, leaving 428px of clear chest where a 12in print would
+           need more. 33.5 px/in is an estimate with an 11% band -- the
+           waistband rib says 35.3 (88px here against the model hoodie's 91)
+           and pocket-seam-to-hem says 31.3 (380px against 443). Neckline
+           comparisons were discarded rather than averaged in: an oversized
+           hood's V is not the same landmark as a worn hoodie's collar, and
+           they disagree by 39%. */
+        warpZone: [
+            { x: 399, y: 486 },
+            { x: 733, y: 486 },
+            { x: 733, y: 820 },
+            { x: 399, y: 820 }
+        ]
+    },
+    {
         id: "frame-black-interior",
         title: "Framed Poster in Interior",
         thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior-thumb.jpg",

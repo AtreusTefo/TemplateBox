@@ -1651,7 +1651,7 @@ async function mockupChecks(page) {
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     const photo = await page.evaluate(`(async () => {
         localStorage.setItem('tb_editor_preset', JSON.stringify('wood-a4'));
-        localStorage.setItem('tb_mockup_v1', JSON.stringify({ product: 'hoodie', bg: '#FF0000' }));
+        localStorage.setItem('tb_mockup_v1', JSON.stringify({ product: 'mug', bg: '#FF0000' }));
         return true;
     })()`);
     if (photo) {
@@ -1831,10 +1831,12 @@ async function mockupChecks(page) {
        ---------------------------------------------------------------------- */
     section("5c. Mockup editor: export panel and saved-mockups tab");
 
-    /* `hoodie`, not `tshirt`: the drawn shirt was retired on September 2,
-       2026. What this pair is for is drawn-vs-photographed canvas sizes, so
-       any drawn product serves -- but it has to be one that still exists. */
-    for (const [doc, native] of [["hoodie", "1000x1000"], ["tshirt-model-white", "1024x1536"]]) {
+    /* `mug`, not `tshirt` or `hoodie`: both drawn apparel products were
+       retired on September 2 and 3, 2026. What this pair is for is
+       drawn-vs-photographed canvas sizes, so any drawn product serves -- but it
+       has to be one that still exists, and after those two retirements only
+       `mug` and `box` do. */
+    for (const [doc, native] of [["mug", "1000x1000"], ["tshirt-model-white", "1024x1536"]]) {
         await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
         await page.evaluate(`(() => {
             localStorage.clear();

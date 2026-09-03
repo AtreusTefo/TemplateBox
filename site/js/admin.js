@@ -274,7 +274,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">T-Shirt Mockup</a></li>\n' +
-'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>\n' +
@@ -1417,7 +1417,10 @@ body + '\n' +
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
         },
-        { id: "hoodie", title: "Hoodie Mockup", category: "mockups", doc: "hoodie" },
+        {
+            id: "hoodie-hanger-white", title: "Hoodie Mockup", category: "mockups", doc: "hoodie-hanger-white",
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies"
+        },
         { id: "mug", title: "Mug Mockup", category: "mockups", doc: "mug" },
         { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },
         {

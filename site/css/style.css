@@ -2252,40 +2252,17 @@ body.is-nav-hidden .site-header:focus-within {
     justify-content: center;
 }
 
-/* One silhouette for both garments: the hoodie is the tee outline plus a
-   hood opening and a pocket, exactly how js/mockup.js builds it on canvas.
-   Shared in a single rule so the two cannot drift apart. */
-.mk-shape.tee,
-.mk-shape.hoodie {
+/* The tee silhouette. This was shared with `.mk-shape.hoodie` -- one rule so
+   the two drawn garments could not drift apart -- until September 3, 2026,
+   when the drawn hoodie was replaced by a photograph and its half of the rule,
+   plus the hood and pocket pseudo-elements, went with it. Retiring a component
+   should delete the rules drawn for it. `.tee` is NOT dead with it:
+   tshirt-mockup-generator.html still uses this shape. */
+.mk-shape.tee {
     width: 78%;
     aspect-ratio: 1 / 1;
     background-color: #1A1A1A;
     clip-path: polygon(30% 8%, 40% 4%, 60% 4%, 70% 8%, 100% 22%, 90% 42%, 78% 36%, 78% 96%, 22% 96%, 22% 36%, 10% 42%, 0 22%);
-}
-
-/* Hood opening at the collar. Both pseudo-elements are clipped by the
-   silhouette above, which is what keeps them inside the garment. */
-.mk-shape.hoodie::before {
-    content: "";
-    position: absolute;
-    top: 4%;
-    left: 34%;
-    right: 34%;
-    height: 14%;
-    border-radius: 0 0 50% 50%;
-    background-color: rgba(255, 255, 255, 0.28);
-}
-
-/* Kangaroo pocket */
-.mk-shape.hoodie::after {
-    content: "";
-    position: absolute;
-    left: 30%;
-    right: 30%;
-    bottom: 10%;
-    height: 22%;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    border-bottom: 0;
 }
 
 .mk-shape.mug {
