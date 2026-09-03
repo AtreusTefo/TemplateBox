@@ -2286,38 +2286,10 @@ body.is-nav-hidden .site-header:focus-within {
     border-radius: 0 50% 50% 0;
 }
 
-.mk-shape.box {
-    width: 72%;
-    aspect-ratio: 1 / 0.78;
-    background-color: #C48A4A;
-    border: 1px solid #A87338;
-}
-
-.mk-shape.box::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background-color: #A87338;
-}
-
-/* The uploaded design, sitting on the product */
-.mk-art {
-    width: 42%;
-    aspect-ratio: 1;
-    background-color: var(--color-card);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-serif);
-    font-size: 0.5rem;
-    font-weight: 700;
-    color: #1A1A1A;
-    position: relative;
-    z-index: 1;
-}
+/* `.mk-shape.box` and its lid pseudo-element stood here until September 3,
+   2026, when the drawn packaging box became the photographic `bag-paper-held`
+   and index.html's card -- its only user -- became a photo card. `.mk-shape.mug`
+   above stays: the drawn mug is the one product still rendered on canvas. */
 
 .mk-shape.mug .mk-art {
     width: 46%;

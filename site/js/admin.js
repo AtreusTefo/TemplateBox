@@ -277,7 +277,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>\n' +
-'                            <li><a href="../mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="bag-paper-held">Packaging Mockup</a></li>\n' +
 '                        </ul>\n' +
 '                    </div>\n' +
 '                    <div>\n' +
@@ -1422,7 +1422,10 @@ body + '\n' +
             folder: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-hanger-white"
         },
         { id: "mug", title: "Mug Mockup", category: "mockups", doc: "mug" },
-        { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },
+        {
+            id: "bag-paper-held", title: "Packaging Mockup", category: "mockups", doc: "bag-paper-held",
+            folder: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-held"
+        },
         {
             id: "wood-a4", title: "Leaning Wood Frame Poster Mockup", category: "mockups", doc: "wood-a4",
             folder: "assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4"

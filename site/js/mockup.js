@@ -133,51 +133,18 @@
         context.restore();
     }
 
-    function drawBoxBody(context, hex, outline) {
-        context.save();
-        context.fillStyle = hex;
-        context.strokeStyle = outline;
-        context.lineWidth = 6;
+    /* `drawBoxBody` stood here until September 3, 2026, when the drawn
+       `box` became the photographic `bag-paper-held`. That was the last of
+       the three drawn products the catalog started with; `mug` is the only
+       one left, and it is what the editor falls back to. */
 
-        /* Front face */
-        context.fillRect(280, 340, 440, 460);
-        context.strokeRect(280, 340, 440, 460);
 
-        /* Top and side flap strips suggest depth without a gradient */
-        context.fillStyle = outline;
-        context.globalAlpha = 0.55;
-        context.beginPath();
-        context.moveTo(280, 340);
-        context.lineTo(360, 260);
-        context.lineTo(800, 260);
-        context.lineTo(720, 340);
-        context.closePath();
-        context.fill();
-
-        context.beginPath();
-        context.moveTo(720, 340);
-        context.lineTo(800, 260);
-        context.lineTo(800, 680);
-        context.lineTo(720, 760);
-        context.closePath();
-        context.fill();
-        context.globalAlpha = 1;
-
-        /* Packing tape tabs, positioned clear of the print area */
-        context.fillStyle = outline;
-        context.fillRect(470, 340, 60, 50);
-        context.fillRect(470, 750, 60, 50);
-
-        context.strokeRect(280, 340, 440, 460);
-        context.restore();
-    }
-
-    /* The drawn apparel is gone: `tshirt` on September 2, 2026 and `hoodie` on
-       September 3, replaced by the photographic `tshirt-hanger-white` and
-       `hoodie-hanger-white`. What is left here is drawn goods -- a mug and a
-       box -- which is also what the editor now falls back to, since a fallback
-       has to paint immediately and a photographic template cannot until seven
-       maps have downloaded. */
+    /* One drawn product left. `tshirt` went on September 2, 2026 and `hoodie`
+       and `box` on September 3, replaced by `tshirt-hanger-white`,
+       `hoodie-hanger-white` and `bag-paper-held`. `mug` stays, and not only
+       for its own sake: the editor's fallback has to paint immediately, and a
+       photographic template cannot until seven maps have downloaded. Retiring
+       this one too would mean finding another answer for that. */
     const PRODUCTS = {
         mug: {
             label: "Mug",
@@ -187,16 +154,6 @@
                 white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" },
                 black: { name: "Black", hex: "#1A1A1A", outline: "#000000" },
                 red: { name: "Red", hex: "#B5352E", outline: "#8F2A24" }
-            }
-        },
-        box: {
-            label: "Packaging Box",
-            printArea: { x: 330, y: 430, w: 340, h: 260 },
-            drawBase: drawBoxBody,
-            colors: {
-                kraft: { name: "Kraft Brown", hex: "#C48A4A", outline: "#9C6B34" },
-                white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" },
-                black: { name: "Black", hex: "#1A1A1A", outline: "#000000" }
             }
         }
     };

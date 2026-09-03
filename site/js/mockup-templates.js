@@ -596,6 +596,109 @@ window.TB_PHOTO_MOCKUPS = [
         ]
     },
     {
+        /* The same product held rather than shot on white, and the template
+           that REPLACED the drawn vector `box` on September 3, 2026 -- the
+           last of the three drawn products to go.
+
+           It is not a duplicate of `bag-paper-white` above. That one is a
+           studio cut-out on transparency, square-on, no model, and it is what
+           a seller uses for a catalogue tile. This is a lifestyle shot with a
+           scene behind it, which is what a listing's second image wants. They
+           differ in every property the renderer cares about: one has
+           `background: true` and this one cannot.
+
+           The terracotta wall is the reason the whole thing works, and it was
+           specified before the photograph existed rather than discovered
+           after. A NEUTRAL GREY backdrop -- the obvious studio choice, and
+           what the reference image used -- would have been unrecoverable:
+           saturation near 0 and luma around 190 passes both gates, the bag
+           touches the backdrop along its whole silhouette so the
+           connected-region restriction cannot separate them, and there is no
+           third property to appeal to. Terracotta measures saturation 116 to
+           123 against the bag's 4 to 10, which is not a margin so much as a
+           different universe. The black trousers fail the luma gate at p99 74
+           and the hand fails saturation at 76. */
+        id: "bag-paper-held",
+        title: "Paper Shopping Bag in Hand",
+        thumb: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-held/bag-paper-held-thumb.jpg",
+        /* 1122x1402, which is 0.8003 -- 4:5 to within 0.03% -- so the catalog
+           card is a straight downscale with no crop. */
+        base: "assets/mockups/packaging/bags/bag-paper-held/bag-paper-held-base.png",
+        overlay: null,
+        displace: "assets/mockups/packaging/bags/bag-paper-held/bag-paper-held-displace.png",
+        shade: "assets/mockups/packaging/bags/bag-paper-held/bag-paper-held-shade.png",
+        /* Kept, and the decision went the other way once before landing here.
+           The specular headroom is 5.5 luma levels (median 236.6 against a
+           241.1 ceiling), the lowest of any template that ships this map, and
+           close enough to the framed poster's 3.4 -- where it was omitted as
+           mostly sensor noise -- to be worth testing rather than assuming. It
+           is noisier than its peers: 0.23 of the local variation inside the
+           zone survives a 5x5 blur, against 0.08 to 0.11 for the studio bag
+           and the two hanger templates. But the render settles it. Dropping
+           the map changes a #12305C navy fill by a mean of 11.8 levels and up
+           to 71, because screen acts hardest on dark ink; on a near-white fill
+           it changes 0.65. Roughly three quarters of that is structure. A map
+           worth eleven levels on dark artwork earns its place even carrying
+           some noise. */
+        light: "assets/mockups/packaging/bags/bag-paper-held/bag-paper-held-light.png",
+        /* 0.3, measured here: a #12305C navy fill loses 10.38% of its blue
+           identity at gain 1.0 and 0.00% at 0.3. */
+        lightGain: 0.3,
+        garment: "assets/mockups/packaging/bags/bag-paper-held/bag-paper-held-garment.png",
+        tone: "assets/mockups/packaging/bags/bag-paper-held/bag-paper-held-tone.png",
+        /* Paper grain rather than a weave, sd 3.22. The studio bag above ships
+           no grain map at all; this photograph's raking light records enough
+           surface for one to be worth having. */
+        grain: "assets/mockups/packaging/bags/bag-paper-held/bag-paper-held-grain.png",
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            kraft: { name: "Kraft Brown", hex: "#C29A6B" },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" }
+        },
+        /* 16, and it lands on the studio bag's own number by the zone measure
+           rather than by copying it: global p99 24.31, zone p99 1.00, so 16
+           delivers 0.66px of peak offset -- 0.058% of base width, against that
+           template's 0.060%. Same product, same stiff paper, same bend.
+
+           This is the flattest print surface in the catalog by some way, zone
+           p50 0.33 where the next flattest is 0.52, and the lowest
+           zone/global ratio at 0.041: the bag's creased edges and its gusset
+           carry essentially all of the gradient while the front panel is
+           glass-flat. That is what a smooth paper face lit evenly looks like
+           to this pipeline, and it is why the offsets here are sub-pixel. */
+        displaceStrength: 16,
+        mode: "surface",
+        backing: null,
+        /* NO `background` key: the scene is opaque, all four corners alpha 255
+           and not one pixel of the image clear, so there is nothing behind the
+           photograph for a colour to reach. The wall IS the backdrop. */
+        /* 486x486 on the bag's front panel, centred at x=571 and vertically
+           between the top edge and the base fold. The panel's own bounds were
+           taken at luma > 215, which separates the face from the gusset
+           cleanly -- the gusset sits in shadow at 180 to 199 while the face
+           runs 230 to 242 -- giving a face of x 263..874 and y 484..1243, the
+           top bound being where the rope handles stop notching into it.
+
+           The zone is 80% of the panel's width, matching the studio bag's
+           proportion, and clears 62px left, 64px right, 128px top and 138px
+           bottom. Verified 100.0000% on the panel, zero impure pixels.
+
+           The panel leans: its right edge runs 874 at the top and 894 at the
+           bottom, so a rectangle inscribed in it has to take the narrower top.
+           At this size that costs nothing -- the margins above are what is
+           left over -- which is why no occlusion overlay is needed here and
+           was on the framed poster. */
+        warpZone: [
+            { x: 328, y: 620 },
+            { x: 813, y: 620 },
+            { x: 813, y: 1105 },
+            { x: 328, y: 1105 }
+        ]
+    },
+    {
         id: "card-white-walnut",
         title: "Business Cards on Walnut",
         thumb: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut/card-white-walnut-thumb.jpg",
