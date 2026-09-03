@@ -699,6 +699,102 @@ window.TB_PHOTO_MOCKUPS = [
         ]
     },
     {
+        /* The first template in the catalog whose print surfaces are NOT
+           axis-aligned rectangles, and the reason the renderer changed on
+           September 3, 2026.
+
+           Until that day a non-rectangular zone cost direct manipulation
+           outright: js/mockup.js warped an offscreen sheet onto the quad on
+           the GPU, a one-way pass, and then nulled every hit rect because
+           there was no way to carry a pointer back. The framed poster lost
+           move, scale and rotate to exactly that and had to be reverted to a
+           rectangle. Nothing about it was fundamental -- the forward map is a
+           homography fixed by four corner correspondences, so the inverse is
+           eight unknowns from eight equations -- and js/mockup.js now solves
+           it, maps the pointer into sheet space and hit-tests there. Flat
+           zones never touch that path.
+
+           What a warped zone still does NOT get is the shading pass:
+           drawWarpedDesign returns before it, so displace, shade and light are
+           never sampled. They are therefore NOT DECLARED HERE, because they
+           would ship as dead weight -- and `grain` goes with them, since it is
+           only read when a colourway declares `heather` and a card palette has
+           none. Three maps instead of seven, 2.0MB instead of about 5MB.
+
+           That omission is affordable on THIS photograph and would not be on
+           every one. The card faces measure a spread of just 10 luma levels
+           p1 to p99, against 32 and 16 on the two zones of card-white-walnut,
+           because a rigid card lit evenly has almost nothing to model. A
+           warped template on a surface with real shading would want the sheet
+           routed through the displacement pass first -- the maps are
+           registered to the base, so the shader would work unchanged once the
+           warp happens into the fabric sheet rather than straight to canvas. */
+        id: "card-white-duotone",
+        title: "Business Cards on Duotone",
+        thumb: "assets/thumbnails/product-mockups/print/business-cards/card-white-duotone/card-white-duotone-thumb.jpg",
+        /* 1122x1402, which is 0.8003 -- 4:5 to within 0.03%, so the catalog
+           card is a straight downscale. */
+        base: "assets/mockups/print/business-cards/card-white-duotone/card-white-duotone-base.png",
+        overlay: null,
+        garment: "assets/mockups/print/business-cards/card-white-duotone/card-white-duotone-garment.png",
+        tone: "assets/mockups/print/business-cards/card-white-duotone/card-white-duotone-tone.png",
+        /* The recolour mask is BOTH stacks. Everywhere else this pipeline
+           keeps only the region connected to the print zone, which would have
+           kept one card and left the other white. The two largest regions are
+           kept instead -- 188,561px and 169,777px, where the third largest is
+           93px of speckle, so there is no judgement in the cut. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            ivory: { name: "Ivory", hex: "#EDE6D6" },
+            kraft: { name: "Kraft Brown", hex: "#C29A6B" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            black: { name: "Black", hex: "#1A1A1A" }
+        },
+        mode: "surface",
+        backing: null,
+        /* NO `background`: the scene is opaque, every corner alpha 255 and not
+           one pixel clear. The dual tone IS the backdrop, and it is what makes
+           the photograph readable at all -- a neutral half would have been
+           masked instead of the cards. Terracotta measures saturation 128-139
+           and the sage 16-21 at luma 48-91, so one fails saturation and the
+           other fails luma, against cards at saturation 0-12 and luma
+           118-241. */
+        designScale: "cover",
+        zoneLabels: ["Front", "Back"],
+        /* Two quads, found by fitting a line to each of the four edges from
+           the face's boundary pixels and intersecting adjacent pairs, rather
+           than by taking extreme points -- an extreme is a single antialiased
+           pixel and is not the corner of a quad in perspective. The faces were
+           separated from the stacks' cut edges at luma > 200: the edges sit
+           around 140 and the faces at 236.
+
+           Both come out 1.78:1 against a business card's 1.75, and the 1.8%
+           is the foreshortening, which is the check that the corners are the
+           real ones. */
+        warpZones: [
+            [
+                { x: 530, y: 247 },
+                { x: 1042, y: 362 },
+                { x: 977, y: 650 },
+                { x: 453, y: 524 }
+            ],
+            [
+                { x: 96, y: 815 },
+                { x: 639, y: 675 },
+                { x: 739, y: 973 },
+                { x: 187, y: 1121 }
+            ]
+        ],
+        /* warpZones[0], not an independent value: every path that predates
+           multi-zone reads this one and the validator requires it. */
+        warpZone: [
+            { x: 530, y: 247 },
+            { x: 1042, y: 362 },
+            { x: 977, y: 650 },
+            { x: 453, y: 524 }
+        ]
+    },
+    {
         id: "card-white-walnut",
         title: "Business Cards on Walnut",
         thumb: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut/card-white-walnut-thumb.jpg",

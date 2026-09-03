@@ -268,6 +268,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="card-white-duotone">Duotone Business Card Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie Back Mockup</a></li>\n' +
@@ -374,7 +375,20 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
             schema.image = cover;
         }
 
-        const ogImage = cover || (POST_ORIGIN + "/assets/logo.png");
+        /* og-cover.png, not logo.png. The logo is 1219x1509, so every OG
+           consumer cropped it to its own 1.91:1 frame and a post with no
+           cover image shared as a mangled square. og-cover.png is the
+           site-wide 1200x630 card, which is what that frame expects.
+
+           The declared width/height pair goes with the FALLBACK only: its
+           dimensions are known, whereas a post's own cover is whatever the
+           author uploaded, and a wrong declared pair renders the card badly
+           where a missing one only costs a measuring round trip. That is the
+           same reasoning that stripped the pair from the logo.png pages. */
+        const ogImage = cover || (POST_ORIGIN + "/assets/og-cover.png");
+        const ogImageDims = cover ? "" :
+'    <meta property="og:image:width" content="1200">\n' +
+'    <meta property="og:image:height" content="630">\n';
         const fonts = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap";
 
         /* Indented to sit inside <article>, which is now one level deeper
@@ -400,6 +414,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '    <meta property="og:description" content="' + desc + '">\n' +
 '    <meta property="og:url" content="' + url + '">\n' +
 '    <meta property="og:image" content="' + ogImage + '">\n' +
+    ogImageDims +
 '    <meta property="article:published_time" content="' + (post.date || "") + '">\n' +
 '    <meta property="article:modified_time" content="' + (post.updated || post.date || "") + '">\n\n' +
 '    <meta name="twitter:card" content="summary_large_image">\n' +
@@ -1445,6 +1460,10 @@ body + '\n' +
         {
             id: "card-white-walnut", title: "Business Card Mockup", category: "mockups", doc: "card-white-walnut",
             folder: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut"
+        },
+        {
+            id: "card-white-duotone", title: "Duotone Business Card Mockup", category: "mockups", doc: "card-white-duotone",
+            folder: "assets/thumbnails/product-mockups/print/business-cards/card-white-duotone"
         },
         {
             id: "banner-rollup-white", title: "Roll-Up Banner Mockup", category: "mockups", doc: "banner-rollup-white",

@@ -391,7 +391,12 @@
         sctx.clearRect(0, 0, w, h);
         sctx.fillStyle = "#FFFFFF";
         sctx.fillRect(0, 0, w, h);
-        paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, false, zoneIndex);
+        /* recordRects is TRUE since September 3, 2026. The rectangles this
+           writes are in SHEET space, not canvas space, which is exactly what
+           `toZoneSpace` carries a pointer back into. Before the inverse
+           homography existed there was nothing to compare them against, so
+           they were discarded. */
+        paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, true, zoneIndex);
         return sheetCanvas;
     }
 
@@ -430,6 +435,102 @@
         return fabricSheet;
     }
 
+
+    /* ----------------------------------------------------------------------
+       Pointer mapping for warped surfaces.
+
+       A zone that is not an axis-aligned rectangle is drawn by warping an
+       offscreen sheet onto its quad on the GPU. That pass is one-way: it takes
+       sheet pixels to canvas pixels and hands nothing back, which is why this
+       file used to null every hit rect on a warped zone and say so -- direct
+       manipulation was not offered, and the framed poster lost move, scale and
+       rotate to exactly that.
+
+       Nothing about it was fundamental. The forward map is a homography fixed
+       by four corner correspondences, so the inverse is too, and eight
+       unknowns from eight equations is a linear solve. With the inverse in
+       hand a pointer can be carried back into sheet space, where the layer's
+       hit rectangle already lives, and every gesture works as it does on a
+       flat zone.
+
+       Rectangular zones never touch any of this: `zoneWarp` stays empty for
+       them and `toZoneSpace` returns the point unchanged.
+       ---------------------------------------------------------------------- */
+
+    /* Canvas-space -> sheet-space transforms, one slot per zone index. A null
+       slot means "this zone is a plain rectangle", which is the common case
+       and costs a single array read. */
+    let zoneWarp = [];
+
+    /* The homography taking four source points to four destination points,
+       as [a, b, c, d, e, f, g, h] for
+           X = (a*x + b*y + c) / (g*x + h*y + 1)
+           Y = (d*x + e*y + f) / (g*x + h*y + 1)
+       Solved by plain Gaussian elimination with partial pivoting: an 8x8
+       system runs once per warped zone per repaint, which is nothing, and a
+       closed form here would be harder to check than it is to run. */
+    function solveHomography(src, dst) {
+        const A = [];
+        for (let i = 0; i < 4; i += 1) {
+            const x = src[i][0], y = src[i][1], X = dst[i][0], Y = dst[i][1];
+            A.push([x, y, 1, 0, 0, 0, -X * x, -X * y, X]);
+            A.push([0, 0, 0, x, y, 1, -Y * x, -Y * y, Y]);
+        }
+        for (let col = 0; col < 8; col += 1) {
+            let pivot = col;
+            for (let r = col + 1; r < 8; r += 1) {
+                if (Math.abs(A[r][col]) > Math.abs(A[pivot][col])) { pivot = r; }
+            }
+            /* A degenerate quad -- three corners in a line, or two the same --
+               has no inverse. Returning null puts the zone back on the old
+               behaviour rather than producing nonsense coordinates. */
+            if (Math.abs(A[pivot][col]) < 1e-9) { return null; }
+            const swap = A[col]; A[col] = A[pivot]; A[pivot] = swap;
+            for (let r = 0; r < 8; r += 1) {
+                if (r === col) { continue; }
+                const f = A[r][col] / A[col][col];
+                for (let c = col; c < 9; c += 1) { A[r][c] -= f * A[col][c]; }
+            }
+        }
+        const out = [];
+        for (let i = 0; i < 8; i += 1) { out.push(A[i][8] / A[i][i]); }
+        return out;
+    }
+
+    function applyHomography(m, x, y) {
+        const den = m[6] * x + m[7] * y + 1;
+        if (!den) { return { x: x, y: y }; }
+        return {
+            x: (m[0] * x + m[1] * y + m[2]) / den,
+            y: (m[3] * x + m[4] * y + m[5]) / den
+        };
+    }
+
+    /* The transform a pointer needs for one zone: canvas pixels back to the
+       offscreen sheet the layers were painted into.
+
+       The GPU pass composes two steps -- the sheet is stretched to the full
+       canvas, then that canvas rectangle is warped onto the quad -- so the
+       inverse composes them the other way round: undo the quad, then undo the
+       stretch. Both are folded into one matrix here so the per-pointer cost
+       is a single homography. */
+    function warpTransformFor(zone, area) {
+        const m = solveHomography(
+            [[zone[0].x, zone[0].y], [zone[1].x, zone[1].y],
+             [zone[2].x, zone[2].y], [zone[3].x, zone[3].y]],
+            [[0, 0], [area.w, 0], [area.w, area.h], [0, area.h]]
+        );
+        return m;
+    }
+
+    /* Sheet space for a warped zone, canvas space for a flat one. Callers do
+       not branch: they ask for the point in the zone's own space and get it. */
+    function toZoneSpace(pt, zoneIndex) {
+        const m = zoneWarp[typeof zoneIndex === "number" ? zoneIndex : 0];
+        if (!m) { return pt; }
+        return applyHomography(m, pt.x, pt.y);
+    }
+
     function drawWarpedDesign(zone, zoneIndex) {
         const area = zoneBounds(zone);
         if (warpLibState === "ready") {
@@ -447,17 +548,21 @@
                 ).update();
                 ctx.drawImage(fxCanvas, 0, 0);
                 texture.destroy();
-                /* Direct manipulation is not offered on warped quads: mapping
-                   a pointer back into sheet space needs the inverse of the
-                   perspective transform, which the GPU pass above does not
-                   hand back. Layers keep no hit rect, so nothing on the
-                   canvas is grabbable and the sidebar controls are the only
-                   way to place artwork here. */
-                layers.forEach((layer) => {
-                    if (typeof zoneIndex !== "number" || layerZone(layer) === zoneIndex) {
-                        layer.rect = null;
-                    }
-                });
+                /* Direct manipulation IS offered on warped quads since
+                   September 3, 2026. The hit rectangles renderSheet() just
+                   wrote are in sheet space; this is the transform that carries
+                   a pointer back there. If the quad is degenerate the solve
+                   returns null and the zone falls back to the old behaviour --
+                   ungrabbable, sidebar only -- rather than to bad coordinates. */
+                const back = warpTransformFor(zone, area);
+                zoneWarp[typeof zoneIndex === "number" ? zoneIndex : 0] = back;
+                if (!back) {
+                    layers.forEach((layer) => {
+                        if (typeof zoneIndex !== "number" || layerZone(layer) === zoneIndex) {
+                            layer.rect = null;
+                        }
+                    });
+                }
                 return;
             } catch (err) {
                 warpLibState = "failed";
@@ -818,6 +923,10 @@
     }
 
     function paint() {
+        /* Rebuilt by drawWarpedDesign() on every repaint that needs it. Cleared
+           here so a template switch, or a zone that stops being warped, cannot
+           leave a stale transform behind for a pointer to fall through. */
+        zoneWarp = [];
         const product = PRODUCTS[currentProduct] ? currentProduct : "mug";
         currentProduct = product;
         const config = PRODUCTS[currentProduct];
@@ -2298,13 +2407,24 @@
         const tol = HANDLE_HIT * k;
         const sel = selectedLayer();
 
+        /* Each layer is compared in ITS OWN zone's space, because a template
+           can mix flat and warped surfaces and a rectangle recorded in sheet
+           space means nothing in canvas space. For a flat zone this is the
+           identity and the comparison is what it always was.
+
+           The tolerance is not rescaled into sheet space. It is exact for a
+           rectangle, and for a warp it is off by the quad's own foreshortening
+           -- about 15% on the business cards, which is invisible on a handle
+           radius. A template with a hard-angled quad would want the local
+           Jacobian here instead. */
         if (sel && sel.rect && sel.visible) {
-            if (distance(pt, rotateHandlePoint(sel.rect, k)) <= tol) {
+            const sp = toZoneSpace(pt, layerZone(sel));
+            if (distance(sp, rotateHandlePoint(sel.rect, k)) <= tol) {
                 return { mode: "rotate", layer: sel };
             }
             const corners = rectCorners(sel.rect);
             for (let i = 0; i < corners.length; i += 1) {
-                if (distance(pt, corners[i]) <= tol) {
+                if (distance(sp, corners[i]) <= tol) {
                     return { mode: "resize", layer: sel };
                 }
             }
@@ -2312,7 +2432,8 @@
 
         for (let i = layers.length - 1; i >= 0; i -= 1) {
             const layer = layers[i];
-            if (layer.rect && layer.visible && hitsBody(layer.rect, pt)) {
+            if (layer.rect && layer.visible
+                && hitsBody(layer.rect, toZoneSpace(pt, layerZone(layer)))) {
                 return { mode: "move", layer: layer };
             }
         }
@@ -2337,16 +2458,22 @@
 
         const rect = hit.layer.rect;
         const center = { x: rect.cx, y: rect.cy };
+        /* The whole gesture is measured in the layer's zone space: the anchor
+           here and every move below. Mixing the two spaces would send a drag
+           off at an angle on a warped surface. */
+        const zone = layerZone(hit.layer);
+        const zpt = toZoneSpace(pt, zone);
         drag = {
             mode: hit.mode,
             layer: hit.layer,
-            start: pt,
+            zone: zone,
+            start: zpt,
             center: center,
             startOffset: { x: hit.layer.offsetX, y: hit.layer.offsetY },
             startScale: hit.layer.scale,
-            startDistance: distance(pt, center),
+            startDistance: distance(zpt, center),
             startRotation: hit.layer.rotation,
-            startAngle: Math.atan2(pt.y - center.y, pt.x - center.x)
+            startAngle: Math.atan2(zpt.y - center.y, zpt.x - center.x)
         };
 
         canvas.setPointerCapture(evt.pointerId);
@@ -2356,10 +2483,12 @@
 
     canvas.addEventListener("pointermove", (evt) => {
         const k = canvasPerScreenPx();
-        const pt = getCanvasPoint(evt);
+        const raw = getCanvasPoint(evt);
+        /* hitTest maps per layer; a live drag is already committed to one. */
+        const pt = drag ? toZoneSpace(raw, drag.zone) : raw;
 
         if (!drag) {
-            const hit = hitTest(pt, k);
+            const hit = hitTest(raw, k);
             canvas.style.cursor = hit
                 ? (hit.mode === "move" ? "grab" : (hit.mode === "rotate" ? "crosshair" : "nwse-resize"))
                 : "default";
