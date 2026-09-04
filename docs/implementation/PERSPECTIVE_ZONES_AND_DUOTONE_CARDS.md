@@ -2,6 +2,7 @@
 
 Date: September 3, 2026
 Status: Implemented
+Updated: September 4, 2026 -- two faults found, see "Corrections" below
 
 ## Summary
 
@@ -116,6 +117,14 @@ shading: warp into the **fabric sheet** rather than straight to the canvas. The
 maps are registered to the base photograph, so the existing shader pass would
 then run over the warped design unchanged.
 
+**September 4, 2026: that surface arrived and did not need this.** The angled
+banner's face spreads 42.5 luma levels against these cards' 10, so the shading
+could not be dropped -- but its displacement measured a zone/global Sobel ratio
+of 0.047, worth 0.47px, so only the shading was actually missing. It rides in
+the `overlay` instead, which composites after the design on both paths. See
+`ANGLED_ROLLUP_BANNER_MOCKUP.md`. The fabric-sheet route is still the answer for
+a warped surface that genuinely bends a print.
+
 ## The photograph
 
 1122x1402, opaque scene, 0.8003 -- 4:5 to within 0.03%.
@@ -148,6 +157,32 @@ Everywhere else this pipeline keeps only the region connected to the print zone,
 which here would have kept one card and left the other white. The **two largest
 regions** are kept instead: 188,561px and 169,777px, where the third largest is
 93px of speckle -- so there is no judgement in the cut.
+
+## Corrections, September 4, 2026
+
+Building the second warped template, `banner-rollup-angled`, found two faults
+that shipped with this work. Both were reproduced on these cards before anything
+was changed. Full write-up:
+`docs/error-fixes/WARPED_ZONE_CHROME_AND_PROMPT_DRAWN_IN_SHEET_SPACE.md`.
+
+**The empty-state prompt covered the bounding box, not the quad.** 511,428px of
+`#F4F3EF` panel lay across both card faces and the backdrop between them,
+because `drawLayersInArea` draws over `zoneBounds(zone)`. Fixed by giving it the
+zone and pathing the quad.
+
+**The selection chrome was drawn in sheet space.** The section above is right
+that `renderSheet` records hit rects in sheet space and that `toZoneSpace` maps
+a pointer back into it -- but `drawOverlay` then took the same rect and painted
+it *straight onto the canvas* with no mapping. The gestures worked; the handles
+were simply drawn somewhere else. Fixed with `fromZoneSpace`, the exact inverse.
+
+**The verification table below is accurate and could not have caught it.** Its
+method -- stated as a strength, and it is one -- was to compute where each
+handle should be and press there rather than "asking the editor where it thought
+its own handles were". That exercises the pointer maths, which was correct, and
+never looks at the drawing, which was not. The lesson is worth keeping: refusing
+to trust the code under test is right, but a check that avoids its output
+entirely cannot see a fault in that output.
 
 ## Related files
 

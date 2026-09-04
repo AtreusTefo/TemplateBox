@@ -955,6 +955,110 @@ window.TB_PHOTO_MOCKUPS = [
         ]
     },
     {
+        /* The same product as the entry above, tilted -- and the first
+           template whose print surface is BOTH warped and shaded.
+
+           A warped quad routes to drawWarpedDesign(), which returns before
+           the displacement pass, so `displace`, `shade` and `light` are never
+           sampled. The duotone cards could simply drop them: a rigid card lit
+           evenly spreads 10 luma levels. This face spreads 42.5 (p1 198.6,
+           p50 225.1, p99 241.1), MORE than the flat banner's 33, because
+           1.2m of vinyl turned into the light is the opposite of evenly lit.
+           Dropped, the sheen would be gone and a filled banner would read as
+           a flat sticker pasted over a photograph.
+
+           So the shading moved into the `overlay`, which composites after the
+           design on both paths and is therefore the one slot a warped
+           template can still use. Two maps carry what would have been four:
+           1.27MB against the flat sibling's 1.5MB.
+
+           The catch is the one the `shade` doc above names: a full-canvas
+           multiply darkens the base a second time wherever the design does
+           not reach, which here would be the whole face before a first
+           upload. The fix is to take the sheen OUT of the base rather than
+           add it twice -- the face is flattened to its own reference white
+           (246,246,247, the per-channel max inside the quad) and the overlay
+           carries base/reference. The two are algebraic inverses, so an empty
+           template reconstructs the photograph exactly: composited through
+           canvas multiply, max error 1 level and mean 0.41 across 2.2M
+           channel samples, with no sample over 2.
+
+           The mask is BINARY and identical in both files, deliberately not
+           feathered. Feathering helps where an overlay meets a base it does
+           not cancel (the interior frame's punch-out); here a fractional
+           alpha on one side of an exact inverse is what would CREATE a seam.
+
+           The overlay is transparent outside the quad, never white. An opaque
+           overlay pixel over a transparent canvas pixel composites to opaque
+           under source-over, which would have filled the cut-out surround and
+           destroyed the alpha channel. Verified: 816,718 clear pixels before
+           and after, all four corners still 0,0,0,0. */
+        id: "banner-rollup-angled",
+        title: "Roll-Up Banner, Angled",
+        thumb: "assets/thumbnails/product-mockups/print/signage/banner-rollup-angled/banner-rollup-angled-thumb.jpg",
+        /* 1024x1536, the same frame as the flat sibling, so the catalog card
+           crops the same way rather than introducing a second aspect for one
+           product. */
+        base: "assets/mockups/print/signage/banner-rollup-angled/banner-rollup-angled-base.png",
+        overlay: "assets/mockups/print/signage/banner-rollup-angled/banner-rollup-angled-overlay.png",
+        /* A luminance map, so multiply. At source-over it would paint the
+           vinyl's own greys over the artwork instead of shading it. */
+        overlayBlend: "multiply",
+        /* NO displace/shade/light, and that is measured rather than forced by
+           the warp path. Sobel p99 inside the zone is 0.90 against 19.27
+           across the image -- a zone/global ratio of 0.047, below the paper
+           bag's 0.041-equivalent flatness and the lowest in the catalog. At
+           the flat sibling's strength of 10 that delivers 0.47px of peak
+           offset, 0.046% of base width. Taut vinyl on a tensioned stand is
+           the flattest print surface here; there is nothing for a
+           displacement map to bend the artwork around. */
+        mode: "surface",
+        backing: null,
+        /* Cut out on transparency like its sibling: all four corners alpha 0,
+           51.93% of the image clear. */
+        background: true,
+        /* A banner's artwork IS the banner, so the first upload fills. */
+        designScale: "cover",
+        /* Corners found by fitting a line to each of the four edges and
+           intersecting adjacent pairs -- never by extreme points, which are
+           single antialiased pixels. The fits are what say the vinyl is
+           genuinely planar and unrippled, which is what a homography
+           requires: residual standard deviations of 0.43, 0.32, 0.31 and 0.30
+           pixels for left, right, top and bottom.
+
+           Left and right edges come out vertical (their intersection sits
+           128,728px above the frame), so only the horizontal direction has a
+           finite vanishing point. That means the standard rectangle-aspect
+           recovery does NOT apply here -- it needs two finite vanishing
+           points -- and no attempt is made to quote one. What can be checked
+           is the shape: mean opposite edges give 550.9 x 1284.4, or 1:2.33,
+           against a standard 850x2000mm roll-up's 1:2.35. The flat sibling's
+           own zone is 1:2.00 and its doc already concedes that is wide, so
+           the tilted photograph is the truer one of the pair.
+
+           Foreshortening is 0.883 -- the far edge 1204.5px against the near
+           edge's 1364.2. Inside the 80-88% asked for: enough tilt to read as
+           depth, little enough that the handle-tolerance approximation in
+           hitTest (not rescaled into sheet space) stays close.
+
+           Purity 99.9338%, 464 impure pixels of 700,446 -- every one of them
+           partial alpha at the vinyl's antialiased rim, ZERO fully clear. The
+           zone sits flush with the face, which is what a bleed-to-edge banner
+           wants and what the sibling's bottom-edge fix was about.
+
+           There is a shadow line about 8px above the bottom edge, where the
+           vinyl enters the cassette slot, and the zone deliberately spans it
+           rather than stopping short: it is content, not a boundary, and the
+           overlay multiplies it back over the artwork so a filled banner
+           still sits IN its cassette instead of floating above it. */
+        warpZone: [
+            { x: 240, y: 65 },
+            { x: 783, y: 138 },
+            { x: 789, y: 1342 },
+            { x: 241, y: 1429 }
+        ]
+    },
+    {
         id: "hoodie-model-white",
         title: "White Hoodie on Model",
         thumb: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-thumb.jpg",

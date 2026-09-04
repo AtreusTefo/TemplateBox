@@ -461,6 +461,7 @@
        slot means "this zone is a plain rectangle", which is the common case
        and costs a single array read. */
     let zoneWarp = [];
+    let zoneUnwarp = [];
 
     /* The homography taking four source points to four destination points,
        as [a, b, c, d, e, f, g, h] for
@@ -523,10 +524,37 @@
         return m;
     }
 
+    /* The same map the other way: sheet space back out to canvas space.
+
+       Needed because hit rects are RECORDED in sheet space but the selection
+       chrome is DRAWN on the canvas. Without this the box and its handles are
+       painted at sheet coordinates -- on the tilted banner the box appeared
+       around (165,435)-(384,929) while the corner it represents was really at
+       (637,965), so every handle was visible where it could not be grabbed and
+       grabbable where it could not be seen. The pointer maths was never wrong;
+       only the drawing was, which is why pressing a computed handle position
+       worked all along. */
+    function unwarpTransformFor(zone, area) {
+        return solveHomography(
+            [[0, 0], [area.w, 0], [area.w, area.h], [0, area.h]],
+            [[zone[0].x, zone[0].y], [zone[1].x, zone[1].y],
+             [zone[2].x, zone[2].y], [zone[3].x, zone[3].y]]
+        );
+    }
+
     /* Sheet space for a warped zone, canvas space for a flat one. Callers do
        not branch: they ask for the point in the zone's own space and get it. */
     function toZoneSpace(pt, zoneIndex) {
         const m = zoneWarp[typeof zoneIndex === "number" ? zoneIndex : 0];
+        if (!m) { return pt; }
+        return applyHomography(m, pt.x, pt.y);
+    }
+
+    /* The exact inverse of toZoneSpace, for anything that has a point in a
+       zone's own space and needs it on the canvas -- which is the selection
+       chrome, and only the selection chrome. */
+    function fromZoneSpace(pt, zoneIndex) {
+        const m = zoneUnwarp[typeof zoneIndex === "number" ? zoneIndex : 0];
         if (!m) { return pt; }
         return applyHomography(m, pt.x, pt.y);
     }
@@ -555,7 +583,12 @@
                    returns null and the zone falls back to the old behaviour --
                    ungrabbable, sidebar only -- rather than to bad coordinates. */
                 const back = warpTransformFor(zone, area);
-                zoneWarp[typeof zoneIndex === "number" ? zoneIndex : 0] = back;
+                const slot = typeof zoneIndex === "number" ? zoneIndex : 0;
+                zoneWarp[slot] = back;
+                /* Only solved when the inverse solved: a degenerate quad must
+                   leave BOTH directions empty, or the chrome would be mapped
+                   by a transform the pointer maths is not using. */
+                zoneUnwarp[slot] = back ? unwarpTransformFor(zone, area) : null;
                 if (!back) {
                     layers.forEach((layer) => {
                         if (typeof zoneIndex !== "number" || layerZone(layer) === zoneIndex) {
@@ -570,7 +603,10 @@
         } else {
             ensureWarpLib();
         }
-        drawLayersInArea(area, 0, zoneIndex);
+        /* No WebGL, so the artwork cannot be warped -- but it must still be
+           confined to the quad rather than to its bounding box, or the
+           degraded path puts ink outside the product. */
+        drawLayersInArea(area, 0, zoneIndex, zone);
     }
 
     /* ----------------------------------------------------------------------
@@ -855,7 +891,34 @@
         });
     }
 
-    function drawLayersInArea(area, cornerRadius, zoneIndex) {
+    /* The print SURFACE as a path, which stops being the same thing as its
+       bounding box the moment a zone is a warped quad. `zoneBounds` squares
+       the quad off, so the tilted banner's box reaches 21px above the vinyl
+       onto the top rail, past the cassette at the foot, and out over the
+       transparent surround -- 700,446px of box around a quad that only
+       covers part of it.
+
+       Everything that paints or clips "the print area" has to follow this
+       rather than the box, which is why it is one function: the two used to
+       be the same call and the difference is invisible until a zone tilts.
+
+       Returns whether it used the quad, because the caller then also wants
+       the quad's centroid rather than the box's centre. */
+    function zonePath(context, area, radius, zone) {
+        if (zone && !zoneIsRect(zone)) {
+            context.beginPath();
+            context.moveTo(zone[0].x, zone[0].y);
+            context.lineTo(zone[1].x, zone[1].y);
+            context.lineTo(zone[2].x, zone[2].y);
+            context.lineTo(zone[3].x, zone[3].y);
+            context.closePath();
+            return true;
+        }
+        roundRectPath(context, area.x, area.y, area.w, area.h, radius);
+        return false;
+    }
+
+    function drawLayersInArea(area, cornerRadius, zoneIndex, zone) {
         const r = typeof cornerRadius === "number" ? cornerRadius : 16;
         /* Placeholder styling scales with the canvas, which runs at 1000px
            for vector products but at the base photograph's native size for
@@ -872,7 +935,7 @@
 
         if (!mine.length) {
             ctx.save();
-            roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
+            const warped = zonePath(ctx, area, r, zone);
             ctx.fillStyle = "#F4F3EF";
             ctx.fill();
             ctx.setLineDash([12 * k, 8 * k]);
@@ -884,7 +947,16 @@
             ctx.font = "400 " + Math.round(32 * k) + 'px "Inter", sans-serif';
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("Upload your design", area.x + area.w / 2, area.y + area.h / 2, area.w - 40 * k);
+            /* The quad's centroid, not the box's centre: on a tilted surface
+               those are different points and the box's one can sit off the
+               product entirely. */
+            const promptX = warped
+                ? (zone[0].x + zone[1].x + zone[2].x + zone[3].x) / 4
+                : area.x + area.w / 2;
+            const promptY = warped
+                ? (zone[0].y + zone[1].y + zone[2].y + zone[3].y) / 4
+                : area.y + area.h / 2;
+            ctx.fillText("Upload your design", promptX, promptY, area.w - 40 * k);
             ctx.restore();
             layers.forEach((layer) => {
                 if (!scoped || layerZone(layer) === zoneIndex) {
@@ -895,7 +967,7 @@
         }
 
         ctx.save();
-        roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
+        zonePath(ctx, area, r, zone);
         ctx.clip();
         paintLayers(ctx, area, true, zoneIndex);
         ctx.restore();
@@ -927,6 +999,7 @@
            here so a template switch, or a zone that stops being warped, cannot
            leave a stale transform behind for a pointer to fall through. */
         zoneWarp = [];
+        zoneUnwarp = [];
         const product = PRODUCTS[currentProduct] ? currentProduct : "mug";
         currentProduct = product;
         const config = PRODUCTS[currentProduct];
@@ -1164,7 +1237,7 @@
                     ctx.fillStyle = backing;
                     ctx.fillRect(area.x, area.y, area.w, area.h);
                 }
-                drawLayersInArea(area, 0, index);
+                drawLayersInArea(area, 0, index, zone);
             });
         };
 
@@ -1375,8 +1448,19 @@
         }
 
         const k = canvasPerScreenPx();
-        const corners = rectCorners(layer.rect);
-        const rot = rotateHandlePoint(layer.rect, k);
+        /* rectCorners and rotateHandlePoint both work in the layer's OWN
+           space, which is sheet space on a warped zone and canvas space on a
+           flat one. The canvas is what gets painted, so carry them out --
+           a no-op for every flat template, since fromZoneSpace returns the
+           point untouched when the zone has no transform.
+
+           A rotated rectangle on a tilted plane projects to a general quad,
+           not to a rectangle, so drawing the mapped corners as a closed path
+           is not an approximation: it is the outline's true shape on screen. */
+        const zi = layerZone(layer);
+        const corners = rectCorners(layer.rect).map((p) => fromZoneSpace(p, zi));
+        const rot = fromZoneSpace(rotateHandlePoint(layer.rect, k), zi);
+        const centre = fromZoneSpace({ x: layer.rect.cx, y: layer.rect.cy }, zi);
 
         octx.save();
         octx.strokeStyle = CHROME_COLOR;
@@ -1418,7 +1502,9 @@
            since canvas has no cursor-per-pixel to rely on. */
         octx.lineWidth = Math.max(1, k);
         corners.forEach((p) => {
-            const angle = Math.atan2(p.y - layer.rect.cy, p.x - layer.rect.cx);
+            /* Measured from the MAPPED centre, so the arrow still points out
+               of the box once perspective has skewed it. */
+            const angle = Math.atan2(p.y - centre.y, p.x - centre.x);
             drawResizeGlyph(octx, p.x, p.y, angle, side * 0.62, side * 0.22);
         });
         drawRotateGlyph(octx, rot.x, rot.y, rotR * 0.6);
