@@ -328,8 +328,27 @@
                     ry += 30;
                 });
 
-                rule(t, px + iw * 0.45, y + h - 76, iw * 0.55, 2, t.ink);
-                label(t, "BALANCE DUE", px + iw * 0.45, y + h - 52, 10, t.muted);
+                /* The total rule starts at 30%, not 45%.
+
+                   "BALANCE DUE" is drawn left-aligned from the rule's start
+                   and the amount right-aligned at its end, both on the same
+                   baseline, so the rule's span is the entire budget for the
+                   pair. At 45% that span is 136.4 reference units against 161.3
+                   the two strings actually need -- the label ran 30.8 card
+                   pixels underneath the amount on every card drawn with this
+                   illustration (og-cover, og-invoice, og-itemized-receipt).
+
+                   Measured rather than nudged: 0.35 leaves -0.1 units, which
+                   is touching, and 0.30 leaves 12.3 units (15.3 card pixels)
+                   of clear air. A total rule spanning the right 70% is also
+                   what a real invoice looks like, so this is the design
+                   landing where it should have been rather than a workaround.
+
+                   The rule's WIDTH is the complement of its start, so the two
+                   numbers must always sum to 1 or it stops meeting the right
+                   edge of the sheet. */
+                rule(t, px + iw * 0.30, y + h - 76, iw * 0.70, 2, t.ink);
+                label(t, "BALANCE DUE", px + iw * 0.30, y + h - 52, 10, t.muted);
                 ctx.font = "700 18px Inter, sans-serif";
                 ctx.fillStyle = t.ink;
                 ctx.textAlign = "right";

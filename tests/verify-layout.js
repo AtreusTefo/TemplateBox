@@ -631,6 +631,96 @@ function staticChecks() {
     }
 
 
+    /* 1l. Every indexable page declares a social card, that card exists on
+           disk, and any size it declares is the file's real size.
+
+           1k above checks <img src> and explicitly skips absolute URLs,
+           because those normally belong to a third party. og:image does not:
+           it is absolute by protocol requirement -- a crawler resolves it
+           without a base -- and it points at our own assets/ folder. That
+           exemption left the whole social-card surface unchecked, and three
+           separate defects were sitting in it on September 3, 2026:
+
+             - privacy.html and blog.html declared twitter:image and NO
+               og:image at all, so every OG consumer (Facebook, LinkedIn,
+               Slack, WhatsApp, Discord, Telegram) rendered them with no
+               preview image. Nothing failed; nothing could.
+             - fifteen pages pointed at logo.png, which is 1219x1509, so every
+               platform cropped a tall square into its 1.91:1 frame.
+             - the pages that DID carry a real card were the only ones
+               declaring og:image:width/height, and the pair had previously
+               been wrong sitewide -- 1200x630 declared for that same
+               1219x1509 file. A platform reserves the preview frame from the
+               declared pair before the file downloads, so a wrong pair
+               renders the card badly where a missing one only costs a
+               measuring round trip.
+
+           Scoped by <link rel="canonical"> rather than by a filename list,
+           which is what makes it maintainable: a page with a canonical is a
+           page meant to be indexed and therefore shared, and the tools,
+           admin, loading, search and 404 pages carry none, so they are out of
+           scope automatically and no exclusion list has to be kept in step.
+
+           The declared-size check reads the PNG's own IHDR rather than
+           trusting the filename, because "og-*.png" is a convention and the
+           header is a fact. */
+    {
+        const ORIGIN = "https://templatebox.win";
+        const pngSize = (file) => {
+            const buf = fs.readFileSync(file);
+            /* 8-byte signature, then a chunk header of 4 length + 4 type;
+               IHDR's width and height are the first two big-endian uint32s
+               of its payload. A PNG that does not start with IHDR is not a
+               PNG this project produces. */
+            if (buf.length < 24 || buf.toString("latin1", 12, 16) !== "IHDR") { return null; }
+            return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+        };
+
+        pages.forEach((file) => {
+            const rel = path.relative(ROOT, file);
+            const html = fs.readFileSync(file, "utf8").replace(/<!--[\s\S]*?-->/g, "");
+            if (!/<link\s+rel="canonical"/.test(html)) { return; }
+
+            const meta = (pattern) => {
+                const m = html.match(pattern);
+                return m ? m[1] : null;
+            };
+            const og = meta(/<meta\s+property="og:image"\s+content="([^"]*)"/);
+            const tw = meta(/<meta\s+name="twitter:image"\s+content="([^"]*)"/);
+
+            check(`${rel}: declares og:image and twitter:image`,
+                !!og && !!tw,
+                `og:image=${og || "MISSING"} twitter:image=${tw || "MISSING"}`);
+            if (!og) { return; }
+
+            /* Both tags must name the same card. Two different images is not
+               a failure of either protocol, but it is always a half-finished
+               edit rather than an intention. */
+            check(`${rel}: og:image and twitter:image name the same card`,
+                og === tw, `og:image=${og} twitter:image=${tw}`);
+
+            /* Only our own origin can be checked; anything else is a third
+               party this suite cannot vouch for, exactly as in 1k. */
+            if (!og.startsWith(ORIGIN + "/")) { return; }
+            const onDisk = path.join(SITE, decodeURI(og.slice(ORIGIN.length + 1).split("?")[0]));
+            const exists = fs.existsSync(onDisk);
+            check(`${rel}: its social card exists on disk`, exists,
+                `${og} resolves to ${path.relative(ROOT, onDisk)}, which is not there`);
+            if (!exists) { return; }
+
+            const declaredW = meta(/<meta\s+property="og:image:width"\s+content="([^"]*)"/);
+            const declaredH = meta(/<meta\s+property="og:image:height"\s+content="([^"]*)"/);
+            if (declaredW === null && declaredH === null) { return; }
+
+            const real = pngSize(onDisk);
+            check(`${rel}: the declared og:image size is the file's real size`,
+                real !== null && Number(declaredW) === real.w && Number(declaredH) === real.h,
+                real === null
+                    ? `${path.basename(onDisk)} has no readable PNG header`
+                    : `declares ${declaredW}x${declaredH}, file is ${real.w}x${real.h}`);
+        });
+    }
+
     /* The catalog-empty message names the card count. It said 17 against
        eighteen cards until August 22, 2026, because adding a card does not
        force anyone to touch that sentence. */
@@ -686,14 +776,52 @@ function tempDir(prefix) {
     return dir;
 }
 
-function cleanTempDirs() {
+async function cleanTempDirs() {
+    /* The delay between attempts has to be a real one, and this is the second
+       attempt at that.
+
+       taskkill returns as soon as it has SIGNALLED the tree, not once Windows
+       has released the handles, so a browser profile is still locked for
+       around a second after close(). The first version of this passed
+       `{ maxRetries: 3 }` and swallowed the failure, so it silently did
+       nothing: measured after a full run, every `tb-verify-` and
+       `tb-baseline-` directory the run had created was still on disk, 87 of
+       them accumulated.
+
+       Adding `retryDelay` did NOT fix it, which is worth writing down because
+       it is the obvious fix and it looks right. Both forms were measured
+       against the suite's own sequence -- spawn headless Chrome on a fresh
+       profile, taskkill /T /F, remove:
+
+         maxRetries: 3                    removed=false  8ms   EPERM
+         maxRetries: 10, retryDelay: 500  removed=false  8ms   EPERM
+         manual loop, 250ms between       removed=TRUE   1079ms  2 attempts
+
+       Both rmSync forms returned in 8ms, so the retry never waited at all --
+       whatever `retryDelay` governs, it is not this EPERM. A loop that
+       actually awaits between attempts succeeds on the second one.
+
+       Still best-effort, and now it SAYS so when it fails rather than
+       returning quietly, because a silent best-effort is indistinguishable
+       from a broken one -- which is exactly how this went unnoticed. */
+    const remaining = [];
     while (TEMP_DIRS.length) {
         const dir = TEMP_DIRS.pop();
-        try {
-            fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
-        } catch (err) {
-            /* Still locked, or already gone. Neither is worth a failure. */
+        let removed = false;
+        let lastErr = null;
+        for (let i = 0; i < 12 && !removed; i += 1) {
+            try {
+                fs.rmSync(dir, { recursive: true, force: true });
+                removed = !fs.existsSync(dir);
+            } catch (err) {
+                lastErr = err.code || err.message;
+            }
+            if (!removed) { await new Promise((r) => setTimeout(r, 250)); }
         }
+        if (!removed) { remaining.push(`${path.basename(dir)} (${lastErr})`); }
+    }
+    if (remaining.length) {
+        console.log(`      NOTE could not remove ${remaining.length} temp dir(s): ${remaining.join(", ")}`);
     }
 }
 
@@ -813,14 +941,22 @@ async function connect(browserPath, cdpPort, options) {
        What replaced it is stronger, not weaker, because `complete` was never
        what this suite needs:
 
-         - `readyState !== "loading"` means the document is parsed and every
-           deferred script has RUN. Per spec the state flips to "interactive"
-           and DOMContentLoaded fires in the same task, so a poll that
-           observes "interactive" from a later turn has necessarily missed
-           neither -- which matters because js/ads.js mounts every band from
-           its DOMContentLoaded listener, and mountPlacement writes its
-           srcdoc iframes synchronously. Nothing this suite measures depends
-           on a cross-origin ad iframe finishing.
+         - Readiness is DOMContentLoaded having fired, read retroactively
+           from PerformanceNavigationTiming, not `readyState`.
+
+           An earlier version of this comment claimed `readyState !==
+           "loading"` meant "the document is parsed and every deferred script
+           has RUN". That is FALSE, and it shipped a real failure. The spec's
+           "stop parsing" algorithm sets the state to "interactive" and only
+           THEN executes the deferred scripts, firing DOMContentLoaded after
+           them. On a page that defers a slow third-party script -- which
+           resume.html does, for jsPDF -- "interactive" arrives long before
+           js/ads.js's DOMContentLoaded listener has mounted anything.
+
+           What is true is the part that matters: DOMContentLoaded does not
+           wait for the load event, so nothing here waits on a cross-origin
+           ad iframe. mountPlacement writes its srcdoc iframes synchronously,
+           so once that listener has run the bands are in the DOM.
 
          - Readiness is then not treated as stillness. The page is polled
            until its layout fingerprint stops changing, which is the "poll
@@ -935,12 +1071,40 @@ async function connect(browserPath, cdpPort, options) {
                 state = await evaluate(`(() => ({
                     path: location.pathname,
                     ready: document.readyState,
+                    /* DOMContentLoaded has FIRED, asked retroactively.
+
+                       readyState is not this signal and the difference is not
+                       academic. Per the HTML spec's "stop parsing" steps the
+                       state is set to "interactive" BEFORE the deferred
+                       scripts run, and DOMContentLoaded is fired after them --
+                       so "interactive" means the parser finished, not that the
+                       document is ready. resume.html defers jsPDF from a CDN,
+                       and js/ads.js mounts every band from its
+                       DOMContentLoaded listener, so on a slow network the poll
+                       released while the deferred script was still downloading
+                       and the snapshot found no ad band at all. Measured on a
+                       degraded connection here: jsPDF took 6.7s, and every
+                       width of resume.html reported "got 0 -- rail=false
+                       leaderboard=false anchor=false" on a page whose markup
+                       and script tag were correct and untouched.
+
+                       domContentLoadedEventEnd stays 0 until the event's
+                       handlers have finished, and it is readable at any time
+                       afterwards, which is what makes it usable from a poll
+                       that may arrive late. It does NOT wait for the load
+                       event, so the ad-iframe cost that this whole change
+                       exists to avoid is still avoided. */
+                    domReady: (() => {
+                        const nav = performance.getEntriesByType('navigation')[0];
+                        return !!(nav && nav.domContentLoadedEventEnd > 0);
+                    })(),
                     adsReady: ${adsBlocked} ||
                               !document.querySelector('script[src*="js/ads.js"]') ||
                               typeof TBAds !== 'undefined'
                 }))()`);
             } catch (e) { continue; }
-            if (!state || state.path !== expected || state.ready === "loading" || !state.adsReady) {
+            if (!state || state.path !== expected || state.ready === "loading" ||
+                    !state.domReady || !state.adsReady) {
                 continue;
             }
             return await quiesce(url, width);
@@ -973,8 +1137,53 @@ async function connect(browserPath, cdpPort, options) {
         throw new Error("navigation to " + url + " did not settle within 20s, twice");
     };
 
+    /* Read an expression once IT has stopped changing, rather than once the
+       page has.
+
+       QUIESCE above is a page-wide approximation, and a good one: the scroll
+       box, the ad reservation, the mounted slot count, main's height and the
+       font status catch almost everything. It cannot catch everything, and
+       resume.html is the case that proves it. Its preview pane grows from
+       535.6px to its 788px cap when the descriptor engine finishes its first
+       paint -- but that pane is far shorter than the 5300px editor pane
+       beside it, so main's height never moves. Every generic measure says the
+       page is still while the exact box section 4 compares is still growing,
+       and the comparison then reports 535.6 against a settled 788 on a file
+       nobody touched.
+
+       So a comparison settles on its OWN snapshot. This is what
+       PROJECT_STATUS.md prescribed in the first place -- "poll for the
+       specific elements each comparison measures" -- and the generic
+       fingerprint is the cheap approximation layered under it, not a
+       replacement for it.
+
+       It cannot mask a real change: a genuine layout difference is stable in
+       both trees, so both sides settle and the difference is still reported.
+       What it removes is the case where one side settles and the other is
+       caught mid-paint. */
+    const settled = async (expression, label) => {
+        const deadline = Date.now() + 8000;
+        let last = null;
+        let matches = 0;
+        let value = null;
+        while (Date.now() < deadline) {
+            value = await evaluate(expression);
+            const key = JSON.stringify(value);
+            if (key === last) {
+                matches += 1;
+                if (matches >= 2) { return value; }
+            } else {
+                matches = 0;
+            }
+            last = key;
+            await new Promise((r) => setTimeout(r, 100));
+        }
+        console.log(`      UNSETTLED ${label} still changing after 8s; comparing anyway`);
+        return value;
+    };
+
     return {
-        call, sessionId, navigate, evaluate,
+        call, sessionId, navigate, evaluate, settled,
         /* killTree, not proc.kill(): a headless browser is the root of a
            process tree, and the renderers it leaves behind are what make the
            NEXT run's navigations slow enough to hit the 20s deadline. */
@@ -2036,12 +2245,40 @@ async function mockupChecks(page) {
     })()`);
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     const modelBg = await page.evaluate(`(async () => {
-        for (let i = 0; i < 80; i += 1) {
-            const label = document.getElementById('mockup-canvas').getAttribute('aria-label');
-            if (label && label.indexOf('White T-Shirt on Model') === 0) { break; }
-            await new Promise(r => setTimeout(r, 100));
-        }
+        /* Wait for the ASSETS, not for the label.
+
+           The aria-label comes from the template config and is set the moment
+           the preset is selected, while the seven bitmaps behind it are still
+           decoding. Until they land, render() takes its not-ready branch and
+           paints a 1000x1000 #F4F3EF placeholder over the whole canvas -- so
+           a corner sampled in that window reads opaque cream, and the
+           "before" half of the assertion below fails while the feature it is
+           testing works perfectly. Measured: before "244,243,239,255" against
+           an expected "0,0,0,0", with the "after" value exactly right.
+
+           The ready branch sizes the canvas to the base image's natural
+           dimensions, so 1024x1536 IS the readiness signal here -- and it is
+           the same fact the next check asserts, which is why it needs no
+           cooperation from mockup.js.
+
+           This surfaced when navigation stopped waiting on
+           readyState === "complete" (September 3, 2026). That wait had been
+           covering these decodes incidentally: mockup.js starts them during
+           load, and an image request started before the load event delays it.
+           Nothing in the editor regressed -- this check never had a wait of
+           its own and had been living off one that was never meant for it.
+           Worth remembering as the general shape: removing an over-broad
+           wait does not break the pages, it exposes every check that was
+           quietly leaning on it. */
         const canvas = document.getElementById('mockup-canvas');
+        let waited = 0;
+        for (let i = 0; i < 150; i += 1) {
+            const label = canvas.getAttribute('aria-label') || '';
+            if (label.indexOf('White T-Shirt on Model') === 0 &&
+                canvas.width === 1024 && canvas.height === 1536) { break; }
+            await new Promise(r => setTimeout(r, 100));
+            waited = i + 1;
+        }
         const corner = () => ${CORNER};
         const before = corner();
         document.getElementById('m-bg-trigger').click();
@@ -2053,6 +2290,9 @@ async function mockupChecks(page) {
             label: canvas.getAttribute('aria-label'),
             native: canvas.width + 'x' + canvas.height,
             hidden: document.getElementById('m-bg-field').hidden,
+            /* Reported so a future failure says whether the wait ran out
+               rather than leaving the next person to guess. */
+            waitedMs: waited * 100,
             before: before, after: corner()
         };
     })()`);
@@ -2896,9 +3136,9 @@ async function parityChecks(browserPath) {
             }
             for (const width of WIDTHS) {
                 await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
-                const now = await page.evaluate(PARITY_SNAPSHOT);
+                const now = await page.settled(PARITY_SNAPSHOT, `${name} @${width} working tree`);
                 await page.navigate(`http://localhost:${BASELINE_PORT}${urlPath}`, width);
-                const head = await page.evaluate(PARITY_SNAPSHOT);
+                const head = await page.settled(PARITY_SNAPSHOT, `${name} @${width} HEAD`);
                 Object.keys(now).forEach((key) => {
                     comparisons += 1;
                     if (JSON.stringify(now[key]) !== JSON.stringify(head[key])) {
@@ -2961,7 +3201,7 @@ async function main() {
         }
     }
 
-    cleanTempDirs();
+    await cleanTempDirs();
 
     console.log(`\n${passed} passed, ${failures.length} failed`);
     if (failures.length) {
@@ -2974,8 +3214,8 @@ async function main() {
 /* A crash must not leave a browser, a server or a profile directory behind:
    the whole point of the tree-kill above is that the NEXT run starts on a
    quiet machine, and the run most likely to leak is the one that failed. */
-main().catch((err) => {
-    cleanTempDirs();
+main().catch(async (err) => {
+    await cleanTempDirs();
     console.error("\n" + err.stack);
     process.exit(1);
 });
