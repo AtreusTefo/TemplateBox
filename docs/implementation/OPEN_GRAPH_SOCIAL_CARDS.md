@@ -86,16 +86,44 @@ and should. A logo is what that field is for; a social card is not.
    `doc` (one of `none`, `invoice`, `receipt`, `notice`, `resume`, `poster`, `tee`), `title`,
    `sub`. Each preset carries its own filename so the whole set can be produced by stepping
    through the list.
-2. Open the tool, pick the preset, click Download PNG, save into `site/assets/`. The tool waits
-   on `document.fonts.ready` before its first paint; if it drew before the webfonts landed it
-   would measure Georgia while painting Playfair, so a machine that cannot reach
-   `fonts.googleapis.com` cannot produce a correct card and should not try.
+2. Run `node tools/make-og-cards.js` from the repository root, which writes every card
+   including the new one. (By hand: open the tool, pick the preset, click Download PNG, save
+   into `site/assets/`.) Either way the tool waits on `document.fonts.ready` before its first
+   paint; if it drew before the webfonts landed it would measure Georgia while painting
+   Playfair, so a machine that cannot reach `fonts.googleapis.com` cannot produce a correct
+   card and should not try — the script refuses outright rather than writing ten wrong ones.
 3. Point the page's `og:image` and `twitter:image` at it and declare 1200x630.
 4. `node tests/verify-layout.js --quick`. Check 1l will fail if the file is not there, if the
    two tags disagree, or if the declared size is not the file's real size.
 
-The whole set can also be rendered headlessly by driving the tool over the DevTools Protocol
-and reading `canvas.toDataURL`, which is how the current set was made.
+The whole set is rendered by `tools/make-og-cards.js`, run from the repository root:
+
+```
+node tools/make-og-cards.js
+```
+
+It drives `site/tools/og-image.html` itself over the DevTools Protocol and reads
+`canvas.toDataURL`, rather than reimplementing the drawing code, so a card it produces is what
+a person gets by opening the tool and clicking Download PNG — there is no second copy of the
+artwork to drift. No npm dependencies; it finds a browser already on the machine.
+
+**It lives at the repository root, not in `site/tools/` beside the page it drives.** `site/` is
+the Netlify publish directory and therefore the web root, so a script placed there would be a
+public URL (`INTERNAL_FILES_PUBLICLY_SERVED.md`). The two `tools/` directories are opposites:
+`site/tools/` is browser pages that ship, the root's is working files that must not.
+
+Two things it does deliberately. It **refuses to write anything** if Playfair Display or Inter
+did not load, because the tool measures the real face while painting whatever is available, and
+a fallback-face card looks fine in isolation and only reveals itself once it is being shared.
+And it **prints the browser build** it used — `Chrome/152.0.7977.66` for the current set —
+because that build is the provenance of the whole set, and a run that rewrites every card
+should be explainable from the log rather than guessed at from the diff.
+
+It prefers the installed system Chrome over a cached Playwright chromium, which is the opposite
+order to `tests/verify-layout.js`. The suite wants the most pinned browser it can find for
+stable measurements; this wants the browser a person actually uses, since that equivalence is
+the whole point. Copying the suite's list verbatim got this wrong once and silently re-rendered
+the committed set with a different binary.
 
 **Regenerate the whole set, not part of it.** The output is deterministic given the tool and
 the browser: re-running the generator returns every card produced by the same Chrome build
