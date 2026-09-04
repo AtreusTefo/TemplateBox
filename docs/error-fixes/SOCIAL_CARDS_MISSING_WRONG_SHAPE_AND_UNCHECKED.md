@@ -59,12 +59,20 @@ written for third-party images and silently swallowed the entire social-card sur
 real tool over the DevTools Protocol rather than by reimplementing its drawing code, so they
 come off the same path as the originals.
 
-The three existing cards were regenerated too, compared against the committed files, and then
-**discarded in favour of the originals**. The re-renders differed: 39,000-40,000 of 3,024,000
-channels, maximum channel delta 27-58 of 255 — glyph-edge antialiasing from a newer Chrome,
-not different content or positions. Replacing three verified, deployed assets to gain nothing
-visible is churn, so `git checkout` put them back. The measurement is the point: without it the
-choice would have been a guess.
+The three existing cards were regenerated too. They were first kept rather than replaced, on
+the grounds that the re-renders differed only in glyph-edge antialiasing — 39,183-40,329 of
+3,024,000 channels at a maximum delta of 27-58 of 255, no difference in content or position —
+so swapping three verified, deployed assets bought nothing visible. **That was then reversed
+at the owner's instruction: all ten cards are rendered on one Chrome build.** Both readings are
+defensible and the deciding argument is not the pixels. A set produced by two different browser
+versions is a set whose provenance has to be explained every time someone regenerates part of
+it; a set from one build is reproducible, and the run that proved it is the evidence below.
+
+The regeneration is deterministic, which is what makes the uniform set worth having. Re-running
+the generator returned the **seven cards drawn earlier the same day byte-identical** — same
+`git hash-object` — and changed only the three from July. So the generator's output is a
+function of the tool plus the Chrome build, with nothing ambient in it. Chrome 152.0.7977.66
+produced the current set.
 
 **A collision in the invoice illustration.** `drawInvoice` places "BALANCE DUE" left-aligned
 from the total rule's start and the amount right-aligned at its end, on the same baseline, so
@@ -147,8 +155,8 @@ is wrong.
 
 - `site/assets/og-cover.png`, `og-payment-receipt.png`, `og-itemized-receipt.png`,
   `og-sales-receipt.png`, `og-invoice.png`, `og-mockup.png`, `og-poster.png` — new
-- `site/assets/og-resume.png`, `og-rent-receipt.png`, `og-warning-notice.png` — unchanged,
-  deliberately
+- `site/assets/og-resume.png`, `og-rent-receipt.png`, `og-warning-notice.png` — re-rendered
+  so the whole set comes off one Chrome build (152.0.7977.66)
 - `site/tools/og-image.html` — the balance-row collision fix
 - `site/js/admin.js` — post-generator fallback and its conditional size declaration
 - Nineteen pages under `site/` and `site/blog/` — `og:image`, `og:image:width`,

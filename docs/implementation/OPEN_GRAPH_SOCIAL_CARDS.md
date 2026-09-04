@@ -95,11 +95,21 @@ and should. A logo is what that field is for; a social card is not.
    two tags disagree, or if the declared size is not the file's real size.
 
 The whole set can also be rendered headlessly by driving the tool over the DevTools Protocol
-and reading `canvas.toDataURL`, which is how the seven new cards were made. Note that a
-re-render on a different Chrome is not byte-identical to an older one: the three pre-existing
-cards came back with 39,000-40,000 of 3,024,000 channels differing at a maximum delta of 27-58
-out of 255, which is glyph-edge antialiasing and nothing else. They were kept rather than
-replaced. Measure before deciding that a re-render is an improvement.
+and reading `canvas.toDataURL`, which is how the current set was made.
+
+**Regenerate the whole set, not part of it.** The output is deterministic given the tool and
+the browser: re-running the generator returns every card produced by the same Chrome build
+byte-identical, verified by `git hash-object`. Across builds it does not — the three cards
+drawn in July came back with 39,183-40,329 of 3,024,000 channels differing at a maximum delta
+of 27-58 out of 255, which is glyph-edge antialiasing and nothing else, no difference in
+content or position. That is invisible in use, so it is not a quality argument either way; the
+reason to regenerate together is provenance. A set built from two browser versions has to have
+that explained every time someone touches part of it, and the explanation is not in the files.
+All ten currently come from **Chrome 152.0.7977.66**.
+
+If a single card ever does need regenerating alone, run the whole set and check with
+`git status` that only the intended file moved. Any other card changing means the browser has
+been updated, and the set should be regenerated and committed as one.
 
 ## The invoice illustration's total row
 
