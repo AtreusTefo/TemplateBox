@@ -71,7 +71,8 @@
                a dye washes dark colours out (navy measured (140,146,159), a
                pale blue-grey, before this map existed).
      garmentColors
-               Palette keyed like the vector products' `colors`. Declaring it
+               Palette keyed the way the retired vector products' `colors`
+               were. Declaring it
                AND `garment` is what turns the colour field on for a
                photographic template; either alone leaves it hidden. Mark the
                entry representing the garment as photographed with
@@ -109,9 +110,12 @@
                rather than detected: wood-a4's base is transparent inside its
                print window (that transparency IS the mask the artwork shows
                through), so an alpha test would qualify it and paint the
-               chosen colour behind the poster. The four drawn products are
-               always eligible and need no flag. Not related to `backing`,
-               the white paper behind artwork inside a frame's window.
+               chosen colour behind the poster. The drawn products were
+               always eligible and needed no flag; the last of them, `mug`,
+               was retired on September 5, 2026, so every product reaching
+               this key is now photographic and must declare it. Not related
+               to `backing`, the white paper behind artwork inside a frame's
+               window.
 
    Adding a template: tools/mockup-admin.html does the whole job. Load the
    base photograph and it will suggest a chest print zone from the garment's
@@ -1448,6 +1452,87 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 850, y: 269 },
             { x: 850, y: 1068 },
             { x: 271, y: 1068 }
+        ]
+    },
+    {
+        /* The second interior frame, and the one that replaced the drawn mug --
+           the catalog's LAST vector product, so this is the entry that ended
+           the drawn era. See js/mockup.js for what that cost.
+
+           It is not a duplicate of `frame-black-interior`. That one LEANS on a
+           floor against dark green brick; this one HANGS on a pale wall over a
+           light oak console. The pair is the same trade as the two paper bags
+           and the two banners: one moody, one bright.
+
+           What makes it worth having beyond the styling is that it is
+           genuinely square-on. The interior frame is photographed in slight
+           perspective, so its aperture is a TRAPEZOID (279..843 at the top,
+           273..849 at the bottom) while a print zone must stay an axis-aligned
+           rectangle -- which cost it 6,341px of artwork bleeding onto the
+           black border and a 2,379KB occlusion overlay to hide. This frame was
+           specified square-on for exactly that reason and came back square-on:
+           its outer edges sit at a constant x=204 and x=919, y=62 and y=1059
+           in every profile, and the mat's opening was fitted at
+
+             left   x 279.59  sd 0.088   slope -0.000129
+             right  x 860.36  sd 0.339   slope -0.000062
+             top    y 143.72  sd 0.161   slope +0.000330
+             bottom y 996.54  sd 0.462   slope -0.000013
+
+           Sub-half-pixel scatter and slopes at the fourth decimal: a real
+           rectangle, so NO overlay, no overhang, and the full shading pass. */
+        id: "frame-black-shelf",
+        title: "Framed Poster over a Shelf",
+        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-shelf/frame-black-shelf-thumb.jpg",
+        /* 1122x1402 -- 0.8003, which is 4:5 to within 0.03%, so the catalog
+           card is a straight downscale with no crop. */
+        base: "assets/mockups/print/posters-and-frames/frame-black-shelf/frame-black-shelf-base.png",
+        overlay: null,
+        /* THE MAP EXISTS TO OPEN THE GATE, and barely more than that.
+           `paintDesign` only enters the displacement pass when `assets.displace`
+           is present, and `shade` is applied inside that pass -- so without a
+           displace map the shading never runs at all. The interior frame ships
+           one for the same reason and says so.
+
+           Nothing here needs displacing: a matted print behind a rigid frame
+           is the flattest print surface measured in this catalog, with a
+           zone/global Sobel ratio of 0.031 against the angled banner's 0.047
+           and the held bag's 0.041. Inside the zone the map measures p50 3.16
+           out of 127, so at strength 2 the interior moves 0.05px. */
+        displace: "assets/mockups/print/posters-and-frames/frame-black-shelf/frame-black-shelf-displace.png",
+        shade: "assets/mockups/print/posters-and-frames/frame-black-shelf/frame-black-shelf-shade.png",
+        /* NO `light`, and this was tested rather than assumed, because the
+           held bag's light map survived a very similar argument.
+
+           Specular headroom is 4.7 luma levels, which the map then normalises
+           across the full 0-255 range -- so one level of sensor noise becomes
+           54. Two measurements settle it. Screened onto a flat #808080 fill at
+           the shared gain of 0.3 it gives sd 9.35 and a p1-p99 spread of 37.9,
+           against sd 1.46 and a spread of 4 with shading alone; the interior
+           frame measured sd 9.35 on a headroom of 3.4 and dropped it for the
+           same reason. And the map has NO spatial structure to justify the
+           noise: its mean is 39.3 in the 8px band at the zone's edge and 39.4
+           across the interior, with a local sd of 17.6. The shade map, for
+           contrast, reads 249 at the edge against 254.1 inside with a local sd
+           of 0.238 -- coherent, which is what a real surface looks like. */
+        displaceStrength: 2,
+        mode: "surface",
+        backing: null,
+        /* NO `background`: the room is the scene and every pixel is opaque, so
+           there is nothing behind the photograph for a colour to show through. */
+        /* A poster fills its frame, whatever shape the artwork is. */
+        designScale: "cover",
+        /* The mat's opening, rounded INWARD from the fitted edges so artwork
+           never lands on the mat: 580x852. The bevel shadow along the opening
+           falls inside the zone deliberately -- it is a shadow cast ON the
+           print, not the edge of it, and `shade` reproduces it over the
+           artwork, which is what makes the print sit behind the mat rather
+           than on top of it. */
+        warpZone: [
+            { x: 280, y: 144 },
+            { x: 860, y: 144 },
+            { x: 860, y: 996 },
+            { x: 280, y: 996 }
         ]
     },
     {

@@ -1,8 +1,7 @@
 /* ==========================================================================
    TemplateBox - Product Mockup Generator Core Logic
-   Responsibilities: strict client-side image mime-type validation, flat
-   vector product illustrations composed on HTML5 Canvas (t-shirt, hoodie,
-   mug, packaging box), photographic mockup templates composited with the
+   Responsibilities: strict client-side image mime-type validation,
+   photographic mockup templates composited with the
    three-layer "Sandwich Method" (scene photograph, warped/placed design,
    shadow-and-glare overlay), an ORDERED STACK of design layers each with its
    own position, size, rotation and visibility, direct manipulation of the
@@ -24,10 +23,14 @@
        stops a template declaring fewer; layerZone() clamps to the real count. */
     const MAX_ZONES = 8;
 
-    /* Internal resolution for the vector products: the visible element
-       scales via CSS while exports render at full 1000 x 1000 quality.
-       Photographic templates instead resize the canvas to the base
-       photograph's native dimensions so exports keep the photo's quality. */
+    /* This WAS the internal resolution of the vector products, and they are
+       all retired. Two uses keep it alive and neither is about drawn products:
+       the loading placeholder sizes the canvas to it before a base photograph
+       has arrived, and the upload prompt scales its dashed border and type by
+       `canvas.width / CANVAS_W` so the chrome is the same visual size on a
+       1024px base as on a 2048px one. A photographic template otherwise
+       resizes the canvas to its base photograph's native dimensions, so
+       exports keep the photo's quality. */
     const CANVAS_W = 1000;
     const CANVAS_H = 1000;
 
@@ -78,85 +81,34 @@
        into.
        ---------------------------------------------------------------------- */
 
-    /* `drawTshirtBody` and `drawHoodieBody` stood here until September 3,
-       2026. Both drawn apparel products are photographs now --
-       `tshirt-hanger-white` and `hoodie-hanger-white` -- and the shapes went
-       with them. The tee's outline had outlived its own product by a day:
-       it survived the drawn tee's retirement only because the drawn hoodie
-       drew itself on top of it, so retiring the hoodie is what finally made
-       it dead code. `mug` and `box` are the drawn products that remain. */
+    /* Every drawn product's shape stood here once. `drawTshirtBody` and
+       `drawHoodieBody` went on September 3, 2026, `drawBoxBody` with them,
+       and `drawMugBody` on September 5 when the drawn `mug` became the
+       photographic `frame-black-shelf`. THERE ARE NO DRAWN PRODUCTS LEFT,
+       so `roundRectPath` above now serves only the selection chrome and the
+       upload prompt.
 
-    function drawMugBody(context, hex, outline) {
-        context.save();
+       Retiring the mug meant answering the question the previous three
+       retirements could dodge, because each of them still left a drawn
+       product for the editor to fall back to. The claim that stood here was
+       that a fallback "has to paint immediately, and a photographic template
+       cannot until seven maps have downloaded". That is only half true:
+       drawPhoto() has always had a loading state, and it paints on the first
+       frame. What a cold start loses is a finished product for the fraction
+       of a second before the base image arrives -- it now shows the same
+       "Loading mockup template..." panel a template switch has always
+       shown, which is a far smaller cost than keeping a vector mug in a
+       catalog of photographs for it. */
 
-        /* Handle, drawn first so the body seam sits cleanly on top of it.
-           The angle range deliberately overshoots 90 degrees on each side so
-           both ends land to the left of the body's right edge (x = 700) and
-           are hidden underneath it, instead of floating disconnected. */
-        context.beginPath();
-        context.arc(700, 560, 150, -1.9, 1.9);
-        context.lineWidth = 55;
-        context.strokeStyle = hex;
-        context.stroke();
-        context.lineWidth = 6;
-        context.strokeStyle = outline;
-        context.stroke();
+    /* Empty, and that is the whole story of September 2-5, 2026: `tshirt`,
+       `hoodie`, `box` and finally `mug` were all replaced by photographs.
+       Every product the editor offers now comes from the registry below.
 
-        /* Body */
-        context.fillStyle = hex;
-        context.strokeStyle = outline;
-        context.lineWidth = 6;
-        roundRectPath(context, 300, 320, 400, 480, 18);
-        context.fill();
-        context.stroke();
-
-        /* Base shadow band */
-        context.globalAlpha = 0.12;
-        context.beginPath();
-        context.ellipse(500, 780, 190, 16, 0, 0, Math.PI, false);
-        context.fillStyle = outline;
-        context.fill();
-        context.globalAlpha = 1;
-
-        /* Rim opening */
-        context.beginPath();
-        context.ellipse(500, 320, 200, 40, 0, 0, Math.PI * 2);
-        context.fillStyle = outline;
-        context.fill();
-        context.beginPath();
-        context.ellipse(500, 314, 188, 32, 0, 0, Math.PI * 2);
-        context.fillStyle = hex;
-        context.fill();
-        context.lineWidth = 4;
-        context.strokeStyle = outline;
-        context.stroke();
-        context.restore();
-    }
-
-    /* `drawBoxBody` stood here until September 3, 2026, when the drawn
-       `box` became the photographic `bag-paper-held`. That was the last of
-       the three drawn products the catalog started with; `mug` is the only
-       one left, and it is what the editor falls back to. */
-
-
-    /* One drawn product left. `tshirt` went on September 2, 2026 and `hoodie`
-       and `box` on September 3, replaced by `tshirt-hanger-white`,
-       `hoodie-hanger-white` and `bag-paper-held`. `mug` stays, and not only
-       for its own sake: the editor's fallback has to paint immediately, and a
-       photographic template cannot until seven maps have downloaded. Retiring
-       this one too would mean finding another answer for that. */
-    const PRODUCTS = {
-        mug: {
-            label: "Mug",
-            printArea: { x: 340, y: 400, w: 320, h: 300 },
-            drawBase: drawMugBody,
-            colors: {
-                white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" },
-                black: { name: "Black", hex: "#1A1A1A", outline: "#000000" },
-                red: { name: "Red", hex: "#B5352E", outline: "#8F2A24" }
-            }
-        }
-    };
+       The object stays rather than being deleted because the registry loop
+       writes into it and the guard against an id colliding with a drawn
+       product is still the right check -- it simply has nothing to collide
+       with today. */
+    const PRODUCTS = {};
 
     /* ----------------------------------------------------------------------
        Photographic mockup templates ("Sandwich Method").
@@ -796,7 +748,22 @@
        a real composition never needs this many. */
     const MAX_LAYERS = 12;
 
-    let currentProduct = "mug";
+    /* A named default WITH a backstop, and both halves are deliberate.
+
+       A bare literal is what dangled at every retirement -- this line has read
+       `tshirt`, then `hoodie`, then `mug` -- so the fallback behind it is what
+       stops that happening a fourth time. The name in front of it is not
+       arbitrary either: the first registry entry is `wood-a4`, a leaning
+       frame with no colourways, and defaulting to it hides the editor's colour
+       controls from anyone arriving without a preset. `tshirt-model-white` is
+       the archetypal print-on-demand product, declares both `garment` and
+       `garmentColors`, and is `background: true`, so the default view shows
+       the full set of controls the way the drawn mug's did. */
+    const DEFAULT_PRODUCT = PRODUCTS["tshirt-model-white"]
+        ? "tshirt-model-white"
+        : Object.keys(PRODUCTS)[0] || "";
+
+    let currentProduct = DEFAULT_PRODUCT;
     let currentColor = "black";
     let customHex = "#FFFFFF";
     /* The canvas background, or null for transparent -- which is the default
@@ -1000,26 +967,25 @@
            leave a stale transform behind for a pointer to fall through. */
         zoneWarp = [];
         zoneUnwarp = [];
-        const product = PRODUCTS[currentProduct] ? currentProduct : "mug";
-        currentProduct = product;
+        const product = PRODUCTS[currentProduct] ? currentProduct : DEFAULT_PRODUCT;
+        currentProduct = product || "";
         const config = PRODUCTS[currentProduct];
 
-        if (config.type === "photo") {
-            drawPhoto(config);
+        /* No products at all means the registry script failed to load, which
+           is the one case this cannot paint through. Leaving the canvas as it
+           was beats throwing on `config.type` and taking the rest of the
+           editor's setup down with it. */
+        if (!config) {
             return;
         }
 
-        if (canvas.width !== CANVAS_W || canvas.height !== CANVAS_H) {
-            canvas.width = CANVAS_W;
-            canvas.height = CANVAS_H;
-        }
-
-        const color = activeColor(config);
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        paintBackground();
-        config.drawBase(ctx, color.hex, color.outline);
-        drawLayersInArea(config.printArea, 16);
+        /* Every product is photographic now, so there is no longer a branch to
+           choose between. The drawn path stood here until September 5, 2026 --
+           canvas resized to CANVAS_W x CANVAS_H, `config.drawBase`, then
+           `drawLayersInArea` over a fixed `printArea` -- and went with `mug`.
+           Re-adding a drawn product means restoring those four lines and a
+           `config.type === "photo"` test in front of this call. */
+        drawPhoto(config);
     }
 
     /* Publishes the canvas's real aspect ratio to CSS, which uses it to bound

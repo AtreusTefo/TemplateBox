@@ -2024,6 +2024,34 @@ async function launchChecks(page) {
    background and nothing else.
    ========================================================================== */
 
+/* A canvas reading of DYED garment fabric against the colour that was asked
+   for.
+
+   These comparisons were byte-exact until September 5, 2026, and could be: the
+   editor's default was a drawn product whose fabric is a flat fill, so a
+   recoloured pixel WAS the hex. With no drawn products left the default is
+   `tshirt-model-white`, dyed through its `tone` map -- the garment's diffuse
+   response normalised to its own peak, which can only darken -- so the reading
+   sits a shade under the request. Measured at the sample point:
+
+     #123456 -> 18,51,84   (asked 18,52,86)   delta 0,1,2
+     #B5352E -> 177,52,45  (asked 181,53,46)  delta 4,1,1
+     #1F2A44 -> 31,41,67   (asked 31,42,68)   delta 0,1,1
+
+   So the tolerance is 5: one level above the worst modulation measured, and an
+   order of magnitude below what a real break shows -- a colourway that fails to
+   reach the garment leaves it at 244,244,249, which is 60 to 226 levels out. */
+const DYE_TOLERANCE = 5;
+
+function dyedAs(pixel, hex) {
+    const m = /^#(..)(..)(..)$/.exec(hex);
+    if (!m || typeof pixel !== "string") { return false; }
+    const want = [1, 2, 3].map((i) => parseInt(m[i], 16));
+    const got = pixel.split(",").map(Number);
+    return got.length === 4 && got[3] >= 250 &&
+        want.every((v, i) => Math.abs(got[i] - v) <= DYE_TOLERANCE);
+}
+
 async function mockupChecks(page) {
     section("5. Mockup editor: background colour");
 
@@ -2036,20 +2064,34 @@ async function mockupChecks(page) {
        Mockups dropdown item, which WRITES tb_editor_preset and then navigates
        to the interstitial, where the run stops. The preset is consumed by the
        next mockup.html load, so without this the checks below would open the
-       wood frame template instead of the default drawn t-shirt and report
+       wood frame template instead of the editor's default and report
        "no background panel" as a product failure. They did, once. */
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     await page.evaluate("localStorage.clear(), true");
 
-    /* A drawn product: eligible, because everything around the garment is
-       transparent and exports that way. */
+    /* The editor's default, which is `tshirt-model-white` since September 5,
+       2026. It is eligible for the same reason the drawn products were --
+       everything around the garment is transparent and exports that way --
+       but it gets there by being a CUT-OUT PHOTOGRAPH rather than by being
+       drawn, which is the only kind of eligible product left now that `mug`
+       is retired. Verified: the canvas corner reads 0,0,0,0 on load. */
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     /* Driven through the picker, not a swatch row: the background's quick
        picks were replaced by a hue strip on August 25, 2026 and Transparent
        moved INTO the preset grid, where it is the first button. That move is
        the load-bearing part of this check -- without it, choosing a colour
        would be a one-way door, and the editor's default state unreachable. */
+    /* Wait for the base photograph before reading a pixel, which a drawn
+       default never needed. drawPhoto()'s loading state fills the WHOLE canvas
+       with #F4F3EF at 1000x1000, so a corner read taken too early returns
+       244,243,239,255 and the "export stays transparent" check fails on a
+       placeholder. Readiness is the canvas reaching the base's native size. */
     const vector = await page.evaluate(`(async () => {
+        for (let i = 0; i < 80; i += 1) {
+            const c = document.getElementById('mockup-canvas');
+            if (c.width + 'x' + c.height === '1024x1536') { break; }
+            await new Promise(r => setTimeout(r, 100));
+        }
         const field = document.getElementById('m-bg-field');
         const trigger = document.getElementById('m-bg-trigger');
         if (!field || !trigger) { return { missing: true }; }
@@ -2083,7 +2125,7 @@ async function mockupChecks(page) {
         };
     })()`);
 
-    check("mockup: background panel offered on a drawn product",
+    check("mockup: background panel offered on a cut-out photographic garment",
         !vector.missing && vector.hidden === false, JSON.stringify(vector));
     check("mockup: no background by default, so the export stays transparent",
         vector.before === "0,0,0,0", `corner ${vector.before}`);
@@ -2106,7 +2148,7 @@ async function mockupChecks(page) {
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     const photo = await page.evaluate(`(async () => {
         localStorage.setItem('tb_editor_preset', JSON.stringify('wood-a4'));
-        localStorage.setItem('tb_mockup_v1', JSON.stringify({ product: 'mug', bg: '#FF0000' }));
+        localStorage.setItem('tb_mockup_v1', JSON.stringify({ product: 'banner-rollup-white', bg: '#FF0000' }));
         return true;
     })()`);
     if (photo) {
@@ -2136,13 +2178,20 @@ async function mockupChecks(page) {
     }
 
     /* The refactor that made one picker into two must not have cost the
-       product colourway path anything. Pixel (500, 300) is garment fabric on
-       the drawn t-shirt, above the print area.
+       product colourway path anything. Pixel (650, 520) is garment fabric on
+       `tshirt-model-white`, 28px above the print zone's top edge at y=548.
+
+       It was (500, 300) until September 5, 2026, chosen for the drawn tee's
+       1000x1000 canvas. On the model photograph's 1024x1536 that point is the
+       model's SKIN -- it measured 156,101,79 -- so the check was reading a
+       face and calling it fabric. The new point measures 244,244,249 and goes
+       to 18,51,84 under a #123456 colourway, which is the literal hex the
+       check types.
 
        Storage is cleared first, and that is not housekeeping: the block above
        seeds a red background to prove it cannot reach a photographic
-       template, and a drawn product IS eligible for it, so without this the
-       corner assertion below would read that red and fail for the wrong
+       template, and the default product IS eligible for it, so without this
+       the corner assertion below would read that red and fail for the wrong
        reason. It did, on the first run. */
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     await page.evaluate("localStorage.clear(), true");
@@ -2150,7 +2199,7 @@ async function mockupChecks(page) {
     const colorway = await page.evaluate(`(async () => {
         const fabric = () => {
             const c = document.getElementById('mockup-canvas');
-            return [...c.getContext('2d').getImageData(500, 300, 1, 1).data].join(',');
+            return [...c.getContext('2d').getImageData(650, 520, 1, 1).data].join(',');
         };
         const before = fabric();
         document.getElementById('m-color-trigger').click();
@@ -2170,7 +2219,7 @@ async function mockupChecks(page) {
     })()`);
 
     check("mockup: the colourway picker still drives the garment",
-        colorway.opened && colorway.closed && colorway.typed === "18,52,86,255",
+        colorway.opened && colorway.closed && dyedAs(colorway.typed, "#123456"),
         JSON.stringify(colorway));
     check("mockup: a garment colour is not a background",
         colorway.corner === "0,0,0,0", `corner ${colorway.corner}`);
@@ -2192,7 +2241,17 @@ async function mockupChecks(page) {
        and what that rounds to is the picker's business; the contract is that
        the garment, the trigger's label and the thumb all agree on it, and
        that the hue actually rotated -- a cyan has both green and blue above
-       red, which #123456 does not. */
+       red, which #123456 does not.
+
+       "Agree" is within DYE_TOLERANCE per channel, not exactly equal, and
+       that changed on September 5, 2026 with the editor's default. A drawn
+       product's fabric was a FLAT fill, so the recoloured pixel was the
+       chosen hex to the bit. A photographic garment is dyed through its
+       `tone` map, which can only darken, so the pixel sits a shade under the
+       label: measured at this point, #123456 lands as 18,51,84 against a
+       label of 18,52,86 -- a delta of 0,-1,-2. The tolerance is the tone
+       map's modulation and nothing more; a real disagreement between the
+       three readings is tens of levels, not two. */
     const stripBox = await page.evaluate(`(() => {
         const el = document.getElementById('m-color-strip');
         el.scrollIntoView({ block: 'center' });
@@ -2208,7 +2267,7 @@ async function mockupChecks(page) {
     const strip = await page.evaluate(`(async () => {
         await new Promise(r => setTimeout(r, 250));
         const c = document.getElementById('mockup-canvas');
-        const px = [...c.getContext('2d').getImageData(500, 300, 1, 1).data];
+        const px = [...c.getContext('2d').getImageData(650, 520, 1, 1).data];
         const label = document.getElementById('m-color-hex').textContent.trim();
         const m = /^#(..)(..)(..)$/.exec(label);
         return {
@@ -2220,7 +2279,8 @@ async function mockupChecks(page) {
 
     check("mockup: the panel hue strip drives the garment and its own thumb",
         !!strip.labelRgb &&
-        strip.px.slice(0, 3).join(",") === strip.labelRgb.join(",") &&
+        strip.px.slice(0, 3).every((v, i) =>
+            Math.abs(v - strip.labelRgb[i]) <= DYE_TOLERANCE) &&
         strip.px[1] > strip.px[0] && strip.px[2] > strip.px[0] &&
         Math.abs(strip.thumb - 50) <= 4,
         JSON.stringify(strip));
@@ -2317,12 +2377,19 @@ async function mockupChecks(page) {
        ---------------------------------------------------------------------- */
     section("5c. Mockup editor: export panel and saved-mockups tab");
 
-    /* `mug`, not `tshirt` or `hoodie`: both drawn apparel products were
-       retired on September 2 and 3, 2026. What this pair is for is
-       drawn-vs-photographed canvas sizes, so any drawn product serves -- but it
-       has to be one that still exists, and after those two retirements only
-       `mug` and `box` do. */
-    for (const [doc, native] of [["mug", "1000x1000"], ["tshirt-model-white", "1024x1536"]]) {
+    /* Two PHOTOGRAPHIC templates now, and that is a change of premise rather
+       than of casting. This pair used to be drawn-versus-photographed --
+       `mug` at 1000x1000 against a photograph at its native size -- and every
+       previous retirement just recast the drawn half: `tshirt` to `hoodie` on
+       September 2, 2026, `hoodie` to `mug` on September 3.
+
+       On September 5 `mug` became `frame-black-shelf` and there is no drawn
+       product left to cast, so the pair is two photographs of DIFFERENT native
+       sizes instead. That still tests the thing this check is for -- that the
+       export sizes are read from the canvas rather than a hardcoded ladder --
+       and tests it slightly harder, because 1122x1402 and 1024x1536 differ in
+       both dimensions where 1000x1000 was square. */
+    for (const [doc, native] of [["frame-black-shelf", "1122x1402"], ["tshirt-model-white", "1024x1536"]]) {
         await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
         await page.evaluate(`(() => {
             localStorage.clear();
@@ -2428,10 +2495,11 @@ async function mockupChecks(page) {
         input.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise(r => setTimeout(r, 900));
 
-        /* Pixel (500, 300) is garment fabric, above the print area: the same
-           reading the colourway checks use. */
+        /* Pixel (650, 520) is garment fabric, above the print area: the same
+           reading the colourway checks use, and moved for the same reason --
+           (500, 300) is the model's skin on the photographic default. */
         const fabric = () => [...document.getElementById('mockup-canvas')
-            .getContext('2d').getImageData(500, 300, 1, 1).data].join(',');
+            .getContext('2d').getImageData(650, 520, 1, 1).data].join(',');
         const setHex = async (value) => {
             document.getElementById('m-color-trigger').click();
             const hex = document.getElementById('m-color-in-hex');
@@ -2536,7 +2604,7 @@ async function mockupChecks(page) {
         tray.count === "1" && tray.countShown && tray.captions === 0,
         JSON.stringify(tray));
     check("mockup: clicking a saved mockup restores it and shows the canvas",
-        tray.reopened.fabric === "181,53,46,255" && tray.reopened.scale === "75" &&
+        dyedAs(tray.reopened.fabric, "#B5352E") && tray.reopened.scale === "75" &&
         tray.reopened.label === "Red tee" && tray.reopened.previewShown &&
         tray.reopened.trayHiddenWhilePreviewing &&
         tray.reopened.active === 0 && tray.reopened.items === 2,
@@ -2557,8 +2625,8 @@ async function mockupChecks(page) {
        and the editor and every edit rewrites the mockup it came from, so the
        tab quietly becomes two copies of the current render. */
     check("mockup: editing a reopened mockup does not rewrite what was saved",
-        tray.backToB.fabric === "31,42,68,255" && tray.backToB.scale === "120" &&
-        tray.backToA.fabric === "181,53,46,255" && tray.backToA.scale === "75",
+        dyedAs(tray.backToB.fabric, "#1F2A44") && tray.backToB.scale === "120" &&
+        dyedAs(tray.backToA.fabric, "#B5352E") && tray.backToA.scale === "75",
         JSON.stringify({ b: tray.backToB, a: tray.backToA }));
     check("mockup: removing a saved mockup drops it and recounts",
         tray.afterRemove.items === 1 && tray.afterRemove.count === "1",
@@ -2571,10 +2639,16 @@ async function mockupChecks(page) {
        Asserted on the MODEL photograph specifically, and that is the whole
        point: its canvas is 1024x1536, so a forced 1:1 tile letterboxes it --
        measured at 84x127 inside a 127x127 box, a third of the tile empty and
-       the mockup looking like a shrunken preview of itself. On the drawn
-       t-shirt the tray checks above run against a 1000x1000 canvas, where a
-       square tile and a correct one are indistinguishable, so this check
-       cannot be moved there without it passing for the wrong reason.
+       the mockup looking like a shrunken preview of itself.
+
+       The reason this stood apart used to be that the tray checks above ran
+       against the drawn t-shirt's 1000x1000 canvas, where a square tile and a
+       correct one are indistinguishable. That stopped being true on
+       September 5, 2026: with no drawn products left the editor's default IS
+       `tshirt-model-white`, so those checks now run on this very template.
+       The check stays because it is the only one that asserts tile SHAPE --
+       the tray checks assert restore, labelling and counting -- but it is no
+       longer isolating a canvas the others cannot reach.
 
        The comparison is the tile's rendered aspect against the thumbnail's
        own natural aspect, rather than a hardcoded 0.667: the assertion is

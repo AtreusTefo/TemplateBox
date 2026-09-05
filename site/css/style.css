@@ -2265,36 +2265,12 @@ body.is-nav-hidden .site-header:focus-within {
     clip-path: polygon(30% 8%, 40% 4%, 60% 4%, 70% 8%, 100% 22%, 90% 42%, 78% 36%, 78% 96%, 22% 96%, 22% 36%, 10% 42%, 0 22%);
 }
 
-.mk-shape.mug {
-    width: 58%;
-    aspect-ratio: 1 / 0.92;
-    background-color: #B5352E;
-    border-radius: 0.125rem 0.125rem 0.375rem 0.375rem;
-}
-
-/* Handle sweeps past 90 degrees each side so it tucks behind the body
-   edge rather than floating free, the same correction js/mockup.js makes */
-.mk-shape.mug::after {
-    content: "";
-    position: absolute;
-    right: -30%;
-    top: 18%;
-    width: 38%;
-    height: 52%;
-    border: 0.1875rem solid #B5352E;
-    border-left-color: transparent;
-    border-radius: 0 50% 50% 0;
-}
-
-/* `.mk-shape.box` and its lid pseudo-element stood here until September 3,
-   2026, when the drawn packaging box became the photographic `bag-paper-held`
-   and index.html's card -- its only user -- became a photo card. `.mk-shape.mug`
-   above stays: the drawn mug is the one product still rendered on canvas. */
-
-.mk-shape.mug .mk-art {
-    width: 46%;
-    margin-right: 8%;
-}
+/* `.mk-shape.mug`, its handle pseudo-element and its `.mk-art` inset stood
+   here until September 5, 2026, when the drawn mug became the photographic
+   `frame-black-shelf` and index.html's card -- their only user -- became a
+   photo card. `.mk-shape.box` went the same way on September 3 and
+   `.mk-shape.hoodie` the day before. `.mk-shape.tee` above is the last one
+   standing, and only because tshirt-mockup-generator.html still draws it. */
 
 .dot-row {
     display: flex;
