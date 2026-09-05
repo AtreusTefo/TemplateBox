@@ -158,11 +158,15 @@ CARD  dropped 1113032 (50.03%) card A 100%     card B 0.0%   (one seed)
 
 The three existing templates are unchanged to the pixel.
 
-## displaceStrength is 4, the lowest in the catalog
+## displaceStrength is 4
 
 Gradient p99 measured **4.54**, against the bag's 10.32, the cap's 30.3 and the
-shirt's 41.5. A printed card lying flat on a desk is as close to a plane as this
-catalog gets, so the map is normalising something very near paper noise.
+shirt's 41.5. A printed card lying flat on a desk is very close to a plane, so
+the map is normalising something very near paper noise.
+
+This heading read "the lowest in the catalog" until September 5, 2026. It is
+not: the three framed prints declare **2**, because on those a displace map
+exists only to open the shading gate rather than to bend anything.
 
 Off the test grid at 1:1: 7 already reads as a buckled card, 12 ripples
 outright, and 2 is indistinguishable from a flat digital paste. 4 keeps a trace

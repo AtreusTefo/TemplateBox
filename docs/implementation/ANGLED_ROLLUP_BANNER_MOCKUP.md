@@ -47,10 +47,16 @@ than assumed.
 | bag-paper-held (flattest before this) | 1.00 | 24.31 | 0.041 | 0.058% |
 | hoodie-model-white | 5.71 | — | 0.200 | 0.195% |
 
-Taut vinyl on a tensioned stand is the flattest print surface in the catalog.
-Half a pixel of peak offset is nothing for a displacement map to buy, so the
-only thing actually missing was the shading -- and shading has a slot a warped
-template can still reach.
+Taut vinyl on a tensioned stand is very flat, and half a pixel of peak offset
+is nothing for a displacement map to buy -- so the only thing actually missing
+was the shading, and shading has a slot a warped template can still reach.
+
+This paragraph originally called it "the flattest print surface in the
+catalog", on the strength of the zone/global column above. That column is a
+within-image measure and cannot rank two photographs, since its denominator is
+whatever else the photograph contains; see `LINEN_FRAME_MOCKUP.md`. The
+conclusion drawn here -- that displacement was not worth having -- rests on the
+delivered offset in the last column, which is resolution-corrected and stands.
 
 ### The overlay is that slot
 

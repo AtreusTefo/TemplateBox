@@ -135,10 +135,17 @@ template's 0.060%**. Same product, same stiff paper, same bend.
 | bucket-hat-white, 6 | 0.79 | 2.65 | — | 0.097% |
 | hoodie-model-white, 10 | 0.58 | 5.71 | 0.200 | 0.195% |
 
-This is the flattest print surface in the catalog by some way, and the lowest
-zone/global ratio: the bag's creased edges and its gusset carry essentially all
-the gradient while the front panel is glass-flat. The offsets here are
-sub-pixel, which is what a smooth paper face lit evenly should be.
+The bag's creased edges and its gusset carry essentially all the gradient while
+the front panel is glass-flat, and the offsets here are sub-pixel -- which is
+what a smooth paper face lit evenly should be.
+
+This paragraph originally called it "the flattest print surface in the catalog
+by some way, and the lowest zone/global ratio". The zone/global column cannot
+rank two photographs -- its denominator is whatever else is in the frame -- and
+three later entries went on to claim the same superlative, one of them
+inverting the arithmetic. Measured on zone luma spread instead, this panel is
+10.5 levels, third flattest. See `LINEN_FRAME_MOCKUP.md`. The `Delivered`
+column is resolution-corrected and remains the sound comparison.
 
 ## The light map was nearly dropped, and the render kept it
 

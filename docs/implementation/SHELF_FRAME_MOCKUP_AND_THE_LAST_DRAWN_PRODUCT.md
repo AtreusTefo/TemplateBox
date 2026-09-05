@@ -70,9 +70,17 @@ global Sobel p99             57.26
 zone / global                0.031
 ```
 
-**0.031 is the flattest print surface measured in this catalog**, against the
-angled banner's 0.047 and the held bag's 0.041. A matted print behind a rigid
-frame is as flat as a print surface gets.
+A matted print behind a rigid frame is about as flat as a print surface gets:
+the zone's luma spread is **10.8 levels** p1 to p99, third of the templates
+whose zones show their print surface.
+
+This paragraph originally read "0.031 is the flattest print surface measured in
+this catalog, against the angled banner's 0.047 and the held bag's 0.041". That
+was wrong twice over and is corrected here: the zone/global ratio cannot rank
+two photographs, because its denominator is whatever else is in the frame, and
+three earlier entries had each claimed the same superlative. See
+`LINEN_FRAME_MOCKUP.md` for the measured comparison and why absolute Sobel does
+not work either.
 
 ## The classifier was bypassed, and why that was right
 

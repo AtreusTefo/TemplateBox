@@ -279,6 +279,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-shelf">Framed Poster Wall Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-wood-linen">Linen Framed Print Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bag-paper-held">Packaging Mockup</a></li>\n' +
 '                        </ul>\n' +
 '                    </div>\n' +
@@ -1440,6 +1441,10 @@ body + '\n' +
         {
             id: "frame-black-shelf", title: "Framed Poster Wall Mockup", category: "mockups", doc: "frame-black-shelf",
             folder: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-shelf"
+        },
+        {
+            id: "frame-wood-linen", title: "Linen Framed Print Mockup", category: "mockups", doc: "frame-wood-linen",
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-wood-linen"
         },
         {
             id: "bag-paper-held", title: "Packaging Mockup", category: "mockups", doc: "bag-paper-held",

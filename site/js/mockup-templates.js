@@ -667,12 +667,17 @@ window.TB_PHOTO_MOCKUPS = [
            delivers 0.66px of peak offset -- 0.058% of base width, against that
            template's 0.060%. Same product, same stiff paper, same bend.
 
-           This is the flattest print surface in the catalog by some way, zone
-           p50 0.33 where the next flattest is 0.52, and the lowest
-           zone/global ratio at 0.041: the bag's creased edges and its gusset
-           carry essentially all of the gradient while the front panel is
-           glass-flat. That is what a smooth paper face lit evenly looks like
-           to this pipeline, and it is why the offsets here are sub-pixel. */
+           The bag's creased edges and its gusset carry essentially all of the
+           gradient while the front panel is glass-flat, which is why the
+           offsets here are sub-pixel. Its zone luma spread is 10.5 levels.
+
+           This said "the flattest print surface in the catalog by some way,
+           and the lowest zone/global ratio at 0.041" until September 5, 2026.
+           The ratio's denominator is whatever else the photograph contains, so
+           it cannot rank two of them -- and three later entries each claimed
+           the same superlative on it, one inverting the arithmetic. The
+           delivered percentage above is resolution-corrected and is the
+           comparison that holds. See docs/implementation/LINEN_FRAME_MOCKUP.md. */
         displaceStrength: 16,
         mode: "surface",
         backing: null,
@@ -820,13 +825,17 @@ window.TB_PHOTO_MOCKUPS = [
             navy: { name: "Navy", hex: "#1F2A44" },
             black: { name: "Black", hex: "#1A1A1A" }
         },
-        /* 4, the lowest in the catalog: 0.17% of base width where the bag is
-           0.39%, the cap 1.03% and the shirt 1.56%. A printed card lying flat
-           on a desk is the stiffest surface here and belongs at the bottom of
-           that ordering. Its gradient p99 measured 4.54 against the bag's
-           10.32, so the map is normalising something very close to paper
-           noise -- on the test grid 7 already reads as a buckled card and 12
-           ripples outright, while 2 is indistinguishable from a flat paste. */
+        /* 4: 0.17% of base width where the bag is 0.39%, the cap 1.03% and
+           the shirt 1.56%. A printed card lying flat on a desk is among the
+           stiffest surfaces here and belongs near the bottom of that ordering.
+           Its gradient p99 measured 4.54 against the bag's 10.32, so the map
+           is normalising something very close to paper noise -- on the test
+           grid 7 already reads as a buckled card and 12 ripples outright,
+           while 2 is indistinguishable from a flat paste.
+
+           This said "the lowest in the catalog" until September 5, 2026, and
+           that is no longer true: the three framed prints all declare 2, where
+           a map exists only to open the shading gate. */
         displaceStrength: 4,
         mode: "surface",
         /* Business cards print full bleed, so the first upload fills the card
@@ -1010,12 +1019,17 @@ window.TB_PHOTO_MOCKUPS = [
         overlayBlend: "multiply",
         /* NO displace/shade/light, and that is measured rather than forced by
            the warp path. Sobel p99 inside the zone is 0.90 against 19.27
-           across the image -- a zone/global ratio of 0.047, below the paper
-           bag's 0.041-equivalent flatness and the lowest in the catalog. At
-           the flat sibling's strength of 10 that delivers 0.47px of peak
-           offset, 0.046% of base width. Taut vinyl on a tensioned stand is
-           the flattest print surface here; there is nothing for a
-           displacement map to bend the artwork around. */
+           across the image, and at the flat sibling's strength of 10 that
+           delivers 0.47px of peak offset -- 0.046% of base width. There is
+           nothing for a displacement map to bend the artwork around.
+
+           This used to add that the zone/global ratio of 0.047 was "below the
+           paper bag's 0.041 and the lowest in the catalog", which is
+           arithmetically backwards as well as unsound: 0.047 is ABOVE 0.041,
+           and the ratio cannot rank two photographs anyway because its
+           denominator is whatever else is in the frame. The delivered
+           percentage is resolution-corrected and carries the argument on its
+           own. See docs/implementation/LINEN_FRAME_MOCKUP.md. */
         mode: "surface",
         backing: null,
         /* Cut out on transparency like its sibling: all four corners alpha 0,
@@ -1495,10 +1509,15 @@ window.TB_PHOTO_MOCKUPS = [
            one for the same reason and says so.
 
            Nothing here needs displacing: a matted print behind a rigid frame
-           is the flattest print surface measured in this catalog, with a
-           zone/global Sobel ratio of 0.031 against the angled banner's 0.047
-           and the held bag's 0.041. Inside the zone the map measures p50 3.16
-           out of 127, so at strength 2 the interior moves 0.05px. */
+           is about as flat as a print surface gets, with a zone luma spread of
+           10.8 levels. Inside the zone the map measures p50 3.16 out of 127,
+           so at strength 2 the interior moves 0.05px.
+
+           This claimed "the flattest print surface measured in this catalog,
+           with a zone/global Sobel ratio of 0.031" until September 5, 2026.
+           The ratio cannot rank two photographs and three entries had already
+           claimed that superlative. See
+           docs/implementation/LINEN_FRAME_MOCKUP.md. */
         displace: "assets/mockups/print/posters-and-frames/frame-black-shelf/frame-black-shelf-displace.png",
         shade: "assets/mockups/print/posters-and-frames/frame-black-shelf/frame-black-shelf-shade.png",
         /* NO `light`, and this was tested rather than assumed, because the
@@ -1533,6 +1552,91 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 860, y: 144 },
             { x: 860, y: 996 },
             { x: 280, y: 996 }
+        ]
+    },
+    {
+        /* The fourth frame, and the first whose derivation needed NOTHING
+           bypassed -- tools/mockup-admin.html's algorithm runs on this
+           photograph unmodified, dilation and all.
+
+           That is worth stating because the other three each cost something.
+           `frame-black-interior` leans in slight perspective, so its aperture
+           is a trapezoid and it needed a 2,379KB occlusion overlay.
+           `frame-black-shelf` is square-on but two pampas fronds cross its
+           frame, and the standard 6px dilation bridges them and drags 302,034
+           px of wall into the poster's region, so its flood has to run
+           undilated. Here the props sit clear of the frame and the backdrop
+           fails the classifier outright, so neither problem arises.
+
+           THE BACKDROP IS WHY. Warm linen measures saturation p1 16, 19 and 19
+           across three separate patches against a gate of 14 -- it fails on
+           every sample, where the shelf frame's pale wall passed at 7 and was
+           held out by the frame alone. The frame's unclassified barrier then
+           measures 22 to 71px on the four sides with ZERO spots at or under
+           the 12px a dilation can bridge, and the flood lands on 528,966px
+           bounded by [255, 281, 854, 1178] -- the frame's interior, which runs
+           x 249..911, y 245..1179. It does not escape. */
+        id: "frame-wood-linen",
+        title: "Framed Print on Linen",
+        thumb: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-wood-linen/frame-wood-linen-thumb.jpg",
+        /* 1054x1492 -- 0.7064, which is 1:sqrt(2) to within 0.1%, so this is
+           an A-series frame rather than the 4:5 the last three templates came
+           back as. The catalog card is 4:5, so its thumbnail is FIT and padded
+           rather than a straight downscale; the two roll-up banners are
+           handled the same way. */
+        base: "assets/mockups/print/posters-and-frames/frame-wood-linen/frame-wood-linen-base.png",
+        overlay: null,
+        /* Present to open the gate, as on both sibling frames: `shade` is
+           applied inside the displacement pass, so a template without a
+           displace map gets no shading at all. Inside the zone the map
+           measures p50 3.61 out of 127, so at strength 2 the interior moves
+           0.06px. */
+        displace: "assets/mockups/print/posters-and-frames/frame-wood-linen/frame-wood-linen-displace.png",
+        shade: "assets/mockups/print/posters-and-frames/frame-wood-linen/frame-wood-linen-shade.png",
+        /* NO `light`, and this one had the strongest case for one of the three
+           frames -- which is why it was measured rather than assumed twice
+           over.
+
+           Specular headroom here is 10.0 luma levels, against the shelf
+           frame's 4.7 and the interior frame's 3.4, so the map amplifies noise
+           by 25x rather than 54x. Dropping it changes a navy fill by a mean of
+           6.65 levels, and the held bag's light map was KEPT on a very similar
+           11.8.
+
+           The structure test is what settles it, and it is unambiguous. The
+           light map reads 27.8 in the 8px band at the zone's edge and 27.7
+           across the interior -- agreement to one part in three hundred, with
+           a local sd of 12.945. `shade` reads 251.9 against 254.6 with a local
+           sd of 0.29. One describes a surface; the other is spatially uniform
+           high-frequency noise, which is what a flat matte print behind a mat
+           should produce, because there is no specular structure to model. On
+           a flat #808080 fill the map takes sd 1.02 to 5.39 and the p1-p99
+           spread from 2 to 19.9, all of it invented. */
+        displaceStrength: 2,
+        mode: "surface",
+        backing: null,
+        /* NO `background`: every pixel is opaque, so there is nothing behind
+           the photograph for a colour to show through. */
+        /* A print fills its mat, whatever shape the artwork is. */
+        designScale: "cover",
+        /* The mat's opening, rounded INWARD from edges fitted at sub-pixel
+           precision. The opening is marked by an engraved line in the mat
+           rather than a step between two whites, so it was found by gradient
+           centroid rather than by thresholding:
+
+             left   x 309.51  sd 0.086  slope +0.000245
+             right  x 787.91  sd 0.259  slope -0.001197
+             top    y 354.13  sd 0.185  slope -0.000137
+             bottom y 1106.05 sd 0.348  slope +0.000912
+
+           477x751, and the print surface inside it is the flattest measured in
+           this catalog: luma p1/p50/p99 of 229.7/234.1/238.5, a spread of 8.8
+           levels against the shelf frame's 12, with ZERO blown pixels. */
+        warpZone: [
+            { x: 310, y: 355 },
+            { x: 787, y: 355 },
+            { x: 787, y: 1106 },
+            { x: 310, y: 1106 }
         ]
     },
     {
