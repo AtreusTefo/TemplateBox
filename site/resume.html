@@ -202,6 +202,25 @@
                             <label for="f-name">Full Name</label>
                             <input type="text" id="f-name" data-bind="name" maxlength="50" required>
                         </div>
+                        <!-- The only file input on this page, and the only
+                             field here that is not a [data-bind] control: the
+                             photograph is cropped and re-encoded by
+                             js/resume.js and kept under its own localStorage
+                             key, so the form sweep neither collects nor
+                             restores it. Gated to the one template that draws
+                             it; like every other gated field it keeps its
+                             value while hidden, so switching away and back
+                             does not lose the upload. -->
+                        <div class="field" data-templates="photo-rail">
+                            <label for="f-photo">Profile Photo</label>
+                            <input type="file" id="f-photo" accept="image/*">
+                            <p class="upload-hint">JPG, PNG or WebP. Centre-cropped to a 4:5 portrait. It stays on this device: nothing is uploaded, here or at export.</p>
+                            <p class="form-error" id="f-photo-error" role="alert"></p>
+                            <div class="photo-chip" id="photo-preview" hidden>
+                                <img id="photo-thumb" alt="Your profile photo as it will appear on the sheet">
+                                <button type="button" class="entry-remove" id="photo-remove">Remove Photo</button>
+                            </div>
+                        </div>
                         <!-- data-templates lists the templates that DRAW a
                              field. Anything not listed is hidden for the
                              current template but still collected and saved,
@@ -314,7 +333,7 @@
                         <button type="button" class="btn btn-secondary btn-block" id="add-language">Add Language</button>
                     </fieldset>
 
-                    <fieldset data-templates="ruled-serif">
+                    <fieldset data-templates="ruled-serif photo-rail">
                         <legend>Accomplishments</legend>
                         <div class="field">
                             <label for="f-accomplishments">Accomplishments (one per line)</label>
@@ -384,7 +403,7 @@
                  stacks the place on its own baseline, so BOTH draw this. It
                  was gated to Ruled Serif alone, which meant the two-column
                  template rendered a field the form gave no way to fill. -->
-            <div class="field" data-templates="ruled-serif grey-rail">
+            <div class="field" data-templates="ruled-serif grey-rail photo-rail">
                 <label>Location</label>
                 <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone, Botswana">
             </div>
@@ -400,7 +419,7 @@
                      and indent 0 -- so a line there is a paragraph, and
                      telling that visitor they are writing bullets is a lie
                      the preview immediately contradicts. -->
-                <p class="upload-hint" data-templates="ruled-serif grey-rail">One bullet per line.</p>
+                <p class="upload-hint" data-templates="ruled-serif grey-rail photo-rail">One bullet per line.</p>
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
         </div>
@@ -462,7 +481,7 @@
             </div>
             <!-- As in the experience row above: grey-rail's education sub
                  sets "School - Place". -->
-            <div class="field" data-templates="ruled-serif grey-rail">
+            <div class="field" data-templates="ruled-serif grey-rail photo-rail">
                 <label>Location</label>
                 <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone">
             </div>
@@ -498,7 +517,7 @@
                 <!-- Gated exactly as the experience row's hint is, and for the
                      same reason: Classic sets a description as prose, so a
                      line there is a paragraph and not a bullet. -->
-                <p class="upload-hint" data-templates="ruled-serif grey-rail">One bullet per line.</p>
+                <p class="upload-hint" data-templates="ruled-serif grey-rail photo-rail">One bullet per line.</p>
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
         </div>

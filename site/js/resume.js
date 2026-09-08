@@ -39,6 +39,18 @@
        document yet. */
     const TEMPLATE_KEY = "tb_resume_template";
 
+    /* The profile photograph gets its OWN key, and not for tidiness.
+
+       TB.storageSet swallows a quota failure by design -- editing has to keep
+       working without persistence -- so a record too large to write fails
+       SILENTLY. A photograph is the only thing this editor stores that can
+       plausibly approach the quota, and in the same record it would take the
+       whole document down with it: every save from that moment on would fail
+       and the visitor's typing would stop being kept, with nothing said. Two
+       keys means the worst a photograph can do is fail to save itself, which
+       is a case this file can see and report. */
+    const PHOTO_KEY = "tb_resume_photo_v1";
+
     const DEFAULT_DOC_NAME = "Untitled resume";
 
     /* The editor's default layout, and the fallback for any template id the
@@ -241,6 +253,11 @@
     const swatchRow = document.getElementById("swatch-row");
     const docNameInput = document.getElementById("doc-name");
     const templateRow = document.getElementById("template-row");
+    const photoInput = document.getElementById("f-photo");
+    const photoError = document.getElementById("f-photo-error");
+    const photoPreview = document.getElementById("photo-preview");
+    const photoThumb = document.getElementById("photo-thumb");
+    const photoRemove = document.getElementById("photo-remove");
 
     /* ----------------------------------------------------------------------
        Template selection.
@@ -491,15 +508,255 @@
         /* After the [data-bind] sweep: languages is composed from its rows,
            not bound to a single control. */
         state.fields.languages = TB.sanitize(collectLanguages());
+        /* Not a form field and not sanitized: it is a base64 data URI this
+           file produced from a canvas, and escaping its "+" and "/" would
+           corrupt it. Both the engine and the reader above validate its shape
+           instead, which is the check that actually matters for a URI. */
+        state.photo = currentPhoto;
         return state;
     }
 
     function persistAndRender() {
         const state = collectState();
-        TB.storageSet(STORAGE_KEY, state);
+        /* The document record WITHOUT the photograph, which lives under its
+           own key -- see PHOTO_KEY. Stripped from a copy so the state handed
+           to the renderer still carries it. */
+        const record = Object.assign({}, state);
+        delete record.photo;
+        TB.storageSet(STORAGE_KEY, record);
         TB.markSaved();
         renderPreview(state);
     }
+
+    /* ----------------------------------------------------------------------
+       Profile photograph.
+
+       NOTHING LEAVES THE DEVICE. The file is read by FileReader, drawn to a
+       canvas and re-encoded, all in the page; the result is a data URI in
+       this browser's localStorage and a bitmap inside a PDF the browser
+       builds. There is no upload, which is the whole architecture of this
+       site (Rule 1 in CLAUDE.md) and also the only answer worth giving to
+       somebody being asked for a photograph of their face.
+
+       THE STORED COPY IS ALREADY THE SHAPE THE SHEET DRAWS. Cropping happens
+       once, here, to TBResume.PHOTO_RATIO, so the engine receives a bitmap at
+       exactly the aspect its photo block will draw and neither painter ever
+       rescales one axis against the other. Cropping at DRAW time was the
+       obvious alternative and does not work: SVG can slice an image to a box
+       and jsPDF's addImage cannot, so the preview would crop and the PDF
+       would stretch -- the one disagreement between the two mediums the
+       engine exists to make impossible.
+       ---------------------------------------------------------------------- */
+
+    /* Wide enough that the 167pt (2.32in) box on photo-rail still has ~207dpi
+       of detail in the PDF, small enough that the JPEG lands in tens of
+       kilobytes rather than hundreds. localStorage is a ~5MB budget shared
+       with every other editor on this origin, and a phone photograph stored
+       raw is 3-8MB on its own. */
+    const PHOTO_W = 480;
+
+    /* Empirically the knee for a portrait at this size: 0.82 is 30-60KB and
+       indistinguishable from 0.95 at 480px, which is 3-4x larger. */
+    const PHOTO_QUALITY = 0.82;
+
+    let currentPhoto = "";
+
+    /* The ratio the engine draws, never a second copy of the number. Falls
+       back only if the engine failed to load, in which case nothing will be
+       drawn anyway and the value merely has to be sane. */
+    function photoRatio() {
+        return (window.TBResume && window.TBResume.PHOTO_RATIO) || 0.8;
+    }
+
+    /* Exactly the guard js/resume-engine.js applies before drawing. Applied
+       here as well, on the way OUT of storage, so a hostile or corrupted
+       value is dropped at the boundary rather than being carried through the
+       form, the thumbnail and the state object first. */
+    function validPhoto(url) {
+        return typeof url === "string" &&
+            /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=\s]+$/.test(url);
+    }
+
+    function canvasOf(w, h) {
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        return c;
+    }
+
+    /* Cover-crop to the target ratio, then downscale in halving steps.
+
+       The halving matters. Every browser's one-shot drawImage undersamples
+       heavily on a large reduction -- a 4000px phone photograph drawn
+       straight to 480px samples a fraction of the pixels it skips, which
+       reads as aliasing on hair and on the edge of a collar. Halving
+       repeatedly averages the pixels being discarded. Same technique, and the
+       same reason, as scaleTo() in js/admin-image.js. */
+    function cropToRatio(img) {
+        const ratio = photoRatio();
+        const sw = img.naturalWidth || img.width;
+        const sh = img.naturalHeight || img.height;
+        if (!sw || !sh) {
+            return "";
+        }
+
+        /* The largest box of the target ratio that fits inside the source,
+           centred. Centred rather than offered as a choice: a crop handle is
+           a second editor, and every portrait photograph a visitor uploads to
+           a CV already has the face near the middle. */
+        let cw = sw;
+        let ch = Math.round(sw / ratio);
+        if (ch > sh) {
+            ch = sh;
+            cw = Math.round(sh * ratio);
+        }
+        const sx = Math.round((sw - cw) / 2);
+        const sy = Math.round((sh - ch) / 2);
+
+        const targetW = Math.min(PHOTO_W, cw);
+        const targetH = Math.max(1, Math.round(targetW / ratio));
+
+        /* First pass takes the crop out at its own size; the halving loop
+           then works on a plain canvas, so the source rectangle is applied
+           once and cannot compound. */
+        let canvas = canvasOf(cw, ch);
+        canvas.getContext("2d").drawImage(img, sx, sy, cw, ch, 0, 0, cw, ch);
+
+        while (canvas.width > targetW * 2) {
+            const next = canvasOf(Math.max(targetW, Math.round(canvas.width / 2)),
+                                  Math.max(targetH, Math.round(canvas.height / 2)));
+            next.getContext("2d").drawImage(canvas, 0, 0, next.width, next.height);
+            canvas = next;
+        }
+
+        const out = canvasOf(targetW, targetH);
+        out.getContext("2d").drawImage(canvas, 0, 0, targetW, targetH);
+        /* JPEG, always: the engine's guard accepts PNG too, but a photograph
+           has no transparency to protect and a PNG of one is roughly ten
+           times the size -- straight out of the localStorage budget. */
+        return out.toDataURL("image/jpeg", PHOTO_QUALITY);
+    }
+
+    /* The form's own copy of the photograph, and the Remove button that goes
+       with it. Hidden entirely when there is none, so the control reads as
+       "no photo yet" rather than as a broken image. */
+    function syncPhotoControls() {
+        if (photoThumb) {
+            /* Assigning src, never markup: the value is a data URI this file
+               produced from a canvas, and it is re-validated on the way out
+               of storage besides.
+
+               REMOVED rather than set to "" when there is none. An empty src
+               resolves against the document, so the browser re-requests
+               resume.html, fails to decode it as an image and paints the alt
+               text -- inside an element that is hidden anyway, for a request
+               that serves nothing. */
+            if (currentPhoto) {
+                photoThumb.src = currentPhoto;
+            } else {
+                photoThumb.removeAttribute("src");
+            }
+        }
+        if (photoPreview) {
+            photoPreview.hidden = !currentPhoto;
+        }
+    }
+
+    /* Writes the photograph and CHECKS that the write happened.
+
+       TB.storageSet cannot report a quota failure -- see PHOTO_KEY above --
+       so the value is read back. Silence would be the worst outcome here:
+       the sheet would show the photograph, the visitor would close the tab,
+       and it would be gone with no explanation. */
+    function storePhoto() {
+        if (!currentPhoto) {
+            TB.storageSet(PHOTO_KEY, "");
+            return true;
+        }
+        TB.storageSet(PHOTO_KEY, currentPhoto);
+        return TB.storageGet(PHOTO_KEY) === currentPhoto;
+    }
+
+    function setPhoto(url) {
+        currentPhoto = url || "";
+        syncPhotoControls();
+        if (!storePhoto() && photoError) {
+            photoError.textContent = "This photo is on the sheet and will export, " +
+                "but there was not enough room in this browser's storage to keep it " +
+                "for next time. Try a smaller image.";
+        }
+        persistAndRender();
+    }
+
+    function bindPhotoUpload() {
+        if (!photoInput) {
+            return;
+        }
+
+        photoInput.addEventListener("change", () => {
+            if (photoError) {
+                photoError.textContent = "";
+            }
+            const file = photoInput.files && photoInput.files[0];
+            if (!file) {
+                return;
+            }
+            /* Explicit mime-type parse, terminating immediately on anything
+               that is not an image -- the file-upload rule in CLAUDE.md, and
+               the same check js/poster.js and js/mockup.js make. */
+            if (!/^image\//.test(file.type)) {
+                if (photoError) {
+                    photoError.textContent = "That file is not an image. Please choose a JPG, PNG, or WebP file.";
+                }
+                photoInput.value = "";
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.addEventListener("load", () => {
+                const img = new Image();
+                img.addEventListener("load", () => {
+                    const prepared = cropToRatio(img);
+                    if (!prepared) {
+                        if (photoError) {
+                            photoError.textContent = "That image could not be read. Please try a different file.";
+                        }
+                        photoInput.value = "";
+                        return;
+                    }
+                    /* Cleared so re-picking the same file still fires change,
+                        which is how a visitor retries after an error. */
+                    photoInput.value = "";
+                    setPhoto(prepared);
+                });
+                img.addEventListener("error", () => {
+                    if (photoError) {
+                        photoError.textContent = "That image could not be decoded. Please try a different file.";
+                    }
+                    photoInput.value = "";
+                });
+                img.src = reader.result;
+            });
+            reader.addEventListener("error", () => {
+                if (photoError) {
+                    photoError.textContent = "That file could not be read. Please try a different file.";
+                }
+                photoInput.value = "";
+            });
+            reader.readAsDataURL(file);
+        });
+
+        if (photoRemove) {
+            photoRemove.addEventListener("click", () => {
+                if (photoError) {
+                    photoError.textContent = "";
+                }
+                photoInput.value = "";
+                setPhoto("");
+            });
+        }
+    }
+
 
     /* ----------------------------------------------------------------------
        Repeating entry rows, cloned from static <template> markup.
@@ -1227,6 +1484,14 @@
         bindAdd("add-reference", referencesList, tplReference);
 
         bindPreviewEditing();
+
+        /* Restored from its own key, and validated on the way out: a value
+           that is not a base64 PNG or JPEG is dropped rather than handed to
+           the engine, the thumbnail and the state object. */
+        const savedPhoto = TB.storageGet(PHOTO_KEY);
+        currentPhoto = validPhoto(savedPhoto) ? savedPhoto : "";
+        syncPhotoControls();
+        bindPhotoUpload();
 
         if (!hasSaved) {
             showSampleNotice();

@@ -46,6 +46,34 @@ window.TBResume = (() => {
         mono:  { css: "'Courier New', Courier, monospace", pdf: "courier" }
     };
 
+    /* Profile photographs. ONE ratio, owned here rather than by a descriptor,
+       and exported so js/resume.js crops every upload to exactly what a photo
+       block will draw. 4:5 portrait is the shape the rest of the site already
+       reshapes uploads to -- see the card window in js/admin-image.js -- and
+       a single fixed ratio is what makes a stretched face impossible: the
+       bitmap arrives at the drawn aspect, so neither painter ever rescales
+       one axis against the other. Switching template cannot re-crop anything,
+       because there is nothing to re-crop to. */
+    const PHOTO_RATIO = 4 / 5;
+
+    /* Filled bands are drawn this much wider than their share, so adjacent
+       segments overlap instead of sharing an edge. See the `bar` block. */
+    const OVERLAP = 0.4;
+
+    /* The ONLY images this engine will draw are base64 bitmaps that a canvas
+       in js/resume.js produced. `state.photo` reaches here from localStorage,
+       which is writable by anything else running on the origin, so it is
+       treated as untrusted: an SVG data URI can carry markup, and "javascript:"
+       or a remote URL would make the sheet fetch something. Anything that is
+       not a base64 PNG or JPEG draws no photo at all, exactly as if none had
+       been uploaded. */
+    const PHOTO_URL = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=\s]+$/;
+
+    function photoUrl(state) {
+        const url = state && state.photo;
+        return (typeof url === "string" && PHOTO_URL.test(url)) ? url : "";
+    }
+
     function desanitize(value) {
         if (window.TB && typeof window.TB.desanitize === "function") {
             return window.TB.desanitize(value);
@@ -141,6 +169,13 @@ window.TBResume = (() => {
     function sectionHasContent(body, state) {
         if (!body) return false;
         if (body.kind === "lines") return (body.lines || []).length > 0;
+        /* A contact block used as a section body: present only if at least
+           one row would draw. That is what lets a CONTACT heading disappear
+           along with its rows on a document that has no contact details,
+           instead of standing over nothing. */
+        if (body.kind === "contact") {
+            return (body.rows || []).some((row) => joinFields(row, state.fields));
+        }
         if (body.kind === "paragraph") {
             return Boolean(readField(state.fields, body.field));
         }
@@ -464,6 +499,88 @@ window.TBResume = (() => {
             return;
         }
 
+        /* A band of equal segments across the column -- the multi-colour bar
+           that closes a photo CV's masthead. It is a `bar` rather than a
+           `rule` with a list of colours because a rule is a stroked line and
+           this is a run of filled rectangles: giving `rule` a second, mutually
+           exclusive drawing mode would make every existing rule read as
+           though it might be one.
+
+           Segments overlap by OVERLAP. Two rectangles that merely share an
+           edge leave a hairline of white between them wherever the device
+           pixel grid falls between the two coordinates -- visible in the PDF
+           at any zoom, and the reason the seam is closed here rather than by
+           rounding the coordinates, which cannot be done without changing the
+           bar's total width. */
+        if (block.kind === "bar") {
+            const colors = block.colors || ["ink"];
+            const h = block.height || 4;
+            cursor[key] += block.gapBefore || 0;
+            ensureRoom(ctx, key, cursor, pageOf, h);
+            const barY = cursor[key];
+            const seg = col.width / colors.length;
+            colors.forEach((role, i) => {
+                const last = i === colors.length - 1;
+                ctx.ops.push({
+                    op: "rect", page: pageOf[key],
+                    x: col.x + seg * i, y: barY,
+                    w: seg + (last ? 0 : OVERLAP), h: h,
+                    fill: colorOf(role, ctx.template, ctx.state)
+                });
+            });
+            cursor[key] = barY + h + (block.gapAfter || 0);
+            started[key] = true;
+            return;
+        }
+
+        /* The visitor's own photograph.
+
+           IT DRAWS NOTHING WITHOUT ONE. No placeholder, no grey box with
+           initials: a document nobody uploaded a photo to simply starts its
+           sidebar at the next block, which is the convention every other
+           block here already follows for an empty field. The alternative was
+           tried on paper and rejected -- a placeholder that reads as a
+           deliberate design in the preview is an embarrassment in an exported
+           PDF, and the engine has no way to draw one in the preview alone
+           without breaking the one-layout-two-painters rule this file exists
+           to enforce.
+
+           THE CURSOR IS A BOX TOP HERE, not a baseline -- the only block for
+           which that is true, because a photograph has no baseline to sit on.
+           It restores the convention on the way out by advancing past its own
+           height, so the block after it reads an ordinary baseline again.
+
+           THE HEIGHT IS NOT THE TEMPLATE'S TO CHOOSE. A descriptor names the
+           width; the height is that width over PHOTO_RATIO, the one ratio
+           js/resume.js crops every upload to. If a template could name both,
+           a mismatch would stretch a face -- and it would do so silently,
+           since neither painter can tell a distorted photograph from an
+           intended one. One number in, no distortion possible. */
+        if (block.kind === "photo") {
+            const url = photoUrl(ctx.state);
+            if (!url) return;
+            const w = block.width || col.width;
+            const h = w / PHOTO_RATIO;
+            const x = col.x + (block.offsetX || 0);
+            cursor[key] += block.gapBefore || 0;
+            const top = cursor[key];
+            /* An offset block of colour behind the photograph, showing at one
+               corner. Drawn first and at the SAME size, so the photo covers
+               all of it but the offset corner. */
+            if (block.backdrop) {
+                ctx.ops.push({
+                    op: "rect", page: page,
+                    x: x + (block.backdrop.dx || 0), y: top + (block.backdrop.dy || 0),
+                    w: w, h: h,
+                    fill: colorOf(block.backdrop.color, ctx.template, ctx.state)
+                });
+            }
+            ctx.ops.push({ op: "image", page: page, url: url, x: x, y: top, w: w, h: h });
+            cursor[key] = top + h + (block.gapAfter || 0);
+            started[key] = true;
+            return;
+        }
+
         if (block.kind === "contact") {
             layoutContact(ctx, block, key, cursor, pageOf);
             started[key] = true;
@@ -530,6 +647,10 @@ window.TBResume = (() => {
     function bodyFirstLine(body, T) {
         if (!body) return 0;
         if (body.kind === "entries") return 40;
+        if (body.kind === "contact") {
+            const t = T.sidebarContact;
+            return t ? (t.lineHeight || t.size) : 14;
+        }
         if (body.kind === "meters") {
             const t = T[body.type || "body"];
             return (t.lineHeight || t.size) * 3;
@@ -591,6 +712,15 @@ window.TBResume = (() => {
            imported descriptor render immediately for review instead of
            having to be finished first. Not for production templates -- a
            shipped template maps to fields. */
+        /* The stacked icon rows, under a heading. `contact` is a BLOCK in
+           its own right as well, for the templates that set the rows with no
+           heading over them; both reach the same function, so the two forms
+           cannot draw differently. */
+        if (body.kind === "contact") {
+            layoutContact(ctx, body, key, cursor, pageOf);
+            return;
+        }
+
         if (body.kind === "lines") {
             const t = T[body.type || "body"];
             (body.lines || []).forEach((ln, i) => {
@@ -1160,6 +1290,25 @@ window.TBResume = (() => {
             n = document.createElementNS(SVG_NS, "polygon");
             n.setAttribute("points", o.points.map((p) => p[0] + "," + p[1]).join(" "));
             n.setAttribute("fill", o.fill);
+        } else if (o.op === "image") {
+            n = document.createElementNS(SVG_NS, "image");
+            n.setAttribute("x", o.x); n.setAttribute("y", o.y);
+            n.setAttribute("width", o.w); n.setAttribute("height", o.h);
+            /* SVG2 `href` for current browsers, the xlink form alongside it
+               for older WebKit, which ignores the unprefixed one and would
+               render an empty box. Both name the same value, so a browser
+               that understands either draws the photograph.
+
+               preserveAspectRatio="none" is SAFE here and nowhere else: the
+               bitmap is already PHOTO_RATIO, so there is nothing to distort.
+               Any of the "meet" values would letterbox a rounding difference
+               into a visible seam against the panel; "slice" would crop in
+               the preview and NOT in the PDF, since jsPDF's addImage has no
+               source rectangle -- the one disagreement between the mediums
+               this engine cannot tolerate. */
+            n.setAttribute("preserveAspectRatio", "none");
+            n.setAttribute("href", o.url);
+            n.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", o.url);
         } else if (o.op === "line") {
             n = document.createElementNS(SVG_NS, "line");
             n.setAttribute("x1", o.x1); n.setAttribute("y1", o.y1);
@@ -1244,6 +1393,15 @@ window.TBResume = (() => {
             doc.lines(rel, start[0], start[1], [1, 1], "F", true);
             return;
         }
+        /* The format is read off the data URI rather than assumed: jsPDF
+           needs to be told, and telling it "JPEG" for a PNG produces a
+           corrupt page rather than an error. photoUrl() has already
+           guaranteed it is one of these two. */
+        if (o.op === "image") {
+            doc.addImage(o.url, /^data:image\/png/.test(o.url) ? "PNG" : "JPEG",
+                         o.x, o.y, o.w, o.h);
+            return;
+        }
         if (o.op === "line") {
             const c = hexToRgb(o.color);
             doc.setDrawColor(c[0], c[1], c[2]);
@@ -1285,6 +1443,9 @@ window.TBResume = (() => {
         renderPreview: renderPreview,
         buildPdf: buildPdf,
         sectionHasContent: sectionHasContent,
+        /* js/resume.js crops to this. Exported rather than duplicated: a
+           second copy of the number is a stretched face waiting to happen. */
+        PHOTO_RATIO: PHOTO_RATIO,
         FAMILY: FAMILY
     };
 })();

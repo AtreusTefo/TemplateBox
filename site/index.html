@@ -593,6 +593,50 @@
                     </div>
                 </article>
 
+                <!-- The only card whose editor asks for a photograph, so the
+                     miniature leads with one: a pale panel down the left with
+                     a portrait block at the top of it, which is the single
+                     thing that distinguishes this design from the two-column
+                     card above. .photo reuses every .mk- class the other
+                     resume miniatures use and adds only the panel side, the
+                     panel tint and the portrait block. -->
+                <article class="template-card" data-category="resumes">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc photo accent-navy">
+                                <div class="mk-panel">
+                                    <div class="mk-portrait"></div>
+                                    <p class="mk-panel-h">Contact</p>
+                                    <p class="mk-panel-line">eliza.reed@mail.com</p>
+                                    <p class="mk-panel-line">+1 415 555 0123</p>
+                                    <p class="mk-panel-h">Skills</p>
+                                    <p class="mk-panel-line">Python, PyTorch</p>
+                                    <p class="mk-panel-line">LLMs, NLP</p>
+                                    <p class="mk-panel-h">Education</p>
+                                    <p class="mk-panel-line">PhD Computer Science</p>
+                                </div>
+                                <div class="mk-main">
+                                    <p class="mk-name">Eliza Reed</p>
+                                    <p class="mk-role">Machine Learning Engineer</p>
+                                    <div class="mk-bar"></div>
+                                    <p class="mk-h">Professional Summary</p>
+                                    <p class="mk-p">Builds and ships large language model systems end to end.</p>
+                                    <p class="mk-h">Experience</p>
+                                    <p class="mk-t">Senior ML Engineer</p>
+                                    <p class="mk-s">Northwind AI, San Francisco</p>
+                                    <div class="mk-fill"></div>
+                                    <p class="mk-h">Certifications and Awards</p>
+                                    <p class="mk-s">Best Paper, NeurIPS 2022</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Resumes</p>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="photo-rail">Photo Profile CV</a></h3>
+                    </div>
+                </article>
+
                 <!-- A real poster image in place of the drawn miniature. This
                      card sat inside .card-preview.framed until August 23, 2026,
                      which composited a photographed wood frame around the
@@ -963,7 +1007,7 @@
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 31.
+                Try a broader term, or clear the search to see all 32.
             </p>
         </section>
 

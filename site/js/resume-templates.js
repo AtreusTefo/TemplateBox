@@ -682,5 +682,251 @@ window.TB_RESUME_TEMPLATES = [
                       ],
                       entryGap: 20 } }
         ]
+    },
+
+    {
+        /* The first template that draws the visitor's photograph. Everything
+           else about it is ordinary registry data -- one photo block, one
+           colour bar, and the same sections every other descriptor here sets.
+
+           THE PHOTO IS OPTIONAL AND THE SHEET IS DESIGNED FOR THAT. Upload
+           nothing and the panel simply starts at CONTACT: no gap, no
+           placeholder, no second layout. See the `photo` branch in
+           js/resume-engine.js for why a placeholder was rejected.
+
+           IT NEEDS NO FIELD THE FORM DID NOT ALREADY COLLECT. The contact
+           rows read `email`, `phone` and `location`, which every template
+           reads, rather than the four address fields grey-rail added -- so
+           switching to this design from any other shows the whole document
+           immediately, with only the photograph left to add. */
+        id: "photo-rail",
+        title: "Photo Profile CV",
+        catalog: true,
+
+        /* Navy, and live: the panel is a pale tint that does NOT track the
+           accent, but the icon discs, every heading, the first bar segment
+           and the block behind the photograph all do, so the swatch row
+           recolours the sheet's whole identity rather than one rule. The
+           panel stays fixed because it is the ground those elements are read
+           against -- tinting it with the accent as well would collapse the
+           contrast the sidebar depends on at three of the five swatches. */
+        defaultAccent: "#1B2A4A",
+
+        page: { width: 595, height: 842 },
+
+        layout: {
+            kind: "two-column",
+            /* A left panel, the side the eye reaches first, because the
+               photograph is the reason to choose this design. 0.355 of 595
+               is 211.2pt: wide enough for a 167pt photograph with margins
+               that still read as margins. */
+            sidebar: {
+                side: "left",
+                width: 0.355,
+                background: "panel",
+                left: 22, right: 22,
+                /* The photo block reads this as a BOX TOP, not a baseline --
+                   it is the first block in the column and the only one for
+                   which the distinction matters. */
+                firstBaseline: 32,
+                bottom: 806
+            },
+            main: {
+                left: 30, right: 34,
+                firstBaseline: 86,
+                bottom: 806
+            }
+        },
+
+        palette: {
+            panel:      "#EEF1F6",
+            accentRole: "accent",   /* discs, headings, bar, photo backdrop */
+            display:    "#14161C",  /* the name, deliberately not the accent */
+            ink:        "#14161C",
+            body:       "#4C525E",
+            sidebarInk: "#2B313C",
+            onAccent:   "#FFFFFF"
+        },
+
+        type: {
+            displayName:    { family: "sans", weight: "bold",   size: 26,
+                              lineHeight: 26, color: "display" },
+            /* Bold and small under a 26pt name: a second line at reading
+               weight disappears against it, and a second large one reads as
+               part of the name. */
+            titleLine:      { family: "sans", weight: "bold",   size: 8.5,
+                              lineHeight: 11, color: "body" },
+            heading:        { family: "sans", weight: "bold",   size: 10.5,
+                              color: "accentRole", uppercase: true,
+                              gapBefore: 25, gapAfter: 15,
+                              rule: { color: "accentRole", width: 0.8, offset: 4 } },
+            sidebarHeading: { family: "sans", weight: "bold",   size: 10,
+                              color: "accentRole", uppercase: true,
+                              gapBefore: 24, gapAfter: 14,
+                              rule: { color: "accentRole", width: 0.8, offset: 4 } },
+            entryHead:      { family: "sans", weight: "bold",   size: 9.5, color: "ink" },
+            entryMeta:      { family: "sans", weight: "normal", size: 8.5, color: "body" },
+            entrySub:       { family: "sans", weight: "bold",   size: 8.5, color: "accentRole" },
+            body:           { family: "sans", weight: "normal", size: 8.8,
+                              lineHeight: 11.5, color: "body" },
+            bullet:         { family: "sans", weight: "normal", size: 8.8,
+                              lineHeight: 11.5, color: "body",
+                              marker: "•", indent: 8, itemGap: 12.5 },
+            /* The panel's own scale. Smaller than the main column's by a
+               point: a 211pt column at the main column's size wraps a job
+               title onto three lines. */
+            sidebarHead:    { family: "sans", weight: "bold",   size: 8.8, color: "ink" },
+            sidebarSub:     { family: "sans", weight: "normal", size: 8.2,
+                              lineHeight: 10.5, color: "sidebarInk" },
+            sidebarItem:    { family: "sans", weight: "normal", size: 8.4,
+                              lineHeight: 10.8, color: "sidebarInk",
+                              marker: "•", indent: 7, itemGap: 10.8 },
+            /* layoutContact reads this role BY NAME, so a photo template
+               without it draws no contact rows at all. */
+            sidebarContact: { family: "sans", weight: "normal", size: 8.2,
+                              lineHeight: 10.5, color: "sidebarInk", rowGap: 11 }
+        },
+
+        blocks: [
+            /* 167pt wide is the panel's full inner width, so the photograph
+               spans the panel edge to edge inside its margins and the design
+               does not depend on a second horizontal measurement. The height
+               follows from PHOTO_RATIO: 208.75pt, a quarter of the page.
+
+               The backdrop is offset UP AND LEFT into the panel's own margin,
+               which is the only direction with room for it, and it is drawn
+               in the accent so the corner reads as part of the colour scheme
+               rather than as a misregistered print. */
+            { column: "sidebar", kind: "photo",
+              width: 167, gapAfter: 20,
+              backdrop: { color: "accentRole", dx: -11, dy: -13 } },
+
+            /* Discs, not bare glyphs: the panel is pale, so a glyph drawn
+               straight onto it in the accent is a small dark smudge at 13pt.
+               A filled disc in the accent with the glyph knocked out of it in
+               white is the chip the reference artwork draws, and `knockout`
+               defaults to the disc so nothing else needs saying.
+
+               The rows are this section's BODY rather than a bare block,
+               which is what puts a CONTACT heading over them -- and what
+               makes the heading vanish with the rows on a document that has
+               no contact details in it. `phoneAlt` rides along with `phone`
+               so a visitor who filled it in for grey-rail keeps it here; it
+               contributes nothing when empty. */
+            { column: "sidebar", kind: "section", label: "Contact",
+              headingType: "sidebarHeading", gapAfter: 16,
+              body: { kind: "contact",
+                      iconSize: 13, textOffset: 21,
+                      disc: "accentRole", glyph: "onAccent",
+                      rows: [
+                          { icon: "envelope", fields: ["email"] },
+                          { icon: "phone",    fields: ["phone", "phoneAlt"],
+                            separator: ", " },
+                          { icon: "pin",      fields: ["location"] }
+                      ] } },
+
+            { column: "sidebar", kind: "section", label: "Skills",
+              headingType: "sidebarHeading",
+              body: { kind: "list", field: "skills", split: ",",
+                      type: "sidebarItem" } },
+
+            /* Education sits in the panel on this design, where every other
+               template sets it in the main column: it is short, it is
+               structured, and it is what balances a panel whose top quarter
+               is a photograph. */
+            { column: "sidebar", kind: "section", label: "Education",
+              headingType: "sidebarHeading", gapAfter: 13,
+              body: { kind: "entries", source: "education",
+                      head: { runs: [{ field: "degree", type: "sidebarHead" }] },
+                      sub: [
+                          { runs: [{ field: "school", type: "sidebarSub" }],
+                            gapBefore: 11 },
+                          { runs: [
+                              { field: "dates", type: "sidebarSub" },
+                              { literal: " - ", type: "sidebarSub" },
+                              { field: "place", type: "sidebarSub" }
+                          ], gapBefore: 10.5 }
+                      ],
+                      entryGap: 15 } },
+
+            { column: "sidebar", kind: "section", label: "Languages",
+              headingType: "sidebarHeading",
+              body: { kind: "list", field: "languages", split: "\n",
+                      type: "sidebarItem", entryList: "language" } },
+
+            /* One line, never split: this masthead sets the whole name at one
+               size against the panel, so the two-line stack grey-rail uses
+               would push the bar and the summary down a full line for no
+               gain. */
+            { column: "main", kind: "display", field: "name", type: "displayName",
+              uppercase: true, fallback: "Your Name", gapAfter: 15 },
+
+            { column: "main", kind: "text", field: "title", type: "titleLine" },
+
+            /* The masthead's signature. Four segments opening on the accent
+               and running to a violet, so the accent is where the eye lands
+               and the rest is a gradient away from it. The three fixed
+               colours are chosen to read against every swatch on the row. */
+            { column: "main", kind: "bar",
+              height: 4.5, gapBefore: 12,
+              colors: ["accentRole", "#2F6FD0", "#23B0C9", "#7A4BC0"] },
+
+            { column: "main", kind: "section", label: "Professional Summary",
+              body: { kind: "paragraph", field: "summary" } },
+
+            { column: "main", kind: "section", label: "Experience",
+              gapAfter: 13,
+              body: { kind: "entries", source: "experience",
+                      head:  { runs: [{ field: "role", type: "entryHead" }] },
+                      aside: { runs: [{ field: "dates", type: "entryMeta" }] },
+                      sub: [
+                          { runs: [
+                              { field: "company", type: "entrySub" },
+                              { literal: ", ",    type: "entrySub" },
+                              { field: "place",   type: "entrySub" }
+                          ], gapBefore: 11.5 }
+                      ],
+                      bullets: { field: "description", split: "\n", gapBefore: 13 },
+                      entryGap: 17 } },
+
+            { column: "main", kind: "section", label: "Projects",
+              gapAfter: 13,
+              body: { kind: "entries", source: "projects",
+                      head:  { runs: [{ field: "name", type: "entryHead" }] },
+                      aside: { runs: [{ field: "dates", type: "entryMeta" }] },
+                      sub: [
+                          { runs: [{ field: "role", type: "entrySub" }],
+                            gapBefore: 11.5 }
+                      ],
+                      bullets: { field: "description", split: "\n", gapBefore: 13 },
+                      entryGap: 17 } },
+
+            /* The reference artwork sets CERTIFICATIONS and AWARDS as two
+               sections. They are ONE here, reading the `accomplishments`
+               field the editor already collects, because splitting them would
+               mean a new form field whose only purpose is to decide which of
+               two identical lists a line appears under. One list, one
+               heading, one place to type. */
+            { column: "main", kind: "section", label: "Certifications and Awards",
+              body: { kind: "list", field: "accomplishments", split: "\n" } },
+
+            { column: "main", kind: "section", label: "References",
+              gapAfter: 13,
+              body: { kind: "entries", source: "references",
+                      head:  { runs: [{ field: "name", type: "entryHead" }] },
+                      aside: { runs: [
+                          { field: "email", type: "entryMeta" },
+                          { literal: " - ", type: "entryMeta" },
+                          { field: "phone", type: "entryMeta" }
+                      ]},
+                      sub: [
+                          { runs: [
+                              { field: "title",   type: "entrySub" },
+                              { literal: ", ",    type: "entrySub" },
+                              { field: "company", type: "entrySub" }
+                          ], gapBefore: 11.5 }
+                      ],
+                      entryGap: 16 } }
+        ]
     }
 ];

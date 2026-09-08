@@ -2026,6 +2026,89 @@ body.is-nav-hidden .site-header:focus-within {
     line-height: 1.05;
 }
 
+/* Photo Profile CV miniature. The panel is on the LEFT and pale rather than
+   filled with the accent, because that is what distinguishes this design from
+   the two-column card above it -- and because the portrait block at the top of
+   the panel, the one thing no other card has, has to read against something.
+   Everything else is the shared .mk- set. */
+
+.mock-doc.photo {
+    flex-direction: row;
+    padding: 0;
+    gap: 0;
+}
+
+/* 35.5% is the descriptor's own sidebar fraction, so the card depicts the
+   proportion the export actually produces. */
+.mock-doc.photo .mk-panel {
+    flex: 0 0 35.5%;
+    /* The descriptor's own panel hex, not a theme token. The paper-surface
+       block above re-declares the LIGHT palette inside .mock-doc for exactly
+       eight variables, and --color-surface is not one of them -- using it
+       would paint a dark panel onto white paper in dark mode, which is the
+       defect that block exists to prevent. A fixed panel is a fixed hex in
+       the descriptor too, so there is nothing here for a theme to decide. */
+    background-color: #EEF1F6;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.375rem 0.3125rem;
+}
+
+/* 4:5, the ratio js/resume.js crops every upload to and the engine draws.
+   Drawn rather than photographed: the card must not promise a face the
+   visitor's own upload will replace. */
+.mock-doc.photo .mk-portrait {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    background-image: linear-gradient(150deg, var(--mk-accent) 0%, #7E8CA6 55%, #C6CEDB 100%);
+    margin-bottom: 0.1875rem;
+}
+
+.mock-doc.photo .mk-panel-h {
+    font-size: 0.28125rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mk-accent);
+    border-bottom: 1px solid var(--mk-accent);
+    padding-bottom: 0.0625rem;
+    margin-top: 0.1875rem;
+}
+
+.mock-doc.photo .mk-panel-line {
+    font-size: 0.25rem;
+    line-height: 1.5;
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+}
+
+.mock-doc.photo .mk-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.5rem 0.4375rem;
+}
+
+.mock-doc.photo .mk-name {
+    font-family: var(--font-sans);
+    font-size: 0.5rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-text);
+}
+
+/* The masthead bar, four segments, opening on the accent exactly as the
+   descriptor's `bar` block does. */
+.mock-doc.photo .mk-bar {
+    height: 0.09375rem;
+    margin: 0.125rem 0 0.0625rem;
+    background-image: linear-gradient(to right,
+        var(--mk-accent) 0 25%, #2F6FD0 25% 50%, #23B0C9 50% 75%, #7A4BC0 75% 100%);
+}
+
 /* Shared: document title, ruled label/value rows, spacer */
 
 .mk-title {
@@ -4775,6 +4858,34 @@ legend {
 .entry-remove:hover {
     border-color: var(--color-text);
     color: var(--color-text);
+}
+
+/* The profile photo the visitor uploaded, beside its Remove button. The
+   thumbnail is fixed at the 4:5 the file was cropped to and painted with
+   object-fit: cover as a belt-and-braces measure -- the bitmap is already 4:5,
+   so cover has nothing to crop, and it only matters if that ever stops being
+   true. Reusing .entry-remove for the button rather than a photo-only variant:
+   it is the same control doing the same job as the one on every entry row. */
+.photo-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`,
+   so the chip has to opt back out by hand or js/resume.js hiding it does
+   nothing -- the same trap .layer-actions and .mockup-tray fell into. */
+.photo-chip[hidden] {
+    display: none;
+}
+
+.photo-chip img {
+    width: 3.5rem;
+    height: 4.375rem;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-card);
 }
 
 /* Also left behind by the September 1, 2026 admin split: docs.html's "Blank
