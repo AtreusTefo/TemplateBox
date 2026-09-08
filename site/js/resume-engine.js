@@ -545,10 +545,19 @@ window.TBResume = (() => {
            without breaking the one-layout-two-painters rule this file exists
            to enforce.
 
-           THE CURSOR IS A BOX TOP HERE, not a baseline -- the only block for
-           which that is true, because a photograph has no baseline to sit on.
-           It restores the convention on the way out by advancing past its own
-           height, so the block after it reads an ordinary baseline again.
+           IT IS POSITIONED ABSOLUTELY, by `top`, and reads the cursor not at
+           all. That is deliberate and it is what makes the no-photo case
+           correct. The first version took the cursor as a box top, which
+           meant the column's `firstBaseline` had to be a box top too -- so a
+           document with no photograph put the first HEADING on that
+           coordinate, 54pt above where a baseline belongs, and the panel sat
+           tight against the paper edge. With an absolute `top` the column's
+           firstBaseline stays an ordinary baseline for the block that
+           actually lands on it, and a masthead photograph is what it looks
+           like: a fixed position on the page, not a thing in a flow.
+
+           It still leaves the cursor BELOW itself, so whatever follows is
+           laid out under the photograph rather than behind it.
 
            THE HEIGHT IS NOT THE TEMPLATE'S TO CHOOSE. A descriptor names the
            width; the height is that width over PHOTO_RATIO, the one ratio
@@ -561,9 +570,8 @@ window.TBResume = (() => {
             if (!url) return;
             const w = block.width || col.width;
             const h = w / PHOTO_RATIO;
-            const x = col.x + (block.offsetX || 0);
-            cursor[key] += block.gapBefore || 0;
-            const top = cursor[key];
+            const x = col.x;
+            const top = block.top || 0;
             /* An offset block of colour behind the photograph, showing at one
                corner. Drawn first and at the SAME size, so the photo covers
                all of it but the offset corner. */
@@ -576,7 +584,9 @@ window.TBResume = (() => {
                 });
             }
             ctx.ops.push({ op: "image", page: page, url: url, x: x, y: top, w: w, h: h });
-            cursor[key] = top + h + (block.gapAfter || 0);
+            /* Never ABOVE where the column already was: a photograph placed
+               high on the page must not pull a cursor backwards. */
+            cursor[key] = Math.max(cursor[key], top + h + (block.gapAfter || 0));
             started[key] = true;
             return;
         }
@@ -1446,6 +1456,12 @@ window.TBResume = (() => {
         /* js/resume.js crops to this. Exported rather than duplicated: a
            second copy of the number is a stretched face waiting to happen. */
         PHOTO_RATIO: PHOTO_RATIO,
+        /* And the same for the guard. js/resume.js has to apply it too --
+           on the way out of storage, so a hostile value never reaches the
+           form -- and a security rule kept in two places is the worst kind
+           to let drift: the copies would still agree the day they were
+           written and stop agreeing the day one was widened. */
+        isPhotoUrl: (url) => Boolean(photoUrl({ photo: url })),
         FAMILY: FAMILY
     };
 })();

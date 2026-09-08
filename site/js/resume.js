@@ -216,6 +216,13 @@
                     listEl.textContent = "";
                     addEntryRow(listEl, template);
                 });
+            /* And the photograph, for the third time the same reason: it is
+               not a [data-bind] control either, so the sweep above does not
+               reach it. Left out, "Start blank" produced an empty resume with
+               the visitor's face still on it -- and left the photograph in
+               storage, so it survived the reload too. Content, and a
+               photograph is content. */
+            setPhoto("");
             /* Starting blank clears the CONTENT, not the design. The template
                stays selected and its own accent comes back, so "Start blank"
                on a template chosen from a catalog card does not silently
@@ -568,13 +575,18 @@
         return (window.TBResume && window.TBResume.PHOTO_RATIO) || 0.8;
     }
 
-    /* Exactly the guard js/resume-engine.js applies before drawing. Applied
-       here as well, on the way OUT of storage, so a hostile or corrupted
-       value is dropped at the boundary rather than being carried through the
-       form, the thumbnail and the state object first. */
+    /* The engine's OWN guard, applied here as well on the way OUT of storage,
+       so a hostile or corrupted value is dropped at the boundary rather than
+       being carried through the form, the thumbnail and the state object
+       first. Called rather than copied: this file carried its own identical
+       regex briefly, and a security rule written down twice agrees on the day
+       it is written and stops agreeing the day one copy is widened.
+
+       Without the engine there is nothing to draw and nothing to protect, so
+       an absent library rejects rather than falls back to a second copy. */
     function validPhoto(url) {
-        return typeof url === "string" &&
-            /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=\s]+$/.test(url);
+        return Boolean(window.TBResume && window.TBResume.isPhotoUrl &&
+                       window.TBResume.isPhotoUrl(url));
     }
 
     function canvasOf(w, h) {
@@ -674,12 +686,29 @@
             return true;
         }
         TB.storageSet(PHOTO_KEY, currentPhoto);
-        return TB.storageGet(PHOTO_KEY) === currentPhoto;
+        if (TB.storageGet(PHOTO_KEY) === currentPhoto) {
+            return true;
+        }
+        /* setItem threw, so the PREVIOUS photograph is still under this key
+           and would come back on the next load -- which would make the
+           message this returns false to say the opposite of what happens.
+           Clearing it costs a photograph that was saved and makes the report
+           true, and a small value replacing a large one is the write most
+           likely to succeed against a full quota. */
+        TB.storageSet(PHOTO_KEY, "");
+        return false;
     }
 
     function setPhoto(url) {
         currentPhoto = url || "";
         syncPhotoControls();
+        /* Any successful set clears a stale message. The upload handler
+           clears it too, on the way in, but this is the path "Start blank"
+           and Remove take -- and a quota warning left standing over a photo
+           that has since been removed describes nothing that is true. */
+        if (photoError) {
+            photoError.textContent = "";
+        }
         if (!storePhoto() && photoError) {
             photoError.textContent = "This photo is on the sheet and will export, " +
                 "but there was not enough room in this browser's storage to keep it " +
@@ -1487,9 +1516,21 @@
 
         /* Restored from its own key, and validated on the way out: a value
            that is not a base64 PNG or JPEG is dropped rather than handed to
-           the engine, the thumbnail and the state object. */
+           the engine, the thumbnail and the state object.
+
+           ONLY ALONGSIDE A SAVED DOCUMENT. A photograph belongs to a
+           document, and separate keys make it possible for one to outlive the
+           other -- clear the record alone and a stored photograph would be
+           restored onto the first-run SAMPLE content, which is somebody's
+           face on a document that is not theirs. Nothing is lost by the gate:
+           uploading writes the document record too, so a photograph with no
+           record is an orphan by definition. It is cleared rather than left,
+           or it would be waiting again on the next load. */
         const savedPhoto = TB.storageGet(PHOTO_KEY);
-        currentPhoto = validPhoto(savedPhoto) ? savedPhoto : "";
+        currentPhoto = (hasSaved && validPhoto(savedPhoto)) ? savedPhoto : "";
+        if (!currentPhoto && savedPhoto) {
+            TB.storageSet(PHOTO_KEY, "");
+        }
         syncPhotoControls();
         bindPhotoUpload();
 

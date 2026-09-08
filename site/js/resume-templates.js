@@ -709,8 +709,19 @@ window.TB_RESUME_TEMPLATES = [
            recolours the sheet's whole identity rather than one rule. The
            panel stays fixed because it is the ground those elements are read
            against -- tinting it with the accent as well would collapse the
-           contrast the sidebar depends on at three of the five swatches. */
-        defaultAccent: "#1B2A4A",
+           contrast the sidebar depends on at three of the five swatches.
+
+           THE HEX IS THE ROW'S NAVY, not a navy chosen for this design. Every
+           `defaultAccent` must be a swatch on resume.html's row -- the
+           invariant is written on the row itself, and check 1m in
+           tests/verify-layout.js enforces it now. This template shipped for
+           an afternoon with #1B2A4A, which is not on the row: it opened with
+           no swatch showing as selected, and the moment the visitor tried
+           another colour the template's own navy was unreachable forever.
+           A NEW swatch was the other option and was rejected -- #1B2A4A and
+           the row's #1F4E79 are both navy, so it would have put two almost
+           identical blues side by side to serve one template. */
+        defaultAccent: "#1F4E79",
 
         page: { width: 595, height: 842 },
 
@@ -725,10 +736,16 @@ window.TB_RESUME_TEMPLATES = [
                 width: 0.355,
                 background: "panel",
                 left: 22, right: 22,
-                /* The photo block reads this as a BOX TOP, not a baseline --
-                   it is the first block in the column and the only one for
-                   which the distinction matters. */
-                firstBaseline: 32,
+                /* An ordinary text baseline, and deliberately the SAME as the
+                   main column's: with no photograph uploaded the panel's
+                   first heading sits level with the name, which is where a
+                   heading belongs. The photograph does not use this -- it is
+                   placed absolutely by its own `top` -- so the two cases are
+                   independent instead of one coordinate having to mean a box
+                   top for one and a baseline for the other. It did mean both
+                   for an afternoon, and the no-photo panel started 54pt too
+                   high as a result. */
+                firstBaseline: 86,
                 bottom: 806
             },
             main: {
@@ -798,7 +815,7 @@ window.TB_RESUME_TEMPLATES = [
                in the accent so the corner reads as part of the colour scheme
                rather than as a misregistered print. */
             { column: "sidebar", kind: "photo",
-              width: 167, gapAfter: 20,
+              top: 32, width: 167, gapAfter: 20,
               backdrop: { color: "accentRole", dx: -11, dy: -13 } },
 
             /* Discs, not bare glyphs: the panel is pale, so a glyph drawn

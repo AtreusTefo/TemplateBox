@@ -1,6 +1,6 @@
 # Photo Profile CV: The First Template That Draws the Visitor
 
-Date: September 8, 2026
+Date: September 8, 2026 (revised the same day -- see "Six Defects Found By Review" at the foot)
 
 Status: Shipped and verified. The resume editor offers five templates, and one
 of them puts the visitor's own photograph on the sheet.
@@ -236,3 +236,107 @@ block exists to prevent.
   contract this extends
 - `docs/implementation/FOURTH_RESUME_DESIGN_GREY_RAIL.md` -- the previous
   template, and the catalog-card parity rules a fifth one has to satisfy
+
+## Six Defects Found By Review, and the Check That Should Have Caught One
+
+Revised: September 8, 2026, after the template above had already been written
+and the suite reported it clean at 1369/1. Every one of these was found by
+reading the code rather than by running it, which is the point worth recording:
+**the suite has no per-template checks at all.** It verifies ad bands, insets,
+launch routing, catalog parity and export filenames. Nothing in it renders a
+resume template and looks at the result, so none of the six below could have
+failed it.
+
+### 1. The default accent was not on the swatch row (high)
+
+`defaultAccent: "#1B2A4A"`, and the swatch row carries `#1F4E79`. The invariant
+is written on the row itself, in an HTML comment, and says exactly what happens:
+`applyAccent()` marks a swatch active by matching its hex EXACTLY, so an off-row
+default opens the editor with nothing selected and, the moment the visitor tries
+another colour, **the template's own accent is unreachable forever**.
+
+That is the dead-control defect this project has hit before -- it is why
+`colorOf` resolves a palette entry that names `accent`, and why the green and
+the graphite were added to the row for the two templates that need them.
+
+Fixed by using the row's own `#1F4E79`. Adding an eighth swatch was the other
+option and was rejected: `#1B2A4A` and `#1F4E79` are both navy, so it would have
+put two nearly identical blues side by side to serve one template.
+
+**New static check 1m** enforces it now, because a comment asking people to
+remember is not a check. It parses the swatch row out of `resume.html` and every
+`id`/`defaultAccent` pair out of the registry, and asserts each declared accent
+is on the row. A template declaring no accent is skipped, which is what Classic
+does on purpose. Mutation-proven three ways: restoring `#1B2A4A` fails naming
+`photo-rail`; deleting the green swatch fails naming `ruled-serif`; renaming the
+swatch class trips a second assertion that the row was parsed at all, so the
+check cannot quietly become vacuous.
+
+### 2. "Start blank" left the photograph behind (high)
+
+The sample notice's Start blank handler clears every `[data-bind]` control, then
+the experience, education, language, project and reference lists by hand --
+each with a comment explaining that rows are not `[data-bind]` controls so the
+sweep does not reach them. It had been written twice already.
+
+A photograph is the same shape of thing a third time, and it was missed: Start
+blank produced an empty resume with the visitor's face still on it, and left the
+photograph in storage so it survived the reload too. It now calls `setPhoto("")`,
+which is the one path that clears the sheet, the thumbnail and the key together.
+
+### 3. Without a photograph the panel started 54pt too high (medium)
+
+The first version had the photo block read the CURSOR as its box top, which
+forced the column's `firstBaseline` to be a box top as well -- 32. With no
+photograph uploaded, the first thing in the panel is the CONTACT heading, and it
+landed on that same 32 as a text BASELINE: hard against the paper edge, and 54pt
+above the name in the main column.
+
+The block is positioned absolutely by its own `top` now and does not read the
+cursor at all. `firstBaseline` is an ordinary baseline again, and deliberately
+86 -- the main column's -- so a document with no photograph sets CONTACT level
+with the name. Measured after the change: CONTACT at 86, name at 86.
+
+**The with-photo case did not move**: photo box still (22, 32) at 167x208.75,
+CONTACT still at 284.75, one page, no overflow. The fix is confined to the case
+that was wrong, which is the property that made it the right fix.
+
+### 4. An orphan photograph was restored onto sample content (medium)
+
+Separate keys are what protects the document (defect class in the section above),
+but they also let one outlive the other. `init()` restored the photograph
+unconditionally, so clearing the document record alone -- and nothing stops that
+-- put somebody's face on the first-run SAMPLE content.
+
+The photograph belongs to a document, so it is restored only when a saved
+document exists, and an orphan is cleared rather than left waiting for the next
+load. Nothing can be lost by the gate: uploading writes the document record too,
+so a photograph with no record is an orphan by definition.
+
+### 5. The security guard existed in two copies (medium)
+
+The engine's `photoUrl()` and the editor's `validPhoto()` carried the same regex,
+written out twice. Both were correct on the day they were written, which is
+exactly how a security rule drifts -- the copies stop agreeing the day one is
+widened and nothing says so.
+
+The engine exports `isPhotoUrl` now and the editor calls it. With no engine there
+is nothing to draw and nothing to protect, so an absent library rejects rather
+than falling back to a second copy.
+
+### 6. A failed save left the previous photograph behind (low)
+
+`storePhoto()` reads back after writing, so a quota failure is reported -- but
+`setItem` throwing leaves the PREVIOUS value under the key, which would come
+back on the next load. The message said the photograph would not be kept; the
+old one would have been.
+
+The key is cleared on failure, so the message is true. A small value replacing a
+large one is also the write most likely to succeed against a full quota.
+Verified by stubbing `setItem` to refuse anything over 500 bytes: the message
+appears, the new photograph is on the sheet and will export exactly as promised,
+and the stale one is gone.
+
+### Also removed
+
+A dead `offsetX` parameter on the photo block that no descriptor used.

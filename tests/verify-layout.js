@@ -721,6 +721,55 @@ function staticChecks() {
         });
     }
 
+    /* 1m. Every resume template's `defaultAccent` must be a swatch on
+           resume.html's row.
+
+           The invariant is written on the row itself, in an HTML comment,
+           and was still broken the first time a template was added after it
+           was written: `photo-rail` shipped with a navy that is not on the
+           row. Nothing fails at runtime, which is the whole problem --
+           applyAccent() marks a swatch active by matching its hex EXACTLY,
+           so an off-row default opens the editor with the row showing
+           nothing selected, and the moment the visitor tries another colour
+           the template's own accent is unreachable forever. It is the
+           dead-control defect this project has hit before, and a comment
+           asking people to remember is not a check.
+
+           The registry is parsed as text rather than executed: it is a
+           browser file that assigns to `window`, and requiring a DOM here
+           would put this in the browser sections where it does not belong.
+           A template that declares NO defaultAccent is fine and skipped --
+           Classic does exactly that on purpose, so it has no opinion about
+           colour and a Classic card cannot reset the visitor's choice. */
+    const templatesJs = fs.readFileSync(path.join(SITE, "js", "resume-templates.js"), "utf8");
+    const resumeHtml = fs.readFileSync(path.join(SITE, "resume.html"), "utf8");
+
+    const swatchHexes = new Set(
+        [...resumeHtml.matchAll(/class="swatch[^"]*"[^>]*?data-accent="(#[0-9A-Fa-f]{6})"/g)]
+            .map(([, hex]) => hex.toUpperCase()));
+
+    /* id and defaultAccent are paired by ORDER: both appear once per entry,
+       and an entry that declares no accent must not borrow the next one's.
+       Scanning for whichever comes first keeps each accent with its own id. */
+    const tplAccents = [...templatesJs.matchAll(/\b(id|defaultAccent):\s*"([^"]+)"/g)]
+        .reduce((acc, [, key, value]) => {
+            if (key === "id") { acc.push({ id: value, accent: null }); }
+            else if (acc.length) { acc[acc.length - 1].accent = value.toUpperCase(); }
+            return acc;
+        }, []);
+
+    check(`resume.html declares an accent swatch row (${swatchHexes.size} swatches) ` +
+          `and js/resume-templates.js declares templates (${tplAccents.length})`,
+        swatchHexes.size > 0 && tplAccents.length > 0,
+        "the swatch row or the template registry could not be parsed, so the " +
+        "defaultAccent invariant cannot be checked against either");
+
+    const offRow = tplAccents.filter((t) => t.accent && !swatchHexes.has(t.accent));
+    check("every resume template's defaultAccent is a swatch on resume.html's row",
+        offRow.length === 0,
+        offRow.map((t) => `${t.id}: ${t.accent} is not on the row ` +
+            `(swatches: ${[...swatchHexes].join(", ")})`).join("\n      "));
+
     /* The catalog-empty message names the card count. It said 17 against
        eighteen cards until August 22, 2026, because adding a card does not
        force anyone to touch that sentence. */
