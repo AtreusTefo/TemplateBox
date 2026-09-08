@@ -456,41 +456,6 @@
                 </article>
 
                 <article class="template-card" data-category="resumes">
-                    <div class="card-preview" aria-hidden="true">
-                        <div class="card-media">
-                            <div class="mock-doc">
-                                <p class="mk-name">Adaeze Nwosu</p>
-                                <p class="mk-role">Operations Director</p>
-                                <p class="mk-contact">adaeze.nwosu@mail.com | +1 555 0148 | Chicago, IL</p>
-                                <p class="mk-h">Summary</p>
-                                <p class="mk-p">Fifteen years leading supply chain and fulfilment teams across three continents.</p>
-                                <p class="mk-h">Experience</p>
-                                <p class="mk-t">Director of Operations, Northwind Logistics</p>
-                                <p class="mk-s">2019 - Present</p>
-                                <p class="mk-p">Cut fulfilment lead time 34% across nine regional depots.</p>
-                                <p class="mk-t">Head of Fulfilment, Cardinal Freight</p>
-                                <p class="mk-s">2014 - 2019</p>
-                                <div class="mk-fill"></div>
-                                <p class="mk-h">Education</p>
-                                <p class="mk-s">MBA, Kellogg School of Management</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-category">Resumes</p>
-                        <!-- data-doc is REQUIRED on every card, even one that
-                             launches the default template. Without it
-                             bindLaunchControls stores no preset and clears
-                             none, so the editor falls through to the last
-                             template the visitor used and this card opens
-                             whatever they happened to look at before it. The
-                             id names the CARD; the editor resolves an id it
-                             has no descriptor for to Classic. -->
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="executive-resume">Executive Resume</a></h3>
-                    </div>
-                </article>
-
-                <article class="template-card" data-category="resumes">
                     <!-- Repointed at the grey-rail descriptor on August 30,
                          2026. This card carried no data-doc and so launched
                          the editor with no preset, meaning it rendered
@@ -553,17 +518,34 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
+                        <!-- data-doc is REQUIRED on every card, even one that
+                             launches the default template. Without it
+                             bindLaunchControls stores no preset and clears
+                             none, so the editor falls through to the last
+                             template the visitor used and this card opens
+                             whatever they happened to look at before it. The
+                             id names the CARD; the editor resolves an id it
+                             has no descriptor for to Classic, which is what
+                             this card relies on -- there is no
+                             `minimalist-ats-resume` descriptor and there does
+                             not need to be.
+
+                             It is the ONLY resume card resolving that way, as
+                             of September 8, 2026. "Executive Resume" resolved
+                             to Classic too, so the two were one document
+                             behind two names and two identical miniatures;
+                             that card is deleted rather than renamed, because
+                             the catalog promising a design the registry does
+                             not hold is the fault itself. -->
                         <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="minimalist-ats-resume">Minimalist ATS Resume</a></h3>
                     </div>
                 </article>
 
-                <!-- The first resume card carrying a data-doc. The three above
-                     it launch the editor with no preset, so they open whatever
-                     template was last used; this one names a descriptor in
-                     js/resume-templates.js and the editor selects it on
-                     arrival. Its miniature needs the .ruled modifier because
-                     centred serif headings between two rules are the whole
-                     signature of the design. -->
+                <!-- Its miniature needs the .ruled modifier because centred
+                     serif headings between two rules are the whole signature
+                     of the design. This once read "the first resume card
+                     carrying a data-doc", which stopped being true on August
+                     30, 2026 when the other cards were given one. -->
                 <article class="template-card" data-category="resumes">
                     <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
@@ -1028,7 +1010,7 @@
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 33.
+                Try a broader term, or clear the search to see all 32.
             </p>
         </section>
 

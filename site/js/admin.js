@@ -1420,7 +1420,6 @@ body + '\n' +
         { id: "sales-receipt", title: "Sales and Cash Receipt Form", category: "documents", doc: "sales-receipt" },
         { id: "invoice", title: "Professional Invoice", category: "documents", doc: "invoice" },
         { id: "warning-notice", title: "Employee Warning Notice", category: "documents", doc: "warning-notice" },
-        { id: "executive-resume", title: "Executive Resume", category: "resumes", doc: "executive-resume" },
         { id: "grey-rail", title: "Modern Professional CV", category: "resumes", doc: "grey-rail" },
         { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: "minimalist-ats-resume" },
         { id: "ruled-serif", title: "Ruled Serif CV", category: "resumes", doc: "ruled-serif" },

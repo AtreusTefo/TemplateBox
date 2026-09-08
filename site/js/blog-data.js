@@ -39,7 +39,6 @@ window.TB_BLOG_POSTS = [
             {
                 "type": "ul",
                 "items": [
-                    "**Executive Resume** - a commanding serif-led layout for senior roles.",
                     "**Modern Professional CV** - clean accent-colored sections with a live preview.",
                     "**Minimalist ATS Resume** - a distraction-free single-column format tuned for tracking systems."
                 ]
