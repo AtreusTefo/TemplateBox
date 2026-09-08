@@ -211,7 +211,14 @@ each edge, and one pixel per side is not a measurement. The band means are.
 
 - Static suite: 131 passed, 0 failed
 - Zone 477x751, artwork coverage 99.993%, no gap at the mat's edge
-- Empty-state prompt confined to the zone: 351,737px inside, **0 outside**
+- Empty-state prompt confined to the zone: 351,737px inside, **0 outside**.
+  That counts the prompt's FILL. It does not mean nothing is painted outside the
+  print area: diffing the render against the raw base instead shows a 2px band
+  of zone stroke beyond the zone on this template (1,570px at distance 1, 1,570
+  at distance 2), because the stroke is centred on the zone path. It is the
+  editor's chrome, shared by every template, and it disappears as soon as a
+  design is added. Measured and explained in
+  `TSHIRT_AND_CAP_SET_MOCKUP.md`
 - Colour field and Background panel both correctly hidden
 - Catalog 31 cards, 18 mockups, mega-menu count matching, search hint at 31
 - Standard derivation verified to keep the frame's interior with dilation ON

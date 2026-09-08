@@ -275,6 +275,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie Back Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-cap-clay">T-Shirt and Cap Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">T-Shirt Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
@@ -1494,6 +1495,10 @@ body + '\n' +
         {
             id: "bucket-hat-white", title: "White Bucket Hat Mockup", category: "mockups", doc: "bucket-hat-white",
             folder: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats/bucket-hat-white"
+        },
+        {
+            id: "tshirt-cap-clay", title: "T-Shirt and Cap Mockup", category: "mockups", doc: "tshirt-cap-clay",
+            folder: "assets/thumbnails/product-mockups/apparel/sets/tshirt-cap-clay"
         },
         {
             id: "tshirt-model-white-back", title: "White T-Shirt Back Mockup", category: "mockups", doc: "tshirt-model-white-back",

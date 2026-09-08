@@ -1735,5 +1735,123 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 800, y: 460 },
             { x: 330, y: 460 }
         ]
+    },
+    {
+        id: "tshirt-cap-clay",
+        title: "White T-Shirt and Cap on Clay",
+        thumb: "assets/thumbnails/product-mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-thumb.jpg",
+        /* 1122x1402, which is 0.8003 -- 4:5 to within 0.03%, so the catalog
+           card is a straight downscale with no padding. The first template
+           carrying TWO garments, and the first two-zone entry that is not the
+           business card pair. */
+        base: "assets/mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-displace.png",
+        shade: "assets/mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-shade.png",
+        light: "assets/mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-light.png",
+        /* 0.3, the apparel default, and the measurement that sets it is the
+           usual one: a #12305C navy fill reaches p95 luma 133.4 in the shirt
+           zone and 149.1 in the cap's at gain 1.0, against a source of 44. At
+           0.3 those fall to 70.8 and 75.6 and nothing loses its blue identity.
+
+           The map was NOT waved through on the apparel precedent. Specular
+           headroom here is 14.7 luma levels, the highest measured in this
+           catalog -- above the held bag's 11.8, which was kept, and the linen
+           frame's 10.0, which was dropped -- so the structure test decided it.
+           Unlike the linen's map, this one has spatial structure: light means
+           run 27.4 at the shirt zone's edge band against 31.4 in its interior,
+           and 45.6 against 37.5 on the cap, where the linen agreed with itself
+           to one part in three hundred (27.8 against 27.7) and was therefore
+           noise. Local sd is 19x the shade map's on the shirt and 10.6x on the
+           cap, against the linen's 45x. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-garment.png",
+        tone: "assets/mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-tone.png",
+        /* 3.56 luma levels, comfortably over the derive's 2.0 floor and the
+           second-best weave in the catalog after the front model shirt's 3.78
+           -- the hanger shirt, shot the same way, only reached 1.92. A cotton
+           tee and a brushed-twill cap both hold their fibre here, so the two
+           heather colourways have real structure to screen back. */
+        grain: "assets/mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-grain.png",
+        /* Both garments dye together, which is what a matching set should do.
+           The mask is the union of the two regions the two print zones seed:
+           634,802px of shirt and 92,439px of cap, where the THIRD largest
+           classified region is 31px of speckle. The 6px dilation does not
+           bridge them -- the shortest path between the shirt's hem and the
+           cap's crown measures 16px, so they close to 4px apart and stay two
+           regions. Between them the two seeds keep 727,280 of 727,407
+           classified pixels, dropping 0.017%. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        displaceStrength: 8,
+        mode: "surface",
+        backing: null,
+        /* NO `background`: the scene is opaque, every corner alpha 255 and not
+           one pixel clear, so the Background colour panel stays hidden. The
+           terracotta wall is not decoration -- it is what holds the backdrop
+           out of the garment mask. Measured saturation p1 runs 81 to 115
+           across three wall patches against a gate of 14, and the woodwork
+           fails it too (rail p1 19, ledge 28, hanger 24). This is the lesson
+           `frame-black-shelf` paid for, where a wall at saturation 7 passed
+           the gate and 302,034px of it flooded into the print region. */
+        zoneLabels: ["T-Shirt", "Cap"],
+        /* Two axis-aligned rectangles, so both keep `zoneIsRect` and the full
+           shading pass; neither routes to the perspective warp.
+
+           SHIRT, 357x475: a real 12x16in print at 29.71 px/in, its top 3in
+           below the neckline, by the same rule `tshirt-hanger-white` applies
+           to its own landmarks. The collar's lowest point on the centreline is
+           y=397 -- found by vertical gradient, not by classification, because
+           the neck opening shows the garment's own inside and the column never
+           breaks -- and the hem is y=1229, so 832px reads as 28in. Centred on
+           x=431, which the body's row midpoints hold to within 4px from the
+           chest to the hem. Verified 100.0000% fabric, zero impure pixels,
+           with 110px of clearance to the body's edge on both sides.
+
+           CAP, 196x98: 2:1, the ratio of a standard 4.5x2.25in cap embroidery
+           area, at this cap's scale of 43.6 px/in. It is boxed in on three
+           sides and each bound was measured: the two eyelets sit at y=996 with
+           cores down at luma 55, the front centre seam runs x=924 from y=948
+           and fades by y=995, and the brim seam is the luma step at y=1162.
+           The zone spans y 1030..1128, clearing the eyelets and seam by 34px
+           and the brim by 34px. Centred on x=914, which is where the two
+           front-panel seams put the panel's middle (they read x=775 and x=1051
+           at three heights) and where the silhouette's own midpoint sits.
+           Verified 100.0000% fabric, zero impure pixels.
+
+           The cap is the reason the photograph was shot square-on from the
+           front rather than as an overhead flat-lay: a cap lying on a surface
+           presents its crown or its lining to an overhead camera, never its
+           front panel, so a flat-lay cannot carry a cap print at all. */
+        warpZones: [
+            [
+                { x: 252, y: 486 },
+                { x: 609, y: 486 },
+                { x: 609, y: 961 },
+                { x: 252, y: 961 }
+            ],
+            [
+                { x: 816, y: 1030 },
+                { x: 1012, y: 1030 },
+                { x: 1012, y: 1128 },
+                { x: 816, y: 1128 }
+            ]
+        ],
+        /* warpZones[0], not an independent value: every path that predates
+           multi-zone reads this one and the validator requires it. */
+        warpZone: [
+            { x: 252, y: 486 },
+            { x: 609, y: 486 },
+            { x: 609, y: 961 },
+            { x: 252, y: 961 }
+        ]
     }
 ];
