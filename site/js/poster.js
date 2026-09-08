@@ -125,6 +125,20 @@
        silent. */
     const CARD_RANK_FONT = "playfair";
 
+    /* Selectable ranks for the two corner indices. Court cards and the ace
+       only, and deliberately no numerals: every glyph here is ONE character,
+       and "10" set at the artwork's 14-per-cent em size overruns the paper
+       margin and collides with the photo panel. The two corners are chosen
+       independently, so two queens or two kings are as available as the
+       artwork's queen and king -- which is the whole point of the control. */
+    const RANKS = ["A", "J", "Q", "K"];
+    const RANK_LABELS = { A: "A - Ace", J: "J - Jack", Q: "Q - Queen", K: "K - King" };
+    const DEFAULT_RANKS = { head: "Q", foot: "K" };
+
+    function validRank(value, corner) {
+        return RANKS.indexOf(value) >= 0 ? value : DEFAULT_RANKS[corner];
+    }
+
     /* Emoji picker inventory. Native Unicode only -- no image CDN, which would
        be a network dependency inside an editor whose whole proposition is that
        it runs with nothing leaving the device (CLAUDE.md Critical Rule 1). */
@@ -191,6 +205,8 @@
         name: DEFAULT_POSTER_NAME,
         size: "A3",
         frame: "black",
+        rankHead: DEFAULT_RANKS.head,
+        rankFoot: DEFAULT_RANKS.foot,
         texts: [defaultText("t1", "")],
         sel: "t1"
     };
@@ -204,7 +220,10 @@
     let future = [];
 
     function snapshot() {
-        return JSON.stringify({ name: state.name, size: state.size, frame: state.frame, texts: state.texts });
+        return JSON.stringify({
+            name: state.name, size: state.size, frame: state.frame,
+            rankHead: state.rankHead, rankFoot: state.rankFoot, texts: state.texts
+        });
     }
 
     function restore(json) {
@@ -212,6 +231,8 @@
         state.name = parsed.name;
         state.size = parsed.size;
         state.frame = parsed.frame;
+        state.rankHead = validRank(parsed.rankHead, "head");
+        state.rankFoot = validRank(parsed.rankFoot, "foot");
         state.texts = parsed.texts;
         if (!state.texts.some((t) => t.id === state.sel)) {
             state.sel = state.texts.length ? state.texts[0].id : null;
@@ -254,6 +275,7 @@
         restore(past.pop().json);
         afterChange();
         syncControls();
+        syncDocControls();
     }
 
     function redo() {
@@ -264,6 +286,7 @@
         restore(future.pop());
         afterChange();
         syncControls();
+        syncDocControls();
     }
 
     function afterChange() {
@@ -291,6 +314,8 @@
             caption: TB.sanitize(first ? first.text : ""),
             frame: state.frame,
             name: TB.sanitize(state.name),
+            rankHead: state.rankHead,
+            rankFoot: state.rankFoot,
             size: state.size,
             texts: state.texts.map((t) => {
                 const copy = Object.assign({}, t);
@@ -306,6 +331,11 @@
             return;
         }
         state.frame = FRAME_STYLES[saved.frame] ? saved.frame : "black";
+        /* Absent on every record written before the ranks became selectable,
+           which is exactly the case validRank() falls back for -- so an older
+           saved poster reopens as the Q and K it was drawn with. */
+        state.rankHead = validRank(saved.rankHead, "head");
+        state.rankFoot = validRank(saved.rankFoot, "foot");
         state.size = PAPER[saved.size] ? saved.size : "A3";
         state.name = TB.desanitize(String(saved.name || "")).trim() || "Untitled poster";
 
@@ -570,8 +600,8 @@
         c.lineWidth = CARD.rule * W;
         c.strokeRect(x, y, w, h);
 
-        drawCardIndex(c, W, H, "Q", false);
-        drawCardIndex(c, W, H, "K", true);
+        drawCardIndex(c, W, H, state.rankHead, false);
+        drawCardIndex(c, W, H, state.rankFoot, true);
     }
 
     /* transparent=true skips the frame, matte and placeholder fills so a PNG
@@ -876,7 +906,46 @@
             beginChange();
             state.frame = FRAME_STYLES[frameSelect.value] ? frameSelect.value : "black";
             commit();
+            syncDocControls();
         });
+    }
+
+    const rankHeadSelect = byId("p-rank-head");
+    const rankFootSelect = byId("p-rank-foot");
+
+    [[rankHeadSelect, "rankHead", "head"], [rankFootSelect, "rankFoot", "foot"]].forEach((entry) => {
+        const el = entry[0];
+        if (!el) {
+            return;
+        }
+        el.addEventListener("change", () => {
+            beginChange();
+            state[entry[1]] = validRank(el.value, entry[2]);
+            commit();
+        });
+    });
+
+    /* Pushes state back INTO the document-level controls. syncControls() next
+       to it does the same job for the text toolbar, and deliberately returns
+       early when nothing is selected, so it was never the place for these.
+
+       Undo and redo are why this exists: they rewrite state wholesale, and
+       until now nothing wrote the result back to these selects -- undoing a
+       frame change repainted the canvas correctly and left the Frame Style
+       select showing the style that had just been undone. The rank selects
+       would have inherited exactly that. */
+    function syncDocControls() {
+        const style = FRAME_STYLES[state.frame] || FRAME_STYLES.black;
+        if (frameSelect) { frameSelect.value = state.frame; }
+        if (sizeSelect) { sizeSelect.value = state.size; }
+        if (nameInput && nameInput.value !== state.name) { nameInput.value = state.name; }
+        if (rankHeadSelect) { rankHeadSelect.value = state.rankHead; }
+        if (rankFootSelect) { rankFootSelect.value = state.rankFoot; }
+
+        const cardFields = byId("p-card-fields");
+        if (cardFields) {
+            cardFields.hidden = style.layout !== "card";
+        }
     }
 
     const sizeSelect = byId("p-size");
@@ -1247,7 +1316,8 @@
         out += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
             '" fill="none" stroke="' + CARD.ink + '" stroke-width="' + (CARD.rule * W) + '"/>';
 
-        return out + cardIndexSVG(W, H, "Q", false, esc) + cardIndexSVG(W, H, "K", true, esc);
+        return out + cardIndexSVG(W, H, state.rankHead, false, esc) +
+            cardIndexSVG(W, H, state.rankFoot, true, esc);
     }
 
     /* SVG: genuinely vector text over an embedded raster photo. The photo
@@ -1617,6 +1687,17 @@
                 frame.appendChild(o);
             });
         }
+        [["p-rank-head", "head"], ["p-rank-foot", "foot"]].forEach((pair) => {
+            const el = byId(pair[0]);
+            if (el && !el.options.length) {
+                RANKS.forEach((r) => {
+                    const o = document.createElement("option");
+                    o.value = r;
+                    o.textContent = RANK_LABELS[r];
+                    el.appendChild(o);
+                });
+            }
+        });
     }
 
     buildSelects();
@@ -1634,9 +1715,7 @@
         state.frame = framePreset;
     }
 
-    if (frameSelect) { frameSelect.value = state.frame; }
-    if (sizeSelect) { sizeSelect.value = state.size; }
-    if (nameInput) { nameInput.value = state.name; }
+    syncDocControls();
 
     initEmoji();
     initDownload();

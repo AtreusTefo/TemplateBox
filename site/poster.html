@@ -404,6 +404,25 @@
                         <label for="p-frame">Frame Style</label>
                         <select id="p-frame"></select>
                     </div>
+
+                    <!-- Only the card layout has corner indices, so these are
+                         hidden for the four frame styles rather than shown
+                         inert: a control that is always visible but usually
+                         does nothing reads as broken, which is the same
+                         argument the text toolbar above is built on.
+                         js/poster.js toggles the wrapper. -->
+                    <div id="p-card-fields" hidden>
+                        <div class="field">
+                            <label for="p-rank-head">Top-Left Letter</label>
+                            <select id="p-rank-head"></select>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-rank-foot">Bottom-Right Letter</label>
+                            <select id="p-rank-foot"></select>
+                            <p class="upload-hint">Two queens or two kings are as valid as a queen and a king. The suit is hearts either way.</p>
+                        </div>
+                    </div>
                 </form>
                 <div class="preview-actions">
                     <p class="upload-hint">Use the Download button in the toolbar to export as PNG, JPG, PDF, SVG or PPTX. Nothing leaves your device.</p>

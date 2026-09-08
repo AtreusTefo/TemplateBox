@@ -19,7 +19,8 @@ Five files, no new dependency and no new persisted field:
 
 | File | Change |
 | --- | --- |
-| `js/poster.js` | the style, the layout renderer, its SVG twin, and preset support |
+| `js/poster.js` | the style, the layout renderer, its SVG twin, preset support, and the rank selection |
+| `poster.html` | the two rank selects, hidden for the other styles |
 | `index.html` | one catalog card, and the catalog-empty count that tracks the card total |
 | `css/style.css` | the card's miniature |
 | `js/admin.js` | the matching `CATALOG_ITEMS` entry |
@@ -338,6 +339,14 @@ ALSO WIRE UP
   asserted. Update it.
 - Name the key so it does not collide with existing vocabulary: "card"
   already means a catalog tile here, so the style key is `hearts`.
+- Two selects for the corner ranks, persisted and validated like the
+  frame. Offer A, J, Q and K only: every glyph must be ONE character,
+  because "10" at this em size overruns the margin into the panel. The
+  corners are independent, so two queens is a reachable pairing. Hide
+  the pair for the other styles rather than showing them inert, and
+  write state back to them on undo and redo -- whatever syncs the text
+  toolbar probably returns early when no text is selected, so it is not
+  the place for document-level controls.
 
 CONSTRAINTS
 - Entirely client-side. No server code, no new runtime dependency.
@@ -392,13 +401,51 @@ set at 83.67pt, and a pip 19.6 x 18.0mm.
   `loading.html?target=poster`, stores `"hearts"`, and the editor opens on the
   card layout with a saved `gold` poster otherwise intact.
 
+## The ranks became selectable (September 8, 2026)
+
+Shipped in the same day as the layout, on request. The artwork specifies a queen
+and a king; the product should not, because a couple wanting two queens or two
+kings had no way to say so.
+
+Two selects, `rankHead` and `rankFoot`, persisted alongside the frame and
+validated the same way. Four things decided along the way:
+
+**Court cards and the ace only -- A, J, Q, K, and deliberately no numerals.**
+Every glyph in that set is one character. "10" set at the artwork's 14-per-cent
+em size overruns the paper margin and collides with the photo panel, and a set
+that ran 2 through 9 while excluding the one two-character rank would look like
+an oversight rather than a decision.
+
+**The controls are hidden for the other four styles**, not shown inert. Only the
+card layout has corner indices, and a control that is always visible but usually
+does nothing reads as broken -- the same argument the text toolbar is built on.
+`syncDocControls()` toggles the wrapper from the selected style's `layout`.
+
+**The corners are independent**, so every pairing in the set is reachable,
+including A and A. Nothing enforces the artwork's Q-then-K.
+
+**An older saved poster reopens as Q and K.** Records written before this change
+carry no rank fields at all, which is exactly the case the validator falls back
+for -- so the migration step is the validator itself, and there is no version
+bump. This is the same discipline the frame and paper size already follow.
+
+### It fixed a staleness bug that was already there
+
+Undo and redo rewrite state wholesale, and nothing wrote the result back to the
+document-level controls: undoing a frame change repainted the canvas correctly
+and left the Frame Style select showing the style that had just been undone.
+`syncControls()` next to it looks like where that belongs, but it serves the
+text toolbar and returns early when no text element is selected.
+
+The rank selects would have inherited the same fault, so the fix is
+`syncDocControls()` -- frame, paper size, document name and both ranks, plus the
+card fields' visibility -- called from `undo()`, `redo()`, the frame change
+handler and once at startup. The three manual assignments that used to sit in
+the init tail are now that one call.
+
 ## Not done
 
-- **The ranks are fixed at Q and K.** A couple wanting K and K, or Q and Q, has
-  no way to say so. Two selects would cost a persisted field, a migration step
-  and two entries in `syncControls()` -- worth doing on request, but it is a
-  product decision rather than a fidelity one, and the artwork specifies one
-  pairing.
-- **Hearts is the only suit**, for the same reason.
+- **Hearts is the only suit.** The pip is a single path constant, so a suit
+  select is a smaller change than the ranks were; it is simply not asked for.
 - The style is not offered on `poster-maker.html`, which still describes the
   frame styles only.
