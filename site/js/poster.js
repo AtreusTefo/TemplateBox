@@ -74,8 +74,56 @@
         none: { frame: null, trim: null, label: "No frame" },
         black: { frame: "#111111", trim: "#111111", label: "Solid Black" },
         wood: { frame: "#7B5B3A", trim: "#5E4426", label: "Matte Wood" },
-        gold: { frame: "#C9A227", trim: "#A5841C", label: "Polished Gold" }
+        gold: { frame: "#C9A227", trim: "#A5841C", label: "Polished Gold" },
+        /* Not a frame in the sense the other four are: it replaces the whole
+           page layout rather than wrapping the photo panel, so paint() branches
+           on `layout` before it reads `frame` or `trim`. It lives in this map
+           anyway because the frame select is built from these keys and migrate()
+           validates the saved style against them, so a fifth entry needs no new
+           control, no new persisted field and no migration step. */
+        hearts: { frame: null, trim: null, label: "Queen and King of Hearts", layout: "card" }
     };
+
+    /* Geometry for the card layout, traced from the supplied A4 artwork
+       (595.3 x 841.9 pt) and stored as fractions of the page rather than
+       points, so one set of numbers serves every paper size and both the
+       preview and the export scale -- the same reason text elements are
+       fractional.
+
+       The artwork's two corner indices are not exact mirrors of each other:
+       the top margin above the Q is 120.4pt against 117.5pt below the K, which
+       reads as hand placement rather than intent. This draws the bottom-right
+       index as a true mirror of the top-left one; the 2.9pt difference is a
+       third of a millimetre on A4. */
+    const CARD = {
+        panel: { x: 74.5 / 595.3, y: 59.1 / 841.9, w: 446.3 / 595.3, h: 724.5 / 841.9 },
+        rule: 4 / 595.3,
+        pip: { x: 11 / 595.3, y: 120.4 / 841.9, w: 55.6 / 595.3, h: 50.9 / 841.9 },
+        rank: { x: 10.99 / 595.3, baseline: 94.55 / 841.9, size: 83.6676 / 595.3 },
+        red: "#BE1E2D",
+        ink: "#000000"
+    };
+
+    /* The suit pip, the artwork's own bezier path normalised to a unit box so
+       it can be placed at any size. One string feeds both renderers -- Path2D
+       parses it for the canvas and the SVG export emits it verbatim under a
+       transform -- so an edit to the shape cannot land in one export format
+       and silently miss the other. */
+    const HEART_PATH = "M0.5,0.1611C0.4478,0.0668 0.3615,0.002 0.259,0.002" +
+        "C0.1133,0.002 0,0.1238 0,0.2849C0,0.5953 0.1547,0.6425 0.5,1" +
+        "C0.8453,0.6405 1,0.5934 1,0.2829C1,0.1238 0.8885,0 0.741,0" +
+        "C0.6385,0 0.5522,0.0668 0.5,0.1611Z";
+    const HEART = new Path2D(HEART_PATH);
+
+    /* The artwork sets its Q and K in Algerian, which is a licensed Monotype
+       face: the design folder carries the TTF, but bundling it into a public
+       web root is a redistribution this project has no licence for, and the
+       FONTS list above exists precisely so the editor never names a face the
+       renderer would substitute. Playfair Display is already loaded by the
+       page and is the closest high-contrast display serif on hand, so the
+       indices are set in it and the substitution is deliberate rather than
+       silent. */
+    const CARD_RANK_FONT = "playfair";
 
     /* Emoji picker inventory. Native Unicode only -- no image CDN, which would
        be a network dependency inside an editor whose whole proposition is that
@@ -444,6 +492,88 @@
         if ("letterSpacing" in c) { c.letterSpacing = "0px"; }
     }
 
+    /* The photo, or the prompt that stands in for it. Shared by both layouts so
+       an empty editor looks the same whichever style is selected, and so the
+       placeholder can never be styled in one and forgotten in the other. */
+    function drawPhotoPanel(c, x, y, w, h, scale, transparent) {
+        if (photo) {
+            drawCoverImage(c, photo, x, y, w, h);
+            return;
+        }
+        if (transparent) {
+            return;
+        }
+        c.fillStyle = "#F4F3EF";
+        c.fillRect(x, y, w, h);
+        c.fillStyle = "#6B6B66";
+        c.font = "400 " + (34 * scale) + 'px "Inter", sans-serif';
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.fillText("Upload a photo to begin", x + w / 2, y + h / 2);
+    }
+
+    /* One corner index: the rank letter with its suit pip below it.
+
+       The bottom-right copy is the top-left one mirrored VERTICALLY, which is
+       what the artwork does -- matrix(1 0 0 -1) on both the K and its pip --
+       rather than the 180-degree rotation a real playing card uses. The
+       difference is visible on the K: a rotation would also reverse it left to
+       right. That is why only the y axis goes through the transform and the x
+       positions are mirrored arithmetically instead. */
+    function drawCardIndex(c, W, H, rank, flip) {
+        const pipW = CARD.pip.w * W;
+        const pipH = CARD.pip.h * H;
+        const pipX = flip ? W - CARD.pip.x * W - pipW : CARD.pip.x * W;
+        const rankX = flip ? W - CARD.rank.x * W : CARD.rank.x * W;
+
+        c.save();
+        if (flip) {
+            c.translate(0, H);
+            c.scale(1, -1);
+        }
+
+        c.fillStyle = CARD.ink;
+        c.font = "700 " + (CARD.rank.size * W) + "px " + fontStack(CARD_RANK_FONT);
+        c.textAlign = flip ? "right" : "left";
+        c.textBaseline = "alphabetic";
+        c.fillText(rank, rankX, CARD.rank.baseline * H);
+
+        c.fillStyle = CARD.red;
+        c.translate(pipX, CARD.pip.y * H);
+        c.scale(pipW, pipH);
+        c.fill(HEART);
+        c.restore();
+    }
+
+    /* The playing-card layout: white paper, a ruled photo panel, and the two
+       corner indices. Nothing here reads frame.frame or frame.trim -- this
+       style carries a layout instead of a colour pair. The indices are drawn
+       even for a transparent export, because they are the artwork rather than
+       the background the toggle exists to drop. */
+    function paintCard(c, W, H, options, scale) {
+        if (!options.transparent) {
+            c.fillStyle = "#FFFFFF";
+            c.fillRect(0, 0, W, H);
+        }
+
+        const x = CARD.panel.x * W;
+        const y = CARD.panel.y * H;
+        const w = CARD.panel.w * W;
+        const h = CARD.panel.h * H;
+
+        drawPhotoPanel(c, x, y, w, h, scale, options.transparent);
+
+        /* Stroked ON the panel boundary, as the artwork has it, so half the
+           rule falls over the photograph. Insetting it instead would leave a
+           hairline of paper between rule and photo at export scale. */
+        c.strokeStyle = CARD.ink;
+        c.lineWidth = CARD.rule * W;
+        c.strokeRect(x, y, w, h);
+
+        drawCardIndex(c, W, H, "Q", false);
+        drawCardIndex(c, W, H, "K", true);
+    }
+
     /* transparent=true skips the frame, matte and placeholder fills so a PNG
        exports with a genuinely empty background rather than a white one -- the
        toggle in the download panel does this and nothing else. */
@@ -451,39 +581,34 @@
         const options = opts || {};
         const frame = FRAME_STYLES[state.frame] || FRAME_STYLES.black;
         const scale = W / 1200;
-        const FRAME_W = frame.frame ? 60 * scale : 0;
-        const MATTE_W = frame.frame ? 50 * scale : 0;
 
         c.clearRect(0, 0, W, H);
 
-        if (!options.transparent) {
-            if (frame.frame) {
-                c.fillStyle = frame.frame;
-                c.fillRect(0, 0, W, H);
-                c.strokeStyle = frame.trim;
-                c.lineWidth = 6 * scale;
-                c.strokeRect(FRAME_W - 14 * scale, FRAME_W - 14 * scale,
-                    W - (FRAME_W - 14 * scale) * 2, H - (FRAME_W - 14 * scale) * 2);
+        if (frame.layout === "card") {
+            paintCard(c, W, H, options, scale);
+        } else {
+            const FRAME_W = frame.frame ? 60 * scale : 0;
+            const MATTE_W = frame.frame ? 50 * scale : 0;
+
+            if (!options.transparent) {
+                if (frame.frame) {
+                    c.fillStyle = frame.frame;
+                    c.fillRect(0, 0, W, H);
+                    c.strokeStyle = frame.trim;
+                    c.lineWidth = 6 * scale;
+                    c.strokeRect(FRAME_W - 14 * scale, FRAME_W - 14 * scale,
+                        W - (FRAME_W - 14 * scale) * 2, H - (FRAME_W - 14 * scale) * 2);
+                }
+                c.fillStyle = "#FFFFFF";
+                c.fillRect(FRAME_W, FRAME_W, W - FRAME_W * 2, H - FRAME_W * 2);
             }
-            c.fillStyle = "#FFFFFF";
-            c.fillRect(FRAME_W, FRAME_W, W - FRAME_W * 2, H - FRAME_W * 2);
-        }
 
-        const px = FRAME_W + MATTE_W;
-        const py = FRAME_W + MATTE_W;
-        const pw = W - px * 2;
-        const ph = H - py * 2 - (0.11 * H);
+            const px = FRAME_W + MATTE_W;
+            const py = FRAME_W + MATTE_W;
+            const pw = W - px * 2;
+            const ph = H - py * 2 - (0.11 * H);
 
-        if (photo) {
-            drawCoverImage(c, photo, px, py, pw, ph);
-        } else if (!options.transparent) {
-            c.fillStyle = "#F4F3EF";
-            c.fillRect(px, py, pw, ph);
-            c.fillStyle = "#6B6B66";
-            c.font = "400 " + (34 * scale) + 'px "Inter", sans-serif';
-            c.textAlign = "center";
-            c.textBaseline = "middle";
-            c.fillText("Upload a photo to begin", W / 2, py + ph / 2);
+            drawPhotoPanel(c, px, py, pw, ph, scale, options.transparent);
         }
 
         state.texts.forEach((el) => drawTextElement(c, el, W, H));
@@ -1072,6 +1197,59 @@
         doc.save(fileName("pdf"));
     }
 
+    /* The uploaded photo as a data URL for embedding in an SVG. It goes through
+       a canvas rather than being carried from the file input, because the
+       source may be any format the browser can decode and the export has to be
+       one an SVG viewer can. */
+    function photoDataURL() {
+        const c = document.createElement("canvas");
+        c.width = photo.width;
+        c.height = photo.height;
+        c.getContext("2d").drawImage(photo, 0, 0);
+        return c.toDataURL("image/jpeg", 0.92);
+    }
+
+    /* SVG twin of drawCardIndex(). Same constants, same unit pip path, same
+       mirror-in-y-only rule for the bottom-right index. */
+    function cardIndexSVG(W, H, rank, flip, esc) {
+        const pipW = CARD.pip.w * W;
+        const pipH = CARD.pip.h * H;
+        const pipX = flip ? W - CARD.pip.x * W - pipW : CARD.pip.x * W;
+        const rankX = flip ? W - CARD.rank.x * W : CARD.rank.x * W;
+
+        return (flip ? '<g transform="translate(0 ' + H + ') scale(1 -1)">' : "<g>") +
+            '<text x="' + rankX + '" y="' + (CARD.rank.baseline * H) +
+            '" font-family="' + esc(fontStack(CARD_RANK_FONT).replace(/"/g, "'")) +
+            '" font-size="' + (CARD.rank.size * W) + '" font-weight="700"' +
+            ' fill="' + CARD.ink + '" text-anchor="' + (flip ? "end" : "start") + '">' +
+            esc(rank) + "</text>" +
+            '<path d="' + HEART_PATH + '" fill="' + CARD.red + '" transform="translate(' +
+            pipX + " " + (CARD.pip.y * H) + ") scale(" + pipW + " " + pipH + ')"/>' +
+            "</g>";
+    }
+
+    /* SVG twin of paintCard(). Reads the same CARD geometry the canvas
+       renderer does, so the two can only drift if a structural element is
+       added to one and not the other. */
+    function cardSVG(W, H, esc) {
+        const x = CARD.panel.x * W;
+        const y = CARD.panel.y * H;
+        const w = CARD.panel.w * W;
+        const h = CARD.panel.h * H;
+
+        let out = '<rect width="' + W + '" height="' + H + '" fill="#FFFFFF"/>';
+
+        if (photo) {
+            out += '<image x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
+                '" preserveAspectRatio="xMidYMid slice" href="' + photoDataURL() + '"/>';
+        }
+
+        out += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
+            '" fill="none" stroke="' + CARD.ink + '" stroke-width="' + (CARD.rule * W) + '"/>';
+
+        return out + cardIndexSVG(W, H, "Q", false, esc) + cardIndexSVG(W, H, "K", true, esc);
+    }
+
     /* SVG: genuinely vector text over an embedded raster photo. The photo
        cannot become vector, but the type does not have to be rasterised with
        it, which is the whole reason to offer this format. */
@@ -1084,22 +1262,23 @@
 
         let body = "";
         const frame = FRAME_STYLES[state.frame] || FRAME_STYLES.black;
-        if (frame.frame) {
-            body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
-        }
-        const fw = frame.frame ? W * 0.05 : 0;
-        body += '<rect x="' + fw + '" y="' + fw + '" width="' + (W - fw * 2) +
-            '" height="' + (H - fw * 2) + '" fill="#FFFFFF"/>';
 
-        if (photo) {
-            const c = document.createElement("canvas");
-            c.width = photo.width;
-            c.height = photo.height;
-            c.getContext("2d").drawImage(photo, 0, 0);
-            const mw = fw + W * 0.042;
-            body += '<image x="' + mw + '" y="' + mw + '" width="' + (W - mw * 2) +
-                '" height="' + (H - mw * 2 - H * 0.11) +
-                '" preserveAspectRatio="xMidYMid slice" href="' + c.toDataURL("image/jpeg", 0.92) + '"/>';
+        if (frame.layout === "card") {
+            body += cardSVG(W, H, esc);
+        } else {
+            if (frame.frame) {
+                body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
+            }
+            const fw = frame.frame ? W * 0.05 : 0;
+            body += '<rect x="' + fw + '" y="' + fw + '" width="' + (W - fw * 2) +
+                '" height="' + (H - fw * 2) + '" fill="#FFFFFF"/>';
+
+            if (photo) {
+                const mw = fw + W * 0.042;
+                body += '<image x="' + mw + '" y="' + mw + '" width="' + (W - mw * 2) +
+                    '" height="' + (H - mw * 2 - H * 0.11) +
+                    '" preserveAspectRatio="xMidYMid slice" href="' + photoDataURL() + '"/>';
+            }
         }
 
         state.texts.forEach((el) => {
@@ -1442,6 +1621,18 @@
 
     buildSelects();
     migrate(TB.storageGet(STORAGE_KEY));
+
+    /* A catalog card can pre-select the frame style, the same data-doc hand-off
+       docs.html and mockup.html already use. The value is only ever matched
+       against FRAME_STYLES, so a tampered localStorage entry resolves to
+       nothing worse than a style this editor already ships. It outranks the
+       saved style because arriving from a card is a fresh, deliberate choice,
+       and it deliberately leaves the rest of the saved poster alone -- the
+       photo, the text and the paper size all survive the switch. */
+    const framePreset = TB.takePreset();
+    if (FRAME_STYLES[framePreset]) {
+        state.frame = framePreset;
+    }
 
     if (frameSelect) { frameSelect.value = state.frame; }
     if (sizeSelect) { sizeSelect.value = state.size; }

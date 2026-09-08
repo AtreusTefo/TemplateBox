@@ -2299,6 +2299,79 @@ body.is-nav-hidden .site-header:focus-within {
 .mock-doc.poster.gold .mk-plate { background-color: #E4DCC8; }
 .mock-doc.poster.gold .mk-plate::before { background-color: #B9A46C; }
 
+/* "Queen and King of Hearts" miniature. The three above it are frames, so
+   there the border IS the picture frame; this one is white paper with a ruled
+   photo panel, which is why the border goes and the plate carries the rule
+   instead. The panel percentages are the CARD.panel fractions from
+   js/poster.js, so the miniature and the poster it opens are the same layout.
+
+   The indices sit in the paper margin and overlap the panel vertically, as
+   they do on the poster, which is what the absolute positioning buys over
+   stacking them above and below it. The foot index is mirrored in y rather
+   than rotated, again matching drawCardIndex(): its markup order is letter
+   then pip, and scaleY(-1) is what puts the pip on top. */
+.mock-doc.poster.hearts {
+    display: block;
+    position: relative;
+    /* The one container query on the site, and it earns itself here: the
+       indices are a percentage of the poster's width in the artwork, and the
+       catalog card is not a fixed size. A rem value cannot serve this tile --
+       inside the two-column band alone the card runs from about 136px at 320px
+       wide to about 360px just under 48rem, so any single size is either
+       clipped by the panel at one end or a speck at the other. */
+    container-type: inline-size;
+    border: 0;
+    padding: 0;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.hearts .mk-plate {
+    position: absolute;
+    left: 12.5%;
+    top: 7%;
+    width: 75%;
+    height: 86%;
+    border: 1px solid #000000;
+}
+
+/* The rank is 14 per cent of the page width in the artwork, so it is 14cqw
+   here. The rem value on the line above each cqw is the fallback a browser
+   without container queries keeps: it is the size that suits the widest card,
+   which is the one most likely to be a laptop.
+
+   The pip is 9.3 per cent of the page WIDE, and a heart glyph renders at about
+   0.85em, so the em size that produces that width is 11cqw rather than 9.3. */
+.mk-index {
+    position: absolute;
+    font-family: var(--font-serif);
+    font-size: 2.375rem;
+    font-size: 14cqw;
+    font-weight: 700;
+    line-height: 1;
+    color: #000000;
+}
+
+.mk-index::after {
+    content: "\2665";
+    display: block;
+    margin-top: 0.05em;
+    font-size: 1.625rem;
+    font-size: 11cqw;
+    line-height: 1;
+    color: #BE1E2D;
+}
+
+.mk-index-head {
+    left: 2%;
+    top: 4%;
+}
+
+.mk-index-foot {
+    right: 2%;
+    bottom: 4%;
+    transform: scaleY(-1);
+}
+
 .mk-caption {
     font-family: var(--font-serif);
     font-size: 0.4375rem;

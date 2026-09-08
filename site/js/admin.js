@@ -1431,6 +1431,11 @@ body + '\n' +
         { id: "framed-photo-poster", title: "Framed Photo Poster", category: "canvas", doc: null },
         { id: "matte-wood-canvas", title: "Matte Wood Canvas", category: "canvas", doc: null },
         { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: null },
+        /* The only canvas entry with a `doc`: it names a FRAME_STYLES key in
+           js/poster.js rather than a document variant, because the poster
+           editor's preset selects a style. The three above carry null because
+           they open the editor on whatever it last held. */
+        { id: "hearts", title: "Queen and King of Hearts", category: "canvas", doc: "hearts" },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"
