@@ -3196,6 +3196,256 @@ const PARITY_SNAPSHOT = `(() => {
   };
 })()`;
 
+/* ==========================================================================
+   9. Resume templates: every design actually renders.
+
+   THE GAP THIS CLOSES. Every other section here checks the machinery AROUND
+   the documents -- which ad band mounts, where the header's edge lands, that
+   a CTA routes through the interstitial, that a download is named from the
+   right field. Nothing rendered a resume template and looked at the result,
+   so on September 8, 2026 seven defects in one template were found by reading
+   the code and NONE of them could have failed this suite.
+
+   Worse, the one net that might have caught a regression -- section 4's
+   comparison against HEAD -- only answers "did anything change since the last
+   commit?". Commit a mistake and it becomes the baseline: from then on the
+   broken version is compared against the broken version and reported clean.
+   A check has to assert what is TRUE of a good sheet, not merely what is
+   unchanged since yesterday.
+
+   WHAT IS ASSERTED, AND WHY NOT MORE. Everything below holds for every
+   template at any content volume, which is what lets it run against all of
+   them with no per-template table to maintain -- a table would be a second
+   source of truth and would drift the way the ad-host and footer constants
+   already have.
+
+   Page COUNT is deliberately not asserted. Ruled Serif is structurally two
+   pages at any content volume (measured; see
+   docs/implementation/RESUME_SHARED_FIELDS_AND_CONTACT_GLYPHS.md), so "one
+   page" is false for it and an expected-count table is the drift this avoids.
+   Overflow is the honest version of the same question: it asks whether
+   content ran past the boundary its own column declared, which is wrong for
+   every template however many pages it takes.
+
+   This runs in the browser because layout() measures text through jsPDF and
+   throws without it, so it cannot live in the static section.
+   ========================================================================== */
+async function resumeTemplateChecks(page) {
+    section("9. Resume templates: every design renders");
+
+    await page.navigate(`http://localhost:${PORT}/resume.html`, 1440);
+
+    const r = await page.evaluate(`(async () => {
+        for (let i = 0; i < 100; i += 1) {
+            if (window.jspdf && window.jspdf.jsPDF) { break; }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        if (!window.jspdf || !window.jspdf.jsPDF) { return { error: 'jsPDF never loaded' }; }
+        if (!window.TBResume || !window.TB_RESUME_TEMPLATES) { return { error: 'the engine or the registry did not load' }; }
+
+        const HEX = /^#[0-9A-Fa-f]{6}$/;
+
+        /* A photograph, so a template that draws one is exercised with one
+           rather than only in its empty state. Drawn on a canvas at the ratio
+           the engine declares, which is also how js/resume.js produces one. */
+        const ratio = window.TBResume.PHOTO_RATIO;
+        const pc = document.createElement('canvas');
+        pc.width = 400; pc.height = Math.round(400 / ratio);
+        const pg = pc.getContext('2d');
+        pg.fillStyle = '#8FB3D9'; pg.fillRect(0, 0, pc.width, pc.height);
+        const photo = pc.toDataURL('image/jpeg', 0.8);
+
+        /* The editor's own sample content, read from the live form rather
+           than restated here: a second copy would let this check keep passing
+           against content the editor no longer produces. */
+        const fields = {};
+        document.querySelectorAll('#resume-form [data-bind]').forEach((el) => {
+            fields[el.getAttribute('data-bind')] = el.value;
+        });
+        const rows = (listId, keys) =>
+            [...document.querySelectorAll('#' + listId + ' [data-entry]')].map((row) => {
+                const out = {};
+                keys.forEach((k) => {
+                    const el = row.querySelector('[data-entry-field="' + k + '"]');
+                    out[k] = el ? el.value : '';
+                });
+                return out;
+            });
+
+        const sample = {
+            accent: '#1F4E79',
+            fields: fields,
+            experience: rows('experience-list', ['role', 'company', 'place', 'dates', 'description']),
+            education: rows('education-list', ['degree', 'school', 'place', 'dates']),
+            projects: rows('projects-list', ['name', 'role', 'dates', 'description']),
+            references: rows('references-list', ['name', 'title', 'company', 'email', 'phone'])
+        };
+        const empty = { accent: '#1A1A1A', fields: {},
+                        experience: [], education: [], projects: [], references: [] };
+
+        const out = { sampleFieldCount: Object.keys(fields).length,
+                      sampleExperience: sample.experience.length, templates: [] };
+
+        window.TB_RESUME_TEMPLATES.forEach((tpl) => {
+            const row = { id: tpl.id, title: tpl.title };
+            const W = tpl.page.width;
+            const H = tpl.page.height;
+
+            const run = (label, state) => {
+                try {
+                    const ctx = window.TBResume.layout(tpl, state);
+                    const ops = ctx.ops;
+
+                    /* Colours. Every op in the display list carries a hex by
+                       the time a painter sees it -- a role name reaching one
+                       is the defect colorOf's indirection was added to fix,
+                       and it paints as nothing rather than erroring. */
+                    const unresolved = ops.filter((o) => {
+                        if (o.op === 'image') { return false; }
+                        const c = o.fill || o.color;
+                        return !c || !HEX.test(c);
+                    }).length;
+
+                    /* Geometry. Anchors and boxes inside the paper. Text ops
+                       carry an ANCHOR rather than an extent, so this catches
+                       gross misplacement -- a block positioned off the page
+                       -- and not overflow by a few points, which is what the
+                       overflow flags are for. */
+                    let offPage = 0;
+                    ops.forEach((o) => {
+                        const pts = [];
+                        if (o.op === 'text' || o.op === 'circle') {
+                            pts.push([o.x === undefined ? o.cx : o.x,
+                                      o.y === undefined ? o.cy : o.y]);
+                        } else if (o.op === 'line') {
+                            pts.push([o.x1, o.y1], [o.x2, o.y2]);
+                        } else if (o.op === 'poly') {
+                            (o.points || []).forEach((pt) => pts.push(pt));
+                        } else {
+                            pts.push([o.x, o.y], [o.x + o.w, o.y + o.h]);
+                        }
+                        /* Half a point of slack: the sidebar rail and the
+                           bar's overlap land exactly on an edge by design. */
+                        if (pts.some(([x, y]) =>
+                                x < -0.5 || x > W + 0.5 || y < -0.5 || y > H + 0.5)) {
+                            offPage += 1;
+                        }
+                    });
+
+                    /* Photographs. The anti-stretch invariant, asserted
+                       rather than trusted: the drawn box must be the ratio
+                       js/resume.js crops every upload to, or a face is
+                       stretched and neither painter can tell. */
+                    const images = ops.filter((o) => o.op === 'image');
+                    const stretched = images.filter((o) =>
+                        Math.abs((o.w / o.h) - ratio) > 0.001).length;
+
+                    return { ok: true, ops: ops.length, pages: ctx.pages,
+                             overflowMain: ctx.overflow.main,
+                             overflowSidebar: ctx.overflow.sidebar,
+                             unresolved: unresolved, offPage: offPage,
+                             images: images.length, stretched: stretched };
+                } catch (e) {
+                    return { ok: false, error: String((e && e.message) || e) };
+                }
+            };
+
+            row.sample = run('sample', sample);
+            row.withPhoto = run('withPhoto', Object.assign({}, sample, { photo: photo }));
+            row.empty = run('empty', empty);
+            /* An empty document must not draw a photograph either, and the
+               guard has to reject a hostile URI rather than hand it to a
+               painter. */
+            row.hostile = run('hostile', Object.assign({}, sample,
+                { photo: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' }));
+
+            try {
+                const doc = window.TBResume.buildPdf(tpl, Object.assign({}, sample, { photo: photo }));
+                row.pdfBytes = doc.output('arraybuffer').byteLength;
+                /* Text must still be TEXT. Embedding a bitmap must not turn a
+                   page into one: see
+                   docs/error-fixes/RESUME_PDF_RASTERIZED_TEXT_FIX.md.
+
+                   THE DOUBLE BACKSLASH IS LOAD-BEARING. This whole block is a
+                   JS template literal, and \\b inside one is the BACKSPACE
+                   escape, not a word boundary -- written singly the regex
+                   becomes /<backspace>Td<backspace>/ and matches nothing at
+                   all. It counted 0 operators on all four templates the first
+                   time this ran, which is only visible because the assertion
+                   demands a positive count rather than merely a non-negative
+                   one. */
+                row.pdfTextOps = (doc.output().match(/\\bTd\\b/g) || []).length;
+            } catch (e) {
+                row.pdfError = String((e && e.message) || e);
+            }
+            out.templates.push(row);
+        });
+        return out;
+    })()`);
+
+    if (r.error) {
+        check("resume.html loads the template engine and the registry", false, r.error);
+        return;
+    }
+
+    /* The sample is read out of the live form, so a form that stopped
+       producing content would make every assertion below vacuously true. */
+    check(`the editor's sample content was read from the form ` +
+          `(${r.sampleFieldCount} fields, ${r.sampleExperience} experience rows)`,
+        r.sampleFieldCount > 5 && r.sampleExperience > 0,
+        "the form produced no sample content, so every template below would " +
+        "have been checked against an empty document");
+
+    check(`js/resume-templates.js registers templates (${r.templates.length})`,
+        r.templates.length > 0, "no templates to render");
+
+    r.templates.forEach((t) => {
+        const states = [["sample content", t.sample], ["a photograph", t.withPhoto],
+                        ["an empty document", t.empty], ["a hostile photo value", t.hostile]];
+
+        states.forEach(([label, s]) => {
+            check(`${t.id}: lays out with ${label}`, s.ok, s.error || "");
+        });
+        if (!states.every(([, s]) => s.ok)) { return; }
+
+        check(`${t.id}: draws a document rather than a blank page`,
+            t.sample.ops > 20, `only ${t.sample.ops} drawing operations`);
+
+        /* Both columns. The sidebar is the one that matters -- it never
+           paginates, so content past its boundary is simply lost off the
+           foot of the sheet with nothing said. */
+        check(`${t.id}: no column overflows its own boundary`,
+            !t.sample.overflowMain && !t.sample.overflowSidebar &&
+            !t.withPhoto.overflowMain && !t.withPhoto.overflowSidebar,
+            `sample main=${t.sample.overflowMain} sidebar=${t.sample.overflowSidebar}, ` +
+            `withPhoto main=${t.withPhoto.overflowMain} sidebar=${t.withPhoto.overflowSidebar}`);
+
+        check(`${t.id}: every colour resolved to a hex`,
+            states.every(([, s]) => s.unresolved === 0),
+            states.map(([l, s]) => `${l}: ${s.unresolved}`).join(", "));
+
+        check(`${t.id}: nothing is drawn off the page`,
+            states.every(([, s]) => s.offPage === 0),
+            states.map(([l, s]) => `${l}: ${s.offPage}`).join(", "));
+
+        check(`${t.id}: no photograph is drawn at the wrong aspect`,
+            states.every(([, s]) => s.stretched === 0),
+            states.map(([l, s]) => `${l}: ${s.stretched} of ${s.images}`).join(", "));
+
+        /* A photo template draws one WITH a photograph and none without --
+           and none from a value the guard should have rejected. */
+        check(`${t.id}: draws a photograph only when there is a real one`,
+            t.sample.images === 0 && t.empty.images === 0 && t.hostile.images === 0,
+            `sample=${t.sample.images} empty=${t.empty.images} hostile=${t.hostile.images}, ` +
+            "each should be 0 -- a photograph drawn from no photo, or from a " +
+            "rejected data URI, means the guard did not hold");
+
+        check(`${t.id}: exports a PDF whose text is still text`,
+            t.pdfBytes > 0 && t.pdfTextOps > 20,
+            t.pdfError || `${t.pdfBytes} bytes, ${t.pdfTextOps} text-positioning operators`);
+    });
+}
+
 async function parityChecks(browserPath) {
     section("4. Ads blocked: layout identical to the last commit");
 
@@ -3314,6 +3564,7 @@ async function main() {
                     await adminThumbnailChecks(page);
                     await adminPersistenceChecks(page);
                     await exportNameChecks(page);
+                    await resumeTemplateChecks(page);
                 } finally {
                     page.close();
                 }

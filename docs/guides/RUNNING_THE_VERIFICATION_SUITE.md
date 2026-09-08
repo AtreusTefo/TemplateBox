@@ -157,6 +157,78 @@ kill the whole run. It is retried once and announced (August 24, 2026).
 One RETRY line is noise. The same page retrying every run is a real defect — do not treat the
 retry as having settled the question.
 
+### 9. Resume templates: every design actually renders
+
+Added September 8, 2026. It closes the gap every other section here shares:
+they check the machinery AROUND the documents -- which ad band mounts, where
+the header's edge lands, that a CTA routes through the interstitial, that a
+download is named from the right field -- and nothing rendered a resume
+template and looked at the result.
+
+That was not theoretical. Seven defects in one template were found by reading
+the code on the day it shipped, and none of them could have failed this suite.
+The one net that might have caught a later regression, section 4, only answers
+"did anything change since the last commit?" -- so a mistake, once committed,
+becomes the baseline and is compared against itself forever after. A check has
+to assert what is TRUE of a good sheet, not merely what is unchanged.
+
+#### What it does
+
+Loads `resume.html`, reads the editor's own sample content back out of the
+live form, and lays out every template in the registry against four states:
+the sample, the sample plus a photograph, an empty document, and a document
+whose photo value is a hostile SVG data URI. For each it asserts:
+
+| Assertion | What it catches |
+|---|---|
+| lays out without throwing | a descriptor naming a type role, field or body kind that does not exist |
+| draws more than 20 operations | a template that renders a blank page |
+| neither column overflows its own boundary | content past the foot of a column -- and the sidebar never paginates, so its overflow is simply lost |
+| every colour resolved to a hex | a role name reaching a painter, which draws as nothing rather than erroring |
+| nothing drawn off the page | a block positioned outside the paper |
+| no photograph at the wrong aspect | a stretched face, which neither painter can detect |
+| a photograph only when there is a real one | the untrusted-input guard failing open |
+| the PDF's text is still text | a change that rasterizes the page and breaks ATS parsing |
+
+#### What it deliberately does NOT assert
+
+**Page count.** Ruled Serif is structurally two pages at any content volume,
+so "one page" is false for it, and a per-template expected-count table would be
+a second source of truth of exactly the kind this project has already watched
+drift. Overflow is the honest version of the same question: it asks whether
+content ran past a boundary the column itself declared, which is wrong for
+every template however many pages it takes.
+
+**Text extent.** A text operation carries an anchor, not a width, so the
+off-page check catches gross misplacement and not overflow by a few points.
+The overflow flags cover the latter.
+
+#### It was mutation-proven six ways
+
+Every assertion family was broken on purpose and confirmed to fail, per the
+rule in CLAUDE.md that an assertion which has never failed is not evidence:
+
+| Break | Caught by |
+|---|---|
+| sidebar `bottom` cut to 300 | no column overflows its own boundary |
+| photo `top` moved to 900 | nothing is drawn off the page |
+| a type role renamed to `nosuchrole` | every colour resolved to a hex |
+| `h = w / PHOTO_RATIO` changed to `/ 1.45` | no photograph at the wrong aspect |
+| the URL guard widened to any `data:image/` | a photograph only when there is a real one |
+| a block naming a type the template lacks | lays out without throwing (all four states) |
+
+#### One trap worth knowing
+
+The evaluated browser code is a JavaScript template literal, and `\b` inside
+one is the BACKSPACE escape, not a word boundary. The PDF text-operator count
+was written `/\bTd\b/` and silently matched nothing, reporting 0 operators on
+all four templates the first time it ran. It has to be `\\b` in the source.
+
+It is only visible because the assertion demands a POSITIVE count rather than a
+non-negative one -- written the lazy way it would have passed forever while
+measuring nothing. That is the general lesson for anything added here: assert
+the value you expect, never merely that the code ran.
+
 ## Adding a Check
 
 Two rules, both learned from this suite's own bugs.
