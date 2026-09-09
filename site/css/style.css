@@ -4854,8 +4854,24 @@ body.has-site-anchor {
 /* Below the editor's two-pane breakpoint the toolbar would otherwise wrap to
    four rows and push the canvas off screen. */
 @media (max-width: 48rem) {
+    /* 3.5rem, not 5. The basis is what the browser breaks lines on BEFORE it
+       grows anything, so on a bar whose other items are fixed -- mark, menu
+       button, and the actions -- this number alone decides whether the actions
+       wrap to a second row. At 5rem the poster bar broke at 360 and 375, which
+       is most Android phones and the SE; at 3.5rem it holds down to 348.
+       Measured, not derived: 348 is one row, 344 is two.
+
+       Lowering it costs nothing where there is room: the field still has
+       flex-grow, so above the break it fills whatever the bar has spare and
+       renders exactly as wide as it did before.
+
+       320 still wraps and is not fixable here. That row would need the basis
+       below 28px, which is a name field showing two characters; fitting it
+       means dropping something from the bar, the way mockup.html dropped its
+       download and docs.html dropped its button labels. That is a product
+       decision rather than a layout one. */
     .doc-name {
-        flex-basis: 5rem;
+        flex-basis: 3.5rem;
     }
 
     .text-toolbar {

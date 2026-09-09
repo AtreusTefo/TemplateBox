@@ -100,34 +100,28 @@
          Replacing the ELEMENT would have broken that contract; replacing its
          CONTENTS is what "a minimal editor bar" actually needs.
 
-         The wordmark is replaced by a home button per the reference layout, and
-         the Templates/Guides/About links are gone -- but the "More" mega-menu
-         below is kept, because it is the only route from an editor to the privacy
-         policy and terms (the editors carry no footer, a gap PROJECT_STATUS.md
-         already flags as worth revisiting rather than widening). -->
+         The bar carries the mark, the document name and the actions, and
+         nothing else. The inline Templates and Guides links and the header
+         search -- field and narrow-width link both -- were removed on
+         September 9, 2026: this is a workspace, and a link out of it competes
+         with the work rather than supporting it. Search is still reachable
+         from the mega-menu below.
+
+         That menu stays, because it is the only route from an editor to the
+         privacy policy and terms (the editors carry no footer, a gap
+         PROJECT_STATUS.md already flags as worth revisiting rather than
+         widening). -->
     <header class="site-header editor-bar">
-        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
-        <!-- Two left-hand identities, one visible at a time: the icon below
-             75rem, the wordmark above it, where there is room for a word.
-             Both link home. Matches mockup.html, which established this. -->
-        <a class="editor-brand" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
+        <!-- The mark alone, ungated: no wordmark beside it, and no viewport
+             gate handing the narrow band to a second identity. `order: -1` is
+             what puts it before the document name, which carries no order of
+             its own -- see the .editor-mark comment in css/style.css, and
+             docs.html, which established this. -->
+        <a class="editor-mark" href="index.html" title="TemplateBox home" aria-label="TemplateBox home, all templates"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg></a>
 
         <!-- Collapses the links below 75rem. Same control, same class and the
              same js/app.js handler as every other page. -->
         <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-
-        <!-- Search as a link below 75rem, where the field is hidden. -->
-        <a class="search-toggle" href="search.html" aria-label="Search templates and guides"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg></a>
-
-        <!-- A real GET form, so it needs no JavaScript: there is nothing on
-             this page to filter, so navigating is the only correct answer and
-             the browser does that itself. -->
-        <form class="editor-search" role="search" action="search.html" method="get">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg>
-            <label class="sr-only" for="editor-search-input">Search templates and guides</label>
-            <input type="search" id="editor-search-input" name="q" placeholder="Search posters and templates"
-                   autocomplete="off" spellcheck="false" maxlength="80">
-        </form>
 
         <label class="sr-only" for="doc-name">Poster name</label>
         <input type="text" class="doc-name" id="doc-name" title="Names the file you download" maxlength="80" value="Untitled poster" aria-label="Poster name">
@@ -147,12 +141,15 @@
             </span>
 
             <div class="dl" data-download>
-                <button type="button" class="btn dl-toggle" id="dl-toggle" aria-expanded="false" aria-controls="dl-panel">
+                <!-- aria-label added with .bar-label below it, and the two go
+                     together: `.editor-bar .bar-label` is display:none under
+                     48rem, and without a label here the word going would take
+                     the button's accessible name with it, leaving an unnamed
+                     control. docs.html's three bar buttons carry theirs for
+                     exactly this reason. -->
+                <button type="button" class="btn dl-toggle" id="dl-toggle" aria-expanded="false" aria-controls="dl-panel" aria-label="Download">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>
-                    <!-- Wrapped so the phone rule can hide the word without
-                         hiding the accessible name: this button has no
-                         aria-label, so the text IS the name. -->
-                    <span>Download</span>
+                    <span class="bar-label">Download</span>
                 </button>
 
                 <div class="dl-panel" id="dl-panel" hidden>
@@ -262,8 +259,6 @@
                     </div>
                 </div>
             </div>
-            <a href="index.html">Templates</a>
-            <a href="blog.html">Guides</a>
         </nav>
     </header>
 
