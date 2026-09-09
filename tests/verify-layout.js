@@ -1073,9 +1073,24 @@ async function connect(browserPath, cdpPort, options) {
   ]);
 })()`;
 
+    /* The state of the LAST navigation's fonts, kept rather than only printed.
+
+       The note above says a timeout is "consistent and therefore still
+       comparable", and within one page's own measurements that is true. It is
+       false across TWO separately navigated pages, which is exactly what
+       section 4 does: if the webfonts load for one side and time out for the
+       other, the two are measured in different faces and every text-driven
+       height differs by a pixel or two. That reads as a layout regression and
+       is not one -- observed with site/ byte-identical to HEAD, where a
+       difference is impossible by construction.
+
+       Kept here, at the only place that knows, so the comparison can ask. */
+    let lastFonts = "unknown";
+
     const awaitFonts = async (url, width) => {
         let state = null;
         try { state = await evaluate(FONTS_READY); } catch (e) { state = "error"; }
+        lastFonts = state;
         if (state === "timeout" || state === "error") {
             console.log(`      FONTS ${url} @${width} not ready after 3s (${state}); measuring in the fallback face`);
         }
@@ -1233,6 +1248,9 @@ async function connect(browserPath, cdpPort, options) {
 
     return {
         call, sessionId, navigate, evaluate, settled,
+        /* Whether the last navigation measured in the real faces or the
+           fallback. Only section 4 reads it; see lastFonts above. */
+        fonts: () => lastFonts,
         /* killTree, not proc.kill(): a headless browser is the root of a
            process tree, and the renderers it leaves behind are what make the
            NEXT run's navigations slow enough to hit the 20s deadline. */
@@ -3630,6 +3648,132 @@ async function posterExportChecks(page) {
         pdf.bytes > 20000 && pdf.image === true,
         `${pdf.bytes} bytes, image XObject=${pdf.image}`);
 
+    /* ----------------------------------------------------------------------
+       The card LAYOUT, which everything above misses.
+
+       The block above exports the style the editor opens with. That leaves
+       the Queen and King of Hearts style -- added September 9, 2026 -- with
+       no coverage at all, and it is the style that needs it most: it is the
+       first `frame` value that is a whole page layout rather than a border,
+       so paint() branches before it reads frame or trim, and it draws things
+       nothing else on this page draws. A heart from a Path2D, and rank
+       glyphs set in a substituted display face.
+
+       It also carries the exact hazard this section exists for. The heart is
+       ONE path string feeding two renderers -- Path2D parses it for the
+       canvas, the SVG export emits it verbatim under a transform -- and the
+       whole point of writing it once is that an edit cannot land in one and
+       silently miss the other. Nothing checked that it had not.
+       ---------------------------------------------------------------------- */
+    const card = await page.evaluate(`(async () => {
+        const frame = document.getElementById('p-frame');
+        if (!frame) { return { error: 'no frame control on poster.html' }; }
+        if (![...frame.options].some(o => o.value === 'hearts')) {
+            return { skip: 'this build has no hearts style' };
+        }
+        frame.value = 'hearts';
+        frame.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 600));
+
+        const out = { ranks: {} };
+        /* The two corner ranks are the style's own controls and are chosen
+           independently, so both are set away from their defaults: a glyph
+           found in the export then proves the CONTROL reached it, not just
+           that some default was drawn. */
+        const head = document.getElementById('p-rank-head');
+        const foot = document.getElementById('p-rank-foot');
+        if (head && foot) {
+            head.value = 'A'; head.dispatchEvent(new Event('change', { bubbles: true }));
+            foot.value = 'J'; foot.dispatchEvent(new Event('change', { bubbles: true }));
+            await new Promise(r => setTimeout(r, 600));
+            out.ranks = { head: head.value, foot: foot.value };
+        }
+
+        const realCreate = URL.createObjectURL;
+        let pending = null;
+        URL.createObjectURL = function (b) { pending = b; return realCreate.call(URL, b); };
+        const realClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function () {};
+        const RealPDF = window.jspdf.jsPDF;
+        const wrap = function (...a) {
+            const inst = new RealPDF(...a);
+            inst.save = () => {
+                const text = inst.output();
+                out.pdf = { bytes: inst.output('arraybuffer').byteLength,
+                            head: text.slice(0, 5),
+                            image: /\\/Subtype\\s*\\/Image/.test(text) };
+                return inst;
+            };
+            return inst;
+        };
+        wrap.prototype = RealPDF.prototype;
+        window.jspdf.jsPDF = wrap;
+
+        const type = document.getElementById('dl-type');
+        const go = document.getElementById('dl-go');
+        const grab = async (fmt) => {
+            pending = null;
+            type.value = fmt;
+            type.dispatchEvent(new Event('change', { bubbles: true }));
+            await new Promise(r => setTimeout(r, 250));
+            go.click();
+            await new Promise(r => setTimeout(r, 3000));
+            return pending;
+        };
+
+        for (const fmt of ['png', 'jpg', 'pptx']) {
+            const b = await grab(fmt);
+            out[fmt] = b ? b.size : 0;
+        }
+        const svgBlob = await grab('svg');
+        const svg = svgBlob ? await svgBlob.text() : '';
+        out.svgBytes = svg.length;
+        /* The opening coordinates of HEART_PATH in js/poster.js. Matching the
+           path itself rather than a count of <path> elements: a frame border
+           is paths too, so only the heart's own geometry proves the heart. */
+        out.svgHeart = svg.indexOf('M0.5,0.1611') !== -1;
+        out.svgRankHead = />\\s*A\\s*</.test(svg);
+        out.svgRankFoot = />\\s*J\\s*</.test(svg);
+        await grab('pdf');
+
+        URL.createObjectURL = realCreate;
+        HTMLAnchorElement.prototype.click = realClick;
+        window.jspdf.jsPDF = RealPDF;
+        return out;
+    })()`);
+
+    if (card.skip) {
+        console.log("      SKIP  " + card.skip);
+    } else if (card.error) {
+        check("poster: the card layout can be selected", false, card.error);
+    } else {
+        check("poster card: both rank controls took the values set",
+            card.ranks.head === "A" && card.ranks.foot === "J",
+            JSON.stringify(card.ranks));
+
+        /* Raster and PPTX carry the card as pixels, so the only honest
+           question for them is whether a real file came out. The floors are
+           the same ones the default style is held to. */
+        check("poster card: PNG, JPG and PPTX all export a real file",
+            card.png > 20000 && card.jpg > 15000 && card.pptx > 15000,
+            `png=${card.png} jpg=${card.jpg} pptx=${card.pptx}`);
+
+        check("poster card: PDF carries the artwork",
+            card.pdf && card.pdf.head === "%PDF-" && card.pdf.bytes > 20000 &&
+            card.pdf.image === true,
+            JSON.stringify(card.pdf));
+
+        /* The one that would have caught a divergence between Path2D and the
+           SVG emitter: the heart's own geometry, in the exported file. */
+        check("poster card: the SVG export draws the heart, not just the photo",
+            card.svgHeart === true,
+            `${card.svgBytes} bytes and no HEART_PATH geometry in them`);
+
+        check("poster card: the SVG export carries both chosen rank glyphs",
+            card.svgHeart && card.svgRankHead && card.svgRankFoot,
+            `head A present=${card.svgRankHead}, foot J present=${card.svgRankFoot}`);
+    }
+
     /* LEAVE THE ORIGIN AS WE FOUND IT, and this is not housekeeping either
        -- the same hazard section 7 documents, one step further on.
 
@@ -3827,6 +3971,7 @@ async function parityChecks(browserPath) {
 
     let comparisons = 0;
     let differences = 0;
+    let skipped = 0;
     /* Same leak as main(): a navigation timeout inside the loop used to skip
        both the browser and the baseline server on port 5098. */
     try {
@@ -3855,8 +4000,30 @@ async function parityChecks(browserPath) {
             for (const width of WIDTHS) {
                 await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
                 const now = await page.settled(PARITY_SNAPSHOT, `${name} @${width} working tree`);
+                const nowFonts = page.fonts();
                 await page.navigate(`http://localhost:${BASELINE_PORT}${urlPath}`, width);
                 const head = await page.settled(PARITY_SNAPSHOT, `${name} @${width} HEAD`);
+                const headFonts = page.fonts();
+
+                /* Both sides must have been measured in the SAME faces or the
+                   comparison is meaningless. Skipping is the honest answer
+                   rather than the convenient one: a difference reported here
+                   would be a font substitution, not a layout change, and a
+                   final section that cries wolf is a section people learn to
+                   ignore.
+
+                   It skips only when the two DISAGREE. Both timing out is
+                   still comparable -- that is the case the note on awaitFonts
+                   describes -- so a font host being unreachable does not
+                   silently disable this check, it just measures everything in
+                   the fallback. */
+                if (nowFonts !== headFonts) {
+                    console.log(`      SKIP  ${name} @${width}: fonts were ${nowFonts} for the ` +
+                        `working tree and ${headFonts} for HEAD, so the two were measured in ` +
+                        "different faces");
+                    skipped += 1;
+                    continue;
+                }
                 Object.keys(now).forEach((key) => {
                     comparisons += 1;
                     if (JSON.stringify(now[key]) !== JSON.stringify(head[key])) {
@@ -3871,7 +4038,11 @@ async function parityChecks(browserPath) {
         server.killTree();
     }
 
-    check(`ads blocked: working tree matches HEAD (${comparisons} measurements)`,
+    /* Reported, not hidden. A run that skipped most of its widths has not
+       verified much, and the number is the only way to tell that from a run
+       that compared everything. */
+    check(`ads blocked: working tree matches HEAD (${comparisons} measurements` +
+          `${skipped ? `, ${skipped} width(s) skipped on a font mismatch` : ""})`,
         differences === 0, `${differences} differing measurements, listed above`);
 }
 

@@ -258,6 +258,24 @@ export would produce valid, empty files and pass against the default document.
 Mutation-proven twice: emptying the SVG's image `href` fails two assertions, and
 short-circuiting the PDF's `addImage` fails the artwork one.
 
+**The card layout is covered separately (September 9, 2026).** Everything above
+exports the style the editor opens with, which left the Queen and King of
+Hearts style -- the first `frame` value that is a whole page layout rather than
+a border -- with no coverage at all. It is the style that needs it most: it
+draws a heart from a `Path2D` and rank glyphs in a substituted display face,
+and the heart is ONE path string feeding two renderers, canvas and the SVG
+emitter. Writing it once is what stops an edit landing in one and silently
+missing the other, and nothing checked that it had not.
+
+The section now also selects that style, sets BOTH rank corners away from their
+defaults (so a glyph found in the export proves the control reached it, not
+that some default was drawn), and asserts the raster and PPTX exports are real
+files, the PDF carries an image, and the SVG carries the heart's own geometry
+and both chosen glyphs. Mutation-proven twice: changing one coordinate of
+`HEART_PATH` and disabling the card branch in `exportSVG` alone each fail it,
+with different messages -- the first leaves the rank glyphs present, the second
+does not.
+
 ### 11. Mockup editor: every template renders its product
 
 Added September 8, 2026. Sections 5, 5b and 5c drive ONE template -- whichever
@@ -324,23 +342,47 @@ later assertion fail for the wrong reason. The rule generalises: **a section
 that writes storage owns clearing it**, and the clear belongs in the section
 that made the mess rather than at the top of the one that trips over it.
 
-#### A FONTS timeout makes section 4 report differences that are not real
+#### A FONTS timeout used to make section 4 report differences that were not real
+
+Fixed September 9, 2026. Recorded because the symptom is distinctive and the
+fix is easy to undo by accident.
+
+Section 4 measures the working tree and the baseline in two SEPARATE
+navigations. If the webfonts loaded for one and timed out for the other, the
+two were measured in different faces and every text-driven height differed by a
+pixel or two -- reported as a layout regression, with `site/` byte-identical to
+HEAD, where a difference is impossible by construction:
 
 ```
-FONTS http://localhost:5099/ @1920 not ready after 3s (timeout); measuring in the fallback face
-index @1920 main: now [184.5,85,1536,4610.5], HEAD [184.5,85,1536,4612.1]
+FONTS http://localhost:5099/ @1920 not ready after 3s (timeout); ...
+FONTS http://localhost:5098/ @1920 not ready after 3s (timeout); ...
+FONTS http://localhost:5099/ @1488 not ready after 3s (timeout); ...
+index @1488 main: now [0,85,1473,4968.5], HEAD [0,85,1473,4972.1]
 ```
 
-Section 4 measures the working tree and the baseline in two separate passes.
-If the webfonts load for one pass and time out for the other, the two are
-measured in different faces and every text-driven height differs by a pixel or
-two. It reads exactly like a regression and is not one.
+Both sides timed out at 1920 and no difference was reported. Only ONE side
+timed out at 1488, and that is the width that failed.
 
-The tell is the `FONTS ... timeout` line immediately above the differences, and
-a difference of one or two pixels rather than the tens a real layout change
-produces. Confirm with `git status --porcelain site/`: if that is empty, both
-servers are serving byte-identical files and any difference is measurement
-noise by definition.
+`awaitFonts` now records the state instead of only printing it, and the parity
+loop skips a width whose two passes disagree, saying so. It skips only on
+DISAGREEMENT: both sides timing out is still comparable, which is the case the
+note on `awaitFonts` describes, so an unreachable font host does not silently
+disable the section -- it measures everything in the fallback instead. The
+number of skipped widths is reported in the check's own name, because a run
+that skipped most of them has not verified much.
+
+Mutation-proven both ways: forcing the two states to disagree produces a SKIP
+line per width, and a real 24px change to `main`'s padding is still caught at
+every width with the skip in place.
+
+**The first two attempts at that second proof were inert, which is worth more
+than the fix.** Adding `margin-bottom` to `.mock-doc` changed nothing, because
+it sits inside a fixed-aspect `.card-media` that absorbs it. Adding
+`padding-top` to `main` changed nothing either, because that rule ends with a
+`padding:` SHORTHAND which overrides any longhand written above it. Both times
+the suite reported no difference and both times it was right -- so if a
+mutation appears not to be caught, prove the mutation is observable in a
+browser before concluding the check is broken.
 
 ## Adding a Check
 
