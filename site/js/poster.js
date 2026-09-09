@@ -105,6 +105,15 @@
         clubs: {
             frame: null, trim: null, label: "King and Queen of Clubs",
             layout: "card", suit: "clubs", ranks: { head: "K", foot: "Q" }
+        },
+        /* A second card LAYOUT rather than a fifth suit: the panel is split
+           diagonally and holds two photographs, the lower one turned upside
+           down the way a court card's halves oppose each other. It reuses the
+           corner indices, the pip and the rank fields wholesale -- the only
+           thing it replaces is what happens inside the panel. */
+        split: {
+            frame: null, trim: null, label: "Queen and King, Two Photos",
+            layout: "split", suit: "hearts", ranks: { head: "Q", foot: "K" }
         }
     };
 
@@ -133,6 +142,23 @@
         rank: { x: 10.99 / 595.3, baseline: 94.55 / 841.9, size: 70.1 / 595.3 },
         red: "#BE1E2D",
         ink: "#000000"
+    };
+
+    /* The split layout, traced from the "Cards - 21" artwork, which is drawn on
+       the same A4 page as the one above and shares its panel, its corner
+       indices and its pip. Two things differ: the panel is cut by a diagonal
+       seam into regions that take a photograph each, and the rule is 8pt
+       against the other's 4 -- which is why this carries its own `rule` rather
+       than reading CARD's.
+
+       The seam is expressed against the PANEL rather than the page, because it
+       runs from the panel's left edge to its right edge and has to stay on
+       them at every paper size. */
+    const SPLIT = {
+        rule: 8 / 595.3,
+        seam: { left: 171.8 / 724.5, right: 572.8 / 724.5 },
+        upper: "#BE1E2D",
+        lower: "#00AEEF"
     };
 
     /* The suit pip, the artwork's own bezier path normalised to a unit box so
@@ -284,6 +310,10 @@
        visitor actually typed. */
     let photo = null;
 
+    /* The split layout's second photograph, held the same way and for the same
+       reason: it is never written to storage either. */
+    let photoB = null;
+
     function defaultText(id, text) {
         return {
             id: id,
@@ -323,6 +353,8 @@
         frame: "black",
         rankHead: FRAME_STYLES.hearts.ranks.head,
         rankFoot: FRAME_STYLES.hearts.ranks.foot,
+        view: defaultView(),
+        viewB: defaultView(),
         texts: [defaultText("t1", "")],
         sel: "t1"
     };
@@ -338,7 +370,8 @@
     function snapshot() {
         return JSON.stringify({
             name: state.name, size: state.size, frame: state.frame,
-            rankHead: state.rankHead, rankFoot: state.rankFoot, texts: state.texts
+            rankHead: state.rankHead, rankFoot: state.rankFoot,
+            view: state.view, viewB: state.viewB, texts: state.texts
         });
     }
 
@@ -349,6 +382,8 @@
         state.frame = parsed.frame;
         state.rankHead = cleanRank(parsed.rankHead);
         state.rankFoot = cleanRank(parsed.rankFoot);
+        state.view = parsed.view || defaultView();
+        state.viewB = parsed.viewB || defaultView();
         state.texts = parsed.texts;
         if (!state.texts.some((t) => t.id === state.sel)) {
             state.sel = state.texts.length ? state.texts[0].id : null;
@@ -524,13 +559,43 @@
        from the preview.
        ---------------------------------------------------------------------- */
 
-    function drawCoverImage(c, img, x, y, w, h) {
-        const scale = Math.max(w / img.width, h / img.height);
+    /* Where a photograph sits inside the box it fills. `zoom` multiplies the
+       cover fit, so 1 is exactly the crop this editor drew before framing
+       existed. x and y are fractions of the SLACK that zoom leaves rather than
+       pixels or image fractions, which is what makes them independent of both
+       the photograph's resolution and the paper size, and what makes them
+       self-clamping: at zoom 1 an image matching the panel's aspect has no
+       slack in one axis, and panning it there correctly does nothing.
+
+       Held on `state` so undo covers it, but deliberately NOT persisted: the
+       photograph itself is never written to storage, so a framing restored
+       without it would apply someone's old crop to their next upload. */
+    function defaultView() {
+        return { zoom: 1, x: 0, y: 0 };
+    }
+
+    function clampUnit(n) {
+        return Math.min(1, Math.max(-1, Number(n) || 0));
+    }
+
+    function photoMetrics(img, w, h, view) {
+        const v = view || defaultView();
+        const zoom = Math.max(1, Number(v.zoom) || 1);
+        const scale = Math.max(w / img.width, h / img.height) * zoom;
         const sw = w / scale;
         const sh = h / scale;
-        const sx = (img.width - sw) / 2;
-        const sy = (img.height - sh) / 2;
-        c.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+        const slackX = (img.width - sw) / 2;
+        const slackY = (img.height - sh) / 2;
+        return {
+            scale: scale, sw: sw, sh: sh, slackX: slackX, slackY: slackY,
+            sx: slackX + clampUnit(v.x) * slackX,
+            sy: slackY + clampUnit(v.y) * slackY
+        };
+    }
+
+    function drawCoverImage(c, img, x, y, w, h, view) {
+        const m = photoMetrics(img, w, h, view);
+        c.drawImage(img, m.sx, m.sy, m.sw, m.sh, x, y, w, h);
     }
 
     /* Splits a string into rendered lines, honouring explicit newlines and
@@ -650,7 +715,7 @@
        placeholder can never be styled in one and forgotten in the other. */
     function drawPhotoPanel(c, x, y, w, h, scale, transparent) {
         if (photo) {
-            drawCoverImage(c, photo, x, y, w, h);
+            drawCoverImage(c, photo, x, y, w, h, state.view);
             return;
         }
         if (transparent) {
@@ -729,6 +794,119 @@
         drawCardIndex(c, W, H, state.rankFoot, true, suit);
     }
 
+    /* The panel's four corners plus the two seam ends, in page pixels. Both
+       renderers derive every region from this one function, so the seam cannot
+       land in one place on the canvas and another in the SVG. */
+    function splitGeometry(W, H) {
+        const x = CARD.panel.x * W;
+        const y = CARD.panel.y * H;
+        const w = CARD.panel.w * W;
+        const h = CARD.panel.h * H;
+        return {
+            x: x, y: y, w: w, h: h,
+            seamLeftY: y + SPLIT.seam.left * h,
+            seamRightY: y + SPLIT.seam.right * h
+        };
+    }
+
+    /* The lower region: the seam, then down the right edge, along the bottom
+       and back up the left. The UPPER region has no path of its own on purpose
+       -- see paintSplit(). */
+    function lowerRegionPath(c, g) {
+        c.beginPath();
+        c.moveTo(g.x, g.seamLeftY);
+        c.lineTo(g.x + g.w, g.seamRightY);
+        c.lineTo(g.x + g.w, g.y + g.h);
+        c.lineTo(g.x, g.y + g.h);
+        c.closePath();
+    }
+
+    /* Covers the panel with one photograph, turned 180 degrees when asked.
+
+       ROTATED, not mirrored. The artwork applies matrix(-s, 0, 0, -s), which is
+       negative on BOTH axes; drawCardIndex() a few lines up applies scale(1,-1),
+       which is negative on one. Those are different operations and they sit in
+       the same renderer: a mirror here would reverse the subject left to right,
+       which on a photograph of a person is unmistakable. */
+    function drawPanelPhoto(c, img, g, upsideDown, view) {
+        c.save();
+        if (upsideDown) {
+            c.translate(g.x + g.w / 2, g.y + g.h / 2);
+            c.rotate(Math.PI);
+            c.translate(-(g.x + g.w / 2), -(g.y + g.h / 2));
+        }
+        drawCoverImage(c, img, g.x, g.y, g.w, g.h, view);
+        c.restore();
+    }
+
+    /* The split layout: one ruled panel divided by a diagonal seam, a
+       photograph in each half, the lower one upside down.
+
+       The upper half is drawn across the WHOLE panel and the lower half is then
+       drawn over it, clipped to its own region. That is what the artwork does
+       -- its two polygons overlap and the later one wins -- and it is also what
+       makes a hairline of paper along the seam impossible: there is no shared
+       edge for two anti-aliased fills to fall either side of. Clipping both
+       halves to meet exactly on the seam is the obvious construction and it
+       shows a white line at export scale. */
+    function paintSplit(c, W, H, options, scale) {
+        if (!options.transparent) {
+            c.fillStyle = "#FFFFFF";
+            c.fillRect(0, 0, W, H);
+        }
+
+        const g = splitGeometry(W, H);
+
+        c.save();
+        c.beginPath();
+        c.rect(g.x, g.y, g.w, g.h);
+        c.clip();
+        if (photo) {
+            drawPanelPhoto(c, photo, g, false, state.view);
+        } else if (!options.transparent) {
+            c.fillStyle = SPLIT.upper;
+            c.fillRect(g.x, g.y, g.w, g.h);
+        }
+        c.restore();
+
+        c.save();
+        lowerRegionPath(c, g);
+        c.clip();
+        if (photoB) {
+            drawPanelPhoto(c, photoB, g, true, state.viewB);
+        } else if (!options.transparent) {
+            c.fillStyle = SPLIT.lower;
+            lowerRegionPath(c, g);
+            c.fill();
+        }
+        c.restore();
+
+        /* The empty state is the artwork's own two-colour split rather than a
+           grey placeholder, so the prompt has to read against a strong red and
+           a strong blue -- white with a dark halo does, and neither flat colour
+           is light enough for the panel's usual grey-on-cream. */
+        if (!photo && !photoB && !options.transparent) {
+            c.save();
+            c.font = "400 " + (34 * scale) + 'px "Inter", sans-serif';
+            c.textAlign = "center";
+            c.textBaseline = "middle";
+            c.lineWidth = 4 * scale;
+            c.strokeStyle = "rgba(0, 0, 0, 0.45)";
+            c.strokeText("Upload two photos to begin", g.x + g.w / 2, g.y + g.h / 2);
+            c.fillStyle = "#FFFFFF";
+            c.fillText("Upload two photos to begin", g.x + g.w / 2, g.y + g.h / 2);
+            c.restore();
+        }
+
+        c.strokeStyle = CARD.ink;
+        c.lineWidth = SPLIT.rule * W;
+        c.strokeRect(g.x, g.y, g.w, g.h);
+
+        const suit = suitOf(state.frame);
+        drawCardIndex(c, W, H, state.rankHead, false, suit);
+        drawCardIndex(c, W, H, state.rankFoot, true, suit);
+    }
+
     /* transparent=true skips the frame, matte and placeholder fills so a PNG
        exports with a genuinely empty background rather than a white one -- the
        toggle in the download panel does this and nothing else. */
@@ -741,6 +919,8 @@
 
         if (frame.layout === "card") {
             paintCard(c, W, H, options, scale);
+        } else if (frame.layout === "split") {
+            paintSplit(c, W, H, options, scale);
         } else {
             const FRAME_W = frame.frame ? 60 * scale : 0;
             const MATTE_W = frame.frame ? 50 * scale : 0;
@@ -818,6 +998,11 @@
 
     let dragging = null;
 
+    /* A photograph being moved. Separate from `dragging`, which moves text: the
+       two never run at once and conflating them would mean one set of fields
+       meaning two things. */
+    let panning = null;
+
     function canvasPoint(ev) {
         const r = canvas.getBoundingClientRect();
         return {
@@ -856,7 +1041,8 @@
        positions in this layout, so the only useful thing a click on one can do
        is take you to the field that changes it. */
     function cardIndexAt(pt, W, H) {
-        if ((FRAME_STYLES[state.frame] || {}).layout !== "card") {
+        const layout = (FRAME_STYLES[state.frame] || {}).layout;
+        if (layout !== "card" && layout !== "split") {
             return null;
         }
         const capPx = CARD.rank.size * W * 0.75;
@@ -900,6 +1086,50 @@
         }
     }
 
+    /* The box a photograph fills, per layout. Both card layouts fill the panel;
+       everything else fills the matted rectangle above the caption band. Shared
+       with paint() so a drag cannot be measured against a different box from
+       the one the photograph was drawn into. */
+    function photoRectFor(W, H) {
+        const layout = (FRAME_STYLES[state.frame] || {}).layout;
+        if (layout === "card" || layout === "split") {
+            return {
+                x: CARD.panel.x * W, y: CARD.panel.y * H,
+                w: CARD.panel.w * W, h: CARD.panel.h * H
+            };
+        }
+        const frame = FRAME_STYLES[state.frame] || FRAME_STYLES.black;
+        const scale = W / 1200;
+        const inset = frame.frame ? 110 * scale : 0;
+        return {
+            x: inset, y: inset,
+            w: W - inset * 2, h: H - inset * 2 - 0.11 * H
+        };
+    }
+
+    /* Which photograph a point belongs to: the split layout owns two, divided
+       by its seam, and every other style owns one. Returns null where there is
+       no photograph to move, so a drag on an empty panel does nothing rather
+       than silently adjusting a framing nobody can see. */
+    function photoAt(pt, W, H) {
+        const layout = (FRAME_STYLES[state.frame] || {}).layout;
+        const r = photoRectFor(W, H);
+        const x = pt.x * W;
+        const y = pt.y * H;
+        if (x < r.x || x > r.x + r.w || y < r.y || y > r.y + r.h) {
+            return null;
+        }
+        if (layout === "split") {
+            const g = splitGeometry(W, H);
+            const t = (x - g.x) / g.w;
+            const seamY = g.seamLeftY + t * (g.seamRightY - g.seamLeftY);
+            if (y > seamY) {
+                return photoB ? { img: photoB, view: state.viewB, key: "viewB", flipped: true } : null;
+            }
+        }
+        return photo ? { img: photo, view: state.view, key: "view", flipped: false } : null;
+    }
+
     canvas.addEventListener("pointerdown", (ev) => {
         const pt = canvasPoint(ev);
         const corner = cardIndexAt(pt, canvas.width, canvas.height);
@@ -909,6 +1139,21 @@
         }
         const hit = hitTest(pt);
         if (!hit) {
+            /* Nothing else claimed the point, so it belongs to the photograph
+               under it. Text wins on purpose: a caption sitting over a photo
+               has to stay draggable. */
+            const target = photoAt(pt, canvas.width, canvas.height);
+            if (target) {
+                const r = photoRectFor(canvas.width, canvas.height);
+                const m = photoMetrics(target.img, r.w, r.h, target.view);
+                panning = {
+                    key: target.key, startX: pt.x, startY: pt.y,
+                    fromX: target.view.x, fromY: target.view.y,
+                    scale: m.scale, slackX: m.slackX, slackY: m.slackY,
+                    flipped: target.flipped, moved: false
+                };
+                canvas.setPointerCapture(ev.pointerId);
+            }
             return;
         }
         state.sel = hit.id;
@@ -919,6 +1164,31 @@
     });
 
     canvas.addEventListener("pointermove", (ev) => {
+        if (panning) {
+            const pt = canvasPoint(ev);
+            if (!panning.moved) {
+                beginChange();
+                panning.moved = true;
+            }
+            /* Pointer delta in canvas pixels, converted to source pixels, then
+               to a fraction of the slack. Negated because moving the crop right
+               through the source moves the picture LEFT on the page -- and
+               negated AGAIN for the split layout's lower half, which is drawn
+               upside down, so a drag has to follow the pointer rather than the
+               source. */
+            const dir = panning.flipped ? 1 : -1;
+            const dxPx = (pt.x - panning.startX) * canvas.width * dir;
+            const dyPx = (pt.y - panning.startY) * canvas.height * dir;
+            const view = state[panning.key];
+            view.x = panning.slackX > 0
+                ? clampUnit(panning.fromX + (dxPx / panning.scale) / panning.slackX)
+                : 0;
+            view.y = panning.slackY > 0
+                ? clampUnit(panning.fromY + (dyPx / panning.scale) / panning.slackY)
+                : 0;
+            render();
+            return;
+        }
         if (!dragging) {
             return;
         }
@@ -935,6 +1205,11 @@
     });
 
     canvas.addEventListener("pointerup", (ev) => {
+        if (panning && panning.moved) {
+            commit();
+            syncPhotoControls();
+        }
+        panning = null;
         if (dragging && dragging.moved) {
             commit();
         }
@@ -947,20 +1222,27 @@
        immediately when file.type does not match the image.* designation.
        ---------------------------------------------------------------------- */
 
-    const fileInput = document.getElementById("p-image");
-    const fileError = document.getElementById("p-image-error");
-
-    if (fileInput) {
-        fileInput.addEventListener("change", () => {
-            fileError.textContent = "";
-            const file = fileInput.files && fileInput.files[0];
+    /* One validated upload path, used by both inputs. The split layout needs a
+       second photograph, and duplicating this would mean two copies of the
+       mime check -- which is the one part of it that is a security control
+       rather than a convenience. `assign` is what differs between them and it
+       is the only thing that differs. */
+    function bindPhotoInput(inputId, errorId, assign) {
+        const input = document.getElementById(inputId);
+        const error = document.getElementById(errorId);
+        if (!input || !error) {
+            return;
+        }
+        input.addEventListener("change", () => {
+            error.textContent = "";
+            const file = input.files && input.files[0];
             if (!file) {
                 return;
             }
             if (!/^image\//.test(file.type)) {
-                fileError.textContent = "That file is not an image. Please choose a JPG, PNG, or WebP file.";
-                fileInput.value = "";
-                photo = null;
+                error.textContent = "That file is not an image. Please choose a JPG, PNG, or WebP file.";
+                input.value = "";
+                assign(null);
                 render();
                 return;
             }
@@ -968,17 +1250,72 @@
             reader.addEventListener("load", () => {
                 const img = new Image();
                 img.addEventListener("load", () => {
-                    photo = img;
+                    assign(img);
                     render();
                 });
                 img.addEventListener("error", () => {
-                    fileError.textContent = "That image could not be decoded. Please try a different file.";
-                    fileInput.value = "";
+                    error.textContent = "That image could not be decoded. Please try a different file.";
+                    input.value = "";
                 });
                 img.src = reader.result;
             });
             reader.readAsDataURL(file);
         });
+    }
+
+    /* A new photograph starts at the plain cover fit. Carrying the previous
+       one's framing over would apply somebody's crop of one picture to a
+       different picture, which is never what they meant. */
+    bindPhotoInput("p-image", "p-image-error", (img) => {
+        photo = img;
+        state.view = defaultView();
+        syncPhotoControls();
+    });
+    bindPhotoInput("p-image-b", "p-image-b-error", (img) => {
+        photoB = img;
+        state.viewB = defaultView();
+        syncPhotoControls();
+    });
+
+    /* The framing controls, which are the same pair twice over. */
+    [["p-zoom", "p-zoom-reset", "view"], ["p-zoom-b", "p-zoom-b-reset", "viewB"]].forEach((entry) => {
+        const slider = byId(entry[0]);
+        const reset = byId(entry[1]);
+        const key = entry[2];
+        if (slider) {
+            slider.addEventListener("input", () => {
+                beginChange();
+                state[key].zoom = Math.max(1, (Number(slider.value) || 100) / 100);
+                commit("zoom-" + key);
+            });
+        }
+        if (reset) {
+            reset.addEventListener("click", () => {
+                beginChange();
+                state[key] = defaultView();
+                commit();
+                syncPhotoControls();
+            });
+        }
+    });
+
+    /* Pushes the framing back into its slider -- after a drag, an undo, or a
+       fresh upload -- and hides the whole group when there is no photograph to
+       frame, since a size control over an empty panel does nothing. */
+    function syncPhotoControls() {
+        const layout = (FRAME_STYLES[state.frame] || {}).layout;
+        const zoom = byId("p-zoom");
+        const zoomB = byId("p-zoom-b");
+        const group = byId("p-frame-fields");
+
+        if (zoom) { zoom.value = Math.round(state.view.zoom * 100); }
+        if (zoomB) { zoomB.value = Math.round(state.viewB.zoom * 100); }
+        if (group) { group.hidden = !photo; }
+
+        const groupB = byId("p-zoom-b");
+        if (groupB && groupB.parentElement) {
+            groupB.parentElement.hidden = layout !== "split" || !photoB;
+        }
     }
 
     /* ----------------------------------------------------------------------
@@ -1136,10 +1473,19 @@
         if (rankHeadInput && rankHeadInput.value !== state.rankHead) { rankHeadInput.value = state.rankHead; }
         if (rankFootInput && rankFootInput.value !== state.rankFoot) { rankFootInput.value = state.rankFoot; }
 
+        /* Both card layouts carry corner indices, so the rank fields belong to
+           either of them; the second upload belongs to the split one alone. */
         const cardFields = byId("p-card-fields");
         if (cardFields) {
-            cardFields.hidden = style.layout !== "card";
+            cardFields.hidden = style.layout !== "card" && style.layout !== "split";
         }
+
+        const splitFields = byId("p-split-fields");
+        if (splitFields) {
+            splitFields.hidden = style.layout !== "split";
+        }
+
+        syncPhotoControls();
     }
 
     const sizeSelect = byId("p-size");
@@ -1464,12 +1810,75 @@
        a canvas rather than being carried from the file input, because the
        source may be any format the browser can decode and the export has to be
        one an SVG viewer can. */
-    function photoDataURL() {
+    function photoDataURL(img) {
+        const source = img || photo;
         const c = document.createElement("canvas");
-        c.width = photo.width;
-        c.height = photo.height;
-        c.getContext("2d").drawImage(photo, 0, 0);
+        c.width = source.width;
+        c.height = source.height;
+        c.getContext("2d").drawImage(source, 0, 0);
         return c.toDataURL("image/jpeg", 0.92);
+    }
+
+    /* One photograph, placed in SVG exactly as the canvas places it.
+
+       preserveAspectRatio="xMidYMid slice" was doing this until framing
+       existed, and it CANNOT express a framing: it always centres its own
+       cover fit, so a zoomed or panned photo would export at the default crop
+       and the file would quietly disagree with the preview. So the whole image
+       is emitted, scaled and offset, and clipped by the caller's clip path --
+       which the caller must therefore provide.
+
+       Both are read from photoMetrics(), the same function the canvas draws
+       from, so the crop cannot be computed two ways. */
+    function photoImageSVG(img, view, x, y, w, h, transform) {
+        const m = photoMetrics(img, w, h, view);
+        const k = w / m.sw;
+        return '<image x="' + (x - m.sx * k) + '" y="' + (y - m.sy * k) +
+            '" width="' + (img.width * k) + '" height="' + (img.height * k) + '"' +
+            (transform ? ' transform="' + transform + '"' : "") +
+            ' href="' + photoDataURL(img) + '"/>';
+    }
+
+    /* SVG twin of paintSplit(). Reads splitGeometry(), the same function the
+       canvas reads, so the seam cannot land in two places -- the arithmetic is
+       shared rather than repeated.
+
+       Same construction as the canvas: the upper photograph covers the whole
+       panel and the lower one is drawn over it inside a clip, so there is no
+       shared edge to leave a hairline. The 180-degree turn is a rotate() about
+       the panel centre, which is the artwork's matrix(-s, 0, 0, -s) said
+       another way. */
+    function splitSVG(W, H, esc) {
+        const g = splitGeometry(W, H);
+        const cx = g.x + g.w / 2;
+        const cy = g.y + g.h / 2;
+        const panelRect = 'x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '"';
+        const lowerPoints = g.x + "," + g.seamLeftY + " " + (g.x + g.w) + "," + g.seamRightY +
+            " " + (g.x + g.w) + "," + (g.y + g.h) + " " + g.x + "," + (g.y + g.h);
+
+        let out = '<rect width="' + W + '" height="' + H + '" fill="#FFFFFF"/>';
+        out += '<defs><clipPath id="tb-split-panel"><rect ' + panelRect + '/></clipPath>' +
+            '<clipPath id="tb-split-lower"><polygon points="' + lowerPoints + '"/></clipPath></defs>';
+
+        out += '<g clip-path="url(#tb-split-panel)">';
+        out += photo
+            ? photoImageSVG(photo, state.view, g.x, g.y, g.w, g.h)
+            : '<rect ' + panelRect + ' fill="' + SPLIT.upper + '"/>';
+        out += "</g>";
+
+        out += '<g clip-path="url(#tb-split-lower)">';
+        out += photoB
+            ? photoImageSVG(photoB, state.viewB, g.x, g.y, g.w, g.h,
+                "rotate(180 " + cx + " " + cy + ")")
+            : '<polygon points="' + lowerPoints + '" fill="' + SPLIT.lower + '"/>';
+        out += "</g>";
+
+        out += '<rect ' + panelRect + ' fill="none" stroke="' + CARD.ink +
+            '" stroke-width="' + (SPLIT.rule * W) + '"/>';
+
+        const suit = suitOf(state.frame);
+        return out + cardIndexSVG(W, H, state.rankHead, false, esc, suit) +
+            cardIndexSVG(W, H, state.rankFoot, true, esc, suit);
     }
 
     /* SVG twin of drawCardIndex(). Same constants, same unit pip path, same
@@ -1507,9 +1916,13 @@
 
         let out = '<rect width="' + W + '" height="' + H + '" fill="#FFFFFF"/>';
 
+        /* The clip is not optional now: a zoomed photograph is larger than the
+           panel, and preserveAspectRatio is no longer doing the cropping. */
         if (photo) {
-            out += '<image x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
-                '" preserveAspectRatio="xMidYMid slice" href="' + photoDataURL() + '"/>';
+            out += '<defs><clipPath id="tb-card-panel"><rect x="' + x + '" y="' + y +
+                '" width="' + w + '" height="' + h + '"/></clipPath></defs>' +
+                '<g clip-path="url(#tb-card-panel)">' +
+                photoImageSVG(photo, state.view, x, y, w, h) + "</g>";
         }
 
         out += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
@@ -1535,6 +1948,8 @@
 
         if (frame.layout === "card") {
             body += cardSVG(W, H, esc);
+        } else if (frame.layout === "split") {
+            body += splitSVG(W, H, esc);
         } else {
             if (frame.frame) {
                 body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
@@ -1545,9 +1960,12 @@
 
             if (photo) {
                 const mw = fw + W * 0.042;
-                body += '<image x="' + mw + '" y="' + mw + '" width="' + (W - mw * 2) +
-                    '" height="' + (H - mw * 2 - H * 0.11) +
-                    '" preserveAspectRatio="xMidYMid slice" href="' + photoDataURL() + '"/>';
+                const pw = W - mw * 2;
+                const ph = H - mw * 2 - H * 0.11;
+                body += '<defs><clipPath id="tb-plain-panel"><rect x="' + mw + '" y="' + mw +
+                    '" width="' + pw + '" height="' + ph + '"/></clipPath></defs>' +
+                    '<g clip-path="url(#tb-plain-panel)">' +
+                    photoImageSVG(photo, state.view, mw, mw, pw, ph) + "</g>";
             }
         }
 

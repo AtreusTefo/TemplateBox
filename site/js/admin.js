@@ -1441,6 +1441,7 @@ body + '\n' +
         { id: "spades", title: "King and Queen of Spades", category: "canvas", doc: "spades" },
         { id: "diamonds", title: "Queen and King of Diamonds", category: "canvas", doc: "diamonds" },
         { id: "clubs", title: "King and Queen of Clubs", category: "canvas", doc: "clubs" },
+        { id: "split", title: "Queen and King, Two Photos", category: "canvas", doc: "split" },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"

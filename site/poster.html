@@ -374,6 +374,35 @@
                         <p class="form-error" id="p-image-error" role="alert"></p>
                     </div>
 
+                    <!-- Framing. The slider is the accessible route to what
+                         dragging on the preview does by hand, and the reset is
+                         the only way back to the plain cover fit once a photo
+                         has been moved -- the slider alone cannot undo a pan. -->
+                    <div class="field" id="p-frame-fields" hidden>
+                        <label for="p-zoom">Photo Size</label>
+                        <input type="range" id="p-zoom" min="100" max="400" step="5" value="100">
+                        <p class="upload-hint">Drag the photo on the preview to move it. <button type="button" class="btn btn-secondary btn-small" id="p-zoom-reset">Reset framing</button></p>
+                    </div>
+
+                    <!-- Only the split layout has a second half to fill, so
+                         this is hidden for every other style rather than shown
+                         inert -- the same argument the rank fields below are
+                         built on. js/poster.js toggles the wrapper. -->
+                    <div id="p-split-fields" hidden>
+                        <div class="field">
+                            <label for="p-image-b">Second Photo</label>
+                            <input type="file" id="p-image-b" accept="image/*">
+                            <p class="upload-hint">Fills the lower half, turned upside down as a playing card's second half is.</p>
+                            <p class="form-error" id="p-image-b-error" role="alert"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-zoom-b">Second Photo Size</label>
+                            <input type="range" id="p-zoom-b" min="100" max="400" step="5" value="100">
+                            <p class="upload-hint">Drag the lower half on the preview to move it. <button type="button" class="btn btn-secondary btn-small" id="p-zoom-b-reset">Reset framing</button></p>
+                        </div>
+                    </div>
+
                     <div class="field">
                         <label for="t-caption">Text</label>
                         <div class="caption-row">

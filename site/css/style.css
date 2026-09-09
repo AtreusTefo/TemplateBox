@@ -2461,6 +2461,40 @@ body.is-nav-hidden .site-header:focus-within {
     color: #BE1E2D;
 }
 
+/* The split layout's tile. The plate is the artwork's two flat colours rather
+   than the shared horizon-and-sun motif, so both of the plate's pseudo-elements
+   are taken over: ::before carries the motif and is dropped, ::after becomes
+   the lower region.
+
+   The polygon is the renderer's own seam -- 23.7 per cent down the left edge to
+   79.1 per cent down the right -- so the tile and the poster it opens are cut
+   on the same line. */
+.mock-doc.poster[data-layout="split"] .mk-plate {
+    background-color: #BE1E2D;
+}
+
+.mock-doc.poster[data-layout="split"] .mk-plate::before {
+    content: none;
+}
+
+/* Every one of these declarations is undoing the sun motif's own: it is a
+   22-per-cent-inset circle with an aspect-ratio and a radius, and this is a
+   full-bleed clipped polygon. `inset: 0` sets all four offsets, so do NOT
+   follow it with `right: auto` or `top: auto` -- that strips two of the four
+   anchors and, with width and height auto, collapses the element to nothing.
+   Which it did, and the tile showed as flat red. */
+.mock-doc.poster[data-layout="split"] .mk-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    aspect-ratio: auto;
+    border-radius: 0;
+    background-color: #00AEEF;
+    clip-path: polygon(0 23.7%, 100% 79.1%, 100% 100%, 0 100%);
+}
+
 .mk-index-head {
     left: 2%;
     top: 4%;
