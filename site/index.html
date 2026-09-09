@@ -674,7 +674,7 @@
                 <article class="template-card" data-category="canvas">
                     <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc poster hearts">
+                            <div class="mock-doc poster" data-suit="hearts">
                                 <span class="mk-index mk-index-head">Q</span>
                                 <div class="mk-plate"></div>
                                 <span class="mk-index mk-index-foot">K</span>
@@ -693,7 +693,7 @@
                 <article class="template-card" data-category="canvas">
                     <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc poster spades">
+                            <div class="mock-doc poster" data-suit="spades">
                                 <span class="mk-index mk-index-head">K</span>
                                 <div class="mk-plate"></div>
                                 <span class="mk-index mk-index-foot">Q</span>
@@ -703,6 +703,41 @@
                     <div class="card-body">
                         <p class="card-category">Posters and Prints</p>
                         <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="spades">King and Queen of Spades</a></h3>
+                    </div>
+                </article>
+
+                <!-- The remaining two suits. Red leads with the queen and black
+                     with the king, which is what gives the four cards four
+                     titles rather than one title in four colours. -->
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="diamonds">
+                                <span class="mk-index mk-index-head">Q</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">K</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="diamonds">Queen and King of Diamonds</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="clubs">
+                                <span class="mk-index mk-index-head">K</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">Q</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="clubs">King and Queen of Clubs</a></h3>
                     </div>
                 </article>
 
@@ -1049,7 +1084,7 @@
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 34.
+                Try a broader term, or clear the search to see all 36.
             </p>
         </section>
 

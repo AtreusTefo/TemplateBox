@@ -1437,6 +1437,8 @@ body + '\n' +
            they open the editor on whatever it last held. */
         { id: "hearts", title: "Queen and King of Hearts", category: "canvas", doc: "hearts" },
         { id: "spades", title: "King and Queen of Spades", category: "canvas", doc: "spades" },
+        { id: "diamonds", title: "Queen and King of Diamonds", category: "canvas", doc: "diamonds" },
+        { id: "clubs", title: "King and Queen of Clubs", category: "canvas", doc: "clubs" },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"

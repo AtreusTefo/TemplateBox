@@ -85,13 +85,26 @@
             frame: null, trim: null, label: "Queen and King of Hearts",
             layout: "card", suit: "hearts", ranks: { head: "Q", foot: "K" }
         },
-        /* The second suit costs a pip path, an ink and a default pairing --
-           no second renderer, which is the return on having made the first one
-           a layout rather than a special case. Its default ranks are K then Q
-           because that is the order its catalog card advertises. */
+        /* The other three suits cost a pip path, an ink and a default pairing
+           each -- no second renderer, which is the return on having made the
+           first one a layout rather than a special case.
+
+           The red suits lead with the queen and the black with the king. That
+           is arbitrary, but it is the pattern the first two shipped with, and
+           it gives the four catalog cards four different titles rather than
+           the same one in four colours. The pairing is only a starting point:
+           both corners are editable on every one of them. */
         spades: {
             frame: null, trim: null, label: "King and Queen of Spades",
             layout: "card", suit: "spades", ranks: { head: "K", foot: "Q" }
+        },
+        diamonds: {
+            frame: null, trim: null, label: "Queen and King of Diamonds",
+            layout: "card", suit: "diamonds", ranks: { head: "Q", foot: "K" }
+        },
+        clubs: {
+            frame: null, trim: null, label: "King and Queen of Clubs",
+            layout: "card", suit: "clubs", ranks: { head: "K", foot: "Q" }
         }
     };
 
@@ -145,13 +158,37 @@
         "C0.65,0.81 0.73,0.86 0.83,0.86C0.93,0.86 1,0.8 1,0.7" +
         "C1,0.63 0.98,0.54 0.85,0.42C0.7,0.28 0.5,0.18 0.5,0Z";
 
+    /* The diamond is the one pip that is symmetric about BOTH axes, so the
+       mirrored corner turns it into itself and the flip is invisible on it.
+       Inset horizontally rather than filling the box, because the pip box is
+       wider than it is tall (the heart's own bbox) and a diamond drawn to the
+       full width reads as a lozenge. */
+    const DIAMOND_PATH = "M0.5,0L0.85,0.5L0.5,1L0.15,0.5Z";
+
+    /* The club is four subpaths -- three lobes and a stem -- rather than one
+       traced outline, which is the only thing here that needs care: canvas and
+       SVG both fill with the NONZERO rule, so the stem has to wind the same way
+       as the lobes or the overlap cancels and leaves a hole where the stem
+       meets them. Drawn the other way round it does exactly that, which is
+       visible immediately and was checked before this was written down.
+
+       The lobes overlap on purpose: at r=0.235 with centres 0.315 apart the
+       top lobe reaches both lower ones, so the union is a single shape. Pull
+       them apart and the trefoil separates into three circles. */
+    const CLUB_PATH = "M0.265,0.235a0.235,0.235 0 1,0 0.47,0a0.235,0.235 0 1,0 -0.47,0Z" +
+        "M0.015,0.55a0.235,0.235 0 1,0 0.47,0a0.235,0.235 0 1,0 -0.47,0Z" +
+        "M0.515,0.55a0.235,0.235 0 1,0 0.47,0a0.235,0.235 0 1,0 -0.47,0Z" +
+        "M0.44,0.35C0.44,0.7 0.4,0.9 0.31,1L0.69,1C0.6,0.9 0.56,0.7 0.56,0.35Z";
+
     /* Suit = a pip path plus the ink it is filled with. Everything else about
-       the layout is shared, so adding a third suit is two lines here and one
-       entry in FRAME_STYLES. The Path2D is built once per suit rather than per
-       paint: paint() runs on every keystroke. */
+       the layout is shared, so a suit costs two lines here and one entry in
+       FRAME_STYLES. The Path2D is built once per suit rather than per paint:
+       paint() runs on every keystroke. */
     const SUITS = {
         hearts: { path: HEART_PATH, ink: "#BE1E2D" },
-        spades: { path: SPADE_PATH, ink: "#000000" }
+        spades: { path: SPADE_PATH, ink: "#000000" },
+        diamonds: { path: DIAMOND_PATH, ink: "#BE1E2D" },
+        clubs: { path: CLUB_PATH, ink: "#000000" }
     };
     const SUIT_PATHS = {};
     Object.keys(SUITS).forEach((k) => { SUIT_PATHS[k] = new Path2D(SUITS[k].path); });

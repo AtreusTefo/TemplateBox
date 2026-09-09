@@ -2310,8 +2310,7 @@ body.is-nav-hidden .site-header:focus-within {
    stacking them above and below it. The foot index is mirrored in y rather
    than rotated, again matching drawCardIndex(): its markup order is letter
    then pip, and scaleY(-1) is what puts the pip on top. */
-.mock-doc.poster.hearts,
-.mock-doc.poster.spades {
+.mock-doc.poster[data-suit] {
     display: block;
     position: relative;
     /* The one container query on the site, and it earns itself here: the
@@ -2326,8 +2325,7 @@ body.is-nav-hidden .site-header:focus-within {
     background-color: #FFFFFF;
 }
 
-.mock-doc.poster.hearts .mk-plate,
-.mock-doc.poster.spades .mk-plate {
+.mock-doc.poster[data-suit] .mk-plate {
     position: absolute;
     left: 12.5%;
     top: 7%;
@@ -2363,12 +2361,27 @@ body.is-nav-hidden .site-header:focus-within {
     color: #BE1E2D;
 }
 
-/* The second suit is the same tile with a different pip: black, and the glyph
-   one code point along. Three classes plus the pseudo-element outrank the rule
-   above, so source order is not what is carrying this. */
-.mock-doc.poster.spades .mk-index::after {
+/* Each further suit is the same tile with a different pip. Keyed on the same
+   data-suit attribute the layout rules use, so a fifth would be three lines
+   here and nowhere else, and an attribute selector plus two classes outranks
+   the rule above -- source order is not what is carrying this.
+
+   The glyphs are the Unicode suits rather than the renderer's own paths: at a
+   tile this size the difference is invisible, and a CSS pseudo-element cannot
+   hold a path anyway. */
+.mock-doc.poster[data-suit="spades"] .mk-index::after {
     content: "\2660";
     color: #000000;
+}
+
+.mock-doc.poster[data-suit="clubs"] .mk-index::after {
+    content: "\2663";
+    color: #000000;
+}
+
+.mock-doc.poster[data-suit="diamonds"] .mk-index::after {
+    content: "\2666";
+    color: #BE1E2D;
 }
 
 .mk-index-head {

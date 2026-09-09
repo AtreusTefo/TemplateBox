@@ -449,6 +449,43 @@ the init tail are now that one call.
 Built by handing Prompt C back to a coding agent, which is the first time that
 prompt has been used for what it was written for.
 
+### All four suits (September 9, 2026)
+
+Clubs and diamonds followed the same day, and cost exactly what the previous
+section predicted: a path, an ink and a pairing each. `SUITS` has four entries;
+nothing else in either renderer changed.
+
+**The club is the only pip that is not one outline.** It is four subpaths --
+three lobes and a stem -- and both canvas and SVG fill with the NONZERO rule, so
+the stem has to wind the same way as the lobes. Wound the other way the overlap
+cancels and leaves a hole where the stem meets them, which was drawn on purpose
+to confirm it before the comment claiming so was written. Two other things about
+it are load-bearing: the lobes have to overlap (at r=0.235 with centres 0.315
+apart the top lobe reaches both lower ones, and pulling them apart separates the
+trefoil into three circles), and the stem has to start high enough -- 0.35, up
+inside the top lobe -- or a white notch is left at the junction.
+
+**The diamond is symmetric about both axes**, so the mirrored corner turns it
+into itself and the flip is invisible on it. It is inset horizontally rather
+than filling the box, because the pip box is wider than it is tall -- it is the
+heart's own bounding box -- and a diamond drawn to the full width reads as a
+lozenge.
+
+**Red leads with the queen and black with the king.** Arbitrary, but it is the
+pattern the first two shipped with, and it gives the four catalog cards four
+titles rather than one title in four colours. It is only a starting point: both
+corners are editable on all four.
+
+The miniatures moved from a class per suit to `data-suit`, because the shared
+rules had started listing every suit twice. A fifth suit is now three lines of
+CSS keyed on that attribute, and the attribute selector plus two classes still
+outranks the plain `.mock-doc.poster` rule, so source order is not carrying it.
+
+Verified per suit: correct pip ink, zero panel intrusion, the catalog hand-off
+delivering the right pairing, and -- for the club specifically -- the exported
+SVG rendered back to a canvas over a magenta ground and sampled at the lobe, the
+junction and the stem, with the paper around it still white.
+
 ### Spades costs a path, an ink and a pairing
 
 `SUITS` is the new indirection: a pip path plus the ink it is filled with.
@@ -529,7 +566,9 @@ is where the visitor is looking, so that is where the way in should be.
 
 ## Not done
 
-- **Two suits, not four.** Clubs and diamonds are a path and an ink each now.
+- **The pips are the four standard suits only.** A visitor who wants something
+  else in the corner -- a monogram, a ring, a date -- has no way to ask, and
+  the pip is the one part of this layout that is not editable.
 - The style is not offered on `poster-maker.html`, which still describes the
   frame styles only.
 - The rank is one font size for both corners; a visitor wanting a small "10"
