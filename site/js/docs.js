@@ -1,12 +1,13 @@
 /* ==========================================================================
    TemplateBox - Business Document Builder Core Logic
-   Covers six documents from one form and one state object: rent receipt,
+   Covers seven documents from one form and one state object: rent receipt,
    cash payment receipt, itemized business receipt, sales and cash receipt
-   form, professional invoice, and employee warning notice.
+   form, professional invoice, ruled invoice with logo, and employee warning
+   notice.
    Responsibilities: document-type switching, real-time localStorage binding,
-   repeating line items, automatic totals and amount-in-words, safe
-   textContent preview rendering, and client-side PDF compilation via the
-   jsPDF native text API.
+   repeating line items, automatic totals and amount-in-words, a local logo
+   upload, safe textContent preview rendering, and client-side PDF
+   compilation via the jsPDF native text API.
    Depends on: js/app.js (TB.sanitize, TB.desanitize, TB.storageGet/Set,
    TB.takePreset)
    ========================================================================== */
@@ -98,6 +99,28 @@
                 note: "Footer Message"
             }
         },
+        /* The ruled invoice (September 9, 2026). Same money model as
+           "invoice" above and deliberately so -- it is a second SHEET, not a
+           second set of arithmetic. What it adds is a visitor-uploaded logo,
+           a per-row date column and an icon contact strip, and what it drops
+           is the issuer address block: on this layout the business appears
+           once as a wordmark beside its logo, and its contact details sit in
+           the footer strip instead. */
+        "logo-invoice": {
+            layout: "ruled-invoice",
+            heading: "INVOICE",
+            file: "logo-invoice",
+            labels: {
+                issuerLegend: "Your Business",
+                issuerName: "Business Name (shown as the wordmark)",
+                recipientLegend: "Bill To",
+                recipientName: "Bill to",
+                docNumber: "No. Invoice",
+                docDate: "Date",
+                paid: "Amount Already Paid",
+                note: "Closing Line"
+            }
+        },
         "warning-notice": {
             layout: "notice",
             heading: "EMPLOYEE WARNING NOTICE",
@@ -162,6 +185,44 @@
         "Final Written Warning"
     ];
 
+    /* ----------------------------------------------------------------------
+       Contact-strip icons for the ruled invoice: Material Symbols outlines,
+       kept as path data rather than as files under site/assets/.
+
+       ONE copy, because two consumers need the same geometry -- the sheet
+       draws it as an inline <svg> and the PDF has to draw it as a bitmap,
+       jsPDF's built-in faces having no handset, envelope or globe glyph. A
+       file plus a constant would be two sources of truth for one shape.
+
+       The viewBox is "0 -960 960 960" and the NEGATIVE Y ORIGIN is the whole
+       trap: the glyph occupies y = -960..0, so a canvas draw that does not
+       translate down by 960 first puts every icon entirely off the surface
+       and silently produces three blank images. See iconPng() below.
+       ---------------------------------------------------------------------- */
+    const ICON_VIEWBOX = "0 -960 960 960";
+    const ICONS = {
+        phone: "M798-120q-125 0-247-54.5T329-329Q229-429 174.5-551T120-798q0-18 12-30t30-12h162q14 0 25 9.5t13 22.5l26 140q2 16-1 27t-11 19l-97 98q20 37 47.5 71.5T387-386q31 31 65 57.5t72 48.5l94-94q9-9 23.5-13.5T670-390l138 28q14 4 23 14.5t9 23.5v162q0 18-12 30t-30 12ZM241-600l66-66-17-94h-89q5 41 14 81t26 79Zm358 358q39 17 79.5 27t81.5 13v-88l-94-19-67 67ZM241-600Zm358 358Z",
+        mail: "M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm320-280L160-640v400h640v-400L480-440Zm0-80 320-200H160l320 200ZM160-640v-80 480-400Z",
+        globe: "M325-111.5q-73-31.5-127.5-86t-86-127.5Q80-398 80-480.5t31.5-155q31.5-72.5 86-127t127.5-86Q398-880 480.5-880t155 31.5q72.5 31.5 127 86t86 127Q880-563 880-480.5T848.5-325q-31.5 73-86 127.5t-127 86Q563-80 480.5-80T325-111.5ZM480-162q26-36 45-75t31-83H404q12 44 31 83t45 75Zm-104-16q-18-33-31.5-68.5T322-320H204q29 50 72.5 87t99.5 55Zm208 0q56-18 99.5-55t72.5-87H638q-9 38-22.5 73.5T584-178ZM170-400h136q-3-20-4.5-39.5T300-480q0-21 1.5-40.5T306-560H170q-5 20-7.5 39.5T160-480q0 21 2.5 40.5T170-400Zm216 0h188q3-20 4.5-39.5T580-480q0-21-1.5-40.5T574-560H386q-3 20-4.5 39.5T380-480q0 21 1.5 40.5T386-400Zm268 0h136q5-20 7.5-39.5T800-480q0-21-2.5-40.5T790-560H654q3 20 4.5 39.5T660-480q0 21-1.5 40.5T654-400Zm-16-240h118q-29-50-72.5-87T584-782q18 33 31.5 68.5T638-640Zm-234 0h152q-12-44-31-83t-45-75q-26 36-45 75t-31 83Zm-200 0h118q9-38 22.5-73.5T376-782q-56 18-99.5 55T204-640Z"
+    };
+
+    /* The ruled invoice's grid is a printed form before it is a report: it
+       always draws at least this many body rows, filled or not, so a
+       half-completed invoice still looks like the template it came from. */
+    const RULED_MIN_ROWS = 8;
+    const RULED_COLUMNS = ["Date", "Item Description", "Price", "Qty", "Total"];
+    /* Proportions of the table width, in the order above. */
+    const RULED_WIDTHS = [0.13, 0.39, 0.17, 0.11, 0.20];
+
+    /* Uploaded logo. Downscaled to this longest edge before storage: a
+       wordmark or a badge needs no more, and the encoded string is what has
+       to fit alongside the visitor's typing in one localStorage record. */
+    const LOGO_MAX_EDGE = 320;
+    /* Read back from storage as untrusted input. Only a base64 raster is
+       accepted; an SVG data URI is a script vector and must produce a sheet
+       and an export identical to having no logo at all. */
+    const LOGO_URI = /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+=*$/;
+
     const DEFAULT_ACCENT = "#1A1A1A";
     const DEFAULT_DOC_NAME = "Untitled document";
 
@@ -177,7 +238,7 @@
        This used to be a visible <select> in the form, and that select WAS the
        runtime source of truth: collectState() read its value on every
        keystroke. The control was removed because it undermined the funnel it
-       sits at the end of -- six catalog cards and six landing pages exist to
+       sits at the end of -- seven catalog cards and seven landing pages exist to
        route a visitor to one document before the editor opens, and a free
        switcher inside the editor turned that into "one form, pick whatever",
        which is the argument for a single generic Documents entry instead.
@@ -202,8 +263,18 @@
     const methodRow = document.getElementById("method-row");
     const violationRow = document.getElementById("violation-row");
     const wordsHint = document.getElementById("amount-words-hint");
+    const logoInput = document.getElementById("f-logo");
+    const logoRemove = document.getElementById("logo-remove");
+    const logoError = document.getElementById("logo-error");
 
     let currentAccent = DEFAULT_ACCENT;
+
+    /* The logo is not a [data-bind] control, so every sweep that walks the
+       form -- collectState, Clear Form, "Start blank" -- has to be told about
+       it explicitly. js/resume.js has been bitten three separate times by
+       exactly this, always by a field that is not an input. */
+    let currentLogo = "";
+    let currentLogoRatio = 0;
 
     /* ----------------------------------------------------------------------
        Value helpers
@@ -329,7 +400,7 @@
     function collectItems() {
         return Array.from(itemList.querySelectorAll("[data-entry]")).map((row) => {
             const item = {};
-            ["description", "qty", "price"].forEach((name) => {
+            ["date", "description", "qty", "price"].forEach((name) => {
                 const input = row.querySelector('[data-entry-field="' + name + '"]');
                 item[name] = TB.sanitize(input ? input.value : "");
             });
@@ -346,6 +417,11 @@
             accent: currentAccent,
             docName: TB.sanitize(docNameInput ? docNameInput.value : DEFAULT_DOC_NAME),
             blankForm: blankToggle.checked === true,
+            /* Not collected from the form: see currentLogo above. The ratio
+               travels with the image because the PDF writer is synchronous
+               and cannot wait for a decode to learn the shape. */
+            logo: currentLogo,
+            logoRatio: currentLogoRatio,
             fields: {},
             items: collectItems(),
             methods: collectChecks(methodRow),
@@ -455,6 +531,136 @@
             persistAndRender();
         });
         itemList.appendChild(row);
+        /* The row carries a [data-for] field of its own (the ruled invoice's
+           Date column), and nothing here reveals or hides it. That is
+           deliberate: applyDocType sweeps `document`, not the form, and it
+           runs on the next persistAndRender -- which is the very next
+           statement on every path that clones a row. A per-clone guard was
+           written here first and then deleted after being disabled on purpose
+           and refusing to change the outcome: it could not be observed to
+           fire, and at init it would have run against the DEFAULT_TYPE
+           anyway, since the preset is resolved after the rows are added. */
+    }
+
+    /* ----------------------------------------------------------------------
+       Logo upload. Nothing leaves the device: the file is read by FileReader,
+       drawn to a canvas, and kept as a data URI in the same localStorage
+       record as the typed fields.
+       ---------------------------------------------------------------------- */
+
+    /* Downscales to LOGO_MAX_EDGE and returns a PNG data URI, or "" if the
+       image could not be drawn. PNG rather than JPEG deliberately: a logo
+       almost always carries a transparent background, and JPEG has no alpha,
+       so the same file would come back with a black box around it. */
+    function prepareLogo(img) {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        if (!w || !h) {
+            return null;
+        }
+        const scale = Math.min(1, LOGO_MAX_EDGE / Math.max(w, h));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+            return null;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return { uri: canvas.toDataURL("image/png"), ratio: w / h };
+    }
+
+    function setLogo(uri, ratio) {
+        currentLogo = uri || "";
+        currentLogoRatio = currentLogo && Number.isFinite(ratio) && ratio > 0 ? ratio : 0;
+        if (logoRemove) {
+            logoRemove.hidden = !currentLogo;
+        }
+        if (logoError) {
+            logoError.textContent = "";
+        }
+
+        persistAndRender();
+
+        /* TB.storageSet swallows a quota failure by design, so a logo that
+           did not fit has to be detected by reading the record back. Saying
+           nothing would be the worst outcome: the visitor sees it on the
+           sheet, closes the tab, and it is gone with no explanation. */
+        if (currentLogo && logoError) {
+            const saved = TB.storageGet(STORAGE_KEY);
+            if (!saved || saved.logo !== currentLogo) {
+                logoError.textContent = "This logo is on the invoice and will " +
+                    "export, but there was not enough room in this browser's " +
+                    "storage to keep it for next time. Try a smaller image.";
+            }
+        }
+    }
+
+    function bindLogoUpload() {
+        if (!logoInput) {
+            return;
+        }
+
+        logoInput.addEventListener("change", () => {
+            if (logoError) {
+                logoError.textContent = "";
+            }
+            const file = logoInput.files && logoInput.files[0];
+            if (!file) {
+                return;
+            }
+            /* Explicit mime-type parse, terminating immediately on anything
+               that is not an image -- the file-upload rule in CLAUDE.md, and
+               the same check js/poster.js, js/mockup.js and js/resume.js
+               make. */
+            if (!/^image\//.test(file.type)) {
+                if (logoError) {
+                    logoError.textContent = "That file is not an image. Please choose a PNG, JPG or WebP file.";
+                }
+                logoInput.value = "";
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.addEventListener("load", () => {
+                const img = new Image();
+                img.addEventListener("load", () => {
+                    const prepared = prepareLogo(img);
+                    /* Cleared on every path, success included, so re-picking
+                       the same file still fires change -- which is how a
+                       visitor retries after an error. */
+                    logoInput.value = "";
+                    if (!prepared) {
+                        if (logoError) {
+                            logoError.textContent = "That image could not be read. Please try a different file.";
+                        }
+                        return;
+                    }
+                    setLogo(prepared.uri, prepared.ratio);
+                });
+                img.addEventListener("error", () => {
+                    logoInput.value = "";
+                    if (logoError) {
+                        logoError.textContent = "That image could not be decoded. Please try a different file.";
+                    }
+                });
+                img.src = reader.result;
+            });
+            reader.addEventListener("error", () => {
+                logoInput.value = "";
+                if (logoError) {
+                    logoError.textContent = "That file could not be read. Please try a different file.";
+                }
+            });
+            reader.readAsDataURL(file);
+        });
+
+        if (logoRemove) {
+            logoRemove.addEventListener("click", () => {
+                logoInput.value = "";
+                setLogo("", 0);
+            });
+        }
     }
 
     /* ----------------------------------------------------------------------
@@ -736,7 +942,208 @@
         return block;
     }
 
-    /* --- Layout 3: employee warning notice ------------------------------- */
+    /* --- Layout 3: ruled invoice with logo -------------------------------- */
+
+    /* An inline SVG built node by node, never from an HTML string. The icon
+       is decorative: the phone number, address or URL beside it is the
+       content, so it is hidden from the accessibility tree entirely. */
+    function iconNode(key) {
+        const NS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(NS, "svg");
+        svg.setAttribute("viewBox", ICON_VIEWBOX);
+        svg.setAttribute("class", "doc-ruled-icon");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+        const path = document.createElementNS(NS, "path");
+        path.setAttribute("d", ICONS[key]);
+        svg.appendChild(path);
+        return svg;
+    }
+
+    /* Label above, value sitting on a rule -- the shape the artwork uses for
+       Date, No. Invoice and Bill to. The rule is drawn whether or not there
+       is a value, so an unfilled invoice prints as something to write on. */
+    function ruledField(label, value) {
+        const field = el("div", "doc-ruled-field");
+        field.appendChild(el("p", "doc-ruled-field-label", label));
+        field.appendChild(el("p", "doc-ruled-field-value", value || ""));
+        return field;
+    }
+
+    function contactRow(key, value) {
+        const row = el("p", "doc-ruled-contact-row" + (value ? "" : " is-blank"));
+        row.appendChild(iconNode(key));
+        row.appendChild(el("span", "doc-ruled-contact-value", value || ""));
+        return row;
+    }
+
+    function renderRuledInvoice(state) {
+        const config = DOC_TYPES[state.docType];
+        const cur = currencyOf(state);
+        const f = state.fields;
+        const d = TB.desanitize;
+        const blank = state.blankForm;
+        const totals = computeTotals(state);
+
+        /* Masthead: the wordmark and the uploaded logo sit on the title's
+           optical line, flush right. */
+        const head = el("div", "doc-ruled-masthead");
+        head.appendChild(el("h3", "doc-ruled-title", config.heading));
+
+        const brand = el("div", "doc-ruled-brand");
+        if (d(f.issuerName) || blank) {
+            brand.appendChild(el("p", "doc-ruled-wordmark", d(f.issuerName)));
+        }
+        if (state.logo) {
+            const logo = document.createElement("img");
+            logo.className = "doc-ruled-logo";
+            logo.alt = "";
+            logo.setAttribute("aria-hidden", "true");
+            logo.src = state.logo;
+            brand.appendChild(logo);
+        }
+        head.appendChild(brand);
+        sheet.appendChild(head);
+
+        /* Reference fields left, payment details right. */
+        const top = el("div", "doc-ruled-top");
+
+        /* The three fields are direct grid children rather than a nested
+           column, which is what lets the payment block align with Bill To by
+           grid placement (grid-row: 3) instead of by a padding figure that
+           would have to be re-derived every time a font size moves. */
+        top.appendChild(ruledField(config.labels.docDate + ":", formatDate(f.docDate)));
+        top.appendChild(ruledField(config.labels.docNumber + " :", d(f.docNumber)));
+        top.appendChild(ruledField(config.labels.recipientName + ":", d(f.recipientName)));
+        const address = el("div", "doc-ruled-address-block");
+        appendLines(address, f.recipientDetails, "doc-ruled-address");
+        top.appendChild(address);
+
+        const pay = el("div", "doc-ruled-pay");
+        /* The same three-way condition writeRuledInvoice uses. They have to
+           agree: a block that appears on the sheet and not in the export, or
+           the reverse, is the preview-disagrees-with-export defect the
+           two-painter discipline exists to prevent. */
+        if (d(f.bankDetails) || d(f.paymentTerms) || formatDate(f.dueDate) || blank) {
+            pay.appendChild(el("p", "doc-ruled-pay-label", "Payment Method:"));
+            appendLines(pay, f.bankDetails, "doc-ruled-pay-line");
+            if (d(f.paymentTerms)) {
+                pay.appendChild(el("p", "doc-ruled-pay-line", "Terms: " + d(f.paymentTerms)));
+            }
+            if (formatDate(f.dueDate)) {
+                pay.appendChild(el("p", "doc-ruled-pay-line", "Due: " + formatDate(f.dueDate)));
+            }
+        }
+        top.appendChild(pay);
+        sheet.appendChild(top);
+
+        /* Line-item grid. Every cell is ruled on all four sides and the body
+           never falls below RULED_MIN_ROWS, so the sheet reads as the printed
+           form it is modelled on however little has been typed into it. */
+        const table = el("table", "doc-ruled-table");
+        const colgroup = document.createElement("colgroup");
+        RULED_WIDTHS.forEach((width) => {
+            const col = document.createElement("col");
+            col.style.width = (width * 100).toFixed(2) + "%";
+            colgroup.appendChild(col);
+        });
+        table.appendChild(colgroup);
+
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        RULED_COLUMNS.forEach((title) => headRow.appendChild(el("th", "", title)));
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        const filled = state.items.filter((item) =>
+            d(item.description) || d(item.date) || num(item.qty) || num(item.price));
+        const rows = blank ? state.items : filled;
+
+        rows.forEach((item) => {
+            const qty = num(item.qty);
+            const price = num(item.price);
+            const tr = document.createElement("tr");
+            tr.appendChild(el("td", "", d(item.date)));
+            tr.appendChild(el("td", "", d(item.description)));
+            tr.appendChild(el("td", "num", price ? money(price, cur) : ""));
+            tr.appendChild(el("td", "num", qty ? String(qty) : ""));
+            /* Computed, never typed: there is no input for a row total. */
+            tr.appendChild(el("td", "num", qty && price ? money(qty * price, cur) : ""));
+            tbody.appendChild(tr);
+        });
+
+        for (let i = rows.length; i < RULED_MIN_ROWS; i += 1) {
+            const tr = el("tr", "is-empty");
+            RULED_COLUMNS.forEach(() => tr.appendChild(el("td", "", "")));
+            tbody.appendChild(tr);
+        }
+
+        table.appendChild(tbody);
+        const tableWrap = el("div", "doc-table-wrap");
+        tableWrap.appendChild(table);
+        sheet.appendChild(tableWrap);
+
+        /* Closing row: the thank-you line, and the single boxed figure the
+           artwork carries. Subtotal, discount, tax and any payment already
+           made appear above the box ONLY when they are not zero, so a plain
+           invoice renders exactly the reference -- one box, one number. */
+        const close = el("div", "doc-ruled-close");
+        close.appendChild(el("p", "doc-ruled-thanks", d(f.note) || "THANK YOU!"));
+
+        const moneyCol = el("div", "doc-ruled-money");
+        if (totals.discount > 0 || totals.taxRate > 0 || totals.paid > 0) {
+            moneyCol.appendChild(totalRow("Subtotal", money(totals.subtotal, cur)));
+            if (totals.discount > 0) {
+                moneyCol.appendChild(totalRow("Discount", "-" + money(totals.discount, cur)));
+            }
+            if (totals.taxRate > 0) {
+                moneyCol.appendChild(totalRow(
+                    (d(f.taxLabel) || "Tax") + " (" + totals.taxRate + "%)",
+                    money(totals.tax, cur)));
+            }
+            if (totals.paid > 0) {
+                moneyCol.appendChild(totalRow(config.labels.paid,
+                    "-" + money(totals.paid, cur)));
+            }
+        }
+
+        const box = el("div", "doc-ruled-total");
+        box.appendChild(el("span", "doc-ruled-total-label",
+            totals.paid > 0 ? "Balance Due:" : "Total:"));
+        box.appendChild(el("span", "doc-ruled-total-value",
+            money(totals.paid > 0 ? totals.balance : totals.total, cur)));
+        moneyCol.appendChild(box);
+        close.appendChild(moneyCol);
+        sheet.appendChild(close);
+
+        /* Footer: icon contact strip left, signature rules right. */
+        const foot = el("div", "doc-ruled-foot");
+
+        const contact = el("div", "doc-ruled-contact");
+        [["phone", d(f.contactPhone)], ["mail", d(f.contactEmail)],
+            ["globe", d(f.contactSite)]].forEach((pair) => {
+            if (pair[1] || blank) {
+                contact.appendChild(contactRow(pair[0], pair[1]));
+            }
+        });
+        foot.appendChild(contact);
+
+        const signs = el("div", "doc-ruled-signs");
+        const first = el("div", "doc-ruled-sign");
+        first.appendChild(el("div", "doc-ruled-sign-rule"));
+        if (d(f.signerName)) {
+            first.appendChild(el("p", "doc-ruled-sign-label", d(f.signerName)));
+        }
+        signs.appendChild(first);
+        signs.appendChild(el("div", "doc-ruled-sign-rule"));
+        signs.appendChild(el("div", "doc-ruled-sign-rule"));
+        foot.appendChild(signs);
+
+        sheet.appendChild(foot);
+    }
+
+    /* --- Layout 4: employee warning notice ------------------------------- */
 
     function renderNotice(state) {
         const config = DOC_TYPES[state.docType];
@@ -814,7 +1221,8 @@
     const RENDERERS = {
         receipt: renderReceipt,
         itemized: renderItemized,
-        notice: renderNotice
+        notice: renderNotice,
+        "ruled-invoice": renderRuledInvoice
     };
 
     function renderPreview(state) {
@@ -849,6 +1257,45 @@
        Every string is written as true vector glyphs with doc.text(), so the
        exported document stays selectable, copyable and machine-readable.
        ---------------------------------------------------------------------- */
+
+    /* ----------------------------------------------------------------------
+       The contact-strip icons, rasterized for the PDF.
+
+       These three cannot be text: jsPDF's built-in WinAnsi faces have no
+       handset, envelope or globe glyph, and asking for one prints nothing.
+       They are the ONLY raster in the export -- every string still goes
+       through doc.text(), so the document stays selectable and parseable,
+       which is the standing rule in
+       docs/error-fixes/RESUME_PDF_RASTERIZED_TEXT_FIX.md.
+
+       The transform is the whole subtlety. The viewBox is "0 -960 960 960",
+       so the path occupies y = -960..0; translating down by the canvas height
+       before scaling is what brings it onto the surface. Without it every
+       icon is drawn above the canvas and three blank images are embedded,
+       which looks exactly like a missing-asset bug and is not one.
+       ---------------------------------------------------------------------- */
+    const iconCache = {};
+
+    function iconPng(key, pixels) {
+        const cacheKey = key + "@" + pixels;
+        if (Object.prototype.hasOwnProperty.call(iconCache, cacheKey)) {
+            return iconCache[cacheKey];
+        }
+        let uri = "";
+        const canvas = document.createElement("canvas");
+        canvas.width = pixels;
+        canvas.height = pixels;
+        const ctx = canvas.getContext("2d");
+        if (ctx && typeof window.Path2D === "function") {
+            const scale = pixels / 960;
+            ctx.setTransform(scale, 0, 0, scale, 0, pixels);
+            ctx.fillStyle = "#1A1A1A";
+            ctx.fill(new window.Path2D(ICONS[key]));
+            uri = canvas.toDataURL("image/png");
+        }
+        iconCache[cacheKey] = uri;
+        return uri;
+    }
 
     const PAGE = { width: 210, margin: 16, bottom: 281 };
     const INK = [26, 26, 26];
@@ -1212,6 +1659,224 @@
             y += 4;
         }
 
+        /* --- Ruled invoice layout ----------------------------------------- */
+
+        const RULED_FILL = [232, 230, 225];
+
+        function writeRuledInvoice() {
+            const totals = computeTotals(state);
+            const cols = RULED_WIDTHS.map((share) => W * share);
+            const x = [];
+            cols.reduce((left, width, index) => {
+                x[index] = left;
+                return left + width;
+            }, L);
+
+            /* Masthead: title left, wordmark and logo flush right. */
+            ensureRoom(30);
+            font("helvetica", "bold", 30, accent);
+            doc.text(config.heading, L, y + 8);
+
+            let brandRight = R;
+            if (state.logo && state.logoRatio > 0) {
+                let logoH = 14;
+                let logoW = logoH * state.logoRatio;
+                if (logoW > 34) {
+                    logoW = 34;
+                    logoH = logoW / state.logoRatio;
+                }
+                doc.addImage(state.logo, "PNG", R - logoW, y - 4, logoW, logoH);
+                brandRight = R - logoW - 3;
+            }
+            if (d(f.issuerName)) {
+                font("helvetica", "bold", 12, INK);
+                doc.text(d(f.issuerName), brandRight, y + 6, { align: "right" });
+            }
+            y += 22;
+
+            /* Reference fields left, payment block right. */
+            const refWidth = W * 0.52;
+            const refTop = y;
+
+            function ruledPdfField(label, value, top) {
+                font("helvetica", "normal", 9, INK_GRAY);
+                doc.text(label, L, top);
+                font("helvetica", "normal", 10.5, INK);
+                doc.text(String(value || ""), L, top + 6);
+                stroke(INK, 0.25);
+                doc.line(L, top + 7.6, L + refWidth, top + 7.6);
+            }
+
+            ensureRoom(50);
+            ruledPdfField(config.labels.docDate + ":", formatDate(f.docDate), refTop);
+            ruledPdfField(config.labels.docNumber + " :", d(f.docNumber), refTop + 14);
+            ruledPdfField(config.labels.recipientName + ":", d(f.recipientName), refTop + 28);
+
+            y = refTop + 42;
+            d(f.recipientDetails).split("\n").map((s) => s.trim()).filter(Boolean)
+                .forEach((line) => block(line, "helvetica", "italic", 9, INK, 0, L, refWidth));
+            const refEnd = y;
+
+            /* Top-aligned with the Bill To field, as the artwork has it. */
+            const payX = L + W * 0.55;
+            const payWidth = W * 0.45;
+            y = refTop + 28;
+            const bank = d(f.bankDetails).split("\n").map((s) => s.trim()).filter(Boolean);
+            /* Same condition as renderRuledInvoice, blank mode included, so
+               the sheet and the export cannot disagree about whether this
+               block is there. */
+            if (bank.length || d(f.paymentTerms) || formatDate(f.dueDate) || blank) {
+                block("Payment Method:", "helvetica", "normal", 9, INK_GRAY, 1.5, payX, payWidth);
+                bank.forEach((line) =>
+                    block(line, "helvetica", "normal", 9.5, INK, 0, payX, payWidth));
+                if (d(f.paymentTerms)) {
+                    block("Terms: " + d(f.paymentTerms), "helvetica", "normal", 9.5, INK, 0, payX, payWidth);
+                }
+                if (formatDate(f.dueDate)) {
+                    block("Due: " + formatDate(f.dueDate), "helvetica", "normal", 9.5, INK, 0, payX, payWidth);
+                }
+            }
+
+            y = Math.max(refEnd, y) + 8;
+
+            /* Line-item grid, ruled on all four sides of every cell. */
+            ensureRoom(20);
+            doc.setFillColor(RULED_FILL[0], RULED_FILL[1], RULED_FILL[2]);
+            stroke(INK, 0.3);
+            doc.rect(L, y, W, 8, "FD");
+            font("helvetica", "bold", 8.5, INK);
+            RULED_COLUMNS.forEach((title, index) => {
+                doc.text(title, x[index] + cols[index] / 2, y + 5.3, { align: "center" });
+            });
+            y += 8;
+
+            function gridRow(height) {
+                stroke(INK, 0.25);
+                doc.rect(L, y, W, height);
+                for (let i = 1; i < x.length; i += 1) {
+                    doc.line(x[i], y, x[i], y + height);
+                }
+            }
+
+            const filled = state.items.filter((item) =>
+                d(item.description) || d(item.date) || num(item.qty) || num(item.price));
+            const rows = blank ? state.items : filled;
+
+            rows.forEach((item) => {
+                const qty = num(item.qty);
+                const price = num(item.price);
+                font("helvetica", "normal", 9.5, INK);
+                const lines = doc.splitTextToSize(d(item.description), cols[1] - 4);
+                const height = Math.max(9, lines.length * 4.6 + 4);
+                ensureRoom(height + 2);
+                gridRow(height);
+                doc.text(d(item.date), x[0] + 2, y + 5.8);
+                lines.forEach((line, index) => {
+                    doc.text(line, x[1] + 2, y + 5.8 + index * 4.6);
+                });
+                if (price) {
+                    doc.text(money(price, cur, true), x[2] + cols[2] - 2, y + 5.8, { align: "right" });
+                }
+                if (qty) {
+                    doc.text(String(qty), x[3] + cols[3] - 2, y + 5.8, { align: "right" });
+                }
+                if (qty && price) {
+                    doc.text(money(qty * price, cur, true), x[4] + cols[4] - 2, y + 5.8,
+                        { align: "right" });
+                }
+                y += height;
+            });
+
+            for (let i = rows.length; i < RULED_MIN_ROWS; i += 1) {
+                ensureRoom(11);
+                gridRow(9);
+                y += 9;
+            }
+
+            y += 10;
+
+            /* Closing row: the thank-you line sits on the Total box's line. */
+            const boxWidth = W * 0.42;
+            const boxLeft = R - boxWidth;
+            ensureRoom(30);
+
+            if (totals.discount > 0 || totals.taxRate > 0 || totals.paid > 0) {
+                font("helvetica", "normal", 9, INK);
+                const sub = [["Subtotal", money(totals.subtotal, cur, true)]];
+                if (totals.discount > 0) {
+                    sub.push(["Discount", "-" + money(totals.discount, cur, true)]);
+                }
+                if (totals.taxRate > 0) {
+                    sub.push([(d(f.taxLabel) || "Tax") + " (" + totals.taxRate + "%)",
+                        money(totals.tax, cur, true)]);
+                }
+                if (totals.paid > 0) {
+                    sub.push([config.labels.paid, "-" + money(totals.paid, cur, true)]);
+                }
+                sub.forEach((pair) => {
+                    doc.text(pair[0], boxLeft, y);
+                    doc.text(pair[1], R, y, { align: "right" });
+                    y += 5;
+                });
+                y += 1;
+            }
+
+            doc.setFillColor(RULED_FILL[0], RULED_FILL[1], RULED_FILL[2]);
+            stroke(INK, 0.3);
+            doc.rect(boxLeft, y, boxWidth, 9, "FD");
+            font("helvetica", "bold", 10.5, INK);
+            doc.text(totals.paid > 0 ? "Balance Due:" : "Total:", boxLeft + 3, y + 6);
+            doc.text(money(totals.paid > 0 ? totals.balance : totals.total, cur, true),
+                R - 3, y + 6, { align: "right" });
+
+            /* The closing line is the visitor's own text, so it can be far
+               longer than the artwork's "THANK YOU!". Shrink to fit rather
+               than run it under the Total box -- the collision this project
+               already shipped once, on the Open Graph invoice illustration. */
+            const thanks = d(f.note) || "THANK YOU!";
+            const thanksRoom = boxLeft - L - 4;
+            let thanksSize = 18;
+            font("helvetica", "bold", thanksSize, accent);
+            while (thanksSize > 10 && doc.getTextWidth(thanks) > thanksRoom) {
+                thanksSize -= 1;
+                font("helvetica", "bold", thanksSize, accent);
+            }
+            doc.text(thanks, L, y + 7);
+            y += 9 + 14;
+
+            /* Footer: icon contact strip left, signature rules right. */
+            ensureRoom(30);
+            const footTop = y;
+
+            [["phone", d(f.contactPhone)], ["mail", d(f.contactEmail)],
+                ["globe", d(f.contactSite)]].forEach((pair) => {
+                if (!pair[1]) {
+                    return;
+                }
+                const png = iconPng(pair[0], 96);
+                if (png) {
+                    doc.addImage(png, "PNG", L, y - 3.2, 4.2, 4.2);
+                }
+                font("helvetica", "normal", 9.5, INK);
+                doc.text(pair[1], L + 6.4, y);
+                y += 7;
+            });
+            const contactEnd = y;
+
+            let signY = footTop + 2;
+            stroke(INK, 0.3);
+            for (let i = 0; i < 3; i += 1) {
+                doc.line(boxLeft, signY, R, signY);
+                if (i === 0 && d(f.signerName)) {
+                    font("helvetica", "normal", 8, INK_GRAY);
+                    doc.text(d(f.signerName), boxLeft, signY + 3.6);
+                }
+                signY += 8;
+            }
+
+            y = Math.max(contactEnd, signY);
+        }
+
         /* --- Warning notice layout ---------------------------------------- */
         function writeNotice() {
             pdfIssuerHead();
@@ -1294,7 +1959,12 @@
             }
         }
 
-        const WRITERS = { receipt: writeReceipt, itemized: writeItemized, notice: writeNotice };
+        const WRITERS = {
+            receipt: writeReceipt,
+            itemized: writeItemized,
+            notice: writeNotice,
+            "ruled-invoice": writeRuledInvoice
+        };
         WRITERS[config.layout]();
 
         return doc;
@@ -1354,7 +2024,10 @@
         });
         itemList.replaceChildren();
         addItemRow();
-        persistAndRender();
+        /* The logo is not a [data-bind] control, so the sweep above does not
+           reach it. Clearing every field and leaving the logo standing is the
+           defect this line exists to prevent. */
+        setLogo("", 0);
     });
 
     /* ----------------------------------------------------------------------
@@ -1365,7 +2038,7 @@
        The builder previously opened onto an empty form beside an empty sheet,
        so a first-time visitor saw a blank rectangle and could not tell what
        the tool produces or that the preview is live. These values are shared
-       across all six document types (the per-type fields that do not apply
+       across all seven document types (the per-type fields that do not apply
        are simply hidden), and are applied ONLY when no saved state exists so
        genuine work is never overwritten. */
     const SAMPLE_FIELDS = {
@@ -1382,6 +2055,10 @@
         receivedBy: "R. Achterberg",
         reference: "Check no. 1042",
         note: "Thank you for your business.",
+        contactPhone: "+1 (555) 018-2244",
+        contactEmail: "billing@example.com",
+        contactSite: "www.example.com",
+        signerName: "R. Achterberg",
         taxLabel: "Sales Tax",
         taxRate: "8.5",
         paymentTerms: "Net 30",
@@ -1396,9 +2073,9 @@
     };
 
     const SAMPLE_ITEMS = [
-        { description: "Oak shelving board", qty: "6", price: "45.00" },
-        { description: "Brass fittings set", qty: "2", price: "42.00" },
-        { description: "Delivery", qty: "1", price: "35.00" }
+        { date: "1 Aug", description: "Oak shelving board", qty: "6", price: "45.00" },
+        { date: "1 Aug", description: "Brass fittings set", qty: "2", price: "42.00" },
+        { date: "3 Aug", description: "Delivery", qty: "1", price: "35.00" }
     ];
 
     /* Renders the sample-content notice above the form, with a one-click
@@ -1430,7 +2107,8 @@
             itemList.replaceChildren();
             addItemRow();
             notice.remove();
-            persistAndRender();
+            /* Same reason as Clear Form above: not a [data-bind] control. */
+            setLogo("", 0);
             const first = form.querySelector("[data-bind]:not(select)");
             if (first) {
                 first.focus();
@@ -1485,6 +2163,18 @@
                 });
             });
             (state.items && state.items.length ? state.items : [null]).forEach(addItemRow);
+
+            /* The stored logo is untrusted input on the way out. Only a
+               base64 raster is accepted -- an SVG data URI is a script
+               vector -- and the ratio has to be present too, because the PDF
+               writer is synchronous and cannot decode the image to learn the
+               shape. A record missing either drops the logo rather than
+               guessing at it and exporting something distorted. */
+            if (LOGO_URI.test(String(state.logo || "")) &&
+                    Number.isFinite(state.logoRatio) && state.logoRatio > 0) {
+                currentLogo = state.logo;
+                currentLogoRatio = state.logoRatio;
+            }
         } else {
             applyAccent(DEFAULT_ACCENT);
             applySampleContent();
@@ -1519,6 +2209,11 @@
             addItemRow();
             persistAndRender();
         });
+
+        bindLogoUpload();
+        if (logoRemove) {
+            logoRemove.hidden = !currentLogo;
+        }
 
         const initial = collectState();
         applyDocType(initial);

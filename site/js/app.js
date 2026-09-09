@@ -49,6 +49,7 @@ const TB = (() => {
         "business-receipt": "Itemized Business Receipt",
         "sales-receipt": "Sales Receipt Form",
         "invoice": "Invoice",
+        "logo-invoice": "Editable Invoice with Logo",
         "warning-notice": "Employee Warning Notice"
     };
 

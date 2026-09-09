@@ -2208,6 +2208,83 @@ body.is-nav-hidden .site-header:focus-within {
     margin-top: 0.09375rem;
 }
 
+
+/* Ruled invoice miniature: a masthead with a logo mark, ruled reference
+   lines and a five-column grid, so the card reads as a printed form and
+   not as a second copy of the Professional Invoice card beside it. */
+.mock-doc.invoiced .mk-inv-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    margin-bottom: 0.125rem;
+}
+
+.mk-inv-title {
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    line-height: 1;
+    color: var(--color-text);
+}
+
+.mk-inv-mark {
+    display: block;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border: 1px solid var(--color-text);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.mk-grid {
+    display: grid;
+    grid-template-columns: 0.5fr 1fr 0.6fr 0.35fr 0.6fr;
+    font-size: 0.28125rem;
+    margin: 0.1875rem 0;
+}
+
+.mk-grid span {
+    border: 1px solid var(--color-border);
+    padding: 0.0625rem;
+    min-height: 0.4375rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mk-grid .mk-gh {
+    background-color: var(--color-bg);
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--color-muted);
+}
+
+.mk-inv-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+}
+
+.mk-inv-thanks {
+    font-size: 0.4375rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--color-text);
+}
+
+.mk-inv-box {
+    font-size: 0.3125rem;
+    font-weight: 700;
+    border: 1px solid var(--color-text);
+    background-color: var(--color-bg);
+    padding: 0.0625rem 0.1875rem;
+    white-space: nowrap;
+}
+
 /* Checkbox rows for the warning-notice miniature */
 
 .mk-check {
@@ -2705,6 +2782,15 @@ body.is-nav-hidden .site-header:focus-within {
     transition: background-color var(--motion-fast) var(--ease),
         border-color var(--motion-fast) var(--ease),
         color var(--motion-fast) var(--ease);
+}
+
+/* An author display declaration beats the UA sheet's [hidden] rule, so a
+   .btn toggled with element.hidden stays on screen and only the
+   accessibility tree agrees it is gone. Hit twice before, on admin.html's
+   catalog preview and on mockup.html's two panels; this closes it for every
+   button the site hides that way, starting with Remove Logo. */
+.btn[hidden] {
+    display: none !important;
 }
 
 /* Softened from the previous full black-to-white inversion, which was the
@@ -5617,6 +5703,261 @@ textarea.rt-inline-editor {
     text-align: left;
 }
 
+
+/* --------------------------------------------------------------------------
+   Ruled invoice sheet (docs.html, .doc-sheet.is-ruled-invoice)
+   The fourth layout family: a printed-form invoice carrying a logo the
+   visitor uploaded. Monochrome by construction -- the accent token reaches
+   only the masthead and the closing line, and its default IS the artwork.
+
+   Two fills carry the design, the grid header strip and the Total box, and
+   both declare print-color-adjust: browsers drop background colours from
+   print output by default and the loss is invisible on screen.
+   -------------------------------------------------------------------------- */
+
+.doc-ruled-masthead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.doc-ruled-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--accent);
+    margin: 0;
+}
+
+.doc-ruled-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-width: 0;
+}
+
+.doc-ruled-wordmark {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+    overflow-wrap: break-word;
+    min-width: 0;
+}
+
+/* Height-bounded with a free width, so a wide wordmark logo and a square
+   badge both sit correctly beside the business name. */
+.doc-ruled-logo {
+    height: 3rem;
+    width: auto;
+    max-width: 8rem;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Reference fields run down column 1; the payment block sits in column 2 on
+   the third row, which is what aligns it with Bill To in the reference
+   artwork. Placement, not padding: a measured offset would have to be
+   re-derived every time one of these font sizes moved. */
+.doc-ruled-top {
+    display: grid;
+    grid-template-columns: 52% 1fr;
+    column-gap: 1.5rem;
+    margin-bottom: 1.75rem;
+}
+
+.doc-ruled-field,
+.doc-ruled-address-block {
+    grid-column: 1;
+}
+
+.doc-ruled-pay {
+    grid-column: 2;
+    grid-row: 3;
+}
+
+.doc-ruled-field {
+    margin-bottom: 1rem;
+}
+
+.doc-ruled-field-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+/* The rule is drawn whether or not there is a value, so an unfilled invoice
+   prints as something to write on. */
+.doc-ruled-field-value {
+    border-bottom: 1px solid #1A1A1A;
+    min-height: 1.25rem;
+    overflow-wrap: break-word;
+}
+
+.doc-ruled-address {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: #4A4A46;
+}
+
+.doc-ruled-pay-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.375rem;
+}
+
+.doc-ruled-pay-line {
+    font-size: 0.75rem;
+    overflow-wrap: break-word;
+}
+
+.doc-ruled-table {
+    width: 100%;
+    min-width: 22rem;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.doc-ruled-table th,
+.doc-ruled-table td {
+    border: 1px solid #1A1A1A;
+    padding: 0.5rem 0.375rem;
+    font-size: 0.75rem;
+    vertical-align: top;
+    overflow-wrap: break-word;
+}
+
+.doc-ruled-table th {
+    background-color: #E8E6E1;
+    font-weight: 600;
+    text-align: center;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.doc-ruled-table td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Never fewer than eight body rows: the sheet is a printed form before it is
+   a report, and an empty row is somewhere to write. */
+.doc-ruled-table tr.is-empty td {
+    height: 1.75rem;
+}
+
+.doc-ruled-close {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-top: 1.75rem;
+}
+
+.doc-ruled-thanks {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--accent);
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+.doc-ruled-money {
+    flex: 0 0 42%;
+    max-width: 42%;
+}
+
+.doc-ruled-money .doc-total-row {
+    font-size: 0.75rem;
+}
+
+.doc-ruled-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid #1A1A1A;
+    background-color: #E8E6E1;
+    padding: 0.5rem 0.625rem;
+    margin-top: 0.375rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.doc-ruled-total-value {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.doc-ruled-foot {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+}
+
+.doc-ruled-contact {
+    min-width: 0;
+}
+
+.doc-ruled-contact-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.375rem;
+    min-width: 0;
+}
+
+.doc-ruled-contact-value {
+    overflow-wrap: anywhere;
+}
+
+/* An SVG's fill does NOT inherit from color, so without this the icons would
+   be browser-default pure black beside #1A1A1A text -- the only thing the
+   declaration actually buys, and the reason it matches its neighbours rather
+   than reading currentColor. It is not a dark-theme guard: .doc-sheet
+   re-declares the light palette and pins its own color, so currentColor would
+   resolve to the same ink in both themes. */
+.doc-ruled-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+    fill: #1A1A1A;
+}
+
+.doc-ruled-contact-row.is-blank .doc-ruled-contact-value {
+    border-bottom: 1px solid var(--color-border);
+    min-width: 8rem;
+    min-height: 0.875rem;
+}
+
+.doc-ruled-signs {
+    flex: 0 0 42%;
+    max-width: 42%;
+    padding-top: 0.25rem;
+}
+
+.doc-ruled-sign-rule {
+    border-top: 1px solid #1A1A1A;
+    margin-top: 1.5rem;
+}
+
+.doc-ruled-sign .doc-ruled-sign-rule {
+    margin-top: 0;
+}
+
+.doc-ruled-sign-label {
+    font-size: 0.6875rem;
+    color: #6B6B66;
+    padding-top: 0.25rem;
+}
+
 .item-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -7777,9 +8118,43 @@ main:has(.mockup-layout) .editor-head {
     .doc-field-grid,
     .doc-sign-grid,
     .doc-check-row.grid,
+    .doc-ruled-top,
     .item-grid,
     .check-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* Both placements have to be released, not just the column:
+       grid-column: 2 against a one-column grid opens an implicit
+       second track and puts the payment block back off to the
+       side, half the sheet wide. */
+    .doc-ruled-pay {
+        grid-column: 1;
+        grid-row: auto;
+        margin-bottom: 1rem;
+    }
+
+    .doc-ruled-masthead,
+    .doc-ruled-close,
+    .doc-ruled-foot {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .doc-ruled-money,
+    .doc-ruled-signs {
+        flex-basis: auto;
+        max-width: none;
+        width: 100%;
+    }
+
+    .doc-ruled-title {
+        font-size: 2rem;
+    }
+
+    .doc-ruled-wordmark {
+        text-align: left;
     }
 
     .doc-sign-grid {

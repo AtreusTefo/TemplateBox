@@ -3935,6 +3935,351 @@ async function mockupTemplateChecks(page) {
     await page.evaluate("localStorage.clear(), sessionStorage.clear(), true");
 }
 
+/* ==========================================================================
+   Section 12. The ruled invoice.
+
+   Every other editor section here checks the machinery AROUND a document --
+   which ad band mounted, where the header's edge landed, whether a download
+   was named from the right field. This one checks the document: that the
+   right layout opened, that the numbers on it are the numbers the inputs
+   imply, and that a logo the visitor supplied survives into the export.
+
+   The arithmetic assertions state the EXPECTED figure rather than merely
+   that a number appeared. A totals bug produces a perfectly well-formed
+   currency string, so "the box is not empty" is an assertion that cannot
+   fail on the fault it exists to catch.
+   ========================================================================== */
+
+/* Captures the PDF the Download button produces, as a binary string, without
+   writing a file. jsPDF 2.5.1 puts save() on the INSTANCE, not the
+   prototype, so the constructor is what has to be wrapped -- js/docs.js
+   reads window.jspdf.jsPDF at click time, which is what makes the swap
+   land. */
+const GRAB_PDF = `
+    const grabPdf = () => {
+        const Orig = window.jspdf.jsPDF;
+        let uri = null;
+        function Patched() {
+            const d = new Orig(...arguments);
+            d.save = function () { uri = d.output('datauristring'); return d; };
+            return d;
+        }
+        Patched.prototype = Orig.prototype;
+        window.jspdf.jsPDF = Patched;
+        document.getElementById('download-pdf').click();
+        window.jspdf.jsPDF = Orig;
+        return uri ? atob(uri.split(',')[1]) : '';
+    };
+    const countIn = (hay, re) => (hay.match(re) || []).length;
+    const setField = (id, value) => {
+        const el = document.getElementById(id);
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const waitForPdfEngine = async () => {
+        for (let i = 0; i < 100; i += 1) {
+            if (window.jspdf && window.jspdf.jsPDF) { return true; }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        return false;
+    };
+`;
+
+async function ruledInvoiceChecks(page) {
+    section("12. Ruled invoice: the sheet, the arithmetic and the logo");
+
+    const open = async (docType) => {
+        /* takePreset() consumes the key on load, so it is written
+           immediately before the navigation that reads it. */
+        await page.evaluate("(localStorage.clear(), localStorage.setItem(" +
+            "'tb_editor_preset', " + JSON.stringify(JSON.stringify(docType)) +
+            "), true)");
+        await page.navigate(`http://localhost:${PORT}/docs.html`, 1440);
+    };
+
+    await open("logo-invoice");
+
+    const r = await page.evaluate(`(async () => {` + GRAB_PDF + `
+        if (!await waitForPdfEngine()) { return { error: 'jsPDF never loaded' }; }
+
+        const sheet = document.getElementById('doc-sheet');
+        const layout = sheet.className;
+
+        /* Start from a controlled document rather than the sample content:
+           these are exact-figure assertions and the sample is free to
+           change. */
+        window.confirm = () => true;
+        document.getElementById('clear-doc').click();
+        await new Promise(r => setTimeout(r, 50));
+
+        setField('f-contact-phone', '+1 (555) 018-2244');
+        setField('f-contact-email', 'billing@example.com');
+        setField('f-contact-site', 'www.example.com');
+
+        const firstRow = document.querySelector('#item-list [data-entry]');
+        const put = (name, value) => {
+            const el = firstRow.querySelector('[data-entry-field="' + name + '"]');
+            el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        put('date', '12 Aug');
+        put('description', 'Oak shelving board');
+        put('qty', '3');
+        put('price', '12.50');
+        await new Promise(r => setTimeout(r, 50));
+
+        const cells = [...sheet.querySelectorAll('.doc-ruled-table tbody tr')]
+            .map(tr => [...tr.children].map(td => td.textContent));
+        const emptyCell = sheet.querySelector('.doc-ruled-table tbody tr.is-empty td');
+        const box = () => ({
+            label: sheet.querySelector('.doc-ruled-total-label').textContent,
+            value: sheet.querySelector('.doc-ruled-total-value').textContent
+        });
+
+        const plain = box();
+        const subRowsWhenPlain = sheet.querySelectorAll('.doc-ruled-money .doc-total-row').length;
+
+        /* 3 x 12.50 = 37.50, +10% tax = 41.25, less 10.00 paid = 31.25. */
+        setField('f-tax-rate', '10');
+        setField('f-paid', '10');
+        await new Promise(r => setTimeout(r, 50));
+        const withPayment = box();
+        const subRows = [...sheet.querySelectorAll('.doc-ruled-money .doc-total-row')]
+            .map(row => row.textContent);
+
+        const icons = [...sheet.querySelectorAll('.doc-ruled-icon')].map(svg => ({
+            viewBox: svg.getAttribute('viewBox'),
+            d: svg.querySelector('path').getAttribute('d').length,
+            fill: getComputedStyle(svg).fill
+        }));
+
+        /* A row added AFTER load must carry the Date input, which only this
+           document type shows. applyDocType sweeps the document rather than
+           the form, so a clone is covered -- but only because the sweep runs
+           after it, and nothing about that is obvious from addItemRow. */
+        document.getElementById('add-item').click();
+        const rows = [...document.querySelectorAll('#item-list [data-entry]')];
+        const addedDateField = rows[rows.length - 1]
+            .querySelector('[data-entry-field="date"]').closest('[data-for]');
+        const dateOnClone = {
+            hidden: addedDateField.hidden,
+            display: getComputedStyle(addedDateField).display
+        };
+
+        /* Logo: built here rather than read from disk, so the check carries
+           its own fixture. Deliberately 2:1, to catch a writer that assumes
+           a square. */
+        const c = document.createElement('canvas');
+        c.width = 200; c.height = 100;
+        const g = c.getContext('2d');
+        g.fillStyle = '#B4501E';
+        g.fillRect(0, 0, 200, 100);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'logo.png', { type: 'image/png' }));
+        const input = document.getElementById('f-logo');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 400));
+
+        const img = sheet.querySelector('.doc-ruled-logo');
+        const stored = JSON.parse(localStorage.getItem('tb_docs_v1') || '{}');
+        const withLogo = grabPdf();
+
+        /* Removing it must return the export to exactly what it was, which
+           is the baseline the hostile-value check below compares against. */
+        document.getElementById('logo-remove').click();
+        await new Promise(r => setTimeout(r, 100));
+        const withoutLogo = grabPdf();
+
+        return {
+            layout: layout,
+            rowCount: cells.length,
+            firstRow: cells[0],
+            emptyRowBorder: emptyCell
+                ? getComputedStyle(emptyCell).borderBottomWidth
+                : 'no empty row',
+            plainLabel: plain.label,
+            plainValue: plain.value,
+            subRowsWhenPlain: subRowsWhenPlain,
+            paidLabel: withPayment.label,
+            paidValue: withPayment.value,
+            subRows: subRows,
+            icons: icons,
+            dateOnClone: dateOnClone,
+            logoOnSheet: !!img,
+            logoIsRaster: /^data:image\\/png;base64,/.test(String(stored.logo || '')),
+            logoRatio: stored.logoRatio,
+            withLogoBytes: withLogo.length,
+            withLogoImages: countIn(withLogo, /\\/Subtype\\s*\\/Image/g),
+            withLogoText: countIn(withLogo, /\\bTj\\b/g) + countIn(withLogo, /\\bTJ\\b/g),
+            withoutLogoBytes: withoutLogo.length,
+            withoutLogoImages: countIn(withoutLogo, /\\/Subtype\\s*\\/Image/g),
+            record: JSON.stringify(JSON.parse(localStorage.getItem('tb_docs_v1')))
+        };
+    })()`);
+
+    check("the logo-invoice preset opens the ruled layout",
+        r && !r.error && r.layout === "doc-sheet is-ruled-invoice",
+        r && r.error ? r.error : `sheet class is "${r && r.layout}"`);
+    if (!r || r.error) { return; }
+
+    check("the grid never falls below eight body rows (one line item entered)",
+        r.rowCount >= 8, `${r.rowCount} row(s) drawn`);
+
+    check("an unfilled row is still ruled",
+        r.emptyRowBorder !== "0px" && r.emptyRowBorder !== "no empty row",
+        `border-bottom-width on an empty cell is ${r.emptyRowBorder}`);
+
+    check("the five columns carry date, description, price, qty and row total",
+        Array.isArray(r.firstRow) && r.firstRow.length === 5 &&
+        r.firstRow[0] === "12 Aug" && r.firstRow[1] === "Oak shelving board" &&
+        r.firstRow[2] === "$12.50" && r.firstRow[3] === "3",
+        `row reads ${JSON.stringify(r.firstRow)}`);
+
+    /* The row total is computed, never typed: 3 x 12.50. */
+    check("the row total is quantity times price",
+        Array.isArray(r.firstRow) && r.firstRow[4] === "$37.50",
+        `row total reads "${r.firstRow && r.firstRow[4]}" against an expected $37.50`);
+
+    check("a plain invoice shows one boxed total and no breakdown above it",
+        r.plainLabel === "Total:" && r.plainValue === "$37.50" &&
+        r.subRowsWhenPlain === 0,
+        `box reads "${r.plainLabel} ${r.plainValue}" with ` +
+        `${r.subRowsWhenPlain} row(s) above it; expected "Total: $37.50" and none`);
+
+    /* 37.50 + 10% = 41.25, less 10.00 already paid. */
+    check("recording a payment switches the box to the balance due",
+        r.paidLabel === "Balance Due:" && r.paidValue === "$31.25",
+        `box reads "${r.paidLabel} ${r.paidValue}" against an expected ` +
+        `"Balance Due: $31.25"`);
+
+    check("subtotal, tax and the amount paid appear above the box once non-zero",
+        r.subRows.length === 3 &&
+        r.subRows[0] === "Subtotal$37.50" &&
+        r.subRows[1] === "Tax (10%)$3.75" &&
+        r.subRows[2] === "Amount Already Paid-$10.00",
+        `breakdown reads ${JSON.stringify(r.subRows)}`);
+
+    check("all three contact icons draw on the sheet",
+        r.icons.length === 3 &&
+        r.icons.every((i) => i.viewBox === "0 -960 960 960" && i.d > 100),
+        `icons: ${JSON.stringify(r.icons.map((i) => [i.viewBox, i.d]))}`);
+
+    /* An SVG's fill does not inherit from color, so a deleted rule shows up
+       here as browser-default pure black beside #1A1A1A text -- close enough
+       to look right in a screenshot and wrong on paper. This cannot tell
+       #1A1A1A from currentColor, and does not need to: inside .doc-sheet the
+       two resolve identically in both themes. */
+    check("the icons are filled with the sheet's ink, not SVG default black",
+        r.icons.every((i) => i.fill === "rgb(26, 26, 26)"),
+        `fills: ${JSON.stringify(r.icons.map((i) => i.fill))}`);
+
+    check("a line-item row added after load carries the Date column's input",
+        r.dateOnClone.hidden === false && r.dateOnClone.display !== "none",
+        `hidden=${r.dateOnClone.hidden} display=${r.dateOnClone.display}`);
+
+    check("an uploaded logo reaches the sheet and is stored as a base64 raster",
+        r.logoOnSheet && r.logoIsRaster && r.logoRatio === 2,
+        `onSheet=${r.logoOnSheet} raster=${r.logoIsRaster} ratio=${r.logoRatio} ` +
+        "(a 200x100 upload; the ratio travels with the image because the PDF " +
+        "writer cannot decode it to learn the shape)");
+
+    check("the export embeds the logo and the icons and is still real text",
+        r.withLogoImages > r.withoutLogoImages && r.withLogoText > 20,
+        `${r.withLogoImages} image XObject(s) with a logo against ` +
+        `${r.withoutLogoImages} without, and ${r.withLogoText} text-showing ` +
+        "operator(s) -- a rasterized sheet would report zero");
+
+    /* Untrusted input on the way out of storage. An SVG data URI is a script
+       vector, and the honest outcome is an export indistinguishable from one
+       with no logo at all -- not a smaller one, not a broken one. */
+    const hostile = JSON.parse(r.record);
+    hostile.logo = "data:image/svg+xml;base64," +
+        Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>').toString("base64");
+    hostile.logoRatio = 2;
+    await page.evaluate("(localStorage.setItem('tb_docs_v1', " +
+        JSON.stringify(JSON.stringify(hostile)) + "), true)");
+    await page.navigate(`http://localhost:${PORT}/docs.html`, 1440);
+
+    const h = await page.evaluate(`(async () => {` + GRAB_PDF + `
+        if (!await waitForPdfEngine()) { return { error: 'jsPDF never loaded' }; }
+        const pdf = grabPdf();
+        return {
+            onSheet: document.querySelectorAll('.doc-ruled-logo').length,
+            bytes: pdf.length,
+            layout: document.getElementById('doc-sheet').className
+        };
+    })()`);
+
+    check("a hostile SVG data URI in storage exports as though there were no logo",
+        h && !h.error && h.onSheet === 0 && h.bytes === r.withoutLogoBytes,
+        h && h.error ? h.error
+            : `${h.onSheet} logo(s) on the sheet and a ${h.bytes}-byte export ` +
+              `against the ${r.withoutLogoBytes}-byte no-logo baseline`);
+
+    /* Clear Form sweeps [data-bind] controls. The logo is not one, and a
+       field that is not an input is the exact shape of defect js/resume.js
+       has been bitten by three separate times. */
+    const cleared = await page.evaluate(`(async () => {
+        const c = document.createElement('canvas');
+        c.width = 120; c.height = 120;
+        c.getContext('2d').fillRect(0, 0, 120, 120);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'l.png', { type: 'image/png' }));
+        const input = document.getElementById('f-logo');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 400));
+        const before = document.querySelectorAll('.doc-ruled-logo').length;
+
+        window.confirm = () => true;
+        document.getElementById('clear-doc').click();
+        await new Promise(r => setTimeout(r, 200));
+        const rec = JSON.parse(localStorage.getItem('tb_docs_v1') || '{}');
+        return {
+            before: before,
+            after: document.querySelectorAll('.doc-ruled-logo').length,
+            storedLogo: String(rec.logo || ''),
+            removeHidden: document.getElementById('logo-remove').hidden
+        };
+    })()`);
+
+    check("Clear Form removes the logo along with the typed fields",
+        cleared.before === 1 && cleared.after === 0 &&
+        cleared.storedLogo === "" && cleared.removeHidden === true,
+        `on the sheet before=${cleared.before} after=${cleared.after}, ` +
+        `stored logo ${cleared.storedLogo.length} byte(s), ` +
+        `Remove button hidden=${cleared.removeHidden}`);
+
+    /* The other side of the cloned-row assertion: the Date input belongs to
+       this one document type, and a check that only ever looks at the type
+       showing it cannot tell "correctly shown" from "always shown". */
+    await open("sales-receipt");
+    const other = await page.evaluate(`(() => {
+        document.getElementById('add-item').click();
+        const rows = [...document.querySelectorAll('#item-list [data-entry]')];
+        const field = rows[rows.length - 1]
+            .querySelector('[data-entry-field="date"]').closest('[data-for]');
+        return {
+            layout: document.getElementById('doc-sheet').className,
+            hidden: field.hidden,
+            display: getComputedStyle(field).display
+        };
+    })()`);
+
+    check("the Date column's input stays off every other document type",
+        other.layout === "doc-sheet is-itemized" && other.hidden === true &&
+        other.display === "none",
+        `on ${other.layout}: hidden=${other.hidden} display=${other.display}`);
+
+    /* Cleared for the same reason sections 10 and 11 clear: js/app.js builds
+       the homepage continue strip from these keys, and section 4 measures
+       that homepage. */
+    await page.evaluate("localStorage.clear(), sessionStorage.clear(), true");
+}
+
 async function parityChecks(browserPath) {
     section("4. Ads blocked: layout identical to the last commit");
 
@@ -4083,6 +4428,7 @@ async function main() {
                     await resumeTemplateChecks(page);
                     await posterExportChecks(page);
                     await mockupTemplateChecks(page);
+                    await ruledInvoiceChecks(page);
                 } finally {
                     page.close();
                 }

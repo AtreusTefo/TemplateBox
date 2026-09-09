@@ -249,6 +249,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../itemized-receipt-template.html">Itemized Business Receipt</a></li>\n' +
 '                            <li><a href="../sales-receipt-template.html">Sales Receipt Form</a></li>\n' +
 '                            <li><a href="../free-invoice-template.html">Free Invoice Template</a></li>\n' +
+'                            <li><a href="../editable-invoice-template.html">Editable Invoice with Logo</a></li>\n' +
 '                            <li><a href="../employee-warning-notice-template.html">Employee Warning Notice</a></li>\n' +
 '                        </ul>\n' +
 '                    </div>\n' +
@@ -1419,6 +1420,7 @@ body + '\n' +
         { id: "business-receipt", title: "Itemized Business Receipt", category: "documents", doc: "business-receipt" },
         { id: "sales-receipt", title: "Sales and Cash Receipt Form", category: "documents", doc: "sales-receipt" },
         { id: "invoice", title: "Professional Invoice", category: "documents", doc: "invoice" },
+        { id: "logo-invoice", title: "Editable Invoice with Logo", category: "documents", doc: "logo-invoice" },
         { id: "warning-notice", title: "Employee Warning Notice", category: "documents", doc: "warning-notice" },
         { id: "grey-rail", title: "Modern Professional CV", category: "resumes", doc: "grey-rail" },
         { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: "minimalist-ats-resume" },
