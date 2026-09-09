@@ -4865,11 +4865,8 @@ body.has-site-anchor {
        flex-grow, so above the break it fills whatever the bar has spare and
        renders exactly as wide as it did before.
 
-       320 still wraps and is not fixable here. That row would need the basis
-       below 28px, which is a name field showing two characters; fitting it
-       means dropping something from the bar, the way mockup.html dropped its
-       download and docs.html dropped its button labels. That is a product
-       decision rather than a layout one. */
+       320 needs one more squeeze on top of this: see the 22.5rem block
+       below. */
     .doc-name {
         flex-basis: 3.5rem;
     }
@@ -4886,6 +4883,58 @@ body.has-site-anchor {
         right: 0;
         width: auto;
         max-height: 70vh;
+    }
+}
+
+/* 320px, where the editor bar is over-subscribed by about 30px and the actions
+   wrap to a second row -- 56px of a 568px-tall phone spent on chrome that is
+   already sticky.
+
+   Paid for in WHITESPACE rather than by dropping a control. mockup.html moved
+   its download out of the bar and docs.html dropped its button labels, and
+   either would work here, but both cost the visitor something: undo, redo, the
+   save state and the exporter are all doing a job on a phone. The gutter and
+   the gaps are not. Eight pixels off the gutter and four off each of three gaps
+   is 20px, and the shorter basis finds the rest.
+
+   The buttons themselves are deliberately NOT shrunk. They are 32px already,
+   under the 44px touch target this project is otherwise careful about, and
+   trading accessibility for a row is the wrong way round. */
+@media (max-width: 22.5rem) {
+    .site-header.editor-bar {
+        --header-pad-x: var(--space-sm);
+        gap: var(--space-xs);
+    }
+
+    .editor-bar .doc-name {
+        flex-basis: 2.5rem;
+    }
+
+    /* The last 30px, and the poster bar is the only one that needs them: it
+       carries undo, redo, the save state AND the exporter, where resume and
+       docs carry fewer and already fit. The save state is the one item here
+       that is passive -- it reports, it does not act -- so it is the one that
+       gives up its space.
+
+       Hidden the .sr-only way rather than display:none, exactly as the
+       wordmark above it is: the element is role="status" aria-live="polite",
+       and taking it out of the accessibility tree would stop it announcing
+       saves to a screen reader, which is most of what it is for. It keeps
+       announcing; it just stops occupying a row on a 320px phone.
+
+       Measured against the suite's width rather than the viewport's: at a
+       320px viewport a desktop browser's scrollbar leaves 305 usable, and the
+       bar has to fit THAT to be one row where the suite looks. */
+    .editor-bar .save-cloud {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
 }
 
