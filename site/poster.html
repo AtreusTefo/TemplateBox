@@ -412,16 +412,25 @@
                          argument the text toolbar above is built on.
                          js/poster.js toggles the wrapper. -->
                     <div id="p-card-fields" hidden>
+                        <!-- Text fields with a suggestion list rather than a
+                             fixed menu: A, J, Q and K stay one click, and a
+                             visitor who wants their own initials can just type
+                             them. Two characters is the cap the paper margin
+                             allows -- see RANK_MAX_W in js/poster.js, which
+                             scales anything wider down rather than letting it
+                             run into the photo. -->
                         <div class="field">
                             <label for="p-rank-head">Top-Left Letter</label>
-                            <select id="p-rank-head"></select>
+                            <input type="text" id="p-rank-head" list="p-rank-options" maxlength="2" autocomplete="off" spellcheck="false">
                         </div>
 
                         <div class="field">
                             <label for="p-rank-foot">Bottom-Right Letter</label>
-                            <select id="p-rank-foot"></select>
-                            <p class="upload-hint">Two queens or two kings are as valid as a queen and a king. The suit is hearts either way.</p>
+                            <input type="text" id="p-rank-foot" list="p-rank-options" maxlength="2" autocomplete="off" spellcheck="false">
+                            <p class="upload-hint">Pick a card letter or type your own, an initial included. Clicking a letter on the poster jumps to its field.</p>
                         </div>
+
+                        <datalist id="p-rank-options"></datalist>
                     </div>
                 </form>
                 <div class="preview-actions">

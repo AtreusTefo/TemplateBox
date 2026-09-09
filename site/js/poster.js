@@ -81,7 +81,18 @@
            anyway because the frame select is built from these keys and migrate()
            validates the saved style against them, so a fifth entry needs no new
            control, no new persisted field and no migration step. */
-        hearts: { frame: null, trim: null, label: "Queen and King of Hearts", layout: "card" }
+        hearts: {
+            frame: null, trim: null, label: "Queen and King of Hearts",
+            layout: "card", suit: "hearts", ranks: { head: "Q", foot: "K" }
+        },
+        /* The second suit costs a pip path, an ink and a default pairing --
+           no second renderer, which is the return on having made the first one
+           a layout rather than a special case. Its default ranks are K then Q
+           because that is the order its catalog card advertises. */
+        spades: {
+            frame: null, trim: null, label: "King and Queen of Spades",
+            layout: "card", suit: "spades", ranks: { head: "K", foot: "Q" }
+        }
     };
 
     /* Geometry for the card layout, traced from the supplied A4 artwork
@@ -99,7 +110,14 @@
         panel: { x: 74.5 / 595.3, y: 59.1 / 841.9, w: 446.3 / 595.3, h: 724.5 / 841.9 },
         rule: 4 / 595.3,
         pip: { x: 11 / 595.3, y: 120.4 / 841.9, w: 55.6 / 595.3, h: 50.9 / 841.9 },
-        rank: { x: 10.99 / 595.3, baseline: 94.55 / 841.9, size: 83.6676 / 595.3 },
+        /* The artwork sets its rank at 83.6676pt in Algerian. Playfair Display,
+           the face substituted for it, is about 18 per cent wider at the same
+           em -- enough that a Q ends 2.8pt PAST the panel edge and a K clears
+           it by 3.8pt against the pip's 7.9pt. So the substituted face is set
+           at the em that puts its Q on the pip's right edge, which is where
+           the artwork puts its own: 70.1pt. Carrying the artwork's number over
+           unchanged is what put the letters into the photograph. */
+        rank: { x: 10.99 / 595.3, baseline: 94.55 / 841.9, size: 70.1 / 595.3 },
         red: "#BE1E2D",
         ink: "#000000"
     };
@@ -113,7 +131,35 @@
         "C0.1133,0.002 0,0.1238 0,0.2849C0,0.5953 0.1547,0.6425 0.5,1" +
         "C0.8453,0.6405 1,0.5934 1,0.2829C1,0.1238 0.8885,0 0.741,0" +
         "C0.6385,0 0.5522,0.0668 0.5,0.1611Z";
-    const HEART = new Path2D(HEART_PATH);
+
+    /* The spade has no artwork to trace, so it is drawn to the heart's own
+       proportions: same unit box, apex on the centre line, lobes reaching the
+       full width, and a stem whose flare ends on the baseline. Drawn point-UP,
+       which is the orientation the heart's mirror gives it for free -- the
+       flipped index turns both suits over together, so nothing about the
+       bottom-right corner needs to know which suit it is drawing. */
+    const SPADE_PATH = "M0.5,0C0.5,0.18 0.3,0.28 0.15,0.42" +
+        "C0.02,0.54 0,0.63 0,0.7C0,0.8 0.07,0.86 0.17,0.86" +
+        "C0.27,0.86 0.35,0.81 0.42,0.73C0.42,0.8 0.39,0.92 0.32,1" +
+        "L0.68,1C0.61,0.92 0.58,0.8 0.58,0.73" +
+        "C0.65,0.81 0.73,0.86 0.83,0.86C0.93,0.86 1,0.8 1,0.7" +
+        "C1,0.63 0.98,0.54 0.85,0.42C0.7,0.28 0.5,0.18 0.5,0Z";
+
+    /* Suit = a pip path plus the ink it is filled with. Everything else about
+       the layout is shared, so adding a third suit is two lines here and one
+       entry in FRAME_STYLES. The Path2D is built once per suit rather than per
+       paint: paint() runs on every keystroke. */
+    const SUITS = {
+        hearts: { path: HEART_PATH, ink: "#BE1E2D" },
+        spades: { path: SPADE_PATH, ink: "#000000" }
+    };
+    const SUIT_PATHS = {};
+    Object.keys(SUITS).forEach((k) => { SUIT_PATHS[k] = new Path2D(SUITS[k].path); });
+
+    function suitOf(frameKey) {
+        const style = FRAME_STYLES[frameKey];
+        return (style && SUITS[style.suit]) ? style.suit : "hearts";
+    }
 
     /* The artwork sets its Q and K in Algerian, which is a licensed Monotype
        face: the design folder carries the TTF, but bundling it into a public
@@ -125,18 +171,51 @@
        silent. */
     const CARD_RANK_FONT = "playfair";
 
-    /* Selectable ranks for the two corner indices. Court cards and the ace
-       only, and deliberately no numerals: every glyph here is ONE character,
-       and "10" set at the artwork's 14-per-cent em size overruns the paper
-       margin and collides with the photo panel. The two corners are chosen
-       independently, so two queens or two kings are as available as the
-       artwork's queen and king -- which is the whole point of the control. */
+    /* The four ranks offered as suggestions. They are no longer the only
+       allowed values: the corner is free text, so an initial, a monogram or a
+       10 are all typeable. This list only fills the datalist behind the two
+       inputs, which is what keeps the common case one click. */
     const RANKS = ["A", "J", "Q", "K"];
-    const RANK_LABELS = { A: "A - Ace", J: "J - Jack", Q: "Q - Queen", K: "K - King" };
-    const DEFAULT_RANKS = { head: "Q", foot: "K" };
 
-    function validRank(value, corner) {
-        return RANKS.indexOf(value) >= 0 ? value : DEFAULT_RANKS[corner];
+    /* Free text needs exactly three rules, and they are the ones the drawing
+       imposes rather than taste: no whitespace (a rank of " " renders as a
+       blank corner that reads as a bug), at most two characters, and nothing
+       that is not a single line. Emptiness is allowed on purpose -- clearing
+       the field leaves the pip alone in the corner, which is a legitimate
+       thing to want. */
+    function cleanRank(value) {
+        return String(value === null || value === undefined ? "" : value)
+            .replace(/\s+/g, "")
+            .slice(0, 2);
+    }
+
+    function styleRanks(frameKey) {
+        const style = FRAME_STYLES[frameKey];
+        return (style && style.ranks) || FRAME_STYLES.hearts.ranks;
+    }
+
+    /* Nothing in the corner reaches further right than the pip does. The pip's
+       own right edge is 66.6pt against a panel starting at 74.5, so the artwork
+       leaves 7.9pt of paper between the index and the photograph -- and it puts
+       its rank on that same edge rather than closer in.
+
+       Expressed against the pip rather than as a number, so the two can only
+       move together. Anything a visitor types that would be wider is scaled
+       down to it, which is what makes a free-text field safe here: without a
+       cap, "WW" runs a third of the way across the photograph. */
+    const RANK_MAX_W = CARD.pip.x + CARD.pip.w - CARD.rank.x;
+
+    function fitRankSize(c, rank, W) {
+        const size = CARD.rank.size * W;
+        if (!rank) {
+            return size;
+        }
+        c.save();
+        c.font = "700 " + size + "px " + fontStack(CARD_RANK_FONT);
+        const measured = c.measureText(rank).width;
+        c.restore();
+        const max = RANK_MAX_W * W;
+        return measured > max ? size * (max / measured) : size;
     }
 
     /* Emoji picker inventory. Native Unicode only -- no image CDN, which would
@@ -205,8 +284,8 @@
         name: DEFAULT_POSTER_NAME,
         size: "A3",
         frame: "black",
-        rankHead: DEFAULT_RANKS.head,
-        rankFoot: DEFAULT_RANKS.foot,
+        rankHead: FRAME_STYLES.hearts.ranks.head,
+        rankFoot: FRAME_STYLES.hearts.ranks.foot,
         texts: [defaultText("t1", "")],
         sel: "t1"
     };
@@ -231,8 +310,8 @@
         state.name = parsed.name;
         state.size = parsed.size;
         state.frame = parsed.frame;
-        state.rankHead = validRank(parsed.rankHead, "head");
-        state.rankFoot = validRank(parsed.rankFoot, "foot");
+        state.rankHead = cleanRank(parsed.rankHead);
+        state.rankFoot = cleanRank(parsed.rankFoot);
         state.texts = parsed.texts;
         if (!state.texts.some((t) => t.id === state.sel)) {
             state.sel = state.texts.length ? state.texts[0].id : null;
@@ -314,8 +393,8 @@
             caption: TB.sanitize(first ? first.text : ""),
             frame: state.frame,
             name: TB.sanitize(state.name),
-            rankHead: state.rankHead,
-            rankFoot: state.rankFoot,
+            rankHead: TB.sanitize(state.rankHead),
+            rankFoot: TB.sanitize(state.rankFoot),
             size: state.size,
             texts: state.texts.map((t) => {
                 const copy = Object.assign({}, t);
@@ -331,11 +410,18 @@
             return;
         }
         state.frame = FRAME_STYLES[saved.frame] ? saved.frame : "black";
-        /* Absent on every record written before the ranks became selectable,
-           which is exactly the case validRank() falls back for -- so an older
-           saved poster reopens as the Q and K it was drawn with. */
-        state.rankHead = validRank(saved.rankHead, "head");
-        state.rankFoot = validRank(saved.rankFoot, "foot");
+        /* Absent on every record written before the ranks were editable, so
+           an older poster reopens as the pairing its own style advertises.
+           Only `undefined` takes the fallback: an empty string is a corner the
+           visitor deliberately cleared, and restoring a letter over it would
+           be the editor arguing with them. */
+        const fallbackRanks = styleRanks(state.frame);
+        state.rankHead = saved.rankHead === undefined
+            ? fallbackRanks.head
+            : cleanRank(TB.desanitize(String(saved.rankHead)));
+        state.rankFoot = saved.rankFoot === undefined
+            ? fallbackRanks.foot
+            : cleanRank(TB.desanitize(String(saved.rankFoot)));
         state.size = PAPER[saved.size] ? saved.size : "A3";
         state.name = TB.desanitize(String(saved.name || "")).trim() || "Untitled poster";
 
@@ -550,11 +636,12 @@
        difference is visible on the K: a rotation would also reverse it left to
        right. That is why only the y axis goes through the transform and the x
        positions are mirrored arithmetically instead. */
-    function drawCardIndex(c, W, H, rank, flip) {
+    function drawCardIndex(c, W, H, rank, flip, suit) {
         const pipW = CARD.pip.w * W;
         const pipH = CARD.pip.h * H;
         const pipX = flip ? W - CARD.pip.x * W - pipW : CARD.pip.x * W;
         const rankX = flip ? W - CARD.rank.x * W : CARD.rank.x * W;
+        const key = SUITS[suit] ? suit : "hearts";
 
         c.save();
         if (flip) {
@@ -563,15 +650,15 @@
         }
 
         c.fillStyle = CARD.ink;
-        c.font = "700 " + (CARD.rank.size * W) + "px " + fontStack(CARD_RANK_FONT);
+        c.font = "700 " + fitRankSize(c, rank, W) + "px " + fontStack(CARD_RANK_FONT);
         c.textAlign = flip ? "right" : "left";
         c.textBaseline = "alphabetic";
         c.fillText(rank, rankX, CARD.rank.baseline * H);
 
-        c.fillStyle = CARD.red;
+        c.fillStyle = SUITS[key].ink;
         c.translate(pipX, CARD.pip.y * H);
         c.scale(pipW, pipH);
-        c.fill(HEART);
+        c.fill(SUIT_PATHS[key]);
         c.restore();
     }
 
@@ -600,8 +687,9 @@
         c.lineWidth = CARD.rule * W;
         c.strokeRect(x, y, w, h);
 
-        drawCardIndex(c, W, H, state.rankHead, false);
-        drawCardIndex(c, W, H, state.rankFoot, true);
+        const suit = suitOf(state.frame);
+        drawCardIndex(c, W, H, state.rankHead, false, suit);
+        drawCardIndex(c, W, H, state.rankFoot, true, suit);
     }
 
     /* transparent=true skips the frame, matte and placeholder fills so a PNG
@@ -725,8 +813,63 @@
         return null;
     }
 
+    /* The clickable area of a corner index: the margin strip beside the panel,
+       from the top of the rank letter down to the foot of the pip. Deliberately
+       generous and deliberately not a drag handle -- the indices have fixed
+       positions in this layout, so the only useful thing a click on one can do
+       is take you to the field that changes it. */
+    function cardIndexAt(pt, W, H) {
+        if ((FRAME_STYLES[state.frame] || {}).layout !== "card") {
+            return null;
+        }
+        const capPx = CARD.rank.size * W * 0.75;
+        const top = CARD.rank.baseline * H - capPx;
+        const bottom = (CARD.pip.y + CARD.pip.h) * H;
+        const left = CARD.rank.x * W;
+        const right = CARD.panel.x * W;
+        const x = pt.x * W;
+        const y = pt.y * H;
+
+        if (x >= left && x <= right && y >= top && y <= bottom) {
+            return "head";
+        }
+        if (x >= W - right && x <= W - left && y >= H - bottom && y <= H - top) {
+            return "foot";
+        }
+        return null;
+    }
+
+    /* Click the letter on the poster, type the letter you want. Not an
+       in-canvas text editor -- that means a caret, a selection model and IME
+       handling for two characters of content -- but it closes the same loop:
+       the corner is where the visitor is looking, so that is where the way in
+       should be. */
+    function focusRankFor(corner) {
+        const input = corner === "head" ? rankHeadInput : rankFootInput;
+        if (!input) {
+            return;
+        }
+        /* On a phone the form and the preview are separate tabs, so focusing a
+           field in the hidden one would do nothing visible. */
+        const editTab = byId("tab-edit");
+        const layout = byId("editor-layout");
+        if (editTab && layout && !layout.classList.contains("show-edit")) {
+            editTab.click();
+        }
+        input.focus();
+        input.select();
+        if (input.scrollIntoView) {
+            input.scrollIntoView({ block: "center" });
+        }
+    }
+
     canvas.addEventListener("pointerdown", (ev) => {
         const pt = canvasPoint(ev);
+        const corner = cardIndexAt(pt, canvas.width, canvas.height);
+        if (corner) {
+            focusRankFor(corner);
+            return;
+        }
         const hit = hitTest(pt);
         if (!hit) {
             return;
@@ -910,19 +1053,30 @@
         });
     }
 
-    const rankHeadSelect = byId("p-rank-head");
-    const rankFootSelect = byId("p-rank-foot");
+    const rankHeadInput = byId("p-rank-head");
+    const rankFootInput = byId("p-rank-foot");
 
-    [[rankHeadSelect, "rankHead", "head"], [rankFootSelect, "rankFoot", "foot"]].forEach((entry) => {
+    /* Both events, and they are not redundant. `input` is the visitor typing,
+       and coalesces so a two-character rank is one history entry rather than
+       two. `change` is the datalist being picked with the mouse, a paste
+       committed by blurring -- and the verification suite, which sets .value
+       and dispatches change to prove the CONTROL reached the export. */
+    [[rankHeadInput, "rankHead"], [rankFootInput, "rankFoot"]].forEach((entry) => {
         const el = entry[0];
         if (!el) {
             return;
         }
-        el.addEventListener("change", () => {
+        const apply = (coalesceKey) => {
+            const next = cleanRank(el.value);
+            if (state[entry[1]] === next) {
+                return;
+            }
             beginChange();
-            state[entry[1]] = validRank(el.value, entry[2]);
-            commit();
-        });
+            state[entry[1]] = next;
+            commit(coalesceKey);
+        };
+        el.addEventListener("input", () => apply("rank-" + entry[1]));
+        el.addEventListener("change", () => apply(null));
     });
 
     /* Pushes state back INTO the document-level controls. syncControls() next
@@ -938,9 +1092,12 @@
         const style = FRAME_STYLES[state.frame] || FRAME_STYLES.black;
         if (frameSelect) { frameSelect.value = state.frame; }
         if (sizeSelect) { sizeSelect.value = state.size; }
+        /* Compared before writing, on all three: these are text fields now, and
+           assigning .value to what it already holds still drops the caret to
+           the end of the field mid-word. */
         if (nameInput && nameInput.value !== state.name) { nameInput.value = state.name; }
-        if (rankHeadSelect) { rankHeadSelect.value = state.rankHead; }
-        if (rankFootSelect) { rankFootSelect.value = state.rankFoot; }
+        if (rankHeadInput && rankHeadInput.value !== state.rankHead) { rankHeadInput.value = state.rankHead; }
+        if (rankFootInput && rankFootInput.value !== state.rankFoot) { rankFootInput.value = state.rankFoot; }
 
         const cardFields = byId("p-card-fields");
         if (cardFields) {
@@ -1280,19 +1437,24 @@
 
     /* SVG twin of drawCardIndex(). Same constants, same unit pip path, same
        mirror-in-y-only rule for the bottom-right index. */
-    function cardIndexSVG(W, H, rank, flip, esc) {
+    function cardIndexSVG(W, H, rank, flip, esc, suit) {
         const pipW = CARD.pip.w * W;
         const pipH = CARD.pip.h * H;
         const pipX = flip ? W - CARD.pip.x * W - pipW : CARD.pip.x * W;
         const rankX = flip ? W - CARD.rank.x * W : CARD.rank.x * W;
+        const key = SUITS[suit] ? suit : "hearts";
+        /* Measured on the live canvas context, because there is nothing in an
+           SVG string to measure with -- and the fit has to be the SAME number
+           the canvas used or a wide rank would collide here and not there. */
+        const size = fitRankSize(ctx, rank, W);
 
         return (flip ? '<g transform="translate(0 ' + H + ') scale(1 -1)">' : "<g>") +
             '<text x="' + rankX + '" y="' + (CARD.rank.baseline * H) +
             '" font-family="' + esc(fontStack(CARD_RANK_FONT).replace(/"/g, "'")) +
-            '" font-size="' + (CARD.rank.size * W) + '" font-weight="700"' +
+            '" font-size="' + size + '" font-weight="700"' +
             ' fill="' + CARD.ink + '" text-anchor="' + (flip ? "end" : "start") + '">' +
             esc(rank) + "</text>" +
-            '<path d="' + HEART_PATH + '" fill="' + CARD.red + '" transform="translate(' +
+            '<path d="' + SUITS[key].path + '" fill="' + SUITS[key].ink + '" transform="translate(' +
             pipX + " " + (CARD.pip.y * H) + ") scale(" + pipW + " " + pipH + ')"/>' +
             "</g>";
     }
@@ -1316,8 +1478,9 @@
         out += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
             '" fill="none" stroke="' + CARD.ink + '" stroke-width="' + (CARD.rule * W) + '"/>';
 
-        return out + cardIndexSVG(W, H, state.rankHead, false, esc) +
-            cardIndexSVG(W, H, state.rankFoot, true, esc);
+        const suit = suitOf(state.frame);
+        return out + cardIndexSVG(W, H, state.rankHead, false, esc, suit) +
+            cardIndexSVG(W, H, state.rankFoot, true, esc, suit);
     }
 
     /* SVG: genuinely vector text over an embedded raster photo. The photo
@@ -1687,17 +1850,16 @@
                 frame.appendChild(o);
             });
         }
-        [["p-rank-head", "head"], ["p-rank-foot", "foot"]].forEach((pair) => {
-            const el = byId(pair[0]);
-            if (el && !el.options.length) {
-                RANKS.forEach((r) => {
-                    const o = document.createElement("option");
-                    o.value = r;
-                    o.textContent = RANK_LABELS[r];
-                    el.appendChild(o);
-                });
-            }
-        });
+        /* Suggestions behind both rank fields, from the one list, so the
+           common four stay one click while the field itself takes anything. */
+        const rankList = byId("p-rank-options");
+        if (rankList && !rankList.options.length) {
+            RANKS.forEach((r) => {
+                const o = document.createElement("option");
+                o.value = r;
+                rankList.appendChild(o);
+            });
+        }
     }
 
     buildSelects();
@@ -1713,6 +1875,15 @@
     const framePreset = TB.takePreset();
     if (FRAME_STYLES[framePreset]) {
         state.frame = framePreset;
+        /* The pairing comes with it, because the card is named after it: a
+           visitor who clicked "King and Queen of Spades" should get a K and a
+           Q. Only the catalog hand-off does this -- picking the same style
+           from the Frame Style control leaves whatever letters are already
+           there, since that is an edit in progress rather than a request for
+           the template as advertised. */
+        const presetRanks = styleRanks(framePreset);
+        state.rankHead = presetRanks.head;
+        state.rankFoot = presetRanks.foot;
     }
 
     syncDocControls();

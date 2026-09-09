@@ -10,6 +10,10 @@ the top-left margin and a mirrored `K` over a heart in the bottom-right. It is
 the fifth entry in `FRAME_STYLES` and the fourth card in the Posters and Prints
 category.
 
+It ships in two suits now, and the letters are whatever the visitor types --
+both later the same week, and both recorded in their own sections at the foot of
+this document.
+
 It was built from supplied A4 artwork (`cards 11-01.svg`, `cards 11-02.svg` and
 a PDF, 595.3 x 841.9 pt). The artwork itself ships nothing: the geometry was
 traced into constants and the pip into a path string, so the repository carries
@@ -407,27 +411,24 @@ Shipped in the same day as the layout, on request. The artwork specifies a queen
 and a king; the product should not, because a couple wanting two queens or two
 kings had no way to say so.
 
-Two selects, `rankHead` and `rankFoot`, persisted alongside the frame and
-validated the same way. Four things decided along the way:
-
-**Court cards and the ace only -- A, J, Q, K, and deliberately no numerals.**
-Every glyph in that set is one character. "10" set at the artwork's 14-per-cent
-em size overruns the paper margin and collides with the photo panel, and a set
-that ran 2 through 9 while excluding the one two-character rank would look like
-an oversight rather than a decision.
+Two fields, `rankHead` and `rankFoot`, persisted alongside the frame. They began
+as four-item selects and became free text the next day (below); what follows
+holds for both.
 
 **The controls are hidden for the other four styles**, not shown inert. Only the
 card layout has corner indices, and a control that is always visible but usually
 does nothing reads as broken -- the same argument the text toolbar is built on.
 `syncDocControls()` toggles the wrapper from the selected style's `layout`.
 
-**The corners are independent**, so every pairing in the set is reachable,
-including A and A. Nothing enforces the artwork's Q-then-K.
+**The corners are independent**, so every pairing is reachable, including A and
+A. Nothing enforces the artwork's Q-then-K.
 
-**An older saved poster reopens as Q and K.** Records written before this change
-carry no rank fields at all, which is exactly the case the validator falls back
-for -- so the migration step is the validator itself, and there is no version
-bump. This is the same discipline the frame and paper size already follow.
+**An older saved poster reopens as the pairing its style advertises.** Records
+written before this change carry no rank fields at all, which is exactly the
+case the fallback exists for -- so the migration step is the validator itself,
+and there is no version bump. Only `undefined` takes the fallback: an empty
+string is a corner the visitor deliberately cleared, and putting a letter back
+over it would be the editor arguing with them.
 
 ### It fixed a staleness bug that was already there
 
@@ -443,9 +444,93 @@ card fields' visibility -- called from `undo()`, `redo()`, the frame change
 handler and once at startup. The three manual assignments that used to sit in
 the init tail are now that one call.
 
+## A second suit, and letters the visitor types (September 9, 2026)
+
+Built by handing Prompt C back to a coding agent, which is the first time that
+prompt has been used for what it was written for.
+
+### Spades costs a path, an ink and a pairing
+
+`SUITS` is the new indirection: a pip path plus the ink it is filled with.
+`FRAME_STYLES.spades` names one, `FRAME_STYLES.hearts` names the other, and
+`drawCardIndex()` and `cardIndexSVG()` take the suit as an argument instead of
+reaching for a constant. No second renderer, which is the return on having made
+the first style a layout rather than a special case.
+
+The spade has no artwork to trace, so it is drawn to the heart's own
+proportions -- same unit box, apex on the centre line, lobes at full width, stem
+flaring to the baseline -- and drawn **point up**. Point-up is what makes it free
+at the other corner: the flipped index turns the whole group over, so the
+bottom-right spade inverts exactly as the heart does and nothing in the mirror
+needs to know which suit it is drawing.
+
+Its default pairing is K then Q, because that is the order its catalog card
+advertises. The preset hand-off carries the pairing along with the style now, so
+clicking "King and Queen of Spades" gives a K and a Q rather than the queen and
+king left over from the other card. **Only the catalog does this**: picking the
+same style from the Frame Style control leaves the letters alone, because that
+is an edit in progress rather than a request for the template as advertised.
+
+### The letters are free text, and that is why they are measured
+
+The four ranks are suggestions in a `datalist` behind two text inputs. A visitor
+who wants their initials, or a 10, types them.
+
+That removes the reason numerals were excluded and replaces it with arithmetic.
+The cap is `RANK_MAX_W`, and it is expressed against the pip rather than as a
+number -- **nothing in the corner reaches further right than the pip does** --
+so the two can only move together.
+
+### The correction that went with it
+
+The first cut of this carried the artwork's 83.6676pt em straight over to the
+substituted face, and that put the letters into the photograph. Measured on the
+artwork's page, in points:
+
+| | Right edge | Gap to the panel at 74.5 |
+| --- | --- | --- |
+| Pip (the artwork's own) | 66.6 | **7.9** |
+| Playfair `A` at 83.67pt | 66.8 | 7.7 |
+| Playfair `K` at 83.67pt | 70.7 | 3.8 |
+| Playfair `Q` at 83.67pt | **77.3** | **-2.8, inside the panel** |
+
+Playfair Display is about 18 per cent wider than Algerian at the same em, so
+carrying the number over unchanged was never going to hold. It was recorded here
+as "the artwork's own Q already overhangs, which is a choice and not a defect" --
+that was wrong, and reported as letters clashing with the photograph.
+
+The artwork puts its rank's right edge ON the pip's, so the substituted face is
+set at the em that does the same: **70.1pt**. Every suggestion then clears the
+panel by at least the pip's own margin, and the cap catches anything typed that
+would not. Verified by pixel-sampling the panel interior for A, J, Q, K, M, 10,
+88, WW and QQ: zero intruding pixels each, and no glyph reaching past the pip.
+
+The lesson is narrow and worth keeping: a substituted typeface inherits the
+artwork's POSITION but not its metrics, and an em size is a metric.
+
+The SVG export measures through the live canvas context, because there is
+nothing in an SVG string to measure with and the fitted size has to be the same
+number the canvas used -- otherwise a wide rank would collide in one export
+format and not the other.
+
+Free text also means the value now goes through `TB.sanitize()` on the way to
+localStorage and `TB.desanitize()` on the way back, like every other string the
+visitor supplies.
+
+### Clicking the letter on the poster
+
+The corner indices are hit-tested, and clicking one focuses its field with the
+text selected, so the next keystroke replaces it. On a phone, where the form and
+the preview are separate tabs, it switches to the form first.
+
+Not an in-canvas text editor: that means a caret, a selection model and IME
+handling for two characters of content. This closes the same loop -- the corner
+is where the visitor is looking, so that is where the way in should be.
+
 ## Not done
 
-- **Hearts is the only suit.** The pip is a single path constant, so a suit
-  select is a smaller change than the ranks were; it is simply not asked for.
+- **Two suits, not four.** Clubs and diamonds are a path and an ink each now.
 - The style is not offered on `poster-maker.html`, which still describes the
   frame styles only.
+- The rank is one font size for both corners; a visitor wanting a small "10"
+  against a large "K" has no way to ask.
