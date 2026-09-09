@@ -3446,6 +3446,351 @@ async function resumeTemplateChecks(page) {
     });
 }
 
+/* ==========================================================================
+   10. Poster editor: what it actually exports.
+
+   Sections 5, 5b and 5c check the mockup editor's controls and section 7
+   checks that a typed name reaches a filename. Nothing opened a poster
+   export and looked inside it.
+
+   THIS EDITOR HAS ALREADY LOST AN EXPORT SILENTLY. poster.html declared a
+   wrong SRI hash for jsPDF, so every browser blocked the script and PDF
+   export had been dead since commit cc7acff -- found while verifying an
+   unrelated resume template, not by a check (see
+   docs/implementation/FOURTH_RESUME_DESIGN_GREY_RAIL.md). Five formats
+   times one silent failure each is the surface this closes.
+
+   IT EXPORTS WITH CONTENT ON THE POSTER, and that is the point rather than
+   a detail. An empty poster's SVG is a legitimate 284 bytes -- two rects and
+   no image -- so a regression that dropped the artwork out of every export
+   would pass against the default document while producing valid, empty
+   files. A photograph and a caption go on first, and each format is then
+   asked to prove it carried them.
+   ========================================================================== */
+async function posterExportChecks(page) {
+    section("10. Poster editor: every format exports something real");
+
+    await page.navigate(`http://localhost:${PORT}/poster.html`, 1440);
+
+    const r = await page.evaluate(`(async () => {
+        for (let i = 0; i < 100; i += 1) {
+            if (window.jspdf && window.jspdf.jsPDF) { break; }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        if (!window.jspdf || !window.jspdf.jsPDF) { return { error: 'jsPDF never loaded' }; }
+
+        const MARKER = 'VERIFYMARKER';
+
+        /* Content first. A saturated fill and a caption, so every format can
+           be asked whether it carried them rather than merely whether it
+           produced bytes. */
+        const pc = document.createElement('canvas');
+        pc.width = 1200; pc.height = 1600;
+        const pg = pc.getContext('2d');
+        pg.fillStyle = '#00A0FF'; pg.fillRect(0, 0, 1200, 1600);
+        const blob = await new Promise(r => pc.toBlob(r, 'image/png'));
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'p.png', { type: 'image/png' }));
+        const fi = document.getElementById('p-image');
+        if (!fi) { return { error: 'no photo input on poster.html' }; }
+        fi.files = dt.files;
+        fi.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 1500));
+
+        const cap = document.getElementById('t-caption');
+        if (cap) {
+            cap.value = MARKER;
+            cap.dispatchEvent(new Event('input', { bubbles: true }));
+            await new Promise(r => setTimeout(r, 700));
+        }
+
+        /* Capture instead of downloading. PNG, JPG, SVG and PPTX all reach
+           the disk through createObjectURL and an anchor; the PDF goes
+           through jsPDF's own save(). Both are intercepted, and the anchor's
+           click is swallowed so the run writes no files. */
+        const out = { marker: MARKER, caption: Boolean(cap) };
+        const realCreate = URL.createObjectURL;
+        let pending = null;
+        URL.createObjectURL = function (b) { pending = b; return realCreate.call(URL, b); };
+        const realClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function () {};
+        const RealPDF = window.jspdf.jsPDF;
+        const wrap = function (...a) {
+            const inst = new RealPDF(...a);
+            inst.save = () => {
+                const text = inst.output();
+                out.pdf = { bytes: inst.output('arraybuffer').byteLength,
+                            head: text.slice(0, 5),
+                            image: /\\/Subtype\\s*\\/Image/.test(text) };
+                return inst;
+            };
+            return inst;
+        };
+        wrap.prototype = RealPDF.prototype;
+        window.jspdf.jsPDF = wrap;
+
+        const magic = async (b, n) => {
+            const buf = new Uint8Array(await b.slice(0, n).arrayBuffer());
+            return [...buf].map((x) => x.toString(16).padStart(2, '0')).join(' ');
+        };
+
+        const type = document.getElementById('dl-type');
+        const go = document.getElementById('dl-go');
+        if (!type || !go) {
+            URL.createObjectURL = realCreate;
+            HTMLAnchorElement.prototype.click = realClick;
+            window.jspdf.jsPDF = RealPDF;
+            return { error: 'no download controls on poster.html' };
+        }
+
+        for (const fmt of ['png', 'jpg', 'svg', 'pptx']) {
+            pending = null;
+            type.value = fmt;
+            type.dispatchEvent(new Event('change', { bubbles: true }));
+            await new Promise(r => setTimeout(r, 250));
+            go.click();
+            await new Promise(r => setTimeout(r, 3000));
+            if (!pending) { out[fmt] = { missing: true }; continue; }
+            out[fmt] = { mime: pending.type, size: pending.size, magic: await magic(pending, 4) };
+            if (fmt === 'svg') {
+                const text = await pending.text();
+                out.svg.hasImage = /<image/.test(text);
+                out.svg.hasText = /<text/.test(text);
+                out.svg.hasDataUri = /href="data:image\\//.test(text);
+                out.svg.carriesCaption = text.indexOf(MARKER) !== -1;
+            }
+        }
+
+        type.value = 'pdf';
+        type.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 250));
+        go.click();
+        await new Promise(r => setTimeout(r, 3500));
+
+        URL.createObjectURL = realCreate;
+        HTMLAnchorElement.prototype.click = realClick;
+        window.jspdf.jsPDF = RealPDF;
+        return out;
+    })()`);
+
+    if (r.error) {
+        check("poster.html offers a photo input and download controls", false, r.error);
+        return;
+    }
+
+    /* Magic bytes, not the MIME the page claimed: a Blob's type is whatever
+       the code that built it said, so asserting it proves only that the
+       label agrees with itself. The first bytes are the file. */
+    const FORMATS = [
+        ["PNG", "png", "image/png", "89 50 4e 47", 20000],
+        ["JPG", "jpg", "image/jpeg", "ff d8 ff", 15000],
+        ["SVG", "svg", "image/svg+xml", "3c 73 76 67", 2000],
+        ["PPTX", "pptx", null, "50 4b 03 04", 15000]
+    ];
+
+    FORMATS.forEach(([label, key, mime, head, floor]) => {
+        const f = r[key] || {};
+        check(`poster ${label}: the download happened`, !f.missing && f.size > 0,
+            f.missing ? "no blob reached the download path" : JSON.stringify(f));
+        if (f.missing || !f.size) { return; }
+
+        check(`poster ${label}: the bytes are really a ${label}`,
+            String(f.magic || "").indexOf(head) === 0,
+            `first bytes ${f.magic}, expected to start ${head}`);
+
+        if (mime) {
+            check(`poster ${label}: the blob is labelled ${mime}`, f.mime === mime,
+                `labelled ${f.mime}`);
+        }
+
+        /* The empty-file failure. A format that silently stopped carrying the
+           artwork still produces a valid, tiny file -- an empty poster's SVG
+           is a legitimate 284 bytes -- so size is the assertion that a
+           magic-byte check alone would miss. */
+        check(`poster ${label}: carries the artwork rather than an empty page`,
+            f.size > floor, `${f.size} bytes, under the ${floor} floor`);
+    });
+
+    /* The SVG is the only format whose content can be read as text, so it is
+       the only one that can be asked exactly what it carried. */
+    const svg = r.svg || {};
+    check("poster SVG: embeds the photograph as an image",
+        Boolean(svg.hasImage && svg.hasDataUri),
+        `hasImage=${svg.hasImage} hasDataUri=${svg.hasDataUri}`);
+    if (r.caption) {
+        check("poster SVG: the caption is real text, not pixels",
+            Boolean(svg.hasText && svg.carriesCaption),
+            `hasText=${svg.hasText} carriesCaption=${svg.carriesCaption}`);
+    }
+
+    const pdf = r.pdf || {};
+    check("poster PDF: save() ran and produced a PDF",
+        pdf.head === "%PDF-", pdf.head ? `starts "${pdf.head}"` : "save() was never called");
+    check("poster PDF: carries the artwork rather than an empty page",
+        pdf.bytes > 20000 && pdf.image === true,
+        `${pdf.bytes} bytes, image XObject=${pdf.image}`);
+
+    /* LEAVE THE ORIGIN AS WE FOUND IT, and this is not housekeeping either
+       -- the same hazard section 7 documents, one step further on.
+
+       Everything above persists real editor state to localStorage on
+       the editors' own origin, and js/app.js builds the homepage's CONTINUE STRIP out of
+       exactly those keys. Section 4 then measures index.html on this origin
+       against a pristine baseline served on another port, which has no such
+       state and so renders no strip. Left behind, this section makes the
+       final parity comparison measure a homepage that carries a strip against
+       one that does not, and reports it as a layout regression in site/ that
+       nobody introduced.
+
+       Cleared here rather than at the top of section 4, because the section
+       that made the mess is the one that has to know about it. */
+    await page.evaluate("localStorage.clear(), sessionStorage.clear(), true");
+}
+
+/* ==========================================================================
+   11. Mockup editor: every template renders its product, and the design
+       lands on it.
+
+   Sections 5, 5b and 5c drive ONE template -- whichever the editor opens
+   with -- and check the background picker, the export panel and the saved
+   tab. Eighteen templates ship. Seventeen of them were never rendered by
+   this suite at all, and a template whose assets 404 or whose zone prints
+   nothing is a dead catalog card that fails silently: the page loads, the
+   controls work, and the product simply never appears.
+
+   HOW A TEMPLATE IS SELECTED. The picker was removed, so a product is
+   reachable only through the catalog card hand-off -- js/app.js writes
+   tb_editor_preset and js/mockup.js reads it with TB.takePreset() on load.
+   That is why this reloads the page per template rather than clicking
+   through a menu: there is no menu.
+
+   ONE ASSERTION, AND THE TWO THAT WERE CUT. Ink is a saturated magenta that
+   appears in no product photograph, so every magenta pixel on the canvas came
+   from the design. Three assertions were written; only one survived being
+   broken on purpose, and the other two are recorded here rather than left in,
+   because a check that cannot fail is worse than no check -- it reads as
+   cover.
+
+   KEPT: a design placed on the template actually prints. Proven twice -- a
+   404 on one template's base photograph, and a 404 on every asset of another
+   -- and it is the assertion that catches a dead catalog card, where the page
+   loads, the controls work, the layer is listed and the product is simply
+   blank.
+
+   CUT: "the product photograph renders", asserted as a floor on opaque
+   pixels. A template whose assets ALL 404 does not render an empty canvas --
+   it falls back to a 1000x1000 canvas that measures 100% opaque, which sails
+   past any floor. The assertion could not fail.
+
+   CUT: "no artwork lands on the transparent surround". The design is masked
+   to the product, so it cannot paint on transparency at all: moving a
+   garment's whole print zone to an 8,8..200,200 corner of the canvas, well
+   clear of the shirt, still measured zero. The assertion could not fail
+   either.
+
+   That second one is worth keeping in mind before writing it again. Artwork
+   landing where it should not IS a real fault class here -- both faults in
+   docs/error-fixes/MOCKUP_PRINT_ZONES_OVERHANGING_THEIR_SURFACE.md are of it
+   -- but neither lands on TRANSPARENCY. The frame's bled onto a black border
+   and the banner's onto its own stand, both opaque scenery. Reintroducing the
+   banner fault (warpZone bottom back to 1347 from 1345) was tested against
+   this section and is not caught. Detecting that class needs the per-template
+   mask audit that document describes, and its own conclusion still stands:
+   "there is no cheap way for it to: the answer depends on the photograph."
+
+   ========================================================================== */
+async function mockupTemplateChecks(page) {
+    section("11. Mockup editor: every template renders its product");
+
+    await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+    const ids = await page.evaluate(
+        "(window.TB_PHOTO_MOCKUPS || []).map(t => t.id)");
+
+    check(`js/mockup-templates.js registers photographic templates (${ids.length})`,
+        Array.isArray(ids) && ids.length > 0,
+        "no templates to render, so every assertion below would be vacuous");
+    if (!Array.isArray(ids) || !ids.length) { return; }
+
+    for (const id of ids) {
+        /* The preset is consumed by takePreset() on load, so it is written
+           immediately before the navigation that reads it. */
+        await page.evaluate(
+            `(localStorage.clear(),
+              localStorage.setItem('tb_editor_preset', ${JSON.stringify(JSON.stringify(id))}), true)`);
+        await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+
+        const r = await page.evaluate(`(async () => {
+            const c = document.getElementById('mockup-canvas');
+            if (!c) { return { error: 'no canvas' }; }
+            const g = c.getContext('2d');
+            const opaqueCount = () => {
+                const d = g.getImageData(0, 0, c.width, c.height).data;
+                let n = 0;
+                for (let i = 3; i < d.length; i += 4) { if (d[i] > 8) { n += 1; } }
+                return n;
+            };
+
+            /* Assets load asynchronously and some products are megabytes, so
+               settle on a stable opaque-pixel count rather than a fixed wait. */
+            let last = -1, stable = 0, waited = 0;
+            while (stable < 3 && waited < 20000) {
+                await new Promise(r => setTimeout(r, 250));
+                waited += 250;
+                const n = opaqueCount();
+                if (n === last && n > 0) { stable += 1; } else { stable = 0; }
+                last = n;
+            }
+
+            const snap = () => new Uint8ClampedArray(g.getImageData(0, 0, c.width, c.height).data);
+            const before = snap();
+
+            const dc = document.createElement('canvas');
+            dc.width = 2000; dc.height = 2000;
+            const dg = dc.getContext('2d');
+            dg.fillStyle = '#FF00AA';
+            dg.fillRect(0, 0, 2000, 2000);
+            const blob = await new Promise(r => dc.toBlob(r, 'image/png'));
+            const dt = new DataTransfer();
+            dt.items.add(new File([blob], 'fill.png', { type: 'image/png' }));
+            const input = document.getElementById('m-design');
+            if (!input) { return { error: 'no design input' }; }
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            await new Promise(r => setTimeout(r, 3000));
+
+            const after = snap();
+            let onProduct = 0;
+            for (let i = 0; i < after.length; i += 4) {
+                if (after[i + 3] <= 8 || before[i + 3] === 0) { continue; }
+                if (after[i] > 120 && after[i + 1] < 110 && after[i + 2] > 80) { onProduct += 1; }
+            }
+            return { w: c.width, h: c.height, settledMs: waited,
+                     baseOpaque: last, onProduct: onProduct,
+                     error: document.getElementById('m-design-error').textContent || '' };
+        })()`);
+
+        if (r.error) {
+            check(`mockup ${id}: renders`, false, r.error);
+            continue;
+        }
+
+        /* The one assertion that was proven able to fail. A zone that prints
+           nothing, a base photograph that 404s, a render that threw: all of
+           them are silent -- the page loads, the controls work, the layer is
+           listed, and the product is blank -- and all of them land here. */
+        check(`mockup ${id}: a design placed on it actually prints`,
+            r.onProduct > 2000,
+            `${r.onProduct} pixels of a saturated fill reached the product, ` +
+            `on a ${r.w}x${r.h} canvas carrying ${r.baseOpaque} opaque pixels`);
+    }
+
+    /* The loop clears storage BEFORE each template, so the last one's mockup
+       state would otherwise be left on the origin. See the note at the foot
+       of section 10: js/app.js builds the homepage continue strip from these
+       keys, and section 4 measures that homepage. */
+    await page.evaluate("localStorage.clear(), sessionStorage.clear(), true");
+}
+
 async function parityChecks(browserPath) {
     section("4. Ads blocked: layout identical to the last commit");
 
@@ -3565,6 +3910,8 @@ async function main() {
                     await adminPersistenceChecks(page);
                     await exportNameChecks(page);
                     await resumeTemplateChecks(page);
+                    await posterExportChecks(page);
+                    await mockupTemplateChecks(page);
                 } finally {
                     page.close();
                 }

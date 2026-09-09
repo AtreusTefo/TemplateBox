@@ -229,6 +229,119 @@ non-negative one -- written the lazy way it would have passed forever while
 measuring nothing. That is the general lesson for anything added here: assert
 the value you expect, never merely that the code ran.
 
+### 10. Poster editor: every format exports something real
+
+Added September 8, 2026. `poster.html` offers five export formats and the suite
+opened none of them.
+
+**This editor has already lost an export silently.** It declared a wrong SRI
+hash for jsPDF, so every browser blocked the script and PDF export had been dead
+since commit `cc7acff` -- found while verifying an unrelated resume template, not
+by a check. Five formats times one silent failure each is the surface this
+closes.
+
+It puts a photograph and a caption on the poster FIRST, and that is the point
+rather than a detail: an empty poster's SVG is a legitimate 284 bytes -- two
+rects and no image -- so a regression that dropped the artwork out of every
+export would produce valid, empty files and pass against the default document.
+
+| Assertion | What it catches |
+|---|---|
+| the download happened | an export path that throws or never fires |
+| the bytes are really a PNG / JPG / SVG / PPTX | checked by magic bytes, not the Blob's `type`, which is only whatever the code that built it claimed |
+| carries the artwork rather than an empty page | a format that still produces a valid file after silently dropping the content |
+| SVG embeds the photograph as an image | the SVG path losing its data URI |
+| SVG's caption is real text, not pixels | the caption being rasterized into the image |
+| PDF `save()` ran and starts `%PDF-` | the jsPDF breakage above, exactly |
+| PDF carries an image XObject | a PDF exported with no artwork in it |
+
+Mutation-proven twice: emptying the SVG's image `href` fails two assertions, and
+short-circuiting the PDF's `addImage` fails the artwork one.
+
+### 11. Mockup editor: every template renders its product
+
+Added September 8, 2026. Sections 5, 5b and 5c drive ONE template -- whichever
+the editor opens with. Eighteen ship, and seventeen had never been rendered by
+this suite at all.
+
+A product is reachable only through the catalog card hand-off (`js/app.js`
+writes `tb_editor_preset`, `js/mockup.js` reads it with `TB.takePreset()`), since
+the template picker was removed. That is why this reloads the page per template:
+there is no menu to click.
+
+It places a saturated magenta fill -- a colour in no product photograph -- and
+asserts **a design placed on the template actually prints**. That catches the
+dead catalog card: the page loads, the controls work, the layer is listed, and
+the product is blank. Proven three times, by 404ing one template's base
+photograph, by 404ing every asset of another, and again on the final build.
+
+#### Two assertions were written and cut, which is the useful part
+
+Both were removed after being broken on purpose and refusing to fail. A check
+that cannot fail is worse than no check, because it reads as cover.
+
+**"The product photograph renders"**, as a floor on opaque pixels. A template
+whose assets ALL 404 does not render an empty canvas -- it falls back to a
+1000x1000 canvas measuring 100% opaque, which sails past any floor.
+
+**"No artwork lands on the transparent surround."** The design is masked to the
+product, so it cannot paint on transparency at all. Moving a garment's entire
+print zone to an `8,8..200,200` corner of the canvas, well clear of the shirt,
+still measured zero off-product pixels.
+
+That second one is worth remembering before writing it again. Artwork landing
+where it should not IS a real fault class here -- both faults in
+`docs/error-fixes/MOCKUP_PRINT_ZONES_OVERHANGING_THEIR_SURFACE.md` are of it --
+but neither lands on transparency. The frame's bled onto a black border and the
+banner's onto its own stand, both opaque scenery. Reintroducing the banner fault
+(`warpZone` bottom back to 1347 from 1345) was tested against this section and is
+**not** caught. Detecting that class needs the per-template mask audit that
+document describes, and its own conclusion still stands: "there is no cheap way
+for it to: the answer depends on the photograph."
+
+#### Cost
+
+Section 11 reloads `mockup.html` eighteen times and some products are several
+megabytes, so it is the slowest section here -- roughly two minutes, and it is
+why a full run is now nearer six than four.
+
+#### A section that writes localStorage must clear it before it returns
+
+Sections 10 and 11 both drive real editors, so both persist real editor state
+to `localStorage` on `localhost:5099`. `js/app.js` builds the homepage's
+**continue strip** out of exactly those keys, and section 4 measures
+`index.html` on that same origin against a pristine baseline served on another
+port -- which has no such state and so renders no strip.
+
+Left behind, the two new sections make the final parity comparison measure a
+homepage carrying a continue strip against one that is not, and report it as a
+layout regression in `site/` that nobody introduced. Both now clear the origin
+before returning.
+
+Section 7 documents the same hazard one step earlier ("Storage is cleared
+first, and that is not housekeeping"), where a seeded background colour made a
+later assertion fail for the wrong reason. The rule generalises: **a section
+that writes storage owns clearing it**, and the clear belongs in the section
+that made the mess rather than at the top of the one that trips over it.
+
+#### A FONTS timeout makes section 4 report differences that are not real
+
+```
+FONTS http://localhost:5099/ @1920 not ready after 3s (timeout); measuring in the fallback face
+index @1920 main: now [184.5,85,1536,4610.5], HEAD [184.5,85,1536,4612.1]
+```
+
+Section 4 measures the working tree and the baseline in two separate passes.
+If the webfonts load for one pass and time out for the other, the two are
+measured in different faces and every text-driven height differs by a pixel or
+two. It reads exactly like a regression and is not one.
+
+The tell is the `FONTS ... timeout` line immediately above the differences, and
+a difference of one or two pixels rather than the tens a real layout change
+produces. Confirm with `git status --porcelain site/`: if that is empty, both
+servers are serving byte-identical files and any difference is measurement
+noise by definition.
+
 ## Adding a Check
 
 Two rules, both learned from this suite's own bugs.
