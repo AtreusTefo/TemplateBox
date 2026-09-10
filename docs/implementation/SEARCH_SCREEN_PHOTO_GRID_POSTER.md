@@ -138,12 +138,17 @@ before any file is decoded. Decoding is asynchronous and a small photograph
 finishes ahead of a large one, so allocating on completion would order the
 pictures differently every time, by nothing the visitor can see.
 
-`uploadTargets()` answers two different questions and so has two rules. Files
-fill every EMPTY card in reading order first, which is what makes one gesture
-work. Once there are none left they fall back to the SELECTED card and the ones
-after it, wrapping -- which is what makes a seventh upload replace something
-visible instead of being silently dropped. Silently dropped is the failure a
-visitor cannot tell from a broken control.
+`uploadTargets()` answers three questions in order. The SELECTED card takes the
+first file when it is empty, because clicking an empty card is how the picker
+usually gets opened now and a photograph landing somewhere else would read as
+the click having missed. Then every remaining empty card in reading order, which
+is what makes one gesture fill a whole masonry. Then, once there are none left,
+the selected card and the ones after it, wrapping -- which is what makes a
+seventh upload replace something visible instead of being silently dropped, and
+silently dropped is the failure a visitor cannot tell from a broken control.
+
+When nothing in particular is selected the first rule picks card 1, which is
+where the second would have put it anyway, so the common case is unchanged.
 
 `readImage()` is now the one mime gate on the page. The check that is a security
 control rather than a convenience existed in one copy when there was one input;
@@ -348,6 +353,47 @@ inline commits and repaints, but nothing else writes the result back to the
 panel field -- so the panel would keep its old value and the next keystroke
 there would revert everything typed on the poster. `syncQueryInput()` writes the
 panel first, before any early return, and `render()` runs after every commit.
+
+### The placeholder is a button now
+
+"Upload a photo to begin" sat in the middle of an empty panel and was a caption
+rather than a control: the visitor read an instruction and then had to go and
+find the button that carried it out. Clicking the words now does the thing the
+words describe, on every layout.
+
+Which input opens depends on the slot under the pointer, and it is the SAME
+input the control panel shows -- the same element, so the one mime gate and the
+one assignment path serve both routes and there is nothing to keep in step:
+
+| clicked | opens |
+| --- | --- |
+| the panel, on a plain or card layout | the single Photo Upload |
+| the split layout's upper half | the first upload |
+| its lower half, past the seam | the second |
+| an empty grid card | the grid's own multi-file input |
+| the empty account circle | the profile upload |
+
+This made the hit-test worth unifying. `slotAt()` answers which slot a point
+falls in FILLED OR NOT, and the two callers test `photos[i]` themselves --
+because a drag wants the slot for the opposite reason an upload does, and two
+separate hit-tests would eventually disagree about where a panel's edge is.
+
+Three details:
+
+**It runs on pointerdown, inside the gesture,** because opening a file dialog
+needs a user activation. Nothing is dragged from an empty panel, so there is no
+interaction to lose by acting on the press rather than the release.
+
+**Text still wins.** `hitTest()` is consulted first, so a caption sitting over an
+empty panel drags as it always did instead of opening a picker. Verified both
+ways round: the bare panel opens the upload, the caption over it opens nothing.
+
+**The cursor says so.** Without it this is a control that looks exactly like a
+caption. Empty photo areas take `pointer`, a photograph takes `grab` and
+`grabbing` while it moves, the corner letters and the search bar take `text`,
+and everything else stays default. The hit-test is skipped entirely during a
+drag: the cursor is already set, and testing on every move is work for an answer
+nobody reads.
 
 ### Light mode
 

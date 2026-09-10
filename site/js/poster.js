@@ -1748,39 +1748,81 @@
        the pointer" and "the box the controls are pointing at" can be different
        things for one frame, and a drag measured against the wrong box moves at
        the wrong speed. */
-    function photoAt(pt, W, H) {
+    /* Which photo slot a point falls in, FILLED OR NOT, and -1 for none.
+
+       Emptiness is deliberately not part of the question. Two things need the
+       answer and they need it for opposite reasons: a drag wants the slot
+       because there is a photograph in it, and a click on the placeholder wants
+       the slot because there is not. Asking once and testing `photos[i]` at the
+       call site is what keeps those two from drifting into two hit-tests that
+       disagree about where a panel's edge is. */
+    function slotAt(pt, W, H) {
         const layout = layoutOf(state.frame);
+        if (layout === "browser") {
+            return cardAt(pt, W, H);
+        }
+        const r = photoRectFor(W, H);
         const x = pt.x * W;
         const y = pt.y * H;
-
-        if (layout === "browser") {
-            const i = cardAt(pt, W, H);
-            if (i === -1 || !photos[i]) {
-                return null;
-            }
-            return {
-                img: photos[i], view: state.views[i], index: i, flipped: false,
-                rect: i === AVATAR_SLOT ? avatarRect(W, H) : gridRects(W, H)[i]
-            };
-        }
-
-        const r = photoRectFor(W, H);
         if (x < r.x || x > r.x + r.w || y < r.y || y > r.y + r.h) {
-            return null;
+            return -1;
         }
         if (layout === "split") {
             const g = splitGeometry(W, H);
             const t = (x - g.x) / g.w;
             const seamY = g.seamLeftY + t * (g.seamRightY - g.seamLeftY);
-            if (y > seamY) {
-                return photos[1]
-                    ? { img: photos[1], view: state.views[1], index: 1, flipped: true, rect: r }
-                    : null;
-            }
+            return y > seamY ? 1 : 0;
         }
-        return photos[0]
-            ? { img: photos[0], view: state.views[0], index: 0, flipped: false, rect: r }
-            : null;
+        return 0;
+    }
+
+    /* The box a given slot's photograph is drawn into. */
+    function rectForSlot(i, W, H) {
+        if (layoutOf(state.frame) !== "browser") {
+            return photoRectFor(W, H);
+        }
+        return i === AVATAR_SLOT ? avatarRect(W, H) : gridRects(W, H)[i];
+    }
+
+    /* Which photograph a point belongs to, and the box it was drawn into.
+       Returns null where there is no photograph to move, so a drag on an empty
+       panel does nothing rather than silently adjusting a framing nobody can
+       see -- the click on that panel is an UPLOAD now, handled separately.
+
+       The RECT comes back with it rather than being re-derived by the caller:
+       with seven boxes on the page, "the photograph under the pointer" and "the
+       box the controls are pointing at" can be different things for one frame,
+       and a drag measured against the wrong box moves at the wrong speed. */
+    function photoAt(pt, W, H) {
+        const i = slotAt(pt, W, H);
+        if (i === -1 || !photos[i]) {
+            return null;
+        }
+        return {
+            img: photos[i], view: state.views[i], index: i,
+            /* The split layout's lower half is drawn upside down, so a drag
+               there has to follow the pointer rather than the source. */
+            flipped: layoutOf(state.frame) === "split" && i === 1,
+            rect: rectForSlot(i, W, H)
+        };
+    }
+
+    /* The upload that belongs to a slot. Clicking the placeholder on the
+       preview opens the same picker the panel's own button does -- the same
+       input element, so the one mime gate and the one assignment path serve
+       both routes and there is nothing here to keep in step. */
+    function openUploadFor(i) {
+        const layout = layoutOf(state.frame);
+        let id = "p-image";
+        if (layout === "browser") {
+            id = i === AVATAR_SLOT ? "p-image-avatar" : "p-image-grid";
+        } else if (layout === "split" && i === 1) {
+            id = "p-image-b";
+        }
+        const input = byId(id);
+        if (input) {
+            input.click();
+        }
     }
 
     canvas.addEventListener("pointerdown", (ev) => {
@@ -1817,6 +1859,20 @@
                 syncPhotoControls();
                 render();
             }
+            /* An EMPTY photo area opens its own file picker. The panel says
+               "Upload a photo to begin" in the middle of that area, and until
+               now that was a caption rather than a control -- the visitor read
+               an instruction and had to go and find the button that carried it
+               out. Clicking the words does the thing the words describe.
+
+               This runs on pointerdown, inside the gesture, because opening a
+               file dialog needs a user activation. Nothing is dragged from an
+               empty panel anyway, so there is no interaction to lose. */
+            const empty = slotAt(pt, canvas.width, canvas.height);
+            if (empty !== -1 && !photos[empty]) {
+                openUploadFor(empty);
+                return;
+            }
             /* Nothing else claimed the point, so it belongs to the photograph
                under it. Text wins on purpose: a caption sitting over a photo
                has to stay draggable. */
@@ -1831,6 +1887,7 @@
                     flipped: target.flipped, moved: false
                 };
                 canvas.setPointerCapture(ev.pointerId);
+                canvas.style.cursor = "grabbing";
             }
             return;
         }
@@ -1841,7 +1898,38 @@
         render();
     });
 
+    /* What the pointer says the canvas will do, which is the only thing telling
+       anyone that the placeholder is clickable at all. Without it the upload
+       area is a control that looks exactly like a caption.
+
+       Skipped entirely while a drag is running: the cursor is already set for
+       that, and hit-testing on every move of a drag is work for an answer
+       nobody reads. */
+    function syncCursor(pt) {
+        const W = canvas.width;
+        const H = canvas.height;
+        if (cardIndexAt(pt, W, H) || queryBarAt(pt, W, H)) {
+            canvas.style.cursor = "text";
+            return;
+        }
+        if (hitTest(pt)) {
+            canvas.style.cursor = "move";
+            return;
+        }
+        const i = slotAt(pt, W, H);
+        if (i === -1) {
+            canvas.style.cursor = "default";
+        } else if (photos[i]) {
+            canvas.style.cursor = "grab";
+        } else {
+            canvas.style.cursor = "pointer";
+        }
+    }
+
     canvas.addEventListener("pointermove", (ev) => {
+        if (!panning && !dragging) {
+            syncCursor(canvasPoint(ev));
+        }
         if (panning) {
             const pt = canvasPoint(ev);
             if (!panning.moved) {
@@ -1883,6 +1971,7 @@
     });
 
     canvas.addEventListener("pointerup", (ev) => {
+        canvas.style.cursor = "";
         if (panning && panning.moved) {
             commit();
             syncPhotoControls();
@@ -1975,8 +2064,17 @@
        tell from a broken control. */
     function uploadTargets(count) {
         const out = [];
+        /* The SELECTED card first, when it is empty and there is a file for it.
+           Clicking an empty card on the preview is now how the picker gets
+           opened, and it also selects that card -- so a photograph that landed
+           in a different one would read as the click having missed. When
+           nothing in particular is selected this is card 1, which is where the
+           reading order below would have put it anyway. */
+        if (count > 0 && state.card < GRID_SLOTS && !photos[state.card]) {
+            out.push(state.card);
+        }
         for (let i = 0; i < GRID_SLOTS && out.length < count; i += 1) {
-            if (!photos[i]) { out.push(i); }
+            if (!photos[i] && out.indexOf(i) === -1) { out.push(i); }
         }
         /* Cards only, never the account circle: that has its own input, and a
            batch of six photographs must not silently claim it. The modulo is
