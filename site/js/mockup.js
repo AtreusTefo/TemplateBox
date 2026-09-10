@@ -200,6 +200,17 @@
         return (isFinite(z) && z >= 0 && z < zoneCount()) ? z : 0;
     }
 
+    /* Whether a surface is showing its "Upload your design" prompt rather than
+       a design.
+
+       One predicate with two readers: drawLayersInArea() decides what to PAINT
+       from it, and the canvas click decides what to DO from it. Written twice
+       they would eventually disagree, and the failure would be a prompt that
+       does nothing or an invisible click target where the artwork is. */
+    function zoneIsEmpty(index) {
+        return !layers.some((layer) => layer.img && layerZone(layer) === index);
+    }
+
     function zoneBounds(zone) {
         const xs = zone.map((p) => p.x);
         const ys = zone.map((p) => p.y);
@@ -896,11 +907,9 @@
            front must not suppress the "Upload your design" prompt on the back,
            or the second card silently looks like part of the photograph. */
         const scoped = typeof zoneIndex === "number";
-        const mine = scoped
-            ? layers.filter((layer) => layer.img && layerZone(layer) === zoneIndex)
-            : readyLayers();
+        const empty = scoped ? zoneIsEmpty(zoneIndex) : !readyLayers().length;
 
-        if (!mine.length) {
+        if (empty) {
             ctx.save();
             const warped = zonePath(ctx, area, r, zone);
             ctx.fillStyle = "#F4F3EF";
@@ -2544,12 +2553,78 @@
         return null;
     }
 
+    /* The empty print surface under a point, or -1.
+
+       Tested against zonePath(), the SAME path the prompt is painted with, and
+       deliberately not against zoneBounds(). On a perspective template those
+       are different regions -- the box reaches off the product entirely, which
+       is the defect recorded in
+       docs/error-fixes/WARPED_ZONE_CHROME_AND_PROMPT_DRAWN_IN_SHEET_SPACE.md
+       for the prompt itself. Hit-testing the box would put that same fault back
+       as a click target: an area that uploads a design while showing bare
+       photograph. */
+    function emptyZoneAt(pt) {
+        const config = PRODUCTS[currentProduct];
+        const tpl = config && config.template;
+        if (!tpl) {
+            return -1;
+        }
+        const zones = zonesOf(tpl);
+        for (let i = 0; i < zones.length; i += 1) {
+            if (!zoneIsEmpty(i)) {
+                continue;
+            }
+            const zone = zones[i];
+            ctx.save();
+            /* Identity, because the point is already in canvas pixels and
+               isPointInPath reads the CURRENT transform. */
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            zonePath(ctx, zoneBounds(zone), 0, zone);
+            const inside = ctx.isPointInPath(pt.x, pt.y);
+            ctx.restore();
+            if (inside) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /* Moves the editor to a surface, the way the surface tabs do. Extracted so
+       clicking a surface on the canvas and clicking its tab leave the editor in
+       the same state -- the selected layer has to go, or the size and rotation
+       controls point at a row the list no longer shows. */
+    function focusZone(index) {
+        if (activeZone === index) {
+            return;
+        }
+        activeZone = index;
+        selectedId = null;
+        renderLayerList();
+        syncScaleControls();
+        syncLayerActions();
+        drawOverlay();
+    }
+
     canvas.addEventListener("pointerdown", (evt) => {
         const k = canvasPerScreenPx();
         const pt = getCanvasPoint(evt);
         const hit = hitTest(pt, k);
 
         if (!hit) {
+            /* An empty print surface opens the design picker. The words on it
+               say "Upload your design", and until now that was a caption
+               rather than a control -- the visitor read an instruction and had
+               to go and find the button that carried it out.
+
+               On a two-surface template the click also moves to the surface it
+               landed on, so the design arrives where it was aimed rather than
+               on whichever card the tabs happened to be showing. */
+            const zone = emptyZoneAt(pt);
+            if (zone !== -1) {
+                focusZone(zone);
+                requestUpload("add", null);
+                return;
+            }
             if (selectedId !== null) {
                 selectLayer(null);
             }
@@ -2593,9 +2668,15 @@
 
         if (!drag) {
             const hit = hitTest(raw, k);
-            canvas.style.cursor = hit
-                ? (hit.mode === "move" ? "grab" : (hit.mode === "rotate" ? "crosshair" : "nwse-resize"))
-                : "default";
+            if (hit) {
+                canvas.style.cursor = hit.mode === "move"
+                    ? "grab"
+                    : (hit.mode === "rotate" ? "crosshair" : "nwse-resize");
+            } else {
+                /* Without this the prompt is a control that looks exactly like
+                   a caption. */
+                canvas.style.cursor = emptyZoneAt(raw) === -1 ? "default" : "pointer";
+            }
             return;
         }
 

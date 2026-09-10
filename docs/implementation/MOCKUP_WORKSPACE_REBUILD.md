@@ -252,6 +252,66 @@ With the row gone, `.color-row` had no users left and was deleted, along with
 `.tray-hint` and the `@media (max-width: 48rem) .editor-bar .dl-label` rule that
 existed only to hide the label of the bar button that no longer exists.
 
+## 7. The upload prompt is a button (September 10, 2026)
+
+"Upload your design" sat in the middle of an empty print surface and was a
+caption rather than a control: the visitor read an instruction and then had to
+go and find the button that carried it out. Clicking the words now opens the
+same picker `requestUpload("add", null)` opens from the action row -- the same
+input element, so the one mime gate every upload funnels through serves this
+route too and there is nothing new to keep in step.
+
+The same change had just been made on the poster editor; this is the other
+editor that draws such a prompt. `resume.html` and `docs.html` do not draw one
+at all -- a missing photograph or logo is simply absent from the sheet -- so
+there is nothing there that says "upload" to click, and an invisible target
+where nothing indicates one would be worse than none.
+
+**It hit-tests `zonePath()`, not `zoneBounds()`, and that is the whole care in
+it.** Those are different regions the moment a zone is a warped quad: the box
+squares the quad off and reaches out over the product and the transparent
+surround. Section 4 of
+`docs/error-fixes/WARPED_ZONE_CHROME_AND_PROMPT_DRAWN_IN_SHEET_SPACE.md`
+records the prompt itself having that fault. Hit-testing the box would have put
+the same fault back as a CLICK TARGET -- an area that uploads a design while
+showing bare photograph -- so the click is tested against the identical path the
+prompt is painted with.
+
+`zoneIsEmpty(index)` was extracted for the same reason one hit-test serves both
+callers on the poster: `drawLayersInArea()` decides what to PAINT from it and
+the canvas click decides what to DO from it. Written twice they drift, and the
+failure is either a prompt that does nothing or an invisible target where the
+artwork is.
+
+**On a two-surface template the click moves to the surface it landed on**, via
+`focusZone()`, which is the surface tabs' own handler extracted. A design has to
+arrive where it was aimed rather than on whichever tab happened to be showing,
+and the selected layer has to be dropped on the way, or the size and rotation
+controls point at a row the list no longer shows.
+
+The cursor turns to `pointer` over an empty surface, because without it this is
+a control that looks exactly like a caption.
+
+### Verified
+
+| clicked | result |
+| --- | --- |
+| the prompt on a single-surface template | picker opens, cursor `pointer` |
+| off the product | nothing, cursor `default` |
+| the Cap surface on `tshirt-cap-clay` | picker opens AND the surface switches to Cap |
+| the T-Shirt surface | picker opens AND it switches back |
+| a surface that already has a design | no picker, cursor `grab`, drag as before |
+
+One false alarm worth recording, because it looked exactly like a defect. The
+first check reported the surface tabs not moving. They were moving:
+`renderZoneSwitch()` destroys and rebuilds those buttons, and the probe was
+holding references captured before the re-render, so it was reading detached
+nodes with stale attributes. The same shape as the resume editor's
+commit-then-re-render bug already recorded in this repo -- **a reference held
+across a re-render describes a node that is no longer on the page.**
+
+Suite: 1488 passed, 0 failed.
+
 ## What this cost
 
 - **`mockup.html` no longer has a sticky export bar.** `.preview-actions` is
