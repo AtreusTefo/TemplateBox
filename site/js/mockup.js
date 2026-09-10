@@ -1111,8 +1111,44 @@
         return tintCanvas;
     }
 
+    /* The template's asset state, in the DOM rather than only in painted
+       pixels.
+
+       This is here for OBSERVABILITY, and it is worth being straight about
+       that: docs/error-fixes/MOCKUP_BACKGROUND_CHECK_SAMPLED_A_LOADING_PLACEHOLDER.md
+       solved the same class of problem in September 2026 without touching this
+       file, on the explicit grounds that "a test hook added to production code
+       for a test's convenience is a liability the next refactor has to carry".
+       That reasoning was right for its scope and is being reversed knowingly.
+
+       What changed is that the signal it used -- the canvas being at the base
+       image's natural size rather than the 1000x1000 placeholder -- was a
+       per-template constant written into the suite as a literal 1024x1536. That
+       works for exactly one check on exactly one template. It cannot serve
+       section 4, which measures this page at every width and cannot hold a
+       table of every template's dimensions without becoming a second source of
+       truth, and it cannot tell a template still LOADING from one that has
+       FAILED, because both leave the canvas at 1000x1000. Those are different
+       facts: one is a wait, the other is a defect, and a check that conflates
+       them reports a slow network as a broken template.
+
+       So the coupling is now explicit and named instead of implicit and
+       numeric, which is the honest version of the same dependency.
+
+       An attribute rather than a global because it is per-element state and CSS
+       can reach it. Note that the canvas's aria-label still names the product
+       while this says "loading" -- a screen-reader user is told "T-Shirt mockup
+       preview" of a canvas reading "Loading mockup template...". This attribute
+       does not fix that; it just makes it visible. */
+    function publishAssetState(state) {
+        if (canvasWrap && canvasWrap.getAttribute("data-mockup-state") !== state) {
+            canvasWrap.setAttribute("data-mockup-state", state);
+        }
+    }
+
     function drawPhoto(config) {
         const assets = ensurePhotoAssets(currentProduct);
+        publishAssetState(assets.status);
 
         if (assets.status !== "ready") {
             if (canvas.width !== CANVAS_W || canvas.height !== CANVAS_H) {

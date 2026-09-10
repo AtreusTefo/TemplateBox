@@ -1164,11 +1164,63 @@ async function connect(browserPath, cdpPort, options) {
                     })(),
                     adsReady: ${adsBlocked} ||
                               !document.querySelector('script[src*="js/ads.js"]') ||
-                              typeof TBAds !== 'undefined'
+                              typeof TBAds !== 'undefined',
+                    /* The mockup template's base photograph has been painted.
+
+                       This is a POSITIVE signal, and it has to be, because the
+                       stillness poll below cannot supply one. While the base
+                       PNG is in flight the canvas is a flat 1000x1000
+                       placeholder fill -- so the page is not merely still, it
+                       is stably WRONG, and three identical fingerprints mean
+                       "nothing is happening", never "everything has happened".
+
+                       Measured, by deleting the default template's base PNG and
+                       serving the tree beside an intact one: the placeholder
+                       settled in 381ms with the preview pane at 640 and the
+                       fabric pixel at 244,243,239, against 788 and 244,244,249
+                       on the healthy tree. Those are exactly the numbers that
+                       had been appearing intermittently in section 4 and in
+                       section 5's colourway check on a clean tree -- one cause,
+                       two symptoms, depending on which section got there first.
+
+                       Testing for "not loading" rather than for "ready" is
+                       deliberate. An ERROR is a real defect, and it must reach
+                       the check that can name it rather than expiring here as a
+                       20-second navigation timeout on every mockup page in the
+                       run. Section 5 asserts the ready state outright.
+
+                       NOTE FOR ANYONE EDITING THIS STRING: it is the inside of
+                       a template literal, so a backtick here does not comment
+                       anything out -- it ENDS the literal. Two pairs of them in
+                       this comment turned the whole expression into a chain of
+                       string comparisons, which is valid JavaScript that
+                       evaluates to false -- so a syntax check passed and every
+                       navigation in the suite timed out at 20 seconds instead. */
+                    mockupReady: (() => {
+                        const wrap = document.querySelector('[data-mockup-state]');
+                        return !wrap || wrap.getAttribute('data-mockup-state') !== 'loading';
+                    })()
                 }))()`);
             } catch (e) { continue; }
+            /* A malformed readiness expression, named rather than waited out.
+
+               The catch above exists because evaluate genuinely fails while a
+               navigation is in flight, and swallowing that is right. What it
+               also swallowed was an expression that RETURNED successfully with
+               a non-object: a stray backtick in the comment above ended the
+               template literal early and left a chain of string comparisons
+               that evaluated to false. Every navigation then polled for 20
+               seconds and the run died on whichever page came first -- with a
+               message blaming that page, which had nothing to do with it.
+
+               A throw here costs one run and points at the real line. */
+            if (state !== null && state !== undefined && typeof state !== "object") {
+                throw new Error("the readiness expression returned " + JSON.stringify(state) +
+                    " instead of an object -- check tests/verify-layout.js for a backtick " +
+                    "inside the evaluated template literal");
+            }
             if (!state || state.path !== expected || state.ready === "loading" ||
-                    !state.domReady || !state.adsReady) {
+                    !state.domReady || !state.adsReady || !state.mockupReady) {
                 continue;
             }
             return await quiesce(url, width);
@@ -2263,6 +2315,27 @@ async function mockupChecks(page) {
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
     await page.evaluate("localStorage.clear(), true");
     await page.navigate(`http://localhost:${PORT}/mockup.html`, 1440);
+
+    /* The template loaded at all, asserted before anything samples the canvas.
+
+       Everything below reads pixels, and until September 10, 2026 they were
+       read with no guarantee there was a photograph under them. The navigation
+       poll now holds until the base image is painted, so this should never
+       fail -- and it is here precisely BECAUSE it should never fail: if the
+       wait is ever removed, weakened, or outrun, this says "the template did
+       not load" instead of letting three colour checks report a placeholder as
+       a wrong colour. A defect should be named by the check nearest to it.
+
+       It fails loudly on `error` rather than hanging: a template whose base
+       photograph 404s is a real defect, and the navigation poll deliberately
+       releases on that state so it arrives here. */
+    const assetState = await page.evaluate(`(() => {
+        const wrap = document.querySelector('[data-mockup-state]');
+        return wrap ? wrap.getAttribute('data-mockup-state') : 'no-attribute';
+    })()`);
+    check("mockup: the template's base photograph loaded before anything sampled it",
+        assetState === "ready", `data-mockup-state was ${assetState}`);
+
     const colorway = await page.evaluate(`(async () => {
         const fabric = () => {
             const c = document.getElementById('mockup-canvas');

@@ -1,12 +1,15 @@
-# Three checks leaning on a wait nobody meant them to have, and a cleanup that never ran
+# Checks leaning on a wait nobody meant them to have, and a cleanup that never ran
 
 Date: September 3, 2026
+Updated: September 10, 2026 -- see section 5, which reverses section 1's "no production change"
 
 ## Summary
 
 Removing the navigation wait on `readyState === "complete"` exposed three separate checks that had been relying on it, in three different ways, none of them a product defect. A fourth finding is recorded alongside them because it has the same shape seen from the other side: a cleanup that looked like it worked and had never once run.
 
 The lesson for the first three is one lesson: **removing an over-broad wait does not break the pages, it exposes every check that was quietly leaning on it.** The lesson for the fourth is its mirror: **a fix inside a silent catch is indistinguishable from no fix at all.** Each section carries the measurement that settled it, because in every one of these cases the plausible reading and the true one differed.
+
+Section 5 was added on September 10, 2026, when the placeholder from section 1 came back in two more checks at once. Its lesson is the one the first four kept circling without naming: **every settling signal here is an absence-of-change signal, and "nothing is happening" can never mean "everything has happened".** A page holding still on a placeholder is indistinguishable from a page that has finished, so the fix is a POSITIVE signal rather than a longer wait -- and it reverses section 1's decision to keep the fix out of production code, with the reasons recorded there.
 
 ## 1. The mockup background check sampled a loading placeholder
 
@@ -225,6 +228,203 @@ The general point is the same as the three above, from the other direction. Thos
 that looked like they were testing something and were not; this was a fix that looked like it
 was working and was not. Neither is visible without going and counting the thing itself.
 
+## 5. The same placeholder again, in two sections at once, and why the fix moved into production
+
+Updated: September 10, 2026
+
+Section 1 above fixed one check by waiting for the canvas to reach `1024x1536`. Seven days later
+the identical placeholder took down two more, and the fix that worked for one check could not be
+extended to either of them.
+
+### Symptom
+
+Three consecutive full runs on a byte-identical, clean working tree, with only a `git commit`
+between them -- which changes no file content -- disagreed with each other:
+
+| Run | Section 5 colourway | Section 4 parity |
+| --- | --- | --- |
+| 1 | passed | failed (a genuine extra catalog card) |
+| 2 | **failed** `before: "244,243,239,255"` | passed |
+| 3 | passed | **failed**, four mockup pane measurements |
+
+Run 2's `before` is `#F4F3EF` -- the placeholder fill from section 1, read at pixel (650, 520)
+this time instead of (2, 2). Run 3 reported `mockup @1366 panes: now [...,640], HEAD [...,788]`
+on files that were identical on both servers.
+
+Two symptoms, one cause, and which one appeared depended only on which section reached the page
+while the photograph was still in flight.
+
+### Root cause
+
+`syncCanvasAspect()` publishes `--mockup-aspect` from whatever the canvas currently is, and CSS
+bounds the preview pane's height from it. While the base photograph is loading the canvas is the
+1000x1000 placeholder, so the aspect is published as `1` and the pane settles at 640 instead of
+788.
+
+The important part is not that the value is wrong. It is that the value is **stably** wrong:
+
+| | healthy tree | base photograph absent |
+| --- | --- | --- |
+| `main` height | 812 | 716.8 |
+| preview pane | 788 | **640** |
+| canvas | 1024x1536 | 1000x1000 |
+| `--mockup-aspect` | 0.667 | 1 |
+| fabric pixel at (650, 520) | 244,244,249 | **244,243,239** |
+| `settled()` returned after | 573 ms | **381 ms** |
+
+Those are the two servers side by side, and the last row is the whole finding. Every settling
+signal this suite has -- the QUIESCE fingerprint, and `settled()` on a comparison's own snapshot
+-- is an **absence-of-change** signal. Three identical readings mean "nothing is happening". They
+can never mean "everything has happened", and a page holding still on a placeholder is
+indistinguishable from a page that has finished.
+
+Timed directly, with a harness serving the real tree but delaying any `-base.png` by 1500 ms and
+injecting a probe into the page so the measurement starts at the first frame rather than a round
+trip later:
+
+| Moment | `data-mockup-state` | Preview pane |
+| --- | --- | --- |
+| 0 ms | not yet set | -- |
+| 31 ms | `loading` | **640** |
+| 1564 ms | `ready` | **788** |
+
+A 1.53-second window of perfect stillness at the wrong value. `settled()` needs three readings
+100 ms apart, so it lands inside that window and returns 640 every time. Section 1's measurements
+put the same window at 1-95 ms across four runs on a warm local server; it widens to whatever the network and the
+machine are doing, which is why this surfaces under contention -- section 4 runs two servers and
+two browsers at once.
+
+### Fix applied
+
+A **positive** signal, because no amount of waiting for stillness can produce one.
+
+`site/js/mockup.js` publishes the asset state it already tracks onto the canvas wrapper:
+
+```
+function publishAssetState(state) {
+    if (canvasWrap && canvasWrap.getAttribute("data-mockup-state") !== state) {
+        canvasWrap.setAttribute("data-mockup-state", state);
+    }
+}
+```
+
+called from `drawPhoto()` with `assets.status`, so it tracks `loading`, `ready` and `error` on
+every repaint including a template switch.
+
+`tests/verify-layout.js` holds its navigation readiness poll while the attribute reads `loading`,
+alongside the existing `adsReady` condition. That is one place, so **every** section that visits
+`mockup.html` inherits it -- including section 5's colourway check, which had no wait of its own
+at all, and section 4, which could not have had one.
+
+The poll tests for "not loading" rather than for "ready" deliberately. An `error` is a real
+defect and has to reach a check that can name it, rather than expiring as a 20-second navigation
+timeout on every mockup page in the run. Section 5 now asserts the ready state outright, before
+anything samples a pixel.
+
+### This reverses section 1's "no production change", knowingly
+
+Section 1 said, and was right to say:
+
+> No production change. The readiness signal already existed in the canvas's own dimensions, so
+> the check needs no cooperation from `js/mockup.js` -- which matters, because a test hook added
+> to production code for a test's convenience is a liability the next refactor has to carry.
+
+Three things changed:
+
+1. **That signal was a per-template constant.** It is the literal `1024 && 1536` in the suite --
+   the default template's dimensions. Section 4 measures this page at every width and would need
+   a table of every template's natural size, which this repo has repeatedly found becomes a
+   second source of truth and drifts.
+2. **It cannot distinguish loading from failed.** Both leave the canvas at 1000x1000. Those are
+   different facts -- one is a wait, the other is a defect -- and a check that conflates them
+   reports a slow network as a broken template.
+3. **The alternative coupling is not weaker, only quieter.** Polling for "not 1000x1000" depends
+   on `CANVAS_W`/`CANVAS_H` just as much, without naming them, and breaks silently the day a base
+   photograph happens to be 1000px wide.
+
+An explicit named attribute is the honest version of a dependency that already existed. It is
+still a cost, and it is recorded here as one.
+
+The attribute is **not** an accessibility fix, though it sits next to a gap worth noting: the
+canvas's `aria-label` names the product while the canvas reads "Loading mockup template...", so a
+screen-reader user is told there is a t-shirt on screen before there is one. That was left alone.
+
+### A mistake this fix made, worth more than the fix
+
+The first attempt put backticks in a comment **inside the evaluated expression**, which is the
+inside of a JavaScript template literal:
+
+```
+`!== "loading"` rather than `=== "ready"` on purpose.
+```
+
+Four backticks close and reopen the literal. The result was a chain of string comparisons --
+entirely valid JavaScript evaluating to `false`. So:
+
+- `node --check tests/verify-layout.js` **passed**.
+- `Runtime.evaluate` returned `false` rather than throwing.
+- The poll's `catch (e) { continue; }` never fired, because nothing threw.
+- Every navigation in the suite polled for its full 20 seconds and the run died on the first page
+  it tried -- `http://localhost:5099/ @1920`, the homepage, which had nothing to do with the
+  change.
+
+A syntax check proves a file parses, not that an expression means anything. The guard added
+alongside the fix throws when the readiness expression returns a non-object, naming the cause
+instead of costing a run and pointing at an innocent page.
+
+The predicate is now verified by **execution** rather than inspection -- extracted from the suite
+source and run against all four states:
+
+| `data-mockup-state` | poll |
+| --- | --- |
+| absent (every non-mockup page) | releases |
+| `loading` | **holds** |
+| `ready` | releases |
+| `error` | releases, so section 5 names it |
+
+### Evidence
+
+**Reproduced on demand, which is the part that was missing before.** A copy of the tree with the
+default template's base photograph deleted, served beside an intact one, produced the failing
+numbers deterministically -- 640 against 788 and `244,243,239` against `244,244,249`, with
+`settled()` declaring the broken page settled in 381 ms. A second harness served the real tree
+with any `-base.png` delayed 1500 ms, which is the honest version of the race: the file exists,
+the page is up, and the photograph is genuinely in flight.
+
+**The check can fail, verified by breaking the product.** With the base photograph removed from
+the working tree, the run reported:
+
+```
+FAIL  mockup: the template's base photograph loaded before anything sampled it
+      data-mockup-state was error
+```
+
+Fifteen other mockup checks failed alongside it -- colours, export sizes, saved mockups, the
+print check, and 24 of section 4's measurements -- every one of them a downstream reading of the
+same placeholder. The new check is the only one that names the cause. Nothing hung: the `error`
+state released the navigation poll as designed, and the run finished in its normal time.
+
+**The absent-attribute escape cannot misfire.** The predicate treats a missing attribute as
+ready, which is what lets every non-mockup page through. On `mockup.html` the attribute is set at
+roughly 48 ms (navigation-relative) while `domContentLoadedEventEnd` is 77.1 ms, and the poll
+already requires the latter -- so the escape is unreachable there. `js/mockup.js` is a classic
+script at the foot of `<body>`, which is why.
+
+**Clean runs.** With the photograph restored: 1488 passed, 0 failed.
+
+### What was deliberately left alone
+
+The two existing `1024x1536` waits in section 5 stay. The navigation gate now guarantees the
+template is painted before either of them runs, so both break out of their loop on the first
+iteration -- they are redundant rather than wrong, and rewriting a passing check to use a new
+mechanism buys nothing and risks something.
+
+They are worth watching for one reason. In the deliberate-break run below, one of them reported
+`waitedMs: 15000`: it spent its entire budget waiting for dimensions that were never coming and
+then sampled the placeholder anyway. That is the failure mode of a wait with no way to say the
+thing it waited for is not going to happen, and it is what the new check replaces -- one
+evaluate, one named answer.
+
 ## Troubleshooting
 
 **The check fails with `waitedMs: 15000`.** The wait ran out, which is a different fault from
@@ -255,7 +455,7 @@ and 6.7 s later the same day, which is what turned finding 3 from latent into re
 
 - `tests/verify-layout.js` — the readiness gate and `quiesce` in `connect()`, the `settled`
   helper, section 4's comparison, and section 5's model-photograph background check
-- `site/js/mockup.js` — the not-ready branch at ~1078 and the label at ~2967; unchanged
+- `site/js/mockup.js` — the not-ready branch and the label; CHANGED on September 10, 2026, which reverses this document's own section 1: `publishAssetState()` writes `data-mockup-state` (`loading` / `ready` / `error`) onto `.mockup-canvas-wrap` from `drawPhoto()`, and `syncCanvasAspect()` is why the pane height follows it
 - `site/resume.html` — the deferred jsPDF tag that exposed finding 3; unchanged
 - `site/js/ads.js` — mounts every band from its `DOMContentLoaded` listener; unchanged
 - `docs/memory/PROJECT_STATUS.md` — the two Open Items this closes
