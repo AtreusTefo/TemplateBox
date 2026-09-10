@@ -1313,6 +1313,23 @@
 
     function bindPreviewEditing() {
         sheet.addEventListener("mousedown", (event) => {
+            /* The prompt where a photograph would be opens the same file input
+               the Profile Photo control does -- the same element, so the crop,
+               the validation and the storage path are one route with two ways
+               in. It is checked BEFORE the editable text below because it is
+               its own thing, and closing an open editor first is what makes a
+               click on it behave like a click anywhere else on the sheet.
+
+               A file dialog needs a user activation, which mousedown carries. */
+            const slot = event.target.closest("[data-photo-slot]");
+            if (slot) {
+                event.preventDefault();
+                closeEditor(true);
+                if (photoInput) {
+                    photoInput.click();
+                }
+                return;
+            }
             const target = event.target.closest(".rt-editable");
             if (!target) {
                 closeEditor(true);

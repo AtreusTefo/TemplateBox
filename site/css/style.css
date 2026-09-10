@@ -5498,6 +5498,28 @@ legend {
     cursor: text;
 }
 
+/* The prompt standing in for a missing profile photograph. Editor chrome: the
+   PDF painter returns on its op, and print drops it below, so it exists only
+   on screen. The pointer is what says it is a control rather than a caption --
+   the same argument as the poster's and the mockup's upload prompts. */
+.rt-photo-slot {
+    cursor: pointer;
+}
+
+.rt-photo-slot rect {
+    transition: fill var(--motion-fast, 120ms) var(--ease, ease);
+}
+
+.rt-photo-slot:hover rect {
+    fill: rgba(0, 0, 0, 0.06);
+}
+
+@media print {
+    .rt-photo-slot {
+        display: none;
+    }
+}
+
 /* A wash rather than a box: the sheet is a document, and a bordered hit area
    around every phrase would read as a form. Painted behind the glyphs so the
    text never loses contrast. */
@@ -5970,6 +5992,48 @@ textarea.rt-inline-editor {
     text-align: right;
     overflow-wrap: break-word;
     min-width: 0;
+}
+
+/* The prompt standing in for a missing logo. Editor chrome: the PDF is drawn
+   from state by jsPDF and never reads this sheet, and print drops it below.
+
+   A 1.25rem SQUARE carrying a plus, rather than a labelled chip, and the size
+   is the whole point. `.doc-ruled-brand` is a flex row inside a masthead that
+   is already tight, and the wordmark wraps when the row runs out of width: an
+   "ADD LOGO" chip measured 68px and pushed the business name onto a second
+   line, taking the masthead from 40px to 45px, so the preview showed a wrapped
+   name the PDF does not wrap. Measured: it stops wrapping below 56px for THIS
+   wordmark, which is exactly why a width was not the fix -- the threshold
+   moves with the length of the name. The square is a fifth of that and it
+   shrinks before the wordmark does, so the chrome yields and the document
+   does not. What it says is in its accessible name instead. */
+.doc-logo-slot {
+    flex: 0 1 auto;
+    min-width: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 1px dashed var(--color-border);
+    border-radius: 0.1875rem;
+    background: transparent;
+    color: var(--color-muted);
+    font-family: inherit;
+    font-size: 0.75rem;
+    line-height: 1;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.doc-logo-slot:hover,
+.doc-logo-slot:focus-visible {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+}
+
+@media print {
+    .doc-logo-slot {
+        display: none;
+    }
 }
 
 /* Height-bounded with a free width, so a wide wordmark logo and a square

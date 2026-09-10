@@ -56,6 +56,10 @@ window.TBResume = (() => {
        because there is nothing to re-crop to. */
     const PHOTO_RATIO = 4 / 5;
 
+    /* The prompt's height where a photograph is missing. See the photo block:
+       it is not the photograph's own height on purpose. */
+    const PHOTO_SLOT_H = 44;
+
     /* Filled bands are drawn this much wider than their share, so adjacent
        segments overlap instead of sharing an edge. See the `bar` block. */
     const OVERLAP = 0.4;
@@ -567,7 +571,37 @@ window.TBResume = (() => {
            intended one. One number in, no distortion possible. */
         if (block.kind === "photo") {
             const url = photoUrl(ctx.state);
-            if (!url) return;
+            if (!url) {
+                /* No photograph: a prompt where one would begin, and NOTHING
+                   else. The cursor is deliberately not advanced, exactly as
+                   before, so a sheet without a photograph lays out and prints
+                   byte for byte as it always has -- reserving the photo's
+                   space would put a hole in every photo-less export.
+
+                   Which is also why the prompt is far shorter than the
+                   photograph it stands for: the full box runs from y=32 to
+                   y=240 on photo-rail, and the sidebar's first heading sits at
+                   y=86 when there is no photograph, so a true-size prompt would
+                   cover the visitor's own contact details. It marks the top-left
+                   corner and the width instead. If another template ever gains
+                   a photo block, check this height against what follows it. */
+                ctx.ops.push({
+                    op: "photoSlot", page: page,
+                    x: col.x, y: block.top || 0,
+                    w: block.width || col.width, h: PHOTO_SLOT_H,
+                    /* The document's own accent, not a fixed colour. This
+                       prompt sits on whatever the template puts behind the
+                       photograph, and photo-rail's sidebar is PALE (#EEF1F6):
+                       a white prompt drawn there is invisible, which is what
+                       the first version of this shipped as. The accent is the
+                       one role guaranteed to contrast with the sheet, because
+                       it is what the headings are already drawn in, and it
+                       follows the visitor's colour choice for free. */
+                    color: colorOf("accent", ctx.template, ctx.state),
+                    label: "Add a photo"
+                });
+                return;
+            }
             const w = block.width || col.width;
             const h = w / PHOTO_RATIO;
             const x = col.x;
@@ -1325,6 +1359,41 @@ window.TBResume = (() => {
             n.setAttribute("x2", o.x2); n.setAttribute("y2", o.y2);
             n.setAttribute("stroke", o.color);
             n.setAttribute("stroke-width", o.width);
+        } else if (o.op === "photoSlot") {
+            /* PREVIEW ONLY, like `edit` below: paintPdf() returns on this op
+               before it reads anything, so an exported file cannot carry it.
+
+               A group rather than one node because it is a box and a word, and
+               js/resume.js binds the click to the group -- the whole prompt is
+               the target, not just the glyphs. */
+            n = document.createElementNS(SVG_NS, "g");
+            n.setAttribute("class", "rt-photo-slot");
+            n.setAttribute("data-photo-slot", "1");
+
+            const box = document.createElementNS(SVG_NS, "rect");
+            box.setAttribute("x", o.x); box.setAttribute("y", o.y);
+            box.setAttribute("width", o.w); box.setAttribute("height", o.h);
+            box.setAttribute("rx", "4");
+            /* No fill: the panel behind this is the template's, and tinting it
+               would be a second colour decision on top of the accent. */
+            box.setAttribute("fill", "none");
+            box.setAttribute("stroke", o.color);
+            box.setAttribute("stroke-width", "1");
+            box.setAttribute("stroke-dasharray", "5 4");
+            box.setAttribute("stroke-opacity", "0.7");
+            n.appendChild(box);
+
+            const label = document.createElementNS(SVG_NS, "text");
+            label.setAttribute("x", o.x + o.w / 2);
+            /* Optically centred: half the box plus about a third of the cap
+               height, which is where a baseline sits in a centred line. */
+            label.setAttribute("y", o.y + o.h / 2 + 4);
+            label.setAttribute("text-anchor", "middle");
+            label.setAttribute("font-family", FAMILY.sans.css);
+            label.setAttribute("font-size", "11");
+            label.setAttribute("fill", o.color);
+            label.textContent = o.label;
+            n.appendChild(label);
         } else {
             n = document.createElementNS(SVG_NS, "text");
             n.setAttribute("x", o.x); n.setAttribute("y", o.y);
@@ -1401,6 +1470,14 @@ window.TBResume = (() => {
                 return [p[0] - prev[0], p[1] - prev[1]];
             });
             doc.lines(rel, start[0], start[1], [1, 1], "F", true);
+            return;
+        }
+        /* Editor chrome, and the reason this is a RETURN rather than an
+           omission: the chain below ends in a text fallthrough, so an op this
+           function does not recognise is not skipped -- it is read as a string
+           and reaches FAMILY[undefined].pdf. Anything preview-only has to say
+           so here explicitly. */
+        if (o.op === "photoSlot") {
             return;
         }
         /* The format is read off the data URI rather than assumed: jsPDF

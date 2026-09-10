@@ -596,6 +596,16 @@
         }
     }
 
+    /* Delegated, because the sheet is replaced on every keystroke and a listener
+       bound to the button would go with it. */
+    if (sheet) {
+        sheet.addEventListener("click", (event) => {
+            if (event.target.closest("[data-logo-slot]") && logoInput) {
+                logoInput.click();
+            }
+        });
+    }
+
     function bindLogoUpload() {
         if (!logoInput) {
             return;
@@ -1001,6 +1011,30 @@
             logo.setAttribute("aria-hidden", "true");
             logo.src = state.logo;
             brand.appendChild(logo);
+        } else {
+            /* A prompt where the logo goes, which opens the same file input the
+               Logo control does. Until now the only sign that this template
+               takes a logo at all was a field further down the form.
+
+               A BUTTON, not a decorated div: it is operated by the keyboard and
+               announced as a control for free, and the sheet is otherwise inert.
+               Deliberately shorter than the logo it stands for -- the real one
+               is 3rem and this row is the wordmark's own height -- so the
+               masthead does not change height when there is nothing in it. The
+               preview would then be taller than the PDF, which draws the logo
+               from `state` and never reads this sheet. */
+            const slot = document.createElement("button");
+            slot.type = "button";
+            slot.className = "doc-logo-slot";
+            slot.setAttribute("data-logo-slot", "");
+            /* The words are the ACCESSIBLE NAME rather than the label, because
+               the visible mark has to stay small enough not to squeeze the
+               business name beside it -- see .doc-logo-slot in css/style.css.
+               A screen reader hears "Add logo"; the sheet shows a plus. */
+            slot.setAttribute("aria-label", "Add logo");
+            slot.setAttribute("title", "Add logo");
+            slot.textContent = "+";
+            brand.appendChild(slot);
         }
         head.appendChild(brand);
         sheet.appendChild(head);
