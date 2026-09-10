@@ -126,6 +126,27 @@
         }
     };
 
+    /* Catalog ids that are not FRAME_STYLES keys.
+
+       For the card layouts the catalog id IS the style key -- someone chose
+       "hearts" to be both -- so those need no translation and are absent here.
+       These three predate the hand-off: their ids name a catalog entry and, for
+       the first, a thumbnail file that ships on disk. Renaming them to "black",
+       "wood" and "gold" would have been the tidier-looking fix and it would
+       have renamed `framed-photo-poster-thumb-blank.webp` to
+       `black-thumb-blank.webp`, which says nothing in a downloads folder or a
+       devtools waterfall. So the ids stay and the mapping lives here.
+
+       They carried no data-doc at all until September 10, 2026, which meant
+       those three cards opened the editor on whatever style it last held. With
+       ten styles and three of them whole layouts, "Framed Photo Poster" could
+       open a search-results screen. */
+    const PRESET_ALIASES = {
+        "framed-photo-poster": "black",
+        "matte-wood-canvas": "wood",
+        "polished-gold-frame": "gold"
+    };
+
     /* Geometry for the card layout, traced from the supplied A4 artwork
        (595.3 x 841.9 pt) and stored as fractions of the page rather than
        points, so one set of numbers serves every paper size and both the
@@ -3546,7 +3567,10 @@
        saved style because arriving from a card is a fresh, deliberate choice,
        and it deliberately leaves the rest of the saved poster alone -- the
        photo, the text and the paper size all survive the switch. */
-    const framePreset = TB.takePreset();
+    /* ONE call: takePreset() removes the key as it reads it, so asking twice
+       gets the value and then an empty string. */
+    const presetId = TB.takePreset();
+    const framePreset = PRESET_ALIASES[presetId] || presetId;
     if (FRAME_STYLES[framePreset]) {
         state.frame = framePreset;
         /* The pairing comes with it, because the card is named after it: a

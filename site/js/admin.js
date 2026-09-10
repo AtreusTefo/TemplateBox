@@ -1430,13 +1430,25 @@ body + '\n' +
            when the wood-a4 hover composite was removed at the owner's
            request. They are ordinary photo cards now: two thumbnails, the
            second optional, exactly like every other entry here. */
-        { id: "framed-photo-poster", title: "Framed Photo Poster", category: "canvas", doc: null },
-        { id: "matte-wood-canvas", title: "Matte Wood Canvas", category: "canvas", doc: null },
-        { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: null },
-        /* The only canvas entry with a `doc`: it names a FRAME_STYLES key in
-           js/poster.js rather than a document variant, because the poster
-           editor's preset selects a style. The three above carry null because
-           they open the editor on whatever it last held. */
+        { id: "framed-photo-poster", title: "Framed Photo Poster", category: "canvas", doc: "framed-photo-poster" },
+        { id: "matte-wood-canvas", title: "Matte Wood Canvas", category: "canvas", doc: "matte-wood-canvas" },
+        { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: "polished-gold-frame" },
+        /* Every canvas entry names a poster STYLE rather than a document
+           variant, because the poster editor's preset selects a style.
+
+           These three carried `doc: null` until September 10, 2026, which meant
+           they opened the editor on whatever it last held. That was survivable
+           while the poster editor had four near-identical frames and the
+           difference between them was one control away. It stopped being
+           survivable when three of the ten styles became whole LAYOUTS: a card
+           titled "Framed Photo Poster", showing a photograph in a black frame,
+           would open a search-results screen because that is what the visitor
+           happened to build last. Reported as exactly that.
+
+           Their ids are not FRAME_STYLES keys the way `hearts` is -- they name
+           a catalog entry and, for the first, a thumbnail file on disk.
+           js/poster.js maps them; see PRESET_ALIASES there and the note on why
+           the id did not move instead. */
         { id: "hearts", title: "Queen and King of Hearts", category: "canvas", doc: "hearts" },
         { id: "spades", title: "King and Queen of Spades", category: "canvas", doc: "spades" },
         { id: "diamonds", title: "Queen and King of Diamonds", category: "canvas", doc: "diamonds" },
