@@ -1442,6 +1442,7 @@ body + '\n' +
         { id: "diamonds", title: "Queen and King of Diamonds", category: "canvas", doc: "diamonds" },
         { id: "clubs", title: "King and Queen of Clubs", category: "canvas", doc: "clubs" },
         { id: "split", title: "Queen and King, Two Photos", category: "canvas", doc: "split" },
+        { id: "browser", title: "Search Screen, Six Photos", category: "canvas", doc: "browser" },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"

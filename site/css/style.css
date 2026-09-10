@@ -2495,6 +2495,130 @@ body.is-nav-hidden .site-header:focus-within {
     clip-path: polygon(0 23.7%, 100% 79.1%, 100% 100%, 0 100%);
 }
 
+/* The search-screen tile. Unlike the five above it this one carries no
+   data-suit, because the layout has no corner indices -- its pips are a row
+   along the foot, which is one element rather than two positioned ones.
+
+   Every percentage is the artwork's own fraction of the 595.28 x 841.89 page,
+   the same numbers SCREEN holds in js/poster.js, so the tile and the poster it
+   opens are the same composition. The masonry is a two-column grid whose row
+   sizes are the artwork's card heights in fr units: written that way the two
+   columns end level at the foot without either one being told where the foot
+   is, which is what the artwork does and what a list of six percentages would
+   have to be kept in step with by hand. */
+.mock-doc.poster[data-layout="browser"] {
+    display: block;
+    position: relative;
+    container-type: inline-size;
+    border: 0;
+    padding: 0;
+    background-color: #070807;
+}
+
+/* The wordmark, in the tile's own width like the card indices above: the
+   catalog card runs from about 136px to about 360px wide, so a rem value is
+   either clipped at one end or unreadable at the other. The rem on the line
+   above is the fallback for a browser without container queries, sized for the
+   widest card. */
+.mock-doc.poster[data-layout="browser"] .mk-wordmark {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3.4%;
+    text-align: center;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-size: 7cqw;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    color: #FFFFFF;
+}
+
+/* The account circle, at the artwork's own centre and radius. */
+.mock-doc.poster[data-layout="browser"] .mk-avatar {
+    position: absolute;
+    left: 79.03%;
+    top: 3.31%;
+    width: 6.55%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-bar {
+    position: absolute;
+    left: 14.63%;
+    top: 9.97%;
+    width: 70.99%;
+    height: 6.31%;
+    border-radius: 999px;
+    background-color: #4E5257;
+}
+
+/* The tab strip's hairline. The tab words themselves are not drawn: at this
+   size they are two pixels of grey mush, and the rule alone is what reads as a
+   results page rather than a photo album. */
+.mock-doc.poster[data-layout="browser"] .mk-rule {
+    position: absolute;
+    left: 11.25%;
+    top: 23.15%;
+    width: 77.57%;
+    height: 1px;
+    background-color: #FFFFFF;
+    opacity: 0.81;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-grid {
+    position: absolute;
+    left: 12.73%;
+    top: 24.34%;
+    width: 74.39%;
+    height: 62.71%;
+    display: grid;
+    grid-template-columns: 48.79% 48.79%;
+    gap: 0 2.43%;
+}
+
+/* One column each, so the two different row gaps stay separate the way the
+   artwork has them -- 23.35pt on the left against 23.02 on the right. */
+.mock-doc.poster[data-layout="browser"] .mk-col {
+    display: grid;
+    gap: 4.42%;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-col-left {
+    grid-template-rows: 216.04fr 144.5fr 120.74fr;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-col-right {
+    grid-template-rows: 157.06fr 157.06fr 167.4fr;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-col span {
+    display: block;
+    border-radius: 2px;
+    background-color: #FFFFFF;
+}
+
+/* The four pips. Unicode hearts rather than the renderer's traced path, on the
+   same argument as the suit tiles above: at this size the difference is
+   invisible and a pseudo-element cannot hold a path. The artwork's spacing is
+   deliberately uneven and this is not -- four hearts three millimetres apart on
+   a 100-pixel tile is a distinction with nothing on the other side of it. */
+.mock-doc.poster[data-layout="browser"] .mk-hearts {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 88.5%;
+    text-align: center;
+    font-size: 0.5rem;
+    font-size: 6cqw;
+    line-height: 1;
+    letter-spacing: 0.15em;
+    color: #E93625;
+}
+
 .mk-index-head {
     left: 2%;
     top: 4%;

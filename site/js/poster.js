@@ -114,6 +114,15 @@
         split: {
             frame: null, trim: null, label: "Queen and King, Two Photos",
             layout: "split", suit: "hearts", ranks: { head: "Q", foot: "K" }
+        },
+        /* A third layout, and the first one that is not a playing card: a phone
+           search-results screen with a masonry of six photographs in it. It
+           carries `suit` for the row of pips along its foot -- the same traced
+           heart the card layouts use -- and no `ranks`, because it has no
+           corner indices for them to fill. */
+        browser: {
+            frame: null, trim: null, label: "Search Screen, Six Photos",
+            layout: "browser", suit: "hearts"
         }
     };
 
@@ -160,6 +169,132 @@
         upper: "#BE1E2D",
         lower: "#00AEEF"
     };
+
+    /* The search-screen layout, traced from the "browser frame" artwork -- an
+       HTML/CSS build of a 595.28 x 841.89 artboard, which is the same A4 page
+       the card layouts are drawn on.
+
+       Kept in the ARTBOARD'S OWN POINTS rather than as page fractions, unlike
+       CARD and SPLIT above. There are about forty numbers here against those
+       two's dozen, and every one of them can be read straight off the source
+       Style.css and checked; written as `x / 595.28` each they become forty
+       divisions that all have to be trusted rather than read. gridRects() and
+       paintScreen() convert with one factor per axis, which is the same
+       arithmetic the fractions were doing, done once instead of at every
+       constant.
+
+       `current: 1` is the artwork's own selected tab: Images, which is the tab
+       a page full of photographs would be on. The strip is clipped at
+       right: 527, which is where the artboard cuts "Forums" off after "For" --
+       a detail rather than an accident, and the thing that makes the mockup
+       read as a screenshot of something wider than the paper. */
+    const SCREEN = {
+        page: { w: 595.28, h: 841.89 },
+        bg: "#070807",
+        lab: { x: 89, y: 32, w: 23, h: 24 },
+        logo: { x: 242.5, y: 29, w: 109.5, h: 37 },
+        avatar: { cx: 489.95, cy: 47.4, r: 19.51, fill: "#FFFFFF" },
+        pill: { x: 87.1, y: 83.9, w: 422.6, h: 53.1, fill: "#4E5257" },
+        search: { x: 103, y: 98.5, w: 22.5, h: 24 },
+        mic: { x: 412.5, y: 97, w: 19.5, h: 25.5 },
+        lens: { x: 467.5, y: 97, w: 26, h: 25.5 },
+        query: { x: 144.4, baseline: 117.27, size: 19.4, right: 394.5, color: "#CCCED3" },
+        tabs: {
+            x: 87.3, baseline: 171.52, size: 17.2, gap: 28.8, right: 527,
+            idle: "#9AA0A6", active: "#FFFFFF",
+            underline: { y: 181.34, h: 2, pad: 1.4 },
+            items: ["All", "Images", "Videos", "News", "Short Videos", "Forums"],
+            current: 1
+        },
+        rule: { x: 66.96, y: 194.93, w: 461.74, h: 0.75, color: "#FFFFFF", alpha: 0.81 },
+        /* Two columns of six cards between them, described by their column
+           rhythm rather than listed as six rectangles: the heights and the two
+           different gaps are the artwork's, and deriving the tops from them is
+           what keeps a change to one card from silently leaving a hole under
+           it. The two gaps really do differ by a third of a point. */
+        grid: {
+            x: 75.78, y: 204.91, colW: 216.04, gutter: 10.76, radius: 12,
+            fill: "#FFFFFF",
+            cols: [
+                { gap: 23.35, cards: [216.04, 144.5, 120.74] },
+                { gap: 23.02, cards: [157.06, 157.06, 167.4] }
+            ]
+        },
+        /* The artwork's hearts are #E93625, a brighter red than the card
+           layouts' #BE1E2D, and that is not a discrepancy to reconcile: this
+           red sits on near-black paper rather than white, and a dark ground
+           needs the lighter red to read as red at all. The PATH is still the
+           card layouts' traced heart, so the site has one heart in it. */
+        pips: { y: 756, w: 45.5, h: 39.5, x: [182, 241.95, 299.24, 356.18], ink: "#E93625" }
+    };
+
+    const GRID_SLOTS = 6;
+
+    /* The artwork's icons, kept in their SOURCE files' own coordinates and
+       viewBoxes rather than normalised to a unit box like the suit pips above.
+       Nothing here was retyped: each `d` is verbatim from the design folder, so
+       there is no transcription to get wrong, and the placement is a transform
+       instead. drawArt() and artSVG() build the same transform from the same
+       four numbers, which is what keeps the canvas and the SVG export from
+       disagreeing -- the drift this editor has already been bitten by once.
+
+       The Google wordmark's source carries the same "l" twice, as a <rect> and
+       again as a path 0.16pt wider that completely contains it. Only the path
+       is here; the rect was redundant geometry, not a second glyph.
+
+       The lab flask's outline is the one stroked part in the set (fill:none,
+       stroke:#fff in the source), which is why `parts` distinguishes a fill
+       from a stroke at all. */
+    const ART = {
+        lab: {
+            view: [89, 32, 23, 24],
+            parts: [
+                { fill: "#FFFFFF", d: "M105,37.21l-9,0c-.16,0-.28-.12-.38-.1h0a2.14,2.14,0,0,1,0-2.25l0,0A.53.53,0,0,1,96,34.6h9a.52.52,0,0,1,.43.28l0,0a2.12,2.12,0,0,1,0,2.15l0,0A.73.73,0,0,1,105,37.21Z" },
+                { fill: "#FFFFFF", d: "M93,48a2.26,2.26,0,0,0,3,2.2,20.6,20.6,0,0,0,4.51-2.14s3.92-2.27,5-2.29,1.42.41,1.42.41l2.78,4.8.39.68a2.11,2.11,0,0,1-.05,2,1.93,1.93,0,0,1-1.8,1H92.69a2,2,0,0,1-1.19-.39,2.19,2.19,0,0,1-.8-1.23A1.77,1.77,0,0,1,91,51.56C91.55,50.66,93,48,93,48Z" },
+                { stroke: "#FFFFFF", width: 1, d: "M110.23,51.49l-6.31-10.94v-3.8h1.13a1.14,1.14,0,0,0,0-2.27H96a1.14,1.14,0,0,0,0,2.27h1.13v3.8L90.81,51.49a2.27,2.27,0,0,0,2,3.4h15.5A2.27,2.27,0,0,0,110.23,51.49Z" }
+            ]
+        },
+        logo: {
+            view: [242.5, 29, 109.5, 37],
+            parts: [
+                { fill: "#FFFFFF", d: "M269.81,42.24H257v3.81h9.08c-.45,5.35-4.88,7.63-9.07,7.63a10.19,10.19,0,0,1,0-20.37,9.84,9.84,0,0,1,6.85,2.76l2.66-2.77a13.5,13.5,0,0,0-9.64-3.81,14,14,0,1,0,.2,28c7.47,0,12.94-5.14,12.94-12.74a11.49,11.49,0,0,0-.23-2.53" },
+                { fill: "#FFFFFF", d: "M280.48,42.92a5.17,5.17,0,0,1,5,5.48,5.1,5.1,0,1,1-10.17,0A5.2,5.2,0,0,1,280.48,42.92Zm-.06-3.53a9,9,0,1,0,9,9A8.88,8.88,0,0,0,280.42,39.39Z" },
+                { fill: "#FFFFFF", d: "M300.13,42.93a5.16,5.16,0,0,1,5,5.47,5.1,5.1,0,1,1-10.17,0,5.19,5.19,0,0,1,5.14-5.45Zm-.05-3.54a9,9,0,1,0,9,9,8.88,8.88,0,0,0-9-9Z" },
+                { fill: "#FFFFFF", d: "M318.78,42.92c2.37,0,4.8,2,4.8,5.49s-2.43,5.45-4.85,5.45a5.1,5.1,0,0,1-5-5.42A5.18,5.18,0,0,1,318.78,42.92Zm-.35-3.53a9,9,0,0,0-.08,18,5.93,5.93,0,0,0,4.92-2.18V57c0,3.11-1.88,5-4.71,5a5,5,0,0,1-4.6-3.21l-3.45,1.45a8.64,8.64,0,0,0,8.07,5.3c4.8,0,8.46-3,8.46-9.39V39.93h-3.77v1.53A6.3,6.3,0,0,0,318.43,39.39Z" },
+                { fill: "#FFFFFF", d: "M342.77,42.84a3.6,3.6,0,0,1,3.33,1.93l-8,3.37a5,5,0,0,1,4.71-5.3Zm-.15-3.46c-4.55,0-8.37,3.63-8.37,9a8.69,8.69,0,0,0,8.8,9,9.11,9.11,0,0,0,7.52-3.95l-3.1-2.07a5,5,0,0,1-4.4,2.47,4.62,4.62,0,0,1-4.4-2.72l12-5-.63-1.46A8.12,8.12,0,0,0,342.62,39.38Z" },
+                { fill: "#FFFFFF", d: "M328.57,56.77h4.57V30.22h-4.57Z" }
+            ]
+        },
+        search: {
+            view: [103, 98.5, 22.5, 24],
+            parts: [
+                { fill: "#B9BAC0", d: "M124.58,121.83l-8-8a7.67,7.67,0,0,1-4.8,1.64,8.24,8.24,0,1,1,8.22-8.22,7.55,7.55,0,0,1-.45,2.62,7.36,7.36,0,0,1-1.2,2.19l8,8ZM111.81,113a5.67,5.67,0,1,0-4-1.66A5.48,5.48,0,0,0,111.81,113Z" }
+            ]
+        },
+        mic: {
+            view: [412.5, 97, 19.5, 25.5],
+            parts: [
+                { fill: "#CCCED3", d: "M422.18,112.31a3.11,3.11,0,0,1-2.35-1,3.48,3.48,0,0,1-.95-2.46v-8.2a3.12,3.12,0,0,1,1-2.31,3.33,3.33,0,0,1,4.68,0,3.12,3.12,0,0,1,1,2.31v8.2a3.47,3.47,0,0,1-.94,2.46A3.13,3.13,0,0,1,422.18,112.31Z" },
+                { fill: "#CCCED3", d: "M421.2,122.21v-4.45a8.83,8.83,0,0,1-5.81-2.9,8.59,8.59,0,0,1-2.36-6h2a6.66,6.66,0,0,0,2.1,5,7.38,7.38,0,0,0,10.17,0,6.63,6.63,0,0,0,2.11-5h2a8.58,8.58,0,0,1-2.35,6,8.87,8.87,0,0,1-5.82,2.9v4.45Z" },
+                { fill: "#CCCED3", d: "M421.2,117.76h1.96v4.44H421.2Z" }
+            ]
+        },
+        lens: {
+            view: [467.5, 97, 26, 25.5],
+            parts: [
+                { fill: "#CCCED3", d: "M485.96,118.07a2.76,2.76,0,1,0,5.52,0a2.76,2.76,0,1,0,-5.52,0Z" },
+                { fill: "#CCCED3", d: "M476.3,111.17a4.14,4.14,0,1,0,8.28,0a4.14,4.14,0,1,0,-8.28,0Z" },
+                { fill: "#CCCED3", d: "M468,116.55a5.66,5.66,0,0,0,5.66,5.66h6.76v-2.76l-6.91,0a3,3,0,0,1-2.75-3.09v-3.1H468Z" },
+                { fill: "#CCCED3", d: "M492.85,105.79a5.66,5.66,0,0,0-5.66-5.66h-3.31l3.45,2.76a3,3,0,0,1,2.76,3.11v5.17h2.76Z" },
+                { fill: "#CCCED3", d: "M483.19,97.37h-5.52l-2.07,2.76h-1.93a5.67,5.67,0,0,0-5.66,5.66v3.31h2.76V106a3,3,0,0,1,2.76-3.11h13.8Z" }
+            ]
+        }
+    };
+
+    /* Parsed once, not per paint: paint() runs on every keystroke. */
+    Object.keys(ART).forEach((k) => {
+        ART[k].parts.forEach((p) => { p.path = new Path2D(p.d); });
+    });
 
     /* The suit pip, the artwork's own bezier path normalised to a unit box so
        it can be placed at any size. One string feeds both renderers -- Path2D
@@ -224,6 +359,12 @@
         return (style && SUITS[style.suit]) ? style.suit : "hearts";
     }
 
+    /* Which of the four renderers a style asks for. Undefined for the plain
+       frames, which is the branch paint() falls through to. */
+    function layoutOf(frameKey) {
+        return (FRAME_STYLES[frameKey] || {}).layout;
+    }
+
     /* The artwork sets its Q and K in Algerian, which is a licensed Monotype
        face: the design folder carries the TTF, but bundling it into a public
        web root is a redistribution this project has no licence for, and the
@@ -233,6 +374,39 @@
        indices are set in it and the substitution is deliberate rather than
        silent. */
     const CARD_RANK_FONT = "playfair";
+
+    /* The search screen's own type. The artwork sets everything in Roboto and
+       the design folder carries the TTF; Inter is what this page already loads,
+       and the two are close relatives -- both neo-grotesque UI faces on the same
+       skeleton, which is why Inter is the usual substitute for Roboto rather
+       than one of many. It is not identical, and it is slightly the wider of
+       the two, which is why the query is measured and fitted rather than set at
+       the artwork's em and hoped for. Named here rather than written into six
+       font strings so the substitution is one decision. */
+    const SCREEN_FONT = "inter";
+
+    /* The search bar's text. Free-form on purpose -- names, a date, a place, an
+       inside joke -- and capped where the pill runs out rather than where the
+       words do: 40 characters is roughly half again what fits at the artwork's
+       own em, and fitQuerySize() sets the overflow down to fit instead of
+       clipping it. */
+    const QUERY_MAX_CHARS = 40;
+
+    /* Deliberately not a pair of names. The artwork's own query is the
+       designer's subject, and inventing a couple to replace them would ship
+       somebody's poster as the default; this states the shape without claiming
+       to be anyone. The field's hint is where the suggestion belongs. */
+    const DEFAULT_QUERY = "Us, always";
+
+    /* One line, inside the cap. Runs of whitespace collapse to a single space,
+       which is what turns a pasted paragraph into one line rather than letting
+       a newline draw over the tab strip -- but a TRAILING space survives,
+       because a field that eats the space you just typed cannot be typed in. */
+    function cleanQuery(value) {
+        return String(value === null || value === undefined ? "" : value)
+            .replace(/\s+/g, " ")
+            .slice(0, QUERY_MAX_CHARS);
+    }
 
     /* The four ranks offered as suggestions. They are no longer the only
        allowed values: the corner is free text, so an initial, a monogram or a
@@ -304,15 +478,19 @@
        State, history and persistence
        ---------------------------------------------------------------------- */
 
-    /* The uploaded photo lives only in memory. Image data is intentionally
+    /* The uploaded photos live only in memory. Image data is intentionally
        never written to localStorage: a single phone photo as a data URL
        exhausts the ~5 MB quota on its own and would evict the text the
-       visitor actually typed. */
-    let photo = null;
+       visitor actually typed.
 
-    /* The split layout's second photograph, held the same way and for the same
-       reason: it is never written to storage either. */
-    let photoB = null;
+       ONE indexed store rather than a variable per photograph. It was `photo`
+       and `photoB` while two was the most any layout wanted; the search screen
+       wants six, and a third variable followed by a fourth is how a renderer
+       ends up with one path that handles slot 3 and another that forgot to.
+       Slot 0 is "the photograph" for every layout that has just one, and slot 1
+       is the split layout's second half, so the two names that were here map
+       onto the first two entries and nothing else had to be re-taught. */
+    const photos = new Array(GRID_SLOTS).fill(null);
 
     function defaultText(id, text) {
         return {
@@ -353,9 +531,14 @@
         frame: "black",
         rankHead: FRAME_STYLES.hearts.ranks.head,
         rankFoot: FRAME_STYLES.hearts.ranks.foot,
-        view: defaultView(),
-        viewB: defaultView(),
+        query: DEFAULT_QUERY,
+        /* One framing per photo slot, indexed to match `photos`. */
+        views: defaultViews(),
         texts: [defaultText("t1", "")],
+        /* Which grid card the framing controls point at. UI selection like
+           `sel` below it, so it is in neither the history nor storage: undoing
+           should move a photograph back, not move the visitor's attention. */
+        card: 0,
         sel: "t1"
     };
 
@@ -371,7 +554,7 @@
         return JSON.stringify({
             name: state.name, size: state.size, frame: state.frame,
             rankHead: state.rankHead, rankFoot: state.rankFoot,
-            view: state.view, viewB: state.viewB, texts: state.texts
+            query: state.query, views: state.views, texts: state.texts
         });
     }
 
@@ -382,8 +565,8 @@
         state.frame = parsed.frame;
         state.rankHead = cleanRank(parsed.rankHead);
         state.rankFoot = cleanRank(parsed.rankFoot);
-        state.view = parsed.view || defaultView();
-        state.viewB = parsed.viewB || defaultView();
+        state.query = cleanQuery(parsed.query);
+        state.views = normalizeViews(parsed.views);
         state.texts = parsed.texts;
         if (!state.texts.some((t) => t.id === state.sel)) {
             state.sel = state.texts.length ? state.texts[0].id : null;
@@ -467,6 +650,7 @@
             name: TB.sanitize(state.name),
             rankHead: TB.sanitize(state.rankHead),
             rankFoot: TB.sanitize(state.rankFoot),
+            query: TB.sanitize(state.query),
             size: state.size,
             texts: state.texts.map((t) => {
                 const copy = Object.assign({}, t);
@@ -494,6 +678,12 @@
         state.rankFoot = saved.rankFoot === undefined
             ? fallbackRanks.foot
             : cleanRank(TB.desanitize(String(saved.rankFoot)));
+        /* Same rule as the ranks: only `undefined` takes the default, because an
+           empty string is a search bar the visitor deliberately cleared and
+           putting words back into it would be the editor arguing with them. */
+        state.query = saved.query === undefined
+            ? DEFAULT_QUERY
+            : cleanQuery(TB.desanitize(String(saved.query)));
         state.size = PAPER[saved.size] ? saved.size : "A3";
         state.name = TB.desanitize(String(saved.name || "")).trim() || "Untitled poster";
 
@@ -572,6 +762,29 @@
        without it would apply someone's old crop to their next upload. */
     function defaultView() {
         return { zoom: 1, x: 0, y: 0 };
+    }
+
+    function defaultViews() {
+        const out = [];
+        for (let i = 0; i < GRID_SLOTS; i += 1) {
+            out.push(defaultView());
+        }
+        return out;
+    }
+
+    /* A history entry written before the search screen existed carries `view`
+       and `viewB` rather than an array, and the history is in memory only -- so
+       this exists for the array's LENGTH rather than for old data: every reader
+       indexes it by slot, and a short array would hand `undefined` to
+       photoMetrics() as a framing. */
+    function normalizeViews(saved) {
+        const out = defaultViews();
+        if (Array.isArray(saved)) {
+            saved.slice(0, GRID_SLOTS).forEach((v, i) => {
+                if (v && typeof v === "object") { out[i] = v; }
+            });
+        }
+        return out;
     }
 
     function clampUnit(n) {
@@ -714,8 +927,8 @@
        an empty editor looks the same whichever style is selected, and so the
        placeholder can never be styled in one and forgotten in the other. */
     function drawPhotoPanel(c, x, y, w, h, scale, transparent) {
-        if (photo) {
-            drawCoverImage(c, photo, x, y, w, h, state.view);
+        if (photos[0]) {
+            drawCoverImage(c, photos[0], x, y, w, h, state.views[0]);
             return;
         }
         if (transparent) {
@@ -861,8 +1074,8 @@
         c.beginPath();
         c.rect(g.x, g.y, g.w, g.h);
         c.clip();
-        if (photo) {
-            drawPanelPhoto(c, photo, g, false, state.view);
+        if (photos[0]) {
+            drawPanelPhoto(c, photos[0], g, false, state.views[0]);
         } else if (!options.transparent) {
             c.fillStyle = SPLIT.upper;
             c.fillRect(g.x, g.y, g.w, g.h);
@@ -872,8 +1085,8 @@
         c.save();
         lowerRegionPath(c, g);
         c.clip();
-        if (photoB) {
-            drawPanelPhoto(c, photoB, g, true, state.viewB);
+        if (photos[1]) {
+            drawPanelPhoto(c, photos[1], g, true, state.views[1]);
         } else if (!options.transparent) {
             c.fillStyle = SPLIT.lower;
             lowerRegionPath(c, g);
@@ -885,7 +1098,7 @@
            grey placeholder, so the prompt has to read against a strong red and
            a strong blue -- white with a dark halo does, and neither flat colour
            is light enough for the panel's usual grey-on-cream. */
-        if (!photo && !photoB && !options.transparent) {
+        if (!photos[0] && !photos[1] && !options.transparent) {
             c.save();
             c.font = "400 " + (34 * scale) + 'px "Inter", sans-serif';
             c.textAlign = "center";
@@ -907,6 +1120,203 @@
         drawCardIndex(c, W, H, state.rankFoot, true, suit);
     }
 
+    /* ------------------------------------------------------------------
+       The search-screen layout
+       ------------------------------------------------------------------ */
+
+    /* Points to pixels, one factor per axis. The A series is all the same
+       1:root-2 shape to within a rounded millimetre, so these two differ by
+       about a tenth of a per cent -- but they are kept separate anyway, because
+       that is what CARD and SPLIT's fractions already do and a single averaged
+       factor would put the artwork's own numbers slightly out on both axes
+       instead of exactly right on each. */
+    function screenScale(W, H) {
+        return { fx: W / SCREEN.page.w, fy: H / SCREEN.page.h };
+    }
+
+    /* One rounded rectangle, as a PATH rather than a shape: each card clips a
+       photograph, so the path is needed whether or not it is also filled.
+
+       arcTo rather than roundRect(), which is recent enough that an older
+       browser would throw here and lose the whole poster rather than draw
+       square corners. */
+    function roundRectPath(c, x, y, w, h, r) {
+        const rad = Math.max(0, Math.min(r, w / 2, h / 2));
+        c.beginPath();
+        c.moveTo(x + rad, y);
+        c.arcTo(x + w, y, x + w, y + h, rad);
+        c.arcTo(x + w, y + h, x, y + h, rad);
+        c.arcTo(x, y + h, x, y, rad);
+        c.arcTo(x, y, x + w, y, rad);
+        c.closePath();
+    }
+
+    /* The six cards, in the order uploads fill them and the order the preview
+       numbers them: down the left column, then down the right. Derived from the
+       column rhythm rather than listed, so the artwork's two different gaps are
+       stated once each. */
+    function gridRects(W, H) {
+        const s = screenScale(W, H);
+        const g = SCREEN.grid;
+        const out = [];
+        g.cols.forEach((col, ci) => {
+            let top = g.y;
+            col.cards.forEach((h) => {
+                out.push({
+                    x: (g.x + ci * (g.colW + g.gutter)) * s.fx,
+                    y: top * s.fy,
+                    w: g.colW * s.fx,
+                    h: h * s.fy
+                });
+                top += h + col.gap;
+            });
+        });
+        return out;
+    }
+
+    /* One icon, placed by transform: to the target box, scaled from the source
+       viewBox, then back by the viewBox's own origin -- which is what lets the
+       path data stay verbatim. artSVG() emits the identical chain. */
+    function drawArt(c, art, x, y, w, h) {
+        const v = art.view;
+        c.save();
+        c.translate(x, y);
+        c.scale(w / v[2], h / v[3]);
+        c.translate(-v[0], -v[1]);
+        art.parts.forEach((p) => {
+            if (p.fill) {
+                c.fillStyle = p.fill;
+                c.fill(p.path);
+            } else {
+                c.strokeStyle = p.stroke;
+                c.lineWidth = p.width;
+                c.stroke(p.path);
+            }
+        });
+        c.restore();
+    }
+
+    /* Nothing in the search bar may reach the microphone: the source's input
+       stops 115.2pt short of the pill's right edge, and this is that edge. A
+       query wider than it is set down rather than clipped, on the same argument
+       as the rank letters -- the alternative is a name that vanishes halfway
+       through with nothing on screen to say why. */
+    const QUERY_MAX_W = SCREEN.query.right - SCREEN.query.x;
+
+    function fitQuerySize(c, text, W) {
+        const size = SCREEN.query.size * (W / SCREEN.page.w);
+        if (!text) {
+            return size;
+        }
+        c.save();
+        c.font = "400 " + size + "px " + fontStack(SCREEN_FONT);
+        const measured = c.measureText(text).width;
+        c.restore();
+        const max = QUERY_MAX_W * (W / SCREEN.page.w);
+        return measured > max ? size * (max / measured) : size;
+    }
+
+    /* The search-screen layout: a phone's results page on near-black paper,
+       with six photographs in the masonry and the visitor's own words in the
+       search bar.
+
+       An empty card is left as the artwork's plain white rather than carrying a
+       placeholder, which is the one place this layout deliberately parts from
+       the other three. There, an empty photo panel means an unfinished poster
+       and saying so is a service. Here it does not: four photographs in six
+       cards is a composition, and printing "upload a photo" into the other two
+       would be the editor putting its furniture on someone's wall. The slot
+       numbers exist instead, in the preview only -- see drawGridChrome(). */
+    function paintScreen(c, W, H, options) {
+        const s = screenScale(W, H);
+        const S = SCREEN;
+
+        if (!options.transparent) {
+            c.fillStyle = S.bg;
+            c.fillRect(0, 0, W, H);
+        }
+
+        drawArt(c, ART.lab, S.lab.x * s.fx, S.lab.y * s.fy, S.lab.w * s.fx, S.lab.h * s.fy);
+        drawArt(c, ART.logo, S.logo.x * s.fx, S.logo.y * s.fy, S.logo.w * s.fx, S.logo.h * s.fy);
+
+        c.fillStyle = S.avatar.fill;
+        c.beginPath();
+        c.arc(S.avatar.cx * s.fx, S.avatar.cy * s.fy, S.avatar.r * s.fx, 0, Math.PI * 2);
+        c.fill();
+
+        c.fillStyle = S.pill.fill;
+        roundRectPath(c, S.pill.x * s.fx, S.pill.y * s.fy, S.pill.w * s.fx, S.pill.h * s.fy,
+            (S.pill.h / 2) * s.fy);
+        c.fill();
+
+        drawArt(c, ART.search, S.search.x * s.fx, S.search.y * s.fy, S.search.w * s.fx, S.search.h * s.fy);
+        drawArt(c, ART.mic, S.mic.x * s.fx, S.mic.y * s.fy, S.mic.w * s.fx, S.mic.h * s.fy);
+        drawArt(c, ART.lens, S.lens.x * s.fx, S.lens.y * s.fy, S.lens.w * s.fx, S.lens.h * s.fy);
+
+        if (state.query) {
+            c.fillStyle = S.query.color;
+            c.font = "400 " + fitQuerySize(c, state.query, W) + "px " + fontStack(SCREEN_FONT);
+            c.textAlign = "left";
+            c.textBaseline = "alphabetic";
+            c.fillText(state.query, S.query.x * s.fx, S.query.baseline * s.fy);
+        }
+
+        /* The strip is clipped, not laid out to fit: cutting "Forums" short is
+           what makes the paper read as a window onto a wider screen. */
+        const t = S.tabs;
+        c.save();
+        c.beginPath();
+        c.rect(t.x * s.fx, (t.baseline - t.size) * s.fy, (t.right - t.x) * s.fx,
+            (t.underline.y + t.underline.h - t.baseline + t.size) * s.fy);
+        c.clip();
+        c.font = "400 " + (t.size * s.fx) + "px " + fontStack(SCREEN_FONT);
+        c.textAlign = "left";
+        c.textBaseline = "alphabetic";
+        let tabX = t.x;
+        t.items.forEach((label, i) => {
+            const wdt = c.measureText(label).width;
+            c.fillStyle = i === t.current ? t.active : t.idle;
+            c.fillText(label, tabX * s.fx, t.baseline * s.fy);
+            if (i === t.current) {
+                c.fillRect(tabX * s.fx - t.underline.pad * s.fx, t.underline.y * s.fy,
+                    wdt + t.underline.pad * 2 * s.fx, t.underline.h * s.fy);
+            }
+            /* Advanced in POINTS, so the measured pixel width comes back
+               through the same factor the rest of the layout uses. */
+            tabX += wdt / s.fx + t.gap;
+        });
+        c.restore();
+
+        c.save();
+        c.globalAlpha = S.rule.alpha;
+        c.fillStyle = S.rule.color;
+        c.fillRect(S.rule.x * s.fx, S.rule.y * s.fy, S.rule.w * s.fx, S.rule.h * s.fy);
+        c.restore();
+
+        gridRects(W, H).forEach((r, i) => {
+            roundRectPath(c, r.x, r.y, r.w, r.h, SCREEN.grid.radius * s.fx);
+            if (photos[i]) {
+                c.save();
+                c.clip();
+                drawCoverImage(c, photos[i], r.x, r.y, r.w, r.h, state.views[i]);
+                c.restore();
+            } else if (!options.transparent) {
+                c.fillStyle = SCREEN.grid.fill;
+                c.fill();
+            }
+        });
+
+        const suit = suitOf(state.frame);
+        c.fillStyle = S.pips.ink;
+        S.pips.x.forEach((px) => {
+            c.save();
+            c.translate(px * s.fx, S.pips.y * s.fy);
+            c.scale(S.pips.w * s.fx, S.pips.h * s.fy);
+            c.fill(SUIT_PATHS[suit]);
+            c.restore();
+        });
+    }
+
     /* transparent=true skips the frame, matte and placeholder fills so a PNG
        exports with a genuinely empty background rather than a white one -- the
        toggle in the download panel does this and nothing else. */
@@ -921,6 +1331,8 @@
             paintCard(c, W, H, options, scale);
         } else if (frame.layout === "split") {
             paintSplit(c, W, H, options, scale);
+        } else if (frame.layout === "browser") {
+            paintScreen(c, W, H, options);
         } else {
             const FRAME_W = frame.frame ? 60 * scale : 0;
             const MATTE_W = frame.frame ? 50 * scale : 0;
@@ -956,7 +1368,46 @@
             canvas.height = s.h;
         }
         paint(ctx, s.w, s.h);
+        drawGridChrome();
         drawSelection();
+    }
+
+    /* Preview-only chrome for the search screen: a number on every empty card,
+       and a dashed outline on the one the controls are pointing at.
+
+       Deliberately outside paint(), which is what every export renders through.
+       The other layouts DO print their "Upload a photo to begin" panel, and
+       rightly: one empty photo panel means an unfinished poster. Six cards are
+       different -- four photographs and two clean white cards is a composition
+       somebody may well want -- so the numbers stay on this side of the export
+       boundary, where they can help without ending up on a wall. */
+    function drawGridChrome() {
+        if (layoutOf(state.frame) !== "browser") {
+            return;
+        }
+        const W = canvas.width;
+        const H = canvas.height;
+        const rects = gridRects(W, H);
+
+        ctx.save();
+        rects.forEach((r, i) => {
+            if (!photos[i]) {
+                ctx.fillStyle = "#B9BAC0";
+                ctx.font = "400 " + (W * 0.045) + 'px "Inter", sans-serif';
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(String(i + 1), r.x + r.w / 2, r.y + r.h / 2);
+            }
+            if (i === state.card) {
+                ctx.strokeStyle = "#8A6A3B";
+                ctx.lineWidth = Math.max(1.5, W * 0.004);
+                ctx.setLineDash([W * 0.01, W * 0.008]);
+                roundRectPath(ctx, r.x, r.y, r.w, r.h, SCREEN.grid.radius * (W / SCREEN.page.w));
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        });
+        ctx.restore();
     }
 
     /* Selection chrome is drawn on the preview only and is never part of an
@@ -1041,7 +1492,7 @@
        positions in this layout, so the only useful thing a click on one can do
        is take you to the field that changes it. */
     function cardIndexAt(pt, W, H) {
-        const layout = (FRAME_STYLES[state.frame] || {}).layout;
+        const layout = layoutOf(state.frame);
         if (layout !== "card" && layout !== "split") {
             return null;
         }
@@ -1068,12 +1519,17 @@
        the corner is where the visitor is looking, so that is where the way in
        should be. */
     function focusRankFor(corner) {
-        const input = corner === "head" ? rankHeadInput : rankFootInput;
+        focusField(corner === "head" ? rankHeadInput : rankFootInput);
+    }
+
+    /* Brings a control into view and puts the caret in it. Shared by the corner
+       letters and the search bar, because the awkward part is the same for both:
+       on a phone the form and the preview are separate tabs, so focusing a field
+       in the hidden one would do nothing visible at all. */
+    function focusField(input) {
         if (!input) {
             return;
         }
-        /* On a phone the form and the preview are separate tabs, so focusing a
-           field in the hidden one would do nothing visible. */
         const editTab = byId("tab-edit");
         const layout = byId("editor-layout");
         if (editTab && layout && !layout.classList.contains("show-edit")) {
@@ -1086,12 +1542,16 @@
         }
     }
 
-    /* The box a photograph fills, per layout. Both card layouts fill the panel;
-       everything else fills the matted rectangle above the caption band. Shared
-       with paint() so a drag cannot be measured against a different box from
-       the one the photograph was drawn into. */
+    /* The box THE photograph fills, per layout. Both card layouts fill the
+       panel; everything else fills the matted rectangle above the caption band.
+       Shared with paint() so a drag cannot be measured against a different box
+       from the one the photograph was drawn into.
+
+       The search screen is deliberately absent: it has six boxes rather than
+       one, so there is no single answer to give and the question is asked of
+       gridRects() instead. photoAt() branches before it reaches here. */
     function photoRectFor(W, H) {
-        const layout = (FRAME_STYLES[state.frame] || {}).layout;
+        const layout = layoutOf(state.frame);
         if (layout === "card" || layout === "split") {
             return {
                 x: CARD.panel.x * W, y: CARD.panel.y * H,
@@ -1107,15 +1567,68 @@
         };
     }
 
-    /* Which photograph a point belongs to: the split layout owns two, divided
-       by its seam, and every other style owns one. Returns null where there is
-       no photograph to move, so a drag on an empty panel does nothing rather
-       than silently adjusting a framing nobody can see. */
-    function photoAt(pt, W, H) {
-        const layout = (FRAME_STYLES[state.frame] || {}).layout;
-        const r = photoRectFor(W, H);
+    /* Which grid card a point is in, or -1. Answers for EMPTY cards too, which
+       is what separates it from photoAt(): clicking an empty card has to select
+       it, so that the next upload and the size slider have somewhere to go. */
+    function cardAt(pt, W, H) {
+        if (layoutOf(state.frame) !== "browser") {
+            return -1;
+        }
         const x = pt.x * W;
         const y = pt.y * H;
+        const rects = gridRects(W, H);
+        for (let i = 0; i < rects.length; i += 1) {
+            const r = rects[i];
+            if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /* The search bar's own hit area, so clicking the words on the poster takes
+       you to the field that changes them -- the same loop cardIndexAt() closes
+       for the corner letters, for the same reason: the visitor is looking at
+       the bar, so that is where the way in should be. */
+    function queryBarAt(pt, W, H) {
+        if (layoutOf(state.frame) !== "browser") {
+            return false;
+        }
+        const s = screenScale(W, H);
+        const x = pt.x * W;
+        const y = pt.y * H;
+        return x >= SCREEN.pill.x * s.fx && x <= (SCREEN.pill.x + SCREEN.pill.w) * s.fx &&
+            y >= SCREEN.pill.y * s.fy && y <= (SCREEN.pill.y + SCREEN.pill.h) * s.fy;
+    }
+
+    /* Which photograph a point belongs to, and the box it was drawn into. The
+       split layout owns two divided by its seam, the search screen owns six in
+       a masonry, and every other style owns one. Returns null where there is no
+       photograph to move, so a drag on an empty panel does nothing rather than
+       silently adjusting a framing nobody can see.
+
+       The RECT comes back with it rather than being re-derived by the caller
+       from photoRectFor(): with six boxes on the page, "the photograph under
+       the pointer" and "the box the controls are pointing at" can be different
+       things for one frame, and a drag measured against the wrong box moves at
+       the wrong speed. */
+    function photoAt(pt, W, H) {
+        const layout = layoutOf(state.frame);
+        const x = pt.x * W;
+        const y = pt.y * H;
+
+        if (layout === "browser") {
+            const i = cardAt(pt, W, H);
+            if (i === -1 || !photos[i]) {
+                return null;
+            }
+            return {
+                img: photos[i], view: state.views[i], index: i,
+                flipped: false, rect: gridRects(W, H)[i]
+            };
+        }
+
+        const r = photoRectFor(W, H);
         if (x < r.x || x > r.x + r.w || y < r.y || y > r.y + r.h) {
             return null;
         }
@@ -1124,10 +1637,14 @@
             const t = (x - g.x) / g.w;
             const seamY = g.seamLeftY + t * (g.seamRightY - g.seamLeftY);
             if (y > seamY) {
-                return photoB ? { img: photoB, view: state.viewB, key: "viewB", flipped: true } : null;
+                return photos[1]
+                    ? { img: photos[1], view: state.views[1], index: 1, flipped: true, rect: r }
+                    : null;
             }
         }
-        return photo ? { img: photo, view: state.view, key: "view", flipped: false } : null;
+        return photos[0]
+            ? { img: photos[0], view: state.views[0], index: 0, flipped: false, rect: r }
+            : null;
     }
 
     canvas.addEventListener("pointerdown", (ev) => {
@@ -1137,17 +1654,32 @@
             focusRankFor(corner);
             return;
         }
+        if (queryBarAt(pt, canvas.width, canvas.height)) {
+            focusField(byId("p-query"));
+            return;
+        }
         const hit = hitTest(pt);
         if (!hit) {
+            /* A click on a grid card selects it whether or not there is a
+               photograph in it, and then falls through to the drag below -- so
+               one press on a filled card both points the controls at it and
+               starts moving it, which is what the text elements have always
+               done. */
+            const card = cardAt(pt, canvas.width, canvas.height);
+            if (card !== -1 && card !== state.card) {
+                state.card = card;
+                syncPhotoControls();
+                render();
+            }
             /* Nothing else claimed the point, so it belongs to the photograph
                under it. Text wins on purpose: a caption sitting over a photo
                has to stay draggable. */
             const target = photoAt(pt, canvas.width, canvas.height);
             if (target) {
-                const r = photoRectFor(canvas.width, canvas.height);
+                const r = target.rect;
                 const m = photoMetrics(target.img, r.w, r.h, target.view);
                 panning = {
-                    key: target.key, startX: pt.x, startY: pt.y,
+                    index: target.index, startX: pt.x, startY: pt.y,
                     fromX: target.view.x, fromY: target.view.y,
                     scale: m.scale, slackX: m.slackX, slackY: m.slackY,
                     flipped: target.flipped, moved: false
@@ -1179,7 +1711,7 @@
             const dir = panning.flipped ? 1 : -1;
             const dxPx = (pt.x - panning.startX) * canvas.width * dir;
             const dyPx = (pt.y - panning.startY) * canvas.height * dir;
-            const view = state[panning.key];
+            const view = state.views[panning.index];
             view.x = panning.slackX > 0
                 ? clampUnit(panning.fromX + (dxPx / panning.scale) / panning.slackX)
                 : 0;
@@ -1222,11 +1754,34 @@
        immediately when file.type does not match the image.* designation.
        ---------------------------------------------------------------------- */
 
-    /* One validated upload path, used by both inputs. The split layout needs a
-       second photograph, and duplicating this would mean two copies of the
-       mime check -- which is the one part of it that is a security control
-       rather than a convenience. `assign` is what differs between them and it
-       is the only thing that differs. */
+    /* THE mime gate. Every upload path on this page reaches an Image through
+       this one function, which is what keeps the check that is a security
+       control rather than a convenience from existing in three copies -- and
+       three copies is what a second and then a sixth photograph would have
+       produced. `fail` takes a message; it never throws, because a rejected
+       file is an ordinary thing a visitor does, not an error. */
+    function readImage(file, ok, fail) {
+        if (!/^image\//.test(file.type)) {
+            fail("That file is not an image. Please choose a JPG, PNG, or WebP file.");
+            return;
+        }
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+            const img = new Image();
+            img.addEventListener("load", () => ok(img));
+            img.addEventListener("error", () => {
+                fail("That image could not be decoded. Please try a different file.");
+            });
+            img.src = reader.result;
+        });
+        reader.addEventListener("error", () => {
+            fail("That file could not be read. Please try a different file.");
+        });
+        reader.readAsDataURL(file);
+    }
+
+    /* One single-photograph input. `assign` is what differs between the two
+       that exist, and it is the only thing that differs. */
     function bindPhotoInput(inputId, errorId, assign) {
         const input = document.getElementById(inputId);
         const error = document.getElementById(errorId);
@@ -1239,83 +1794,189 @@
             if (!file) {
                 return;
             }
-            if (!/^image\//.test(file.type)) {
-                error.textContent = "That file is not an image. Please choose a JPG, PNG, or WebP file.";
+            readImage(file, (img) => {
+                assign(img);
+                render();
+            }, (message) => {
+                error.textContent = message;
                 input.value = "";
                 assign(null);
                 render();
-                return;
-            }
-            const reader = new FileReader();
-            reader.addEventListener("load", () => {
-                const img = new Image();
-                img.addEventListener("load", () => {
-                    assign(img);
-                    render();
-                });
-                img.addEventListener("error", () => {
-                    error.textContent = "That image could not be decoded. Please try a different file.";
-                    input.value = "";
-                });
-                img.src = reader.result;
             });
-            reader.readAsDataURL(file);
         });
     }
 
     /* A new photograph starts at the plain cover fit. Carrying the previous
        one's framing over would apply somebody's crop of one picture to a
        different picture, which is never what they meant. */
-    bindPhotoInput("p-image", "p-image-error", (img) => {
-        photo = img;
-        state.view = defaultView();
+    function fillSlot(i, img) {
+        photos[i] = img;
+        state.views[i] = defaultView();
         syncPhotoControls();
-    });
-    bindPhotoInput("p-image-b", "p-image-b-error", (img) => {
-        photoB = img;
-        state.viewB = defaultView();
-        syncPhotoControls();
-    });
+    }
 
-    /* The framing controls, which are the same pair twice over. */
-    [["p-zoom", "p-zoom-reset", "view"], ["p-zoom-b", "p-zoom-b-reset", "viewB"]].forEach((entry) => {
-        const slider = byId(entry[0]);
-        const reset = byId(entry[1]);
-        const key = entry[2];
-        if (slider) {
-            slider.addEventListener("input", () => {
-                beginChange();
-                state[key].zoom = Math.max(1, (Number(slider.value) || 100) / 100);
-                commit("zoom-" + key);
-            });
-        }
-        if (reset) {
-            reset.addEventListener("click", () => {
-                beginChange();
-                state[key] = defaultView();
-                commit();
-                syncPhotoControls();
-            });
-        }
-    });
+    bindPhotoInput("p-image", "p-image-error", (img) => fillSlot(0, img));
+    bindPhotoInput("p-image-b", "p-image-b-error", (img) => fillSlot(1, img));
 
-    /* Pushes the framing back into its slider -- after a drag, an undo, or a
-       fresh upload -- and hides the whole group when there is no photograph to
-       frame, since a size control over an empty panel does nothing. */
+    /* Where the next batch of files lands: every empty card in reading order
+       first, and then -- once there are none left -- the SELECTED card and the
+       ones after it, wrapping round. Two rules rather than one because they
+       answer two different questions. Filling the empty cards is what makes
+       "choose six photos" work in a single gesture; falling back to the
+       selection is what makes a seventh upload replace something visible
+       instead of being silently dropped, which is the failure a visitor cannot
+       tell from a broken control. */
+    function uploadTargets(count) {
+        const out = [];
+        for (let i = 0; i < GRID_SLOTS && out.length < count; i += 1) {
+            if (!photos[i]) { out.push(i); }
+        }
+        for (let k = 0; k < GRID_SLOTS && out.length < count; k += 1) {
+            const i = (state.card + k) % GRID_SLOTS;
+            if (out.indexOf(i) === -1) { out.push(i); }
+        }
+        return out;
+    }
+
+    /* The grid's own input: many files at once, each one decoded through the
+       same gate as every other upload.
+
+       Slots are allocated SYNCHRONOUSLY, in the order the files were chosen,
+       before any of them is decoded. Decoding is asynchronous and a small
+       photograph finishes ahead of a large one, so allocating on completion
+       would put the pictures in a different order every time, depending on
+       nothing the visitor can see. */
+    (() => {
+        const input = byId("p-image-grid");
+        const error = byId("p-image-grid-error");
+        if (!input || !error) {
+            return;
+        }
+        input.addEventListener("change", () => {
+            error.textContent = "";
+            const files = Array.prototype.slice.call(input.files || []);
+            if (!files.length) {
+                return;
+            }
+            const targets = uploadTargets(files.length);
+            if (files.length > targets.length) {
+                error.textContent = "There are six cards, so " +
+                    (files.length - targets.length) + " of those files were not used.";
+            }
+            targets.forEach((slot, n) => {
+                readImage(files[n], (img) => {
+                    fillSlot(slot, img);
+                    render();
+                }, (message) => {
+                    error.textContent = message;
+                });
+            });
+            /* Cleared so choosing the same file again still fires a change. */
+            input.value = "";
+        });
+    })();
+
+    /* Which framing the shared size slider drives: the selected card on the
+       search screen, and slot 0 on every other layout, which is the only
+       photograph they have. Read at event time rather than bound once, because
+       the selection moves. */
+    function primarySlot() {
+        return layoutOf(state.frame) === "browser" ? state.card : 0;
+    }
+
+    /* The framing controls. The first pair serves whichever slot primarySlot()
+       names; the second belongs to the split layout's lower half alone. */
+    [["p-zoom", "p-zoom-reset", primarySlot], ["p-zoom-b", "p-zoom-b-reset", () => 1]]
+        .forEach((entry) => {
+            const slider = byId(entry[0]);
+            const reset = byId(entry[1]);
+            const slot = entry[2];
+            if (slider) {
+                slider.addEventListener("input", () => {
+                    const i = slot();
+                    beginChange();
+                    state.views[i].zoom = Math.max(1, (Number(slider.value) || 100) / 100);
+                    commit("zoom-" + i);
+                });
+            }
+            if (reset) {
+                reset.addEventListener("click", () => {
+                    beginChange();
+                    state.views[slot()] = defaultView();
+                    commit();
+                    syncPhotoControls();
+                });
+            }
+        });
+
+    /* Empties the selected card. The only way back from a photograph in the
+       wrong card, since an upload fills the empty cards first and would never
+       choose an occupied one on its own.
+
+       Writes NO history entry, exactly as an upload does not. Photographs have
+       never been in the undo stack -- they are not in `state` at all, for the
+       storage reason above -- so a commit here would push an entry that
+       restores the framing of a photograph undo cannot bring back. An undo that
+       visibly does nothing is worse than one that is not offered. */
+    const cardClear = byId("p-card-clear");
+    if (cardClear) {
+        cardClear.addEventListener("click", () => {
+            fillSlot(state.card, null);
+            render();
+        });
+    }
+
+    const cardPick = byId("p-card-pick");
+    if (cardPick) {
+        cardPick.addEventListener("change", () => {
+            state.card = Math.min(GRID_SLOTS - 1, Math.max(0, Number(cardPick.value) || 0));
+            syncPhotoControls();
+            render();
+        });
+    }
+
+    /* Pushes the framing back into its slider -- after a drag, an undo, a fresh
+       upload or a change of selected card -- and hides the whole group when
+       there is no photograph to frame, since a size control over an empty panel
+       does nothing. */
     function syncPhotoControls() {
-        const layout = (FRAME_STYLES[state.frame] || {}).layout;
+        const layout = layoutOf(state.frame);
+        const grid = layout === "browser";
+        const slot = primarySlot();
         const zoom = byId("p-zoom");
         const zoomB = byId("p-zoom-b");
         const group = byId("p-frame-fields");
+        const label = byId("p-zoom-label");
 
-        if (zoom) { zoom.value = Math.round(state.view.zoom * 100); }
-        if (zoomB) { zoomB.value = Math.round(state.viewB.zoom * 100); }
-        if (group) { group.hidden = !photo; }
+        if (zoom) { zoom.value = Math.round(state.views[slot].zoom * 100); }
+        if (zoomB) { zoomB.value = Math.round(state.views[1].zoom * 100); }
+        if (group) { group.hidden = !photos[slot]; }
+        /* One slider serves six cards on the search screen, so it has to say
+           which one it is holding -- otherwise a visitor who selected card 4 is
+           given a control labelled for a photograph they are not looking at. */
+        if (label) {
+            label.textContent = grid ? "Card " + (slot + 1) + " Size" : "Photo Size";
+        }
 
         const groupB = byId("p-zoom-b");
         if (groupB && groupB.parentElement) {
-            groupB.parentElement.hidden = layout !== "split" || !photoB;
+            groupB.parentElement.hidden = layout !== "split" || !photos[1];
         }
+
+        const pick = byId("p-card-pick");
+        if (pick) {
+            if (pick.value !== String(slot)) { pick.value = String(slot); }
+            /* Which cards are already taken, in the menu rather than only on the
+               canvas: on a phone the preview is a separate tab, so the menu is
+               the only place that answer can be while the form is open. */
+            Array.prototype.forEach.call(pick.options, (o, i) => {
+                const text = "Card " + (i + 1) + (photos[i] ? "" : " (empty)");
+                if (o.textContent !== text) { o.textContent = text; }
+            });
+        }
+
+        const clear = byId("p-card-clear");
+        if (clear) { clear.disabled = !grid || !photos[state.card]; }
     }
 
     /* ----------------------------------------------------------------------
@@ -1453,6 +2114,24 @@
         el.addEventListener("change", () => apply(null));
     });
 
+    /* The search bar's text. Same two events as the ranks and for the same
+       reasons -- typing coalesces into one history entry per burst, and `change`
+       catches a paste committed by blurring. */
+    const queryInput = byId("p-query");
+    if (queryInput) {
+        const applyQuery = (coalesceKey) => {
+            const next = cleanQuery(queryInput.value);
+            if (state.query === next) {
+                return;
+            }
+            beginChange();
+            state.query = next;
+            commit(coalesceKey);
+        };
+        queryInput.addEventListener("input", () => applyQuery("query"));
+        queryInput.addEventListener("change", () => applyQuery(null));
+    }
+
     /* Pushes state back INTO the document-level controls. syncControls() next
        to it does the same job for the text toolbar, and deliberately returns
        early when nothing is selected, so it was never the place for these.
@@ -1472,6 +2151,7 @@
         if (nameInput && nameInput.value !== state.name) { nameInput.value = state.name; }
         if (rankHeadInput && rankHeadInput.value !== state.rankHead) { rankHeadInput.value = state.rankHead; }
         if (rankFootInput && rankFootInput.value !== state.rankFoot) { rankFootInput.value = state.rankFoot; }
+        if (queryInput && queryInput.value !== state.query) { queryInput.value = state.query; }
 
         /* Both card layouts carry corner indices, so the rank fields belong to
            either of them; the second upload belongs to the split one alone. */
@@ -1484,6 +2164,17 @@
         if (splitFields) {
             splitFields.hidden = style.layout !== "split";
         }
+
+        /* The search screen's upload is a different control from the others' --
+           six cards at once rather than one panel -- so the two swap places
+           rather than sitting side by side. Leaving the single Photo Upload
+           visible would give the grid two ways in, one of which only ever fills
+           card 1, which reads as the other one being broken. */
+        const grid = style.layout === "browser";
+        const gridFields = byId("p-grid-fields");
+        if (gridFields) { gridFields.hidden = !grid; }
+        const photoFields = byId("p-photo-fields");
+        if (photoFields) { photoFields.hidden = grid; }
 
         syncPhotoControls();
     }
@@ -1811,7 +2502,7 @@
        source may be any format the browser can decode and the export has to be
        one an SVG viewer can. */
     function photoDataURL(img) {
-        const source = img || photo;
+        const source = img || photos[0];
         const c = document.createElement("canvas");
         c.width = source.width;
         c.height = source.height;
@@ -1839,6 +2530,121 @@
             ' href="' + photoDataURL(img) + '"/>';
     }
 
+    /* One icon in SVG. The transform chain is character for character the one
+       drawArt() applies to the canvas -- translate to the box, scale from the
+       source viewBox, translate back by the viewBox origin -- because the path
+       data is the source file's own and the placement is the only difference
+       between the two renderers. Anything else here and the export drifts, which
+       on this page has happened before and is invisible until someone opens the
+       file. */
+    function artSVG(art, x, y, w, h) {
+        const v = art.view;
+        const t = "translate(" + x + " " + y + ") scale(" + (w / v[2]) + " " + (h / v[3]) +
+            ") translate(" + (-v[0]) + " " + (-v[1]) + ")";
+        return '<g transform="' + t + '">' + art.parts.map((p) => '<path d="' + p.d + '"' +
+            (p.fill
+                ? ' fill="' + p.fill + '"'
+                : ' fill="none" stroke="' + p.stroke + '" stroke-width="' + p.width + '"') +
+            "/>").join("") + "</g>";
+    }
+
+    /* SVG twin of paintScreen(). Reads screenScale() and gridRects(), the same
+       two functions the canvas reads, so the masonry cannot land in one place
+       here and another there.
+
+       The tab strip needs a real clip rather than a laid-out row, exactly as the
+       canvas does, because cutting "Forums" short is the artwork. Every card
+       needs one too: a zoomed photograph is larger than the card it fills and
+       preserveAspectRatio is not doing the cropping any more. */
+    function screenSVG(W, H, esc) {
+        const s = screenScale(W, H);
+        const S = SCREEN;
+        const rects = gridRects(W, H);
+        const tabClip = {
+            x: S.tabs.x * s.fx,
+            y: (S.tabs.baseline - S.tabs.size) * s.fy,
+            w: (S.tabs.right - S.tabs.x) * s.fx,
+            h: (S.tabs.underline.y + S.tabs.underline.h - S.tabs.baseline + S.tabs.size) * s.fy
+        };
+        const family = esc(fontStack(SCREEN_FONT).replace(/"/g, "'"));
+
+        let defs = '<clipPath id="tb-screen-tabs"><rect x="' + tabClip.x + '" y="' + tabClip.y +
+            '" width="' + tabClip.w + '" height="' + tabClip.h + '"/></clipPath>';
+        rects.forEach((r, i) => {
+            if (!photos[i]) { return; }
+            defs += '<clipPath id="tb-screen-card-' + i + '"><rect x="' + r.x + '" y="' + r.y +
+                '" width="' + r.w + '" height="' + r.h + '" rx="' + (S.grid.radius * s.fx) + '"/></clipPath>';
+        });
+
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + S.bg + '"/>';
+        out += "<defs>" + defs + "</defs>";
+
+        out += artSVG(ART.lab, S.lab.x * s.fx, S.lab.y * s.fy, S.lab.w * s.fx, S.lab.h * s.fy);
+        out += artSVG(ART.logo, S.logo.x * s.fx, S.logo.y * s.fy, S.logo.w * s.fx, S.logo.h * s.fy);
+        out += '<circle cx="' + (S.avatar.cx * s.fx) + '" cy="' + (S.avatar.cy * s.fy) +
+            '" r="' + (S.avatar.r * s.fx) + '" fill="' + S.avatar.fill + '"/>';
+        out += '<rect x="' + (S.pill.x * s.fx) + '" y="' + (S.pill.y * s.fy) + '" width="' +
+            (S.pill.w * s.fx) + '" height="' + (S.pill.h * s.fy) + '" rx="' +
+            ((S.pill.h / 2) * s.fy) + '" fill="' + S.pill.fill + '"/>';
+        out += artSVG(ART.search, S.search.x * s.fx, S.search.y * s.fy, S.search.w * s.fx, S.search.h * s.fy);
+        out += artSVG(ART.mic, S.mic.x * s.fx, S.mic.y * s.fy, S.mic.w * s.fx, S.mic.h * s.fy);
+        out += artSVG(ART.lens, S.lens.x * s.fx, S.lens.y * s.fy, S.lens.w * s.fx, S.lens.h * s.fy);
+
+        if (state.query) {
+            /* Measured on the live canvas context, because there is nothing in
+               an SVG string to measure with -- and it has to be the SAME number
+               the canvas used, or a long query wraps the mic here and not
+               there. */
+            out += '<text x="' + (S.query.x * s.fx) + '" y="' + (S.query.baseline * s.fy) +
+                '" font-family="' + family + '" font-size="' + fitQuerySize(ctx, state.query, W) +
+                '" fill="' + S.query.color + '">' + esc(state.query) + "</text>";
+        }
+
+        const t = S.tabs;
+        ctx.save();
+        ctx.font = "400 " + (t.size * s.fx) + "px " + fontStack(SCREEN_FONT);
+        out += '<g clip-path="url(#tb-screen-tabs)">';
+        let tabX = t.x;
+        t.items.forEach((label, i) => {
+            const wdt = ctx.measureText(label).width;
+            out += '<text x="' + (tabX * s.fx) + '" y="' + (t.baseline * s.fy) +
+                '" font-family="' + family + '" font-size="' + (t.size * s.fx) +
+                '" fill="' + (i === t.current ? t.active : t.idle) + '">' + esc(label) + "</text>";
+            if (i === t.current) {
+                out += '<rect x="' + (tabX * s.fx - t.underline.pad * s.fx) + '" y="' +
+                    (t.underline.y * s.fy) + '" width="' + (wdt + t.underline.pad * 2 * s.fx) +
+                    '" height="' + (t.underline.h * s.fy) + '" fill="' + t.active + '"/>';
+            }
+            tabX += wdt / s.fx + t.gap;
+        });
+        ctx.restore();
+        out += "</g>";
+
+        out += '<rect x="' + (S.rule.x * s.fx) + '" y="' + (S.rule.y * s.fy) + '" width="' +
+            (S.rule.w * s.fx) + '" height="' + (S.rule.h * s.fy) + '" fill="' + S.rule.color +
+            '" fill-opacity="' + S.rule.alpha + '"/>';
+
+        rects.forEach((r, i) => {
+            const box = 'x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h +
+                '" rx="' + (S.grid.radius * s.fx) + '"';
+            if (photos[i]) {
+                out += '<g clip-path="url(#tb-screen-card-' + i + ')">' +
+                    photoImageSVG(photos[i], state.views[i], r.x, r.y, r.w, r.h) + "</g>";
+            } else {
+                out += "<rect " + box + ' fill="' + S.grid.fill + '"/>';
+            }
+        });
+
+        const suit = suitOf(state.frame);
+        S.pips.x.forEach((px) => {
+            out += '<path d="' + SUITS[suit].path + '" fill="' + S.pips.ink +
+                '" transform="translate(' + (px * s.fx) + " " + (S.pips.y * s.fy) + ") scale(" +
+                (S.pips.w * s.fx) + " " + (S.pips.h * s.fy) + ')"/>';
+        });
+
+        return out;
+    }
+
     /* SVG twin of paintSplit(). Reads splitGeometry(), the same function the
        canvas reads, so the seam cannot land in two places -- the arithmetic is
        shared rather than repeated.
@@ -1861,14 +2667,14 @@
             '<clipPath id="tb-split-lower"><polygon points="' + lowerPoints + '"/></clipPath></defs>';
 
         out += '<g clip-path="url(#tb-split-panel)">';
-        out += photo
-            ? photoImageSVG(photo, state.view, g.x, g.y, g.w, g.h)
+        out += photos[0]
+            ? photoImageSVG(photos[0], state.views[0], g.x, g.y, g.w, g.h)
             : '<rect ' + panelRect + ' fill="' + SPLIT.upper + '"/>';
         out += "</g>";
 
         out += '<g clip-path="url(#tb-split-lower)">';
-        out += photoB
-            ? photoImageSVG(photoB, state.viewB, g.x, g.y, g.w, g.h,
+        out += photos[1]
+            ? photoImageSVG(photos[1], state.views[1], g.x, g.y, g.w, g.h,
                 "rotate(180 " + cx + " " + cy + ")")
             : '<polygon points="' + lowerPoints + '" fill="' + SPLIT.lower + '"/>';
         out += "</g>";
@@ -1918,11 +2724,11 @@
 
         /* The clip is not optional now: a zoomed photograph is larger than the
            panel, and preserveAspectRatio is no longer doing the cropping. */
-        if (photo) {
+        if (photos[0]) {
             out += '<defs><clipPath id="tb-card-panel"><rect x="' + x + '" y="' + y +
                 '" width="' + w + '" height="' + h + '"/></clipPath></defs>' +
                 '<g clip-path="url(#tb-card-panel)">' +
-                photoImageSVG(photo, state.view, x, y, w, h) + "</g>";
+                photoImageSVG(photos[0], state.views[0], x, y, w, h) + "</g>";
         }
 
         out += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
@@ -1950,6 +2756,8 @@
             body += cardSVG(W, H, esc);
         } else if (frame.layout === "split") {
             body += splitSVG(W, H, esc);
+        } else if (frame.layout === "browser") {
+            body += screenSVG(W, H, esc);
         } else {
             if (frame.frame) {
                 body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
@@ -1958,14 +2766,14 @@
             body += '<rect x="' + fw + '" y="' + fw + '" width="' + (W - fw * 2) +
                 '" height="' + (H - fw * 2) + '" fill="#FFFFFF"/>';
 
-            if (photo) {
+            if (photos[0]) {
                 const mw = fw + W * 0.042;
                 const pw = W - mw * 2;
                 const ph = H - mw * 2 - H * 0.11;
                 body += '<defs><clipPath id="tb-plain-panel"><rect x="' + mw + '" y="' + mw +
                     '" width="' + pw + '" height="' + ph + '"/></clipPath></defs>' +
                     '<g clip-path="url(#tb-plain-panel)">' +
-                    photoImageSVG(photo, state.view, mw, mw, pw, ph) + "</g>";
+                    photoImageSVG(photos[0], state.views[0], mw, mw, pw, ph) + "</g>";
             }
         }
 
@@ -2315,6 +3123,18 @@
                 rankList.appendChild(o);
             });
         }
+        /* Six cards, numbered as the preview numbers them. The "(empty)" half of
+           each label is written by syncPhotoControls(), which is the only thing
+           that knows what is in them. */
+        const pick = byId("p-card-pick");
+        if (pick && !pick.options.length) {
+            for (let i = 0; i < GRID_SLOTS; i += 1) {
+                const o = document.createElement("option");
+                o.value = String(i);
+                o.textContent = "Card " + (i + 1);
+                pick.appendChild(o);
+            }
+        }
     }
 
     buildSelects();
@@ -2336,9 +3156,15 @@
            from the Frame Style control leaves whatever letters are already
            there, since that is an edit in progress rather than a request for
            the template as advertised. */
-        const presetRanks = styleRanks(framePreset);
-        state.rankHead = presetRanks.head;
-        state.rankFoot = presetRanks.foot;
+        /* Only a style that DECLARES a pairing carries one, which the search
+           screen does not: it has no corner indices, so taking the fallback
+           here would quietly rewrite the letters on a card poster the visitor
+           still had open, from a card that shows no letters at all. */
+        const preset = FRAME_STYLES[framePreset];
+        if (preset.ranks) {
+            state.rankHead = preset.ranks.head;
+            state.rankFoot = preset.ranks.foot;
+        }
     }
 
     syncDocControls();

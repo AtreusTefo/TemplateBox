@@ -362,19 +362,52 @@
             <section class="editor-pane" aria-label="Poster controls">
                 <h2>Poster Controls</h2>
                 <form id="poster-form">
-                    <div class="field">
+                    <!-- Hidden for the search-screen layout, which has its own
+                         upload below: that one fills six cards, and leaving this
+                         one visible beside it would give the grid a second way
+                         in that only ever fills card 1. js/poster.js swaps
+                         them. -->
+                    <div class="field" id="p-photo-fields">
                         <label for="p-image">Photo Upload</label>
                         <input type="file" id="p-image" accept="image/*">
                         <p class="upload-hint">JPG, PNG, or WebP. Validated client-side before drawing.</p>
                         <p class="form-error" id="p-image-error" role="alert"></p>
                     </div>
 
+                    <!-- The search screen's six cards. One input for all of
+                         them, because "choose six photos" is one gesture on
+                         every phone's picker; the select is what the size
+                         slider and the remove button point at, and it doubles
+                         as the way in for anyone not using the preview. -->
+                    <div id="p-grid-fields" hidden>
+                        <div class="field">
+                            <label for="p-image-grid">Photos</label>
+                            <input type="file" id="p-image-grid" accept="image/*" multiple>
+                            <p class="upload-hint">Choose up to six at once. Each one fills the next empty card, numbered on the preview.</p>
+                            <p class="form-error" id="p-image-grid-error" role="alert"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-card-pick">Selected Card</label>
+                            <select id="p-card-pick"></select>
+                            <p class="upload-hint">Clicking a card on the preview selects it too. <button type="button" class="btn btn-secondary btn-small" id="p-card-clear">Remove photo</button></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-query">Search Text</label>
+                            <input type="text" id="p-query" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Sits in the search bar: your names, a date, a place. Clicking the bar on the poster jumps here.</p>
+                        </div>
+                    </div>
+
                     <!-- Framing. The slider is the accessible route to what
                          dragging on the preview does by hand, and the reset is
                          the only way back to the plain cover fit once a photo
-                         has been moved -- the slider alone cannot undo a pan. -->
+                         has been moved -- the slider alone cannot undo a pan.
+                         Its label is rewritten to name the selected card on the
+                         search screen, where one slider serves six. -->
                     <div class="field" id="p-frame-fields" hidden>
-                        <label for="p-zoom">Photo Size</label>
+                        <label for="p-zoom" id="p-zoom-label">Photo Size</label>
                         <input type="range" id="p-zoom" min="100" max="400" step="5" value="100">
                         <p class="upload-hint">Drag the photo on the preview to move it. <button type="button" class="btn btn-secondary btn-small" id="p-zoom-reset">Reset framing</button></p>
                     </div>
