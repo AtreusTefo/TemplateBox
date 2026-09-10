@@ -620,8 +620,17 @@
                              CSS scales the visible element responsively.
                              aria-label is set from js/mockup.js to name the active
                              mockup: with the template picker gone, this is the
-                             only text that identifies which one is loaded. -->
-                        <canvas id="mockup-canvas" width="1000" height="1000" role="img" aria-label="Mockup preview"></canvas>
+                             only text that identifies which one is loaded.
+
+                             aria-busy starts TRUE and js/mockup.js clears it on
+                             the first paint. The canvas exists from the moment
+                             the parser reaches this line, but the script that
+                             fills it runs at the foot of the body, so without
+                             this there is a window where an empty canvas
+                             announces itself as ready. It is a short window and
+                             a permanent one if that script never loads at all,
+                             which is exactly the case where "busy" is true. -->
+                        <canvas id="mockup-canvas" width="1000" height="1000" role="img" aria-busy="true" aria-label="Mockup preview"></canvas>
 
                         <!-- Selection chrome (bounding box, corner handles,
                              rotate handle, layer name tag) is drawn HERE and

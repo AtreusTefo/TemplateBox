@@ -345,9 +345,38 @@ Three things changed:
 An explicit named attribute is the honest version of a dependency that already existed. It is
 still a cost, and it is recorded here as one.
 
-The attribute is **not** an accessibility fix, though it sits next to a gap worth noting: the
-canvas's `aria-label` names the product while the canvas reads "Loading mockup template...", so a
-screen-reader user is told there is a t-shirt on screen before there is one. That was left alone.
+### The label was lying, and it says so now
+
+Publishing the state exposed a real accessibility defect rather than only a testing one. The
+canvas is `role="img"` and its `aria-label` named the product unconditionally, so someone using a
+screen reader was told "White T-Shirt on Model mockup preview" of a canvas that actually read
+"Loading mockup template..." in grey text -- and was told *exactly the same thing* when the
+photograph had failed outright and never would arrive. Sighted users could see both of those
+states; the label reported neither.
+
+`syncCanvasLabel()` now composes the state into the label, and `publishAssetState()` sets
+`aria-busy` alongside it:
+
+| state | `aria-busy` | `aria-label` |
+| --- | --- | --- |
+| loading | `true` | White T-Shirt on Model mockup preview**, still loading** |
+| ready | `false` | White T-Shirt on Model mockup preview |
+| error | `false` | White T-Shirt on Model mockup preview**, could not be loaded** |
+
+Both, because neither substitutes for the other. `aria-busy` is what lets assistive technology
+hold off and re-announce when it clears, and it is machine-readable rather than prose -- but it
+cannot express WHICH of loading and failed this is, which is the one thing a person most needs
+to know. The label carries that and `aria-busy` carries the timing.
+
+A SUFFIX rather than a prefix, for two reasons. The product still leads, so someone skimming
+hears what the image is before the qualifier, which is where English puts a qualifier. And the
+label's opening words stay stable, which matters beyond prose: three checks in
+`tests/verify-layout.js` identify this canvas by the start of its label, with
+`indexOf(prefix) === 0` at lines 2278, 2477 and 2807. None asserts the whole string, which is what made a suffix safe -- that
+was checked before the change, not after.
+
+The ready label is byte-identical to what it was before, so nothing that reads a finished canvas
+sees any difference at all.
 
 ### A mistake this fix made, worth more than the fix
 
@@ -410,6 +439,13 @@ roughly 48 ms (navigation-relative) while `domContentLoadedEventEnd` is 77.1 ms,
 already requires the latter -- so the escape is unreachable there. `js/mockup.js` is a classic
 script at the foot of `<body>`, which is why.
 
+**The three label states, observed rather than assumed.** With `-base.png` delayed 1500 ms and a
+probe injected into the page: `aria-busy="true"` with "..., still loading" at 16 ms, and
+`aria-busy="false"` with the plain label at 1597 ms. Against the tree whose photograph 404s:
+"..., could not be loaded" with the canvas still 1000x1000. On the healthy tree the ready label
+is byte-identical to the one this file recorded before the change, and a colourway still
+composes into it as "White T-Shirt on Model in Custom mockup preview".
+
 **Clean runs.** With the photograph restored: 1488 passed, 0 failed.
 
 ### What was deliberately left alone
@@ -424,6 +460,12 @@ They are worth watching for one reason. In the deliberate-break run below, one o
 then sampled the placeholder anyway. That is the failure mode of a wait with no way to say the
 thing it waited for is not going to happen, and it is what the new check replaces -- one
 evaluate, one named answer.
+
+No live region was added for the load state either. `aria-busy` clearing is the mechanism ARIA
+provides for exactly this, and a polite live region announcing every template switch would be
+noise on a page where switching templates is the main thing you do. The page's one existing
+`role="status"` region is the save cloud, and borrowing it would make saving and loading talk
+over each other.
 
 ## Troubleshooting
 
@@ -455,7 +497,7 @@ and 6.7 s later the same day, which is what turned finding 3 from latent into re
 
 - `tests/verify-layout.js` — the readiness gate and `quiesce` in `connect()`, the `settled`
   helper, section 4's comparison, and section 5's model-photograph background check
-- `site/js/mockup.js` — the not-ready branch and the label; CHANGED on September 10, 2026, which reverses this document's own section 1: `publishAssetState()` writes `data-mockup-state` (`loading` / `ready` / `error`) onto `.mockup-canvas-wrap` from `drawPhoto()`, and `syncCanvasAspect()` is why the pane height follows it
+- `site/js/mockup.js` — the not-ready branch and the label; CHANGED on September 10, 2026, which reverses this document's own section 1: `publishAssetState()` writes `data-mockup-state` (`loading` / `ready` / `error`) onto `.mockup-canvas-wrap` from `drawPhoto()`, sets `aria-busy` on the canvas and re-derives `syncCanvasLabel()`, which now states the loading and failed cases instead of naming a product that is not drawn; `syncCanvasAspect()` is why the pane height follows the same state
 - `site/resume.html` — the deferred jsPDF tag that exposed finding 3; unchanged
 - `site/js/ads.js` — mounts every band from its `DOMContentLoaded` listener; unchanged
 - `docs/memory/PROJECT_STATUS.md` — the two Open Items this closes

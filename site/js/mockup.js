@@ -1136,14 +1136,30 @@
        numeric, which is the honest version of the same dependency.
 
        An attribute rather than a global because it is per-element state and CSS
-       can reach it. Note that the canvas's aria-label still names the product
-       while this says "loading" -- a screen-reader user is told "T-Shirt mockup
-       preview" of a canvas reading "Loading mockup template...". This attribute
-       does not fix that; it just makes it visible. */
+       can reach it.
+
+       It also drives what the canvas TELLS a screen-reader user. The label used
+       to name the product unconditionally, so someone was told "White T-Shirt
+       on Model mockup preview" of a canvas that actually read "Loading mockup
+       template..." in grey text -- and told exactly the same thing when the
+       photograph had failed outright. Both are now said plainly. */
+    let assetState = "";
+
     function publishAssetState(state) {
-        if (canvasWrap && canvasWrap.getAttribute("data-mockup-state") !== state) {
+        if (assetState === state) {
+            return;
+        }
+        assetState = state;
+        if (canvasWrap) {
             canvasWrap.setAttribute("data-mockup-state", state);
         }
+        /* aria-busy is the machine-readable half and the label is the human
+           half. Neither substitutes for the other: aria-busy is what lets
+           assistive technology hold off and re-announce when it clears, and it
+           cannot express WHICH of loading and failed this is, which is the one
+           thing a person most needs to know. */
+        canvas.setAttribute("aria-busy", state === "loading" ? "true" : "false");
+        syncCanvasLabel();
     }
 
     function drawPhoto(config) {
@@ -3044,6 +3060,18 @@
        mockup, so it carries the whole burden for screen-reader users.
        ---------------------------------------------------------------------- */
 
+    /* What the label ends with while the photograph is not on the canvas.
+
+       A suffix rather than a prefix, so the product still leads: someone
+       skimming hears what the image IS first and the qualifier after it, which
+       is where English puts a qualifier. It also keeps the label's opening
+       words stable, which matters beyond prose -- several checks in
+       tests/verify-layout.js identify this canvas by the start of its label. */
+    const LABEL_STATE = {
+        loading: ", still loading",
+        error: ", could not be loaded"
+    };
+
     /* With the template picker gone this label is the only thing naming the
        mockup for a screen-reader user. Now that the colourway changes what is
        rendered, it has to name that too -- otherwise choosing a colour
@@ -3052,7 +3080,8 @@
         const config = PRODUCTS[currentProduct];
         const color = activeColor(config);
         const suffix = color && !color.original ? " in " + color.name : "";
-        canvas.setAttribute("aria-label", config.label + suffix + " mockup preview");
+        canvas.setAttribute("aria-label",
+            config.label + suffix + " mockup preview" + (LABEL_STATE[assetState] || ""));
     }
 
     /* ----------------------------------------------------------------------
