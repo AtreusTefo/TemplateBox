@@ -190,23 +190,24 @@
        read as a screenshot of something wider than the paper. */
     const SCREEN = {
         page: { w: 595.28, h: 841.89 },
-        bg: "#070807",
         lab: { x: 89, y: 32, w: 23, h: 24 },
         logo: { x: 242.5, y: 29, w: 109.5, h: 37 },
-        avatar: { cx: 489.95, cy: 47.4, r: 19.51, fill: "#FFFFFF" },
-        pill: { x: 87.1, y: 83.9, w: 422.6, h: 53.1, fill: "#4E5257" },
+        /* A photograph slot in its own right, not a decoration: it is the
+           account picture, and the one place on this poster where a face
+           belongs. Empty, it falls back to the theme's own flat circle. */
+        avatar: { cx: 489.95, cy: 47.4, r: 19.51 },
+        pill: { x: 87.1, y: 83.9, w: 422.6, h: 53.1 },
         search: { x: 103, y: 98.5, w: 22.5, h: 24 },
         mic: { x: 412.5, y: 97, w: 19.5, h: 25.5 },
         lens: { x: 467.5, y: 97, w: 26, h: 25.5 },
-        query: { x: 144.4, baseline: 117.27, size: 19.4, right: 394.5, color: "#CCCED3" },
+        query: { x: 144.4, baseline: 117.27, size: 19.4, right: 394.5 },
         tabs: {
             x: 87.3, baseline: 171.52, size: 17.2, gap: 28.8, right: 527,
-            idle: "#9AA0A6", active: "#FFFFFF",
             underline: { y: 181.34, h: 2, pad: 1.4 },
             items: ["All", "Images", "Videos", "News", "Short Videos", "Forums"],
             current: 1
         },
-        rule: { x: 66.96, y: 194.93, w: 461.74, h: 0.75, color: "#FFFFFF", alpha: 0.81 },
+        rule: { x: 66.96, y: 194.93, w: 461.74, h: 0.75 },
         /* Two columns of six cards between them, described by their column
            rhythm rather than listed as six rectangles: the heights and the two
            different gaps are the artwork's, and deriving the tops from them is
@@ -214,21 +215,88 @@
            it. The two gaps really do differ by a third of a point. */
         grid: {
             x: 75.78, y: 204.91, colW: 216.04, gutter: 10.76, radius: 12,
-            fill: "#FFFFFF",
             cols: [
                 { gap: 23.35, cards: [216.04, 144.5, 120.74] },
                 { gap: 23.02, cards: [157.06, 157.06, 167.4] }
             ]
         },
-        /* The artwork's hearts are #E93625, a brighter red than the card
-           layouts' #BE1E2D, and that is not a discrepancy to reconcile: this
-           red sits on near-black paper rather than white, and a dark ground
-           needs the lighter red to read as red at all. The PATH is still the
-           card layouts' traced heart, so the site has one heart in it. */
-        pips: { y: 756, w: 45.5, h: 39.5, x: [182, 241.95, 299.24, 356.18], ink: "#E93625" }
+        pips: { y: 756, w: 45.5, h: 39.5, x: [182, 241.95, 299.24, 356.18] }
     };
 
+    /* Every colour on the search screen, and NOTHING else -- the geometry above
+       is shared, so the two themes cannot drift apart in layout however much
+       they differ in ink. Adding a third would be one entry here.
+
+       `dark` is the supplied artwork exactly. `light` is the same screen in
+       daylight rather than an inversion: a straight negative would put pure
+       black on pure white and a #B1A9A8 pill on it, which is not what a light
+       search page looks like. These are the greys the real thing uses.
+
+       Two of them are worth their own line.
+
+       `card` is what an EMPTY photo card is filled with, and it is the one
+       value that cannot simply be carried across. White cards on near-black
+       paper are the artwork; white cards on a white page are invisible, so the
+       light theme fills them with the same grey as its search pill and the
+       masonry still reads as a masonry before a single photograph is uploaded.
+
+       `pip` mirrors a decision already recorded for the dark theme, in the
+       other direction. The artwork's hearts are #E93625, lighter than the card
+       layouts' #BE1E2D, because a dark ground needs a lighter red to read as
+       red at all. On white paper that argument reverses, so the light theme
+       uses the card layouts' own red -- which is the red this site already
+       prints on white. */
+    const SCREEN_THEMES = {
+        dark: {
+            label: "Dark",
+            bg: "#070807",
+            chrome: "#FFFFFF",
+            pill: "#4E5257",
+            searchIcon: "#B9BAC0",
+            icon: "#CCCED3",
+            query: "#CCCED3",
+            tabIdle: "#9AA0A6",
+            rule: "#FFFFFF",
+            ruleAlpha: 0.81,
+            avatar: "#FFFFFF",
+            card: "#FFFFFF",
+            pip: "#E93625"
+        },
+        light: {
+            label: "Light",
+            bg: "#FFFFFF",
+            chrome: "#202124",
+            pill: "#F1F3F4",
+            searchIcon: "#5F6368",
+            icon: "#5F6368",
+            query: "#202124",
+            tabIdle: "#5F6368",
+            rule: "#DADCE0",
+            ruleAlpha: 1,
+            avatar: "#DADCE0",
+            card: "#F1F3F4",
+            pip: "#BE1E2D"
+        }
+    };
+
+    const DEFAULT_SCREEN_THEME = "dark";
+
+    function screenTheme() {
+        return SCREEN_THEMES[state.screenTheme] || SCREEN_THEMES[DEFAULT_SCREEN_THEME];
+    }
+
+    /* Six cards in the masonry, plus the account circle above the search bar,
+       which is a seventh photograph and not a decoration.
+
+       Two constants rather than one because they answer different questions.
+       GRID_SLOTS is how many cards the masonry has, and it is what the upload
+       fills in order and what the preview numbers. SLOT_COUNT is how long the
+       photo array is. The circle is last so that every index the grid uses
+       keeps the number it already had -- a card the visitor knows as "card 3"
+       must not become card 4 because a slot was added in front of it. */
     const GRID_SLOTS = 6;
+    const AVATAR_SLOT = 6;
+    const SLOT_COUNT = 7;
 
     /* The artwork's icons, kept in their SOURCE files' own coordinates and
        viewBoxes rather than normalised to a unit box like the suit pips above.
@@ -244,49 +312,54 @@
 
        The lab flask's outline is the one stroked part in the set (fill:none,
        stroke:#fff in the source), which is why `parts` distinguishes a fill
-       from a stroke at all. */
+       from a stroke at all.
+
+       The COLOUR is the one thing not carried over from the source files. Each
+       icon is monochrome there, so it names a role in SCREEN_THEMES instead of
+       a hex -- which is what lets the same five paths serve the dark screen and
+       the light one without a second copy of any of them. */
     const ART = {
         lab: {
-            view: [89, 32, 23, 24],
+            view: [89, 32, 23, 24], ink: "chrome",
             parts: [
-                { fill: "#FFFFFF", d: "M105,37.21l-9,0c-.16,0-.28-.12-.38-.1h0a2.14,2.14,0,0,1,0-2.25l0,0A.53.53,0,0,1,96,34.6h9a.52.52,0,0,1,.43.28l0,0a2.12,2.12,0,0,1,0,2.15l0,0A.73.73,0,0,1,105,37.21Z" },
-                { fill: "#FFFFFF", d: "M93,48a2.26,2.26,0,0,0,3,2.2,20.6,20.6,0,0,0,4.51-2.14s3.92-2.27,5-2.29,1.42.41,1.42.41l2.78,4.8.39.68a2.11,2.11,0,0,1-.05,2,1.93,1.93,0,0,1-1.8,1H92.69a2,2,0,0,1-1.19-.39,2.19,2.19,0,0,1-.8-1.23A1.77,1.77,0,0,1,91,51.56C91.55,50.66,93,48,93,48Z" },
-                { stroke: "#FFFFFF", width: 1, d: "M110.23,51.49l-6.31-10.94v-3.8h1.13a1.14,1.14,0,0,0,0-2.27H96a1.14,1.14,0,0,0,0,2.27h1.13v3.8L90.81,51.49a2.27,2.27,0,0,0,2,3.4h15.5A2.27,2.27,0,0,0,110.23,51.49Z" }
+                { d: "M105,37.21l-9,0c-.16,0-.28-.12-.38-.1h0a2.14,2.14,0,0,1,0-2.25l0,0A.53.53,0,0,1,96,34.6h9a.52.52,0,0,1,.43.28l0,0a2.12,2.12,0,0,1,0,2.15l0,0A.73.73,0,0,1,105,37.21Z" },
+                { d: "M93,48a2.26,2.26,0,0,0,3,2.2,20.6,20.6,0,0,0,4.51-2.14s3.92-2.27,5-2.29,1.42.41,1.42.41l2.78,4.8.39.68a2.11,2.11,0,0,1-.05,2,1.93,1.93,0,0,1-1.8,1H92.69a2,2,0,0,1-1.19-.39,2.19,2.19,0,0,1-.8-1.23A1.77,1.77,0,0,1,91,51.56C91.55,50.66,93,48,93,48Z" },
+                { stroke: true, width: 1, d: "M110.23,51.49l-6.31-10.94v-3.8h1.13a1.14,1.14,0,0,0,0-2.27H96a1.14,1.14,0,0,0,0,2.27h1.13v3.8L90.81,51.49a2.27,2.27,0,0,0,2,3.4h15.5A2.27,2.27,0,0,0,110.23,51.49Z" }
             ]
         },
         logo: {
-            view: [242.5, 29, 109.5, 37],
+            view: [242.5, 29, 109.5, 37], ink: "chrome",
             parts: [
-                { fill: "#FFFFFF", d: "M269.81,42.24H257v3.81h9.08c-.45,5.35-4.88,7.63-9.07,7.63a10.19,10.19,0,0,1,0-20.37,9.84,9.84,0,0,1,6.85,2.76l2.66-2.77a13.5,13.5,0,0,0-9.64-3.81,14,14,0,1,0,.2,28c7.47,0,12.94-5.14,12.94-12.74a11.49,11.49,0,0,0-.23-2.53" },
-                { fill: "#FFFFFF", d: "M280.48,42.92a5.17,5.17,0,0,1,5,5.48,5.1,5.1,0,1,1-10.17,0A5.2,5.2,0,0,1,280.48,42.92Zm-.06-3.53a9,9,0,1,0,9,9A8.88,8.88,0,0,0,280.42,39.39Z" },
-                { fill: "#FFFFFF", d: "M300.13,42.93a5.16,5.16,0,0,1,5,5.47,5.1,5.1,0,1,1-10.17,0,5.19,5.19,0,0,1,5.14-5.45Zm-.05-3.54a9,9,0,1,0,9,9,8.88,8.88,0,0,0-9-9Z" },
-                { fill: "#FFFFFF", d: "M318.78,42.92c2.37,0,4.8,2,4.8,5.49s-2.43,5.45-4.85,5.45a5.1,5.1,0,0,1-5-5.42A5.18,5.18,0,0,1,318.78,42.92Zm-.35-3.53a9,9,0,0,0-.08,18,5.93,5.93,0,0,0,4.92-2.18V57c0,3.11-1.88,5-4.71,5a5,5,0,0,1-4.6-3.21l-3.45,1.45a8.64,8.64,0,0,0,8.07,5.3c4.8,0,8.46-3,8.46-9.39V39.93h-3.77v1.53A6.3,6.3,0,0,0,318.43,39.39Z" },
-                { fill: "#FFFFFF", d: "M342.77,42.84a3.6,3.6,0,0,1,3.33,1.93l-8,3.37a5,5,0,0,1,4.71-5.3Zm-.15-3.46c-4.55,0-8.37,3.63-8.37,9a8.69,8.69,0,0,0,8.8,9,9.11,9.11,0,0,0,7.52-3.95l-3.1-2.07a5,5,0,0,1-4.4,2.47,4.62,4.62,0,0,1-4.4-2.72l12-5-.63-1.46A8.12,8.12,0,0,0,342.62,39.38Z" },
-                { fill: "#FFFFFF", d: "M328.57,56.77h4.57V30.22h-4.57Z" }
+                { d: "M269.81,42.24H257v3.81h9.08c-.45,5.35-4.88,7.63-9.07,7.63a10.19,10.19,0,0,1,0-20.37,9.84,9.84,0,0,1,6.85,2.76l2.66-2.77a13.5,13.5,0,0,0-9.64-3.81,14,14,0,1,0,.2,28c7.47,0,12.94-5.14,12.94-12.74a11.49,11.49,0,0,0-.23-2.53" },
+                { d: "M280.48,42.92a5.17,5.17,0,0,1,5,5.48,5.1,5.1,0,1,1-10.17,0A5.2,5.2,0,0,1,280.48,42.92Zm-.06-3.53a9,9,0,1,0,9,9A8.88,8.88,0,0,0,280.42,39.39Z" },
+                { d: "M300.13,42.93a5.16,5.16,0,0,1,5,5.47,5.1,5.1,0,1,1-10.17,0,5.19,5.19,0,0,1,5.14-5.45Zm-.05-3.54a9,9,0,1,0,9,9,8.88,8.88,0,0,0-9-9Z" },
+                { d: "M318.78,42.92c2.37,0,4.8,2,4.8,5.49s-2.43,5.45-4.85,5.45a5.1,5.1,0,0,1-5-5.42A5.18,5.18,0,0,1,318.78,42.92Zm-.35-3.53a9,9,0,0,0-.08,18,5.93,5.93,0,0,0,4.92-2.18V57c0,3.11-1.88,5-4.71,5a5,5,0,0,1-4.6-3.21l-3.45,1.45a8.64,8.64,0,0,0,8.07,5.3c4.8,0,8.46-3,8.46-9.39V39.93h-3.77v1.53A6.3,6.3,0,0,0,318.43,39.39Z" },
+                { d: "M342.77,42.84a3.6,3.6,0,0,1,3.33,1.93l-8,3.37a5,5,0,0,1,4.71-5.3Zm-.15-3.46c-4.55,0-8.37,3.63-8.37,9a8.69,8.69,0,0,0,8.8,9,9.11,9.11,0,0,0,7.52-3.95l-3.1-2.07a5,5,0,0,1-4.4,2.47,4.62,4.62,0,0,1-4.4-2.72l12-5-.63-1.46A8.12,8.12,0,0,0,342.62,39.38Z" },
+                { d: "M328.57,56.77h4.57V30.22h-4.57Z" }
             ]
         },
         search: {
-            view: [103, 98.5, 22.5, 24],
+            view: [103, 98.5, 22.5, 24], ink: "searchIcon",
             parts: [
-                { fill: "#B9BAC0", d: "M124.58,121.83l-8-8a7.67,7.67,0,0,1-4.8,1.64,8.24,8.24,0,1,1,8.22-8.22,7.55,7.55,0,0,1-.45,2.62,7.36,7.36,0,0,1-1.2,2.19l8,8ZM111.81,113a5.67,5.67,0,1,0-4-1.66A5.48,5.48,0,0,0,111.81,113Z" }
+                { d: "M124.58,121.83l-8-8a7.67,7.67,0,0,1-4.8,1.64,8.24,8.24,0,1,1,8.22-8.22,7.55,7.55,0,0,1-.45,2.62,7.36,7.36,0,0,1-1.2,2.19l8,8ZM111.81,113a5.67,5.67,0,1,0-4-1.66A5.48,5.48,0,0,0,111.81,113Z" }
             ]
         },
         mic: {
-            view: [412.5, 97, 19.5, 25.5],
+            view: [412.5, 97, 19.5, 25.5], ink: "icon",
             parts: [
-                { fill: "#CCCED3", d: "M422.18,112.31a3.11,3.11,0,0,1-2.35-1,3.48,3.48,0,0,1-.95-2.46v-8.2a3.12,3.12,0,0,1,1-2.31,3.33,3.33,0,0,1,4.68,0,3.12,3.12,0,0,1,1,2.31v8.2a3.47,3.47,0,0,1-.94,2.46A3.13,3.13,0,0,1,422.18,112.31Z" },
-                { fill: "#CCCED3", d: "M421.2,122.21v-4.45a8.83,8.83,0,0,1-5.81-2.9,8.59,8.59,0,0,1-2.36-6h2a6.66,6.66,0,0,0,2.1,5,7.38,7.38,0,0,0,10.17,0,6.63,6.63,0,0,0,2.11-5h2a8.58,8.58,0,0,1-2.35,6,8.87,8.87,0,0,1-5.82,2.9v4.45Z" },
-                { fill: "#CCCED3", d: "M421.2,117.76h1.96v4.44H421.2Z" }
+                { d: "M422.18,112.31a3.11,3.11,0,0,1-2.35-1,3.48,3.48,0,0,1-.95-2.46v-8.2a3.12,3.12,0,0,1,1-2.31,3.33,3.33,0,0,1,4.68,0,3.12,3.12,0,0,1,1,2.31v8.2a3.47,3.47,0,0,1-.94,2.46A3.13,3.13,0,0,1,422.18,112.31Z" },
+                { d: "M421.2,122.21v-4.45a8.83,8.83,0,0,1-5.81-2.9,8.59,8.59,0,0,1-2.36-6h2a6.66,6.66,0,0,0,2.1,5,7.38,7.38,0,0,0,10.17,0,6.63,6.63,0,0,0,2.11-5h2a8.58,8.58,0,0,1-2.35,6,8.87,8.87,0,0,1-5.82,2.9v4.45Z" },
+                { d: "M421.2,117.76h1.96v4.44H421.2Z" }
             ]
         },
         lens: {
-            view: [467.5, 97, 26, 25.5],
+            view: [467.5, 97, 26, 25.5], ink: "icon",
             parts: [
-                { fill: "#CCCED3", d: "M485.96,118.07a2.76,2.76,0,1,0,5.52,0a2.76,2.76,0,1,0,-5.52,0Z" },
-                { fill: "#CCCED3", d: "M476.3,111.17a4.14,4.14,0,1,0,8.28,0a4.14,4.14,0,1,0,-8.28,0Z" },
-                { fill: "#CCCED3", d: "M468,116.55a5.66,5.66,0,0,0,5.66,5.66h6.76v-2.76l-6.91,0a3,3,0,0,1-2.75-3.09v-3.1H468Z" },
-                { fill: "#CCCED3", d: "M492.85,105.79a5.66,5.66,0,0,0-5.66-5.66h-3.31l3.45,2.76a3,3,0,0,1,2.76,3.11v5.17h2.76Z" },
-                { fill: "#CCCED3", d: "M483.19,97.37h-5.52l-2.07,2.76h-1.93a5.67,5.67,0,0,0-5.66,5.66v3.31h2.76V106a3,3,0,0,1,2.76-3.11h13.8Z" }
+                { d: "M485.96,118.07a2.76,2.76,0,1,0,5.52,0a2.76,2.76,0,1,0,-5.52,0Z" },
+                { d: "M476.3,111.17a4.14,4.14,0,1,0,8.28,0a4.14,4.14,0,1,0,-8.28,0Z" },
+                { d: "M468,116.55a5.66,5.66,0,0,0,5.66,5.66h6.76v-2.76l-6.91,0a3,3,0,0,1-2.75-3.09v-3.1H468Z" },
+                { d: "M492.85,105.79a5.66,5.66,0,0,0-5.66-5.66h-3.31l3.45,2.76a3,3,0,0,1,2.76,3.11v5.17h2.76Z" },
+                { d: "M483.19,97.37h-5.52l-2.07,2.76h-1.93a5.67,5.67,0,0,0-5.66,5.66v3.31h2.76V106a3,3,0,0,1,2.76-3.11h13.8Z" }
             ]
         }
     };
@@ -490,7 +563,7 @@
        Slot 0 is "the photograph" for every layout that has just one, and slot 1
        is the split layout's second half, so the two names that were here map
        onto the first two entries and nothing else had to be re-taught. */
-    const photos = new Array(GRID_SLOTS).fill(null);
+    const photos = new Array(SLOT_COUNT).fill(null);
 
     function defaultText(id, text) {
         return {
@@ -532,6 +605,7 @@
         rankHead: FRAME_STYLES.hearts.ranks.head,
         rankFoot: FRAME_STYLES.hearts.ranks.foot,
         query: DEFAULT_QUERY,
+        screenTheme: DEFAULT_SCREEN_THEME,
         /* One framing per photo slot, indexed to match `photos`. */
         views: defaultViews(),
         texts: [defaultText("t1", "")],
@@ -554,7 +628,8 @@
         return JSON.stringify({
             name: state.name, size: state.size, frame: state.frame,
             rankHead: state.rankHead, rankFoot: state.rankFoot,
-            query: state.query, views: state.views, texts: state.texts
+            query: state.query, screenTheme: state.screenTheme,
+            views: state.views, texts: state.texts
         });
     }
 
@@ -566,6 +641,8 @@
         state.rankHead = cleanRank(parsed.rankHead);
         state.rankFoot = cleanRank(parsed.rankFoot);
         state.query = cleanQuery(parsed.query);
+        state.screenTheme = SCREEN_THEMES[parsed.screenTheme]
+            ? parsed.screenTheme : DEFAULT_SCREEN_THEME;
         state.views = normalizeViews(parsed.views);
         state.texts = parsed.texts;
         if (!state.texts.some((t) => t.id === state.sel)) {
@@ -651,6 +728,7 @@
             rankHead: TB.sanitize(state.rankHead),
             rankFoot: TB.sanitize(state.rankFoot),
             query: TB.sanitize(state.query),
+            screenTheme: state.screenTheme,
             size: state.size,
             texts: state.texts.map((t) => {
                 const copy = Object.assign({}, t);
@@ -684,6 +762,8 @@
         state.query = saved.query === undefined
             ? DEFAULT_QUERY
             : cleanQuery(TB.desanitize(String(saved.query)));
+        state.screenTheme = SCREEN_THEMES[saved.screenTheme]
+            ? saved.screenTheme : DEFAULT_SCREEN_THEME;
         state.size = PAPER[saved.size] ? saved.size : "A3";
         state.name = TB.desanitize(String(saved.name || "")).trim() || "Untitled poster";
 
@@ -766,7 +846,7 @@
 
     function defaultViews() {
         const out = [];
-        for (let i = 0; i < GRID_SLOTS; i += 1) {
+        for (let i = 0; i < SLOT_COUNT; i += 1) {
             out.push(defaultView());
         }
         return out;
@@ -780,7 +860,7 @@
     function normalizeViews(saved) {
         const out = defaultViews();
         if (Array.isArray(saved)) {
-            saved.slice(0, GRID_SLOTS).forEach((v, i) => {
+            saved.slice(0, SLOT_COUNT).forEach((v, i) => {
                 if (v && typeof v === "object") { out[i] = v; }
             });
         }
@@ -1174,23 +1254,37 @@
         return out;
     }
 
+    /* The square the account photograph is cover-fitted into, before the circle
+       clips it. Square rather than the circle's bounding behaviour, so a
+       portrait crops the way it does in every other slot and the framing
+       controls mean the same thing here as they do on a card. */
+    function avatarRect(W, H) {
+        const s = screenScale(W, H);
+        const a = SCREEN.avatar;
+        return {
+            x: (a.cx - a.r) * s.fx, y: (a.cy - a.r) * s.fy,
+            w: a.r * 2 * s.fx, h: a.r * 2 * s.fy
+        };
+    }
+
     /* One icon, placed by transform: to the target box, scaled from the source
        viewBox, then back by the viewBox's own origin -- which is what lets the
        path data stay verbatim. artSVG() emits the identical chain. */
     function drawArt(c, art, x, y, w, h) {
         const v = art.view;
+        const ink = screenTheme()[art.ink];
         c.save();
         c.translate(x, y);
         c.scale(w / v[2], h / v[3]);
         c.translate(-v[0], -v[1]);
         art.parts.forEach((p) => {
-            if (p.fill) {
-                c.fillStyle = p.fill;
-                c.fill(p.path);
-            } else {
-                c.strokeStyle = p.stroke;
+            if (p.stroke) {
+                c.strokeStyle = ink;
                 c.lineWidth = p.width;
                 c.stroke(p.path);
+            } else {
+                c.fillStyle = ink;
+                c.fill(p.path);
             }
         });
         c.restore();
@@ -1230,21 +1324,33 @@
     function paintScreen(c, W, H, options) {
         const s = screenScale(W, H);
         const S = SCREEN;
+        const ink = screenTheme();
 
         if (!options.transparent) {
-            c.fillStyle = S.bg;
+            c.fillStyle = ink.bg;
             c.fillRect(0, 0, W, H);
         }
 
         drawArt(c, ART.lab, S.lab.x * s.fx, S.lab.y * s.fy, S.lab.w * s.fx, S.lab.h * s.fy);
         drawArt(c, ART.logo, S.logo.x * s.fx, S.logo.y * s.fy, S.logo.w * s.fx, S.logo.h * s.fy);
 
-        c.fillStyle = S.avatar.fill;
+        /* The account circle. A photograph when there is one, clipped to the
+           circle rather than drawn square and rounded off, so the crop the
+           visitor drags is the crop they get. */
         c.beginPath();
         c.arc(S.avatar.cx * s.fx, S.avatar.cy * s.fy, S.avatar.r * s.fx, 0, Math.PI * 2);
-        c.fill();
+        if (photos[AVATAR_SLOT]) {
+            const a = avatarRect(W, H);
+            c.save();
+            c.clip();
+            drawCoverImage(c, photos[AVATAR_SLOT], a.x, a.y, a.w, a.h, state.views[AVATAR_SLOT]);
+            c.restore();
+        } else if (!options.transparent) {
+            c.fillStyle = ink.avatar;
+            c.fill();
+        }
 
-        c.fillStyle = S.pill.fill;
+        c.fillStyle = ink.pill;
         roundRectPath(c, S.pill.x * s.fx, S.pill.y * s.fy, S.pill.w * s.fx, S.pill.h * s.fy,
             (S.pill.h / 2) * s.fy);
         c.fill();
@@ -1254,7 +1360,7 @@
         drawArt(c, ART.lens, S.lens.x * s.fx, S.lens.y * s.fy, S.lens.w * s.fx, S.lens.h * s.fy);
 
         if (state.query) {
-            c.fillStyle = S.query.color;
+            c.fillStyle = ink.query;
             c.font = "400 " + fitQuerySize(c, state.query, W) + "px " + fontStack(SCREEN_FONT);
             c.textAlign = "left";
             c.textBaseline = "alphabetic";
@@ -1275,7 +1381,7 @@
         let tabX = t.x;
         t.items.forEach((label, i) => {
             const wdt = c.measureText(label).width;
-            c.fillStyle = i === t.current ? t.active : t.idle;
+            c.fillStyle = i === t.current ? ink.chrome : ink.tabIdle;
             c.fillText(label, tabX * s.fx, t.baseline * s.fy);
             if (i === t.current) {
                 c.fillRect(tabX * s.fx - t.underline.pad * s.fx, t.underline.y * s.fy,
@@ -1288,8 +1394,8 @@
         c.restore();
 
         c.save();
-        c.globalAlpha = S.rule.alpha;
-        c.fillStyle = S.rule.color;
+        c.globalAlpha = ink.ruleAlpha;
+        c.fillStyle = ink.rule;
         c.fillRect(S.rule.x * s.fx, S.rule.y * s.fy, S.rule.w * s.fx, S.rule.h * s.fy);
         c.restore();
 
@@ -1301,13 +1407,13 @@
                 drawCoverImage(c, photos[i], r.x, r.y, r.w, r.h, state.views[i]);
                 c.restore();
             } else if (!options.transparent) {
-                c.fillStyle = SCREEN.grid.fill;
+                c.fillStyle = ink.card;
                 c.fill();
             }
         });
 
         const suit = suitOf(state.frame);
-        c.fillStyle = S.pips.ink;
+        c.fillStyle = ink.pip;
         S.pips.x.forEach((px) => {
             c.save();
             c.translate(px * s.fx, S.pips.y * s.fy);
@@ -1370,6 +1476,7 @@
         paint(ctx, s.w, s.h);
         drawGridChrome();
         drawSelection();
+        syncQueryInput();
     }
 
     /* Preview-only chrome for the search screen: a number on every empty card,
@@ -1389,6 +1496,12 @@
         const H = canvas.height;
         const rects = gridRects(W, H);
 
+        const selectRing = () => {
+            ctx.strokeStyle = "#8A6A3B";
+            ctx.lineWidth = Math.max(1.5, W * 0.004);
+            ctx.setLineDash([W * 0.01, W * 0.008]);
+        };
+
         ctx.save();
         rects.forEach((r, i) => {
             if (!photos[i]) {
@@ -1399,14 +1512,26 @@
                 ctx.fillText(String(i + 1), r.x + r.w / 2, r.y + r.h / 2);
             }
             if (i === state.card) {
-                ctx.strokeStyle = "#8A6A3B";
-                ctx.lineWidth = Math.max(1.5, W * 0.004);
-                ctx.setLineDash([W * 0.01, W * 0.008]);
+                selectRing();
                 roundRectPath(ctx, r.x, r.y, r.w, r.h, SCREEN.grid.radius * (W / SCREEN.page.w));
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
         });
+
+        /* The account circle gets the same ring, drawn round rather than square
+           so the selection matches the shape that is actually clickable. It
+           carries no number: it is not part of the numbered run, and a digit
+           inside a 39pt circle would be furniture rather than help. */
+        if (state.card === AVATAR_SLOT) {
+            const sc = screenScale(W, H);
+            selectRing();
+            ctx.beginPath();
+            ctx.arc(SCREEN.avatar.cx * sc.fx, SCREEN.avatar.cy * sc.fy,
+                SCREEN.avatar.r * sc.fx + ctx.lineWidth, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
         ctx.restore();
     }
 
@@ -1583,6 +1708,17 @@
                 return i;
             }
         }
+        /* The account circle, tested as a CIRCLE rather than as its bounding
+           box. The box would claim the paper at each corner, and the corner
+           nearest the page edge is a place a caption can legitimately sit. */
+        const s = screenScale(W, H);
+        const a = SCREEN.avatar;
+        const dx = x - a.cx * s.fx;
+        const dy = y - a.cy * s.fy;
+        const rr = a.r * s.fx;
+        if (dx * dx + dy * dy <= rr * rr) {
+            return AVATAR_SLOT;
+        }
         return -1;
     }
 
@@ -1623,8 +1759,8 @@
                 return null;
             }
             return {
-                img: photos[i], view: state.views[i], index: i,
-                flipped: false, rect: gridRects(W, H)[i]
+                img: photos[i], view: state.views[i], index: i, flipped: false,
+                rect: i === AVATAR_SLOT ? avatarRect(W, H) : gridRects(W, H)[i]
             };
         }
 
@@ -1655,7 +1791,17 @@
             return;
         }
         if (queryBarAt(pt, canvas.width, canvas.height)) {
-            focusField(byId("p-query"));
+            /* Anywhere on the pill puts the caret in the search bar, which is
+               what the source artwork's own script does -- the input covers the
+               words, not the whole pill, so without this a click beside the
+               magnifier would do nothing. The panel field is the fallback for
+               when the inline one is not on screen, which on a phone is
+               whenever the form tab is showing. */
+            if (queryLive && !queryLive.hidden) {
+                queryLive.focus();
+            } else {
+                focusField(byId("p-query"));
+            }
             return;
         }
         const hit = hitTest(pt);
@@ -1817,6 +1963,7 @@
 
     bindPhotoInput("p-image", "p-image-error", (img) => fillSlot(0, img));
     bindPhotoInput("p-image-b", "p-image-b-error", (img) => fillSlot(1, img));
+    bindPhotoInput("p-image-avatar", "p-image-avatar-error", (img) => fillSlot(AVATAR_SLOT, img));
 
     /* Where the next batch of files lands: every empty card in reading order
        first, and then -- once there are none left -- the SELECTED card and the
@@ -1831,8 +1978,13 @@
         for (let i = 0; i < GRID_SLOTS && out.length < count; i += 1) {
             if (!photos[i]) { out.push(i); }
         }
+        /* Cards only, never the account circle: that has its own input, and a
+           batch of six photographs must not silently claim it. The modulo is
+           taken against a card index for the same reason -- the circle can be
+           the selected slot, and 6 % 6 would quietly restart at card 1. */
+        const from = state.card < GRID_SLOTS ? state.card : 0;
         for (let k = 0; k < GRID_SLOTS && out.length < count; k += 1) {
-            const i = (state.card + k) % GRID_SLOTS;
+            const i = (from + k) % GRID_SLOTS;
             if (out.indexOf(i) === -1) { out.push(i); }
         }
         return out;
@@ -1880,6 +2032,13 @@
        search screen, and slot 0 on every other layout, which is the only
        photograph they have. Read at event time rather than bound once, because
        the selection moves. */
+    /* What a slot is called, in the one place both the menu and the slider
+       label read from, so they cannot disagree about which photograph the
+       controls are pointing at. */
+    function slotName(i) {
+        return i === AVATAR_SLOT ? "Profile circle" : "Card " + (i + 1);
+    }
+
     function primarySlot() {
         return layoutOf(state.frame) === "browser" ? state.card : 0;
     }
@@ -1926,14 +2085,133 @@
         });
     }
 
+    const themeSelect = byId("p-screen-theme");
+    if (themeSelect) {
+        themeSelect.addEventListener("change", () => {
+            beginChange();
+            state.screenTheme = SCREEN_THEMES[themeSelect.value]
+                ? themeSelect.value : DEFAULT_SCREEN_THEME;
+            commit();
+            render();
+        });
+    }
+
     const cardPick = byId("p-card-pick");
     if (cardPick) {
         cardPick.addEventListener("change", () => {
-            state.card = Math.min(GRID_SLOTS - 1, Math.max(0, Number(cardPick.value) || 0));
+            state.card = Math.min(SLOT_COUNT - 1, Math.max(0, Number(cardPick.value) || 0));
             syncPhotoControls();
             render();
         });
     }
+
+    /* The search bar, typed on directly.
+
+       Position, width and type size all come from the SAME constants
+       paintScreen() draws from, converted through the canvas's RENDERED size
+       rather than its pixel size -- the canvas is 990px wide internally and
+       whatever CSS gives it on screen, and the input lives in CSS pixels.
+
+       The font size is fitQuerySize(), not SCREEN.query.size, because a long
+       query is set down to fit and the caret has to land between the glyphs
+       that are actually drawn. Same function, same number, so it does.
+
+       Called from render(), which is what runs on every keystroke, paper-size
+       change and undo -- and from a resize listener, because none of those fire
+       when the pane merely gets wider. */
+    /* The inline input's own font size, which is NOT the size it renders at --
+       see the transform in syncQueryInput(). Sixteen because that is where iOS
+       stops zooming the page when it focuses a field. */
+    const QUERY_LIVE_FONT = 16;
+
+    function syncQueryInput() {
+        /* The panel field FIRST, and before any early return.
+
+           There are two ways to type the same string now, and each has to
+           follow the other. This direction is the one that is easy to miss:
+           typing inline commits and repaints, but nothing else writes the
+           result back to the panel -- so the panel keeps the value it had, and
+           the next keystroke there reverts everything typed on the poster.
+           render() runs after every commit, which is what makes this the right
+           place for it. */
+        const panel = byId("p-query");
+        if (panel && panel.value !== state.query) {
+            panel.value = state.query;
+        }
+        if (!queryLive) {
+            return;
+        }
+        if (layoutOf(state.frame) !== "browser") {
+            queryLive.hidden = true;
+            return;
+        }
+        queryLive.hidden = false;
+
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) {
+            /* The preview is on the other tab, so there is nothing to sit over.
+               Leaving the last position would put an invisible input across a
+               pane it no longer belongs to. */
+            return;
+        }
+        /* CSS pixels per canvas pixel, and canvas pixels per artboard point. */
+        const k = rect.width / canvas.width;
+        const s = screenScale(canvas.width, canvas.height);
+        const size = fitQuerySize(ctx, state.query, canvas.width) * k;
+
+        /* The element stays at QUERY_LIVE_FONT and a transform does the sizing,
+           so its COMPUTED font-size never drops under the 16px at which iOS
+           zooms the page on focus. Width and height are therefore divided by
+           the scale: they are pre-transform lengths, and the transform is what
+           brings them back to the sizes wanted on screen. */
+        const scale = size / QUERY_LIVE_FONT;
+        queryLive.style.left = (SCREEN.query.x * s.fx * k) + "px";
+        queryLive.style.width = ((QUERY_MAX_W * s.fx * k) / scale) + "px";
+        queryLive.style.transform = "scale(" + scale + ")";
+        /* Positioned on the BASELINE the canvas draws from: the input's own box
+           is its line height, and the text sits centred in it, so the top is
+           the baseline less the part of the em that rises above it. 0.8 of the
+           size is Inter's ascent closely enough that the caret brackets the
+           drawn glyphs rather than floating over them. The transform's origin
+           is this corner, so the arithmetic is the same either way. */
+        queryLive.style.height = (QUERY_LIVE_FONT * 1.35) + "px";
+        queryLive.style.top = (SCREEN.query.baseline * s.fy * k - size * 0.8 -
+            size * 0.175) + "px";
+        queryLive.style.caretColor = screenTheme().query;
+
+        if (queryLive.value !== state.query) {
+            queryLive.value = state.query;
+        }
+    }
+
+    const queryLive = byId("p-query-live");
+    if (queryLive) {
+        const applyLive = (coalesceKey) => {
+            const next = cleanQuery(queryLive.value);
+            if (state.query === next) {
+                return;
+            }
+            beginChange();
+            state.query = next;
+            commit(coalesceKey);
+            /* commit() repaints through afterChange(), and render() calls
+               syncQueryInput(), which writes the cleaned value back. */
+        };
+        queryLive.addEventListener("input", () => applyLive("query"));
+        queryLive.addEventListener("change", () => applyLive(null));
+        /* Enter has nothing to submit -- there is no form here and no search to
+           run -- so it blurs, which is what it appears to do on the real thing. */
+        queryLive.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter") {
+                ev.preventDefault();
+                queryLive.blur();
+            }
+        });
+    }
+
+    /* The pane resizing moves the canvas without redrawing it, and the input is
+       positioned against the canvas's rendered size. */
+    window.addEventListener("resize", syncQueryInput);
 
     /* Pushes the framing back into its slider -- after a drag, an undo, a fresh
        upload or a change of selected card -- and hides the whole group when
@@ -1955,7 +2233,7 @@
            which one it is holding -- otherwise a visitor who selected card 4 is
            given a control labelled for a photograph they are not looking at. */
         if (label) {
-            label.textContent = grid ? "Card " + (slot + 1) + " Size" : "Photo Size";
+            label.textContent = grid ? slotName(slot) + " Size" : "Photo Size";
         }
 
         const groupB = byId("p-zoom-b");
@@ -1970,7 +2248,7 @@
                canvas: on a phone the preview is a separate tab, so the menu is
                the only place that answer can be while the form is open. */
             Array.prototype.forEach.call(pick.options, (o, i) => {
-                const text = "Card " + (i + 1) + (photos[i] ? "" : " (empty)");
+                const text = slotName(i) + (photos[i] ? "" : " (empty)");
                 if (o.textContent !== text) { o.textContent = text; }
             });
         }
@@ -2152,6 +2430,7 @@
         if (rankHeadInput && rankHeadInput.value !== state.rankHead) { rankHeadInput.value = state.rankHead; }
         if (rankFootInput && rankFootInput.value !== state.rankFoot) { rankFootInput.value = state.rankFoot; }
         if (queryInput && queryInput.value !== state.query) { queryInput.value = state.query; }
+        if (themeSelect) { themeSelect.value = state.screenTheme; }
 
         /* Both card layouts carry corner indices, so the rank fields belong to
            either of them; the second upload belongs to the split one alone. */
@@ -2539,12 +2818,13 @@
        file. */
     function artSVG(art, x, y, w, h) {
         const v = art.view;
+        const ink = screenTheme()[art.ink];
         const t = "translate(" + x + " " + y + ") scale(" + (w / v[2]) + " " + (h / v[3]) +
             ") translate(" + (-v[0]) + " " + (-v[1]) + ")";
         return '<g transform="' + t + '">' + art.parts.map((p) => '<path d="' + p.d + '"' +
-            (p.fill
-                ? ' fill="' + p.fill + '"'
-                : ' fill="none" stroke="' + p.stroke + '" stroke-width="' + p.width + '"') +
+            (p.stroke
+                ? ' fill="none" stroke="' + ink + '" stroke-width="' + p.width + '"'
+                : ' fill="' + ink + '"') +
             "/>").join("") + "</g>";
     }
 
@@ -2559,6 +2839,7 @@
     function screenSVG(W, H, esc) {
         const s = screenScale(W, H);
         const S = SCREEN;
+        const ink = screenTheme();
         const rects = gridRects(W, H);
         const tabClip = {
             x: S.tabs.x * s.fx,
@@ -2570,22 +2851,33 @@
 
         let defs = '<clipPath id="tb-screen-tabs"><rect x="' + tabClip.x + '" y="' + tabClip.y +
             '" width="' + tabClip.w + '" height="' + tabClip.h + '"/></clipPath>';
+        if (photos[AVATAR_SLOT]) {
+            defs += '<clipPath id="tb-screen-avatar"><circle cx="' + (S.avatar.cx * s.fx) +
+                '" cy="' + (S.avatar.cy * s.fy) + '" r="' + (S.avatar.r * s.fx) + '"/></clipPath>';
+        }
         rects.forEach((r, i) => {
             if (!photos[i]) { return; }
             defs += '<clipPath id="tb-screen-card-' + i + '"><rect x="' + r.x + '" y="' + r.y +
                 '" width="' + r.w + '" height="' + r.h + '" rx="' + (S.grid.radius * s.fx) + '"/></clipPath>';
         });
 
-        let out = '<rect width="' + W + '" height="' + H + '" fill="' + S.bg + '"/>';
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + ink.bg + '"/>';
         out += "<defs>" + defs + "</defs>";
 
         out += artSVG(ART.lab, S.lab.x * s.fx, S.lab.y * s.fy, S.lab.w * s.fx, S.lab.h * s.fy);
         out += artSVG(ART.logo, S.logo.x * s.fx, S.logo.y * s.fy, S.logo.w * s.fx, S.logo.h * s.fy);
-        out += '<circle cx="' + (S.avatar.cx * s.fx) + '" cy="' + (S.avatar.cy * s.fy) +
-            '" r="' + (S.avatar.r * s.fx) + '" fill="' + S.avatar.fill + '"/>';
+        if (photos[AVATAR_SLOT]) {
+            const av = avatarRect(W, H);
+            out += '<g clip-path="url(#tb-screen-avatar)">' +
+                photoImageSVG(photos[AVATAR_SLOT], state.views[AVATAR_SLOT],
+                    av.x, av.y, av.w, av.h) + "</g>";
+        } else {
+            out += '<circle cx="' + (S.avatar.cx * s.fx) + '" cy="' + (S.avatar.cy * s.fy) +
+                '" r="' + (S.avatar.r * s.fx) + '" fill="' + ink.avatar + '"/>';
+        }
         out += '<rect x="' + (S.pill.x * s.fx) + '" y="' + (S.pill.y * s.fy) + '" width="' +
             (S.pill.w * s.fx) + '" height="' + (S.pill.h * s.fy) + '" rx="' +
-            ((S.pill.h / 2) * s.fy) + '" fill="' + S.pill.fill + '"/>';
+            ((S.pill.h / 2) * s.fy) + '" fill="' + ink.pill + '"/>';
         out += artSVG(ART.search, S.search.x * s.fx, S.search.y * s.fy, S.search.w * s.fx, S.search.h * s.fy);
         out += artSVG(ART.mic, S.mic.x * s.fx, S.mic.y * s.fy, S.mic.w * s.fx, S.mic.h * s.fy);
         out += artSVG(ART.lens, S.lens.x * s.fx, S.lens.y * s.fy, S.lens.w * s.fx, S.lens.h * s.fy);
@@ -2597,7 +2889,7 @@
                there. */
             out += '<text x="' + (S.query.x * s.fx) + '" y="' + (S.query.baseline * s.fy) +
                 '" font-family="' + family + '" font-size="' + fitQuerySize(ctx, state.query, W) +
-                '" fill="' + S.query.color + '">' + esc(state.query) + "</text>";
+                '" fill="' + ink.query + '">' + esc(state.query) + "</text>";
         }
 
         const t = S.tabs;
@@ -2609,11 +2901,11 @@
             const wdt = ctx.measureText(label).width;
             out += '<text x="' + (tabX * s.fx) + '" y="' + (t.baseline * s.fy) +
                 '" font-family="' + family + '" font-size="' + (t.size * s.fx) +
-                '" fill="' + (i === t.current ? t.active : t.idle) + '">' + esc(label) + "</text>";
+                '" fill="' + (i === t.current ? ink.chrome : ink.tabIdle) + '">' + esc(label) + "</text>";
             if (i === t.current) {
                 out += '<rect x="' + (tabX * s.fx - t.underline.pad * s.fx) + '" y="' +
                     (t.underline.y * s.fy) + '" width="' + (wdt + t.underline.pad * 2 * s.fx) +
-                    '" height="' + (t.underline.h * s.fy) + '" fill="' + t.active + '"/>';
+                    '" height="' + (t.underline.h * s.fy) + '" fill="' + ink.chrome + '"/>';
             }
             tabX += wdt / s.fx + t.gap;
         });
@@ -2621,8 +2913,8 @@
         out += "</g>";
 
         out += '<rect x="' + (S.rule.x * s.fx) + '" y="' + (S.rule.y * s.fy) + '" width="' +
-            (S.rule.w * s.fx) + '" height="' + (S.rule.h * s.fy) + '" fill="' + S.rule.color +
-            '" fill-opacity="' + S.rule.alpha + '"/>';
+            (S.rule.w * s.fx) + '" height="' + (S.rule.h * s.fy) + '" fill="' + ink.rule +
+            '" fill-opacity="' + ink.ruleAlpha + '"/>';
 
         rects.forEach((r, i) => {
             const box = 'x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h +
@@ -2631,13 +2923,13 @@
                 out += '<g clip-path="url(#tb-screen-card-' + i + ')">' +
                     photoImageSVG(photos[i], state.views[i], r.x, r.y, r.w, r.h) + "</g>";
             } else {
-                out += "<rect " + box + ' fill="' + S.grid.fill + '"/>';
+                out += "<rect " + box + ' fill="' + ink.card + '"/>';
             }
         });
 
         const suit = suitOf(state.frame);
         S.pips.x.forEach((px) => {
-            out += '<path d="' + SUITS[suit].path + '" fill="' + S.pips.ink +
+            out += '<path d="' + SUITS[suit].path + '" fill="' + ink.pip +
                 '" transform="translate(' + (px * s.fx) + " " + (S.pips.y * s.fy) + ") scale(" +
                 (S.pips.w * s.fx) + " " + (S.pips.h * s.fy) + ')"/>';
         });
@@ -3126,12 +3418,21 @@
         /* Six cards, numbered as the preview numbers them. The "(empty)" half of
            each label is written by syncPhotoControls(), which is the only thing
            that knows what is in them. */
+        const theme = byId("p-screen-theme");
+        if (theme && !theme.options.length) {
+            Object.keys(SCREEN_THEMES).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = SCREEN_THEMES[k].label;
+                theme.appendChild(o);
+            });
+        }
         const pick = byId("p-card-pick");
         if (pick && !pick.options.length) {
-            for (let i = 0; i < GRID_SLOTS; i += 1) {
+            for (let i = 0; i < SLOT_COUNT; i += 1) {
                 const o = document.createElement("option");
                 o.value = String(i);
-                o.textContent = "Card " + (i + 1);
+                o.textContent = slotName(i);
                 pick.appendChild(o);
             }
         }

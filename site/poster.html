@@ -387,16 +387,33 @@
                             <p class="form-error" id="p-image-grid-error" role="alert"></p>
                         </div>
 
+                        <!-- The account circle above the search bar is a photo
+                             slot in its own right, with its own input: a batch
+                             of six chosen for the masonry must never silently
+                             land in it. -->
                         <div class="field">
-                            <label for="p-card-pick">Selected Card</label>
+                            <label for="p-image-avatar">Profile Photo</label>
+                            <input type="file" id="p-image-avatar" accept="image/*">
+                            <p class="upload-hint">Fills the circle above the search bar. Optional.</p>
+                            <p class="form-error" id="p-image-avatar-error" role="alert"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-card-pick">Selected Photo</label>
                             <select id="p-card-pick"></select>
-                            <p class="upload-hint">Clicking a card on the preview selects it too. <button type="button" class="btn btn-secondary btn-small" id="p-card-clear">Remove photo</button></p>
+                            <p class="upload-hint">Clicking a card or the circle on the preview selects it too. <button type="button" class="btn btn-secondary btn-small" id="p-card-clear">Remove photo</button></p>
                         </div>
 
                         <div class="field">
                             <label for="p-query">Search Text</label>
                             <input type="text" id="p-query" maxlength="40" autocomplete="off">
-                            <p class="upload-hint">Sits in the search bar: your names, a date, a place. Clicking the bar on the poster jumps here.</p>
+                            <p class="upload-hint">Type straight into the search bar on the preview, or here. Same words either way.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-screen-theme">Screen Mode</label>
+                            <select id="p-screen-theme"></select>
+                            <p class="upload-hint">The same screen by day or by night. Only the colours change, never the layout.</p>
                         </div>
                     </div>
 
@@ -501,7 +518,29 @@
                 <div class="poster-stage">
                     <!-- Fixed internal resolution keeps exports high-quality;
                          CSS scales the visible element responsively -->
-                    <canvas id="poster-canvas" width="1200" height="1500"></canvas>
+                    <div class="poster-frame">
+                        <canvas id="poster-canvas" width="1200" height="1500"></canvas>
+
+                        <!-- Typing on the search bar itself, on the search-screen
+                             layout only. A real input rather than a caret drawn
+                             into the canvas: that would mean writing a caret, a
+                             selection model and IME handling by hand, and this
+                             gets all three from the browser.
+
+                             Its text is TRANSPARENT and the canvas underneath
+                             draws the words. That keeps one renderer -- what you
+                             see is what downloads, because it is literally the
+                             thing that downloads -- and avoids two copies of the
+                             same string sitting a fraction of a pixel apart. The
+                             caret and the selection are the input's own.
+
+                             js/poster.js positions it over the pill and hides it
+                             for every other style. It is never part of an
+                             export: exports render from the canvas. -->
+                        <input type="text" id="p-query-live" class="query-live"
+                               maxlength="40" autocomplete="off" spellcheck="false"
+                               aria-label="Search text on the poster" hidden>
+                    </div>
                 </div>
             </section>
 

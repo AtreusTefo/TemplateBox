@@ -6212,10 +6212,60 @@ textarea.rt-inline-editor {
     justify-content: center;
 }
 
-.poster-stage canvas {
+/* The canvas and the search-bar input share one box, so the input can be
+   positioned against the canvas's rendered size rather than the pane's.
+   Width is capped here rather than on the canvas, and the canvas fills it. */
+.poster-frame {
+    position: relative;
     width: 100%;
     max-width: 26rem;
+    line-height: 0;
+}
+
+.poster-stage canvas {
+    width: 100%;
     height: auto;
+}
+
+/* Typing straight onto the poster's search bar. Transparent text, because the
+   canvas underneath is what draws the words -- see poster.html. Everything
+   here that could paint is switched off; what is left is a caret and a hit
+   area. js/poster.js sets position, size and colour from the same constants
+   the renderer uses. */
+.query-live {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: transparent;
+    font-family: "Inter", system-ui, sans-serif;
+    line-height: 1;
+    letter-spacing: 0;
+    /* Sixteen pixels and then SCALED, rather than simply set small.
+
+       iOS zooms the whole page when a field it focuses computes under 16px, and
+       the type on this poster is far under it on a phone -- about 6px at 390.
+       A transform changes what is rendered without changing the computed size,
+       which is the value iOS actually reads, so the caret still sits on the
+       drawn glyphs and the page still does not lurch. js/poster.js sets the
+       scale; the origin has to be the top-left corner or the box would grow
+       about its centre and slide off the pill. */
+    font-size: 16px;
+    transform-origin: 0 0;
+    /* Chromium paints the selection band even when the text is transparent,
+       which is the one piece of feedback that would otherwise be missing. */
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.query-live::selection {
+    background: rgba(120, 160, 255, 0.45);
+}
+
+.query-live:focus-visible {
+    outline: 0;
 }
 
 .upload-hint {

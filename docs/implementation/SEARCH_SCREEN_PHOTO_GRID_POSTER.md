@@ -2,6 +2,8 @@
 
 Date: September 10, 2026
 Status: Implemented
+Updated: September 10, 2026 -- the account circle takes a photograph, the search
+bar is typed on directly, and the screen has a light mode
 
 ## Summary
 
@@ -12,13 +14,14 @@ playing card and the diagonal split.
 
 | File | Change |
 | --- | --- |
-| `js/poster.js` | the `browser` layout: constants, icons, both renderers, six photo slots |
-| `poster.html` | the grid's upload, card selector and search text |
-| `css/style.css` | the catalog miniature |
+| `js/poster.js` | the `browser` layout: constants, icons, both renderers, seven photo slots, two colour themes |
+| `poster.html` | the grid's upload, slot selector, search text, screen mode, and the inline search bar |
+| `css/style.css` | the catalog miniature, and the search bar's inline input |
 | `index.html`, `js/admin.js` | the catalog card and its picker entry |
 
-The visitor uploads up to six photographs in one gesture, moves and resizes each
-of them, and types their own words into the search bar.
+The visitor uploads up to six photographs in one gesture plus one for the
+account circle, moves and resizes each of them, types their own words straight
+onto the search bar, and picks a light or dark screen.
 
 ## What the artwork is, and what was kept
 
@@ -77,11 +80,14 @@ their SOURCE files' own coordinates and viewBoxes, not normalised to a unit box
 the way the suit pips are.
 
 ```js
-lab: { view: [89, 32, 23, 24], parts: [ { fill: "#FFFFFF", d: "M105,37.21l-9,0..." } ] }
+lab: { view: [89, 32, 23, 24], ink: "chrome", parts: [ { d: "M105,37.21l-9,0..." } ] }
 ```
 
-Nothing was retyped, so there is no transcription to get wrong. Placement is a
-transform instead:
+Nothing was retyped, so there is no transcription to get wrong. The COLOUR is
+the one thing not carried over: each icon is monochrome in its source, so it
+names a role in `SCREEN_THEMES` rather than a hex, which is what lets the same
+five paths serve both the dark screen and the light one. Placement is a
+transform:
 
 ```
 translate(x, y)  ->  scale(w / viewW, h / viewH)  ->  translate(-viewX, -viewY)
@@ -106,8 +112,8 @@ The editor held `photo` and `photoB`. Two was the most any layout wanted, and
 It is one indexed store now:
 
 ```js
-const photos = new Array(GRID_SLOTS).fill(null);   // GRID_SLOTS = 6
-state.views = [ {zoom,x,y} x 6 ]
+const photos = new Array(SLOT_COUNT).fill(null);   // 6 cards + the account circle
+state.views = [ {zoom,x,y} x 7 ]
 ```
 
 Slot 0 is "the photograph" for every layout that has one, and slot 1 is the
@@ -148,9 +154,9 @@ a second and then a sixth photograph is exactly how it ends up in three.
 Every other layout prints its "Upload a photo to begin" panel, and rightly: one
 empty photo panel means an unfinished poster, and saying so is a service.
 
-Six cards are different. Four photographs and two clean white cards is a
-composition somebody may well want, so an empty card here is left as the
-artwork's plain white. The slot numbers and the selected-card outline live in
+Six cards are different. Four photographs and two clean cards is a composition
+somebody may well want, so an empty card here is left as the theme's own flat
+fill -- white on the dark screen, its pill grey on the light one. The slot numbers and the selected-card outline live in
 `drawGridChrome()`, which `render()` calls and `paint()` does not -- and `paint()`
 is what every export renders through.
 
@@ -243,10 +249,159 @@ and are still reset to K and Q by the spades card.
 - The rendered poster against the source artwork side by side: same composition,
   same proportions, same colours.
 
+## Three additions, September 10, 2026
+
+The account circle takes a photograph, the search bar can be typed on directly,
+and the whole screen has a light mode. All three were asked for together and
+they land in the same three places, so they are recorded together.
+
+### The account circle is the seventh photograph
+
+It was white, "as the artwork has it", and listed under Not done below on the
+grounds that a seventh upload target for a 39pt circle was not worth the
+control. That was wrong twice over: it is the one place on this poster where a
+FACE belongs, and it is what a real account picture is.
+
+The photo store went from six slots to seven, and the two numbers are now kept
+apart on purpose:
+
+```js
+const GRID_SLOTS = 6;    // cards in the masonry: what an upload fills in order
+const AVATAR_SLOT = 6;   // the circle, last
+const SLOT_COUNT = 7;    // how long the array is
+```
+
+The circle is LAST rather than first so every index the grid already used keeps
+the number it had. A card the visitor knows as "card 3" must not become card 4
+because a slot was added in front of it.
+
+Three details that are not obvious:
+
+**Its own upload.** `uploadTargets()` still walks `GRID_SLOTS`, so a batch of
+six photographs chosen for the masonry can never silently land in the circle.
+The circle has a separate input. The wrap-around in that function also takes its
+modulo against a card index now: the circle can be the SELECTED slot, and
+`6 % 6` would quietly restart at card 1.
+
+**Hit-tested as a circle, not as its bounding box.** The box would claim the
+paper at each corner, and the corner nearest the page edge is somewhere a
+caption can legitimately sit. Verified: with a photograph in the circle, the
+corner of its bounding box still samples the page colour, which a square draw
+would have tinted.
+
+**Cover-fitted into the SQUARE around the circle**, then clipped. So a portrait
+crops the way it does in every other slot and the framing controls mean the same
+thing here as they do on a card -- drag to move, the slider to size.
+
+### Typing on the search bar itself
+
+The words were editable from the control panel, and clicking the bar jumped
+there. Now the bar is typed on where it is.
+
+A real `<input>` positioned over the pill, not a caret drawn into the canvas.
+Drawing one means writing a caret, a selection model and IME handling by hand,
+for one line of text; an input gets all three from the browser and costs the
+positioning instead.
+
+**Its text is transparent and the canvas underneath draws the words.** That is
+the part worth keeping: there is still ONE renderer, so what is on screen is
+literally the thing that downloads, and there are never two copies of the same
+string sitting a fraction of a pixel apart. What the input contributes is the
+caret, the selection band and the keyboard.
+
+Position, width and type size come from the same constants `paintScreen()` draws
+from, converted through the canvas's RENDERED size rather than its pixel size --
+the canvas is 990px wide internally and whatever CSS gives it on screen. The
+font size is `fitQuerySize()`, not `SCREEN.query.size`, because a long query is
+set down to fit and the caret has to land between the glyphs actually drawn.
+
+Measured rather than eyeballed, at a rendered width the editor never uses by
+default, to prove it tracks rather than happens to line up:
+
+| | input | canvas |
+| --- | --- | --- |
+| advance width of "Us, always" | 74.67px | 74.70px |
+| text origin | 109.04px | 109.04px (ink starts 110.33, the U's side bearing) |
+
+0.03px apart over ten characters, so the caret walks the same distances as the
+drawn letters. Vertically the drawn ink falls inside the input's box.
+
+**Sixteen pixels, then scaled.** The verification suite caught this and it was a
+real defect, not a checkbox: iOS zooms the whole page when it focuses a field
+whose COMPUTED font-size is under 16px, and the type on this poster is about 6px
+at a 390px viewport -- so tapping the search bar on a phone would have made the
+page lurch. The element stays at 16px and a `transform: scale()` does the
+sizing, which changes what is rendered without changing the value iOS reads.
+Width and height are divided by that scale, because they are pre-transform
+lengths, and `transform-origin` has to be the top-left corner or the box grows
+about its centre and slides off the pill. Re-measured afterwards: computed 16px,
+rendered 13.56px, advance widths 0.015px apart, origin unmoved.
+
+Two smaller decisions. **Clicking anywhere on the pill focuses the bar**, which
+is what the source artwork's own `App.js` does -- the input covers the words
+rather than the whole pill, so without it a click beside the magnifier would do
+nothing. And **Enter blurs**: there is no form here and no search to run, and
+blurring is what it appears to do on the real thing.
+
+**Both fields follow each other, and one direction is easy to miss.** Typing
+inline commits and repaints, but nothing else writes the result back to the
+panel field -- so the panel would keep its old value and the next keystroke
+there would revert everything typed on the poster. `syncQueryInput()` writes the
+panel first, before any early return, and `render()` runs after every commit.
+
+### Light mode
+
+The same screen by day. Only the colours move: `SCREEN` holds the geometry and
+`SCREEN_THEMES` holds every colour and nothing else, so the two modes cannot
+drift apart in layout however far apart they are in ink. A third would be one
+entry.
+
+The five icons stopped carrying literal fills and name a ROLE instead
+(`chrome`, `icon`, `searchIcon`), which is what lets the same five paths serve
+both modes without a second copy of any of them. Their `d` strings are still
+verbatim from the design folder.
+
+Light is not an inversion. A straight negative gives pure black on pure white
+with a #B1A9A8 pill, which is not what a light search page looks like; these are
+the greys the real one uses. Two values needed their own decision:
+
+- **An empty card cannot stay white.** White cards on near-black paper are the
+  artwork; white cards on a white page are invisible. Light fills them with its
+  own pill grey, so the masonry reads as a masonry before a single photograph is
+  uploaded.
+- **The hearts change red.** The dark theme uses the artwork's #E93625, lighter
+  than the card layouts' #BE1E2D, because a dark ground needs a lighter red to
+  read as red at all. On white paper that argument reverses, so light uses
+  #BE1E2D -- the red this site already prints on white.
+
+It is one template with a mode, not two templates: a Screen Mode control in the
+editor, persisted and undoable, with a single dark catalog card. The card is the
+artwork as supplied.
+
+### Verified
+
+- All seven slots appear in the picker, the seventh named "Profile circle"
+  rather than "Card 7", from one `slotName()` that both the menu and the size
+  slider's label read.
+- The circle's clip is genuinely circular: with a photograph in it, the corner
+  of its bounding box still samples the page colour.
+- Typing on the poster updates the panel field; typing in the panel updates the
+  poster; undo moves both.
+- Theme switching moves page, pill, avatar, rule, empty cards and hearts, and
+  the inline caret's colour with them. Empty cards read `#FFFFFF` on dark and
+  `#F1F3F4` on light.
+- The SVG export matches the canvas at ten sample points IN LIGHT MODE with
+  seven photographs, worst difference 1/255 -- the embedded JPEG round trip --
+  including the avatar's circular clip, whose bounding-box corner is the page
+  colour in both renderers.
+- The new `.poster-frame` wrapper is layout-neutral: the canvas still measures
+  416 x 588.3 with no gap beneath it.
+
 ## Not done
 
-- **The account circle is not a photo slot.** It is white, as the artwork has
-  it. A seventh upload target for a 39pt circle was not worth the control.
+These are what is still not done AFTER the three additions above; the account
+circle and the light mode were on this list until September 10, 2026.
+
 - **The active tab is fixed on Images**, which is the tab a page of photographs
   would be on. Making it selectable is a menu for a detail nobody looking at the
   poster will read.
