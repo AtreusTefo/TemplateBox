@@ -417,6 +417,45 @@
                         </div>
                     </div>
 
+                    <!-- The music player's own fields. Hidden for every
+                         other style, the way the card and grid fields are:
+                         a control that is visible but inert reads as broken. -->
+                    <div id="p-player-fields" hidden>
+                        <div class="field">
+                            <label for="p-song">Song Title</label>
+                            <input type="text" id="p-song" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field">
+                            <label for="p-artist">Artist Name</label>
+                            <input type="text" id="p-artist" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field field-row">
+                            <div>
+                                <label for="p-elapsed">Time Played</label>
+                                <input type="text" id="p-elapsed" maxlength="8" autocomplete="off">
+                            </div>
+                            <div>
+                                <label for="p-total">Track Length</label>
+                                <input type="text" id="p-total" maxlength="8" autocomplete="off">
+                            </div>
+                        </div>
+                        <p class="upload-hint">The dot on the progress bar follows these two. Anything that is not a time leaves it where the artwork put it.</p>
+
+                        <div class="field">
+                            <label for="p-image-code">Scan Code</label>
+                            <input type="file" id="p-image-code" accept="image/*">
+                            <p class="upload-hint">Optional. Save the code image from your music app's share menu, then upload it here. Nothing is fetched for you: this editor never talks to another service.</p>
+                            <p class="form-error" id="p-image-code-error" role="alert"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-player-theme">Screen Mode</label>
+                            <select id="p-player-theme"></select>
+                        </div>
+                    </div>
+
                     <!-- Framing. The slider is the accessible route to what
                          dragging on the preview does by hand, and the reset is
                          the only way back to the plain cover fit once a photo

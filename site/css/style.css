@@ -2619,6 +2619,157 @@ body.is-nav-hidden .site-header:focus-within {
     color: #E93625;
 }
 
+/* The music-player tile. Like the search screen's it carries data-layout and
+   no data-suit, because this layout has no pip and no corner index.
+
+   Percentages are the artwork's own fractions of its 597.45 x 841.89 page, so
+   the tile and the poster it opens are the same composition. The chevron and
+   the three dots are a pixel each at this size and are left out rather than
+   rendered as grit; everything else is here, including the scan-code strip,
+   which was left out of the first version and took a third of the tile's height
+   with it -- the poster is bottom-heavy without it and the tile looked
+   unfinished rather than minimal. */
+.mock-doc.poster[data-layout="player"] {
+    display: block;
+    position: relative;
+    container-type: inline-size;
+    border: 0;
+    padding: 0;
+    background-color: #231F20;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-album {
+    position: absolute;
+    left: 15.24%;
+    top: 4.85%;
+    width: 69.65%;
+    height: 50.24%;
+    border-radius: 2px;
+    background-color: #FFFFFF;
+}
+
+/* Two bars standing in for the title and the artist, at their own baselines
+   and weights: the title is the taller one. */
+.mock-doc.poster[data-layout="player"] .mk-song,
+.mock-doc.poster[data-layout="player"] .mk-artist {
+    position: absolute;
+    left: 15.73%;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-song {
+    top: 59.6%;
+    width: 38%;
+    height: 3.2%;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-artist {
+    top: 64.4%;
+    width: 24%;
+    height: 2%;
+    opacity: 0.75;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-heart {
+    position: absolute;
+    left: 78.7%;
+    top: 60.1%;
+    width: 6.7%;
+    height: 4.4%;
+    color: #55BA5D;
+    font-size: 0.5rem;
+    font-size: 6cqw;
+    line-height: 1;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-bar {
+    position: absolute;
+    left: 15.43%;
+    top: 69.8%;
+    width: 69.5%;
+    height: 0.6%;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.74);
+}
+
+/* The knob, at the artwork's own 25.6 per cent of the track rather than at the
+   times' 21.8: the tile has no times to follow. */
+.mock-doc.poster[data-layout="player"] .mk-bar::after {
+    content: "";
+    position: absolute;
+    left: 25.6%;
+    top: 50%;
+    width: 2.3%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: #FFFFFF;
+    transform: translate(-50%, -50%);
+}
+
+/* The transport row as five marks, the middle one the play disc. */
+.mock-doc.poster[data-layout="player"] .mk-transport {
+    position: absolute;
+    left: 15.4%;
+    top: 76.5%;
+    width: 69.6%;
+    height: 8.5%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-transport span {
+    width: 7%;
+    height: 30%;
+    border-radius: 1px;
+    background-color: #FFFFFF;
+}
+
+/* The play disc. aspect-ratio rather than a width, because `border-radius: 50%`
+   on a box that is not square is an ELLIPSE -- which is what the first version
+   drew, and it is obvious at a glance and invisible in any measurement. */
+.mock-doc.poster[data-layout="player"] .mk-transport span:nth-child(3) {
+    width: auto;
+    height: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+}
+
+/* The scan code, at the artwork's own box: a dark plate with a few bars
+   standing in for the pattern. Never the real thing -- the poster's code is
+   whatever the visitor uploads, and this repository ships none. */
+.mock-doc.poster[data-layout="player"] .mk-code {
+    position: absolute;
+    left: 11.48%;
+    top: 85.43%;
+    width: 77.13%;
+    height: 13.68%;
+    border-radius: 2px;
+    background-color: #0A0A0A;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 7%;
+}
+
+/* THIN bars with air between them, which is the only thing that reads as a
+   scannable code rather than a row of pills. The first version gave each bar
+   `flex: 1` and they came out a tenth of the strip wide apiece -- measurably
+   present, visibly wrong. */
+.mock-doc.poster[data-layout="player"] .mk-code span {
+    flex: 0 0 3.4%;
+    border-radius: 999px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(3n+1) { height: 62%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(3n+2) { height: 30%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(3n) { height: 84%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(4) { height: 45%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(7) { height: 72%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(10) { height: 38%; }
+
 .mk-index-head {
     left: 2%;
     top: 4%;

@@ -148,6 +148,14 @@
         browser: {
             frame: null, trim: null, label: "Search Screen, Six Photos",
             layout: "browser", suit: "hearts"
+        },
+        /* The fourth layout: a phone music player, one album photograph and one
+           scannable code. No `suit` and no `ranks` -- it has neither a pip nor
+           a corner index, and styleRanks() is only consulted for styles that
+           declare a pairing. */
+        player: {
+            frame: null, trim: null, label: "Now Playing, Music Poster",
+            layout: "player"
         }
     };
 
@@ -348,6 +356,127 @@
         return SCREEN_THEMES[state.screenTheme] || SCREEN_THEMES[DEFAULT_SCREEN_THEME];
     }
 
+    /* The music-player layout, traced from the supplied "spotify template.svg".
+
+       That file holds BOTH colourways on one artboard, side by side: the light
+       one is the dark one translated by (+646.77, -6.10). Only the dark theme
+       is traced here and the light one is a palette, which is what keeps the
+       two from drifting apart in layout the way SCREEN and SCREEN_THEMES do.
+
+       Points, not page fractions, for the same reason SCREEN uses them: every
+       number below can be read straight off the source SVG and checked, where
+       `x / 597.45` forty times over can only be trusted.
+
+       THE ARTWORK DISAGREES WITH ITSELF IN THREE PLACES, all of them hand
+       placement rather than intent, and all three are resolved here rather than
+       averaged:
+
+       - The two time baselines are 612.6 and 615.31. They read as one row, so
+         both are drawn on the FIRST, and the 2.7pt is discarded.
+       - The left edge is 91.04 for the album box, 92.2 for the progress track
+         and 93.97 for the title. Those are kept AS THEY ARE: they are what the
+         artwork looks like, the differences are under a millimetre on A4, and
+         squaring them up would be redrawing somebody's poster rather than
+         tracing it.
+       - The knob sits at 25.6 per cent of the track while the times say 1:07 of
+         5:07, which is 21.8. See playedFraction(): the knob follows the times,
+         because a poster reading 1:07 of 3:48 with the knob at four fifths is
+         wrong in a way nobody has to measure to see. The artwork's own figure
+         survives as the fallback for when the fields are not times. */
+    const PLAYER = {
+        page: { w: 597.45, h: 841.89 },
+        album: { x: 91.04, y: 40.85, w: 416.15, h: 422.99, r: 13.53, stroke: 3 },
+        dots: { cx: 493.96, r: 2.07, y: [22.42, 29.72, 37.02] },
+        title: { x: 93.97, baseline: 521.12, size: 32, right: 462 },
+        artist: { x: 93.96, baseline: 549.97, size: 21, right: 462 },
+        track: { x1: 92.2, x2: 507.52, y: 589.14, width: 5, dim: 0.74 },
+        knob: { r: 9.72 },
+        /* Both times on the first baseline; `squeeze` is the artwork's own
+           scale(0.87 1), a horizontal condense rather than a narrower face. */
+        time: { baseline: 612.6, size: 19.75, squeeze: 0.87, leftX: 92.2, rightX: 472.31 },
+        play: { cx: 299.62, cy: 667.67, r: 35.88 },
+        code: { x: 68.6, y: 719.22, w: 460.8, h: 115.2 },
+        /* The fallback when either time field is not a time: the artwork's own
+           knob position, (198.63 - 92.2) / (507.52 - 92.2). */
+        fallbackPlayed: 0.2563
+    };
+
+    const PLAYER_THEMES = {
+        dark: {
+            label: "Dark",
+            /* #231F20, not #000000. The SVG says #231F20 and the designer's own
+               exported PNG samples #000000 at the same point -- a real
+               disagreement between the master and the render. The master wins:
+               it is the editable file and that value is what was typed. On
+               screen the difference is invisible; in print it is a rich black
+               against a flat one. */
+            page: "#231F20",
+            ink: "#FFFFFF",
+            accent: "#55BA5D",
+            albumFill: "#FFFFFF",
+            albumStroke: null
+        },
+        light: {
+            label: "Light",
+            page: "#FFFFFF",
+            ink: "#231F20",
+            accent: "#55BA5D",
+            /* The empty album is an OUTLINE here rather than a fill. A white
+               box on white paper is not a box, which is the same problem the
+               search screen's empty cards have and the same shape of answer. */
+            albumFill: null,
+            albumStroke: "#231F20"
+        }
+    };
+
+    const DEFAULT_PLAYER_THEME = "dark";
+
+    function playerTheme() {
+        return PLAYER_THEMES[state.playerTheme] || PLAYER_THEMES[DEFAULT_PLAYER_THEME];
+    }
+
+    /* The player's glyphs, verbatim from the SVG and already in PAGE
+       coordinates -- unlike the search screen's five icons, which carry their
+       source files' own viewBoxes. So the `view` here is the page itself and
+       the transform that places them is just the page scale.
+
+       `rule` matters on exactly one of them. The repeat glyph is drawn with
+       fill-rule: evenodd in the source (its class carries `fill-rule:evenodd`),
+       and filled nonzero it comes out as a solid blob with the arrow's counter
+       filled in. Same class of trap as the club pip's winding, and visible
+       immediately once drawn. */
+    const PLAYER_VIEW = [0, 0, 597.45, 841.89];
+
+    const PLAYER_ART = {
+        chrome: {
+            view: PLAYER_VIEW, ink: "ink",
+            parts: [
+                { stroke: true, width: 3, d: "M100.37,24.63L109.36,35.29L117.99,24.63" },
+                { d: "M103.62,667.67l.78-1.1,1.32-1.83c-2.18-2.93-4.6-5.3-7.45-5.3H92.18v3.79h6.09c1.66,0,3.45,1.92,5.35,4.44Z" },
+                { d: "M119.75,670.76v4.7h-4.46c-1.79,0-3.5-1.94-5.27-4.46l-.46.69c-.47.71-.94,1.42-1.44,2.14,2.3,2.95,4.7,5.37,7.17,5.37h4.46v4.69l3.34-3.28,3.35-3.28L123.09,674Z" },
+                { d: "M123.09,658l-3.34-3.29v4.7h-4.46c-6.35,0-12.25,16-17,16H92.18v3.79h6.09c7.41,0,11.87-16,17-16h4.46v4.69l3.34-3.28,3.35-3.28Z" },
+                { d: "M189.53,665.11V653h-6.32V682.3h6.32V670.22l21,12.14V653Z" },
+                { d: "M409.71,654.78v12.07l-21-12.14V684.1l21-12.13V684H416V654.78Z" },
+                { rule: "evenodd", d: "M500.4,679.62h-6.21l3.29,3.46a2.44,2.44,0,0,1,0,3.24,2.15,2.15,0,0,1-3.14.07l-6.73-7.09h0a2.43,2.43,0,0,1,0-3.31l6.73-7.09a2.15,2.15,0,0,1,3.14,0,2.45,2.45,0,0,1,0,3.31l-2.59,2.73h5.51a3.06,3.06,0,0,0,3-3.14v-9.5a3.06,3.06,0,0,0-3-3.14H479.73a3.06,3.06,0,0,0-3,3.14v9.5a3.06,3.06,0,0,0,3,3.14h1.95a2.34,2.34,0,0,1,0,4.68h-1.95a7.63,7.63,0,0,1-7.42-7.82v-9.5a7.64,7.64,0,0,1,7.42-7.82H500.4a7.64,7.64,0,0,1,7.42,7.82v9.5A7.63,7.63,0,0,1,500.4,679.62Z" }
+            ]
+        },
+        /* The play triangle is the PAGE colour, not the ink: it is a hole in the
+           white disc behind it, so on the light theme it is white. */
+        playIcon: {
+            view: PLAYER_VIEW, ink: "page",
+            parts: [{ d: "M289.63,651.3v29.39l26-14.7Z" }]
+        },
+        /* The one colour that does not flip between the themes. */
+        heart: {
+            view: PLAYER_VIEW, ink: "accent",
+            parts: [{ d: "M490.06,512.22a11.35,11.35,0,0,0-9.67-5.88A10.19,10.19,0,0,0,470,516.71c0,11.41,6.23,13.14,20.05,26.27,13.83-13.13,20.06-14.86,20.06-26.27a10.19,10.19,0,0,0-10.38-10.37A11.37,11.37,0,0,0,490.06,512.22Z" }]
+        }
+    };
+
+    Object.keys(PLAYER_ART).forEach((k) => {
+        PLAYER_ART[k].parts.forEach((p) => { p.path = new Path2D(p.d); });
+    });
+
     /* Six cards in the masonry, plus the account circle above the search bar,
        which is a seventh photograph and not a decoration.
 
@@ -359,7 +488,14 @@
        must not become card 4 because a slot was added in front of it. */
     const GRID_SLOTS = 6;
     const AVATAR_SLOT = 6;
-    const SLOT_COUNT = 7;
+    /* The music player's scannable code, appended for the same reason the
+       circle was: every index already in use keeps the number it had.
+
+       Its ALBUM artwork is not here -- that is slot 0, "the photograph" every
+       single-photo layout uses, so switching between the card and the player
+       carries the picture across the way it already does everywhere else. */
+    const CODE_SLOT = 7;
+    const SLOT_COUNT = 8;
 
     /* The artwork's icons, kept in their SOURCE files' own coordinates and
        viewBoxes rather than normalised to a unit box like the suit pips above.
@@ -534,6 +670,58 @@
        to be anyone. The field's hint is where the suggestion belongs. */
     const DEFAULT_QUERY = "Us, always";
 
+    /* The music player's four words, and the two rules they follow.
+
+       The defaults are the artwork's own -- "Song Title", "Artist Name", 1:07
+       and 5:07 -- because unlike the search bar's query these ARE placeholders
+       in the source rather than somebody's real content, so shipping them
+       copies nobody's poster. */
+    const DEFAULT_SONG = "Song Title";
+    const DEFAULT_ARTIST = "Artist Name";
+    const DEFAULT_ELAPSED = "1:07";
+    const DEFAULT_TOTAL = "5:07";
+
+    const LINE_MAX_CHARS = 40;
+    const TIME_MAX_CHARS = 8;
+
+    function cleanLine(value) {
+        return String(value === null || value === undefined ? "" : value)
+            .replace(/\s+/g, " ")
+            .slice(0, LINE_MAX_CHARS);
+    }
+
+    /* Free text, not a parsed duration. A visitor may well want "--:--" or
+       "forever", and a field that refuses anything but digits would be an
+       editor arguing with a poster. playedFraction() reads it leniently and
+       falls back when it cannot; it never rewrites what was typed. */
+    function cleanTime(value) {
+        return String(value === null || value === undefined ? "" : value)
+            .replace(/\s+/g, "")
+            .slice(0, TIME_MAX_CHARS);
+    }
+
+    /* Where the knob sits, from the two time fields rather than a control of
+       its own. m:ss and h:mm:ss both parse; anything else -- and any total of
+       zero -- takes the artwork's own position instead of dividing by nothing. */
+    function playedFraction() {
+        const secs = (text) => {
+            const parts = String(text).split(":");
+            if (!parts.length || parts.length > 3) { return null; }
+            let total = 0;
+            for (let i = 0; i < parts.length; i += 1) {
+                if (!/^\d{1,2}$/.test(parts[i])) { return null; }
+                total = total * 60 + Number(parts[i]);
+            }
+            return total;
+        };
+        const a = secs(state.elapsed);
+        const b = secs(state.total);
+        if (a === null || b === null || b <= 0) {
+            return PLAYER.fallbackPlayed;
+        }
+        return Math.min(1, Math.max(0, a / b));
+    }
+
     /* One line, inside the cap. Runs of whitespace collapse to a single space,
        which is what turns a pasted paragraph into one line rather than letting
        a newline draw over the tab strip -- but a TRAILING space survives,
@@ -669,6 +857,11 @@
         rankFoot: FRAME_STYLES.hearts.ranks.foot,
         query: DEFAULT_QUERY,
         screenTheme: DEFAULT_SCREEN_THEME,
+        playerTheme: DEFAULT_PLAYER_THEME,
+        song: DEFAULT_SONG,
+        artist: DEFAULT_ARTIST,
+        elapsed: DEFAULT_ELAPSED,
+        total: DEFAULT_TOTAL,
         /* One framing per photo slot, indexed to match `photos`. */
         views: defaultViews(),
         texts: [defaultText("t1", "")],
@@ -692,6 +885,8 @@
             name: state.name, size: state.size, frame: state.frame,
             rankHead: state.rankHead, rankFoot: state.rankFoot,
             query: state.query, screenTheme: state.screenTheme,
+            playerTheme: state.playerTheme, song: state.song, artist: state.artist,
+            elapsed: state.elapsed, total: state.total,
             views: state.views, texts: state.texts
         });
     }
@@ -706,6 +901,12 @@
         state.query = cleanQuery(parsed.query);
         state.screenTheme = SCREEN_THEMES[parsed.screenTheme]
             ? parsed.screenTheme : DEFAULT_SCREEN_THEME;
+        state.playerTheme = PLAYER_THEMES[parsed.playerTheme]
+            ? parsed.playerTheme : DEFAULT_PLAYER_THEME;
+        state.song = cleanLine(parsed.song);
+        state.artist = cleanLine(parsed.artist);
+        state.elapsed = cleanTime(parsed.elapsed);
+        state.total = cleanTime(parsed.total);
         state.views = normalizeViews(parsed.views);
         state.texts = parsed.texts;
         if (!state.texts.some((t) => t.id === state.sel)) {
@@ -792,6 +993,11 @@
             rankFoot: TB.sanitize(state.rankFoot),
             query: TB.sanitize(state.query),
             screenTheme: state.screenTheme,
+            playerTheme: state.playerTheme,
+            song: TB.sanitize(state.song),
+            artist: TB.sanitize(state.artist),
+            elapsed: TB.sanitize(state.elapsed),
+            total: TB.sanitize(state.total),
             size: state.size,
             texts: state.texts.map((t) => {
                 const copy = Object.assign({}, t);
@@ -827,6 +1033,18 @@
             : cleanQuery(TB.desanitize(String(saved.query)));
         state.screenTheme = SCREEN_THEMES[saved.screenTheme]
             ? saved.screenTheme : DEFAULT_SCREEN_THEME;
+        state.playerTheme = PLAYER_THEMES[saved.playerTheme]
+            ? saved.playerTheme : DEFAULT_PLAYER_THEME;
+        /* Same rule as the ranks and the search query: only `undefined` takes
+           the default, because an empty string is a line the visitor cleared. */
+        state.song = saved.song === undefined
+            ? DEFAULT_SONG : cleanLine(TB.desanitize(String(saved.song)));
+        state.artist = saved.artist === undefined
+            ? DEFAULT_ARTIST : cleanLine(TB.desanitize(String(saved.artist)));
+        state.elapsed = saved.elapsed === undefined
+            ? DEFAULT_ELAPSED : cleanTime(TB.desanitize(String(saved.elapsed)));
+        state.total = saved.total === undefined
+            ? DEFAULT_TOTAL : cleanTime(TB.desanitize(String(saved.total)));
         state.size = PAPER[saved.size] ? saved.size : "A3";
         state.name = TB.desanitize(String(saved.name || "")).trim() || "Untitled poster";
 
@@ -1333,9 +1551,9 @@
     /* One icon, placed by transform: to the target box, scaled from the source
        viewBox, then back by the viewBox's own origin -- which is what lets the
        path data stay verbatim. artSVG() emits the identical chain. */
-    function drawArt(c, art, x, y, w, h) {
+    function drawArt(c, art, x, y, w, h, theme) {
         const v = art.view;
-        const ink = screenTheme()[art.ink];
+        const ink = (theme || screenTheme())[art.ink];
         c.save();
         c.translate(x, y);
         c.scale(w / v[2], h / v[3]);
@@ -1347,7 +1565,9 @@
                 c.stroke(p.path);
             } else {
                 c.fillStyle = ink;
-                c.fill(p.path);
+                /* evenodd where the source says so: the player's repeat glyph
+                   fills as a solid blob under the nonzero default. */
+                if (p.rule) { c.fill(p.path, p.rule); } else { c.fill(p.path); }
             }
         });
         c.restore();
@@ -1486,6 +1706,180 @@
         });
     }
 
+    /* ------------------------------------------------------------------
+       The music-player layout
+       ------------------------------------------------------------------ */
+
+    function playerScale(W, H) {
+        return { fx: W / PLAYER.page.w, fy: H / PLAYER.page.h };
+    }
+
+    /* The album box, which is where the photograph goes and the one rectangle
+       on this layout the pointer can reach. */
+    function albumRect(W, H) {
+        const s = playerScale(W, H);
+        const a = PLAYER.album;
+        return { x: a.x * s.fx, y: a.y * s.fy, w: a.w * s.fx, h: a.h * s.fy };
+    }
+
+    /* The scannable code's box. Kept beside albumRect() so the two slots this
+       layout owns are derived the same way. */
+    function codeRect(W, H) {
+        const s = playerScale(W, H);
+        const c = PLAYER.code;
+        return { x: c.x * s.fx, y: c.y * s.fy, w: c.w * s.fx, h: c.h * s.fy };
+    }
+
+    /* One line of the player's type, set down when it would reach the heart.
+
+       The artwork's face is Helvetica World Bold and Inter is not metrically
+       identical to it, so a title that fits there can overrun here -- and what
+       it overruns into is the green heart, which is the one thing on this row
+       that cannot move. Same treatment as the rank letters and the search
+       query: measured and scaled to fit rather than clipped. */
+    function fitLine(c, text, px, maxPx, weight) {
+        c.font = weight + " " + px + "px " + fontStack(SCREEN_FONT);
+        if (!text) {
+            return px;
+        }
+        const measured = c.measureText(text).width;
+        return measured > maxPx ? px * (maxPx / measured) : px;
+    }
+
+    /* The player: a phone's now-playing screen on A4, with one photograph in
+       the album box and one uploaded scan code along the foot.
+
+       An empty album is the ARTWORK'S own empty state -- a white panel on the
+       dark theme, an outlined one on the light -- rather than a prompt, because
+       that is a finished-looking design in the source and printing "upload a
+       photo" over it would be the editor putting its furniture on a wall. An
+       empty code box draws nothing at all, for the same reason the search
+       screen's empty cards do: a poster with no scan code is a perfectly
+       ordinary thing to want, and a placeholder there would be a caption
+       nobody asked for. Both carry preview-only prompts instead; see
+       drawPlayerChrome(). */
+    function paintPlayer(c, W, H, options) {
+        const s = playerScale(W, H);
+        const P = PLAYER;
+        const ink = playerTheme();
+
+        if (!options.transparent) {
+            c.fillStyle = ink.page;
+            c.fillRect(0, 0, W, H);
+        }
+
+        /* The album photograph, clipped to the artwork's rounded corners. */
+        const album = albumRect(W, H);
+        roundRectPath(c, album.x, album.y, album.w, album.h, P.album.r * s.fx);
+        if (photos[0]) {
+            c.save();
+            c.clip();
+            drawCoverImage(c, photos[0], album.x, album.y, album.w, album.h, state.views[0]);
+            c.restore();
+        } else if (!options.transparent) {
+            if (ink.albumFill) {
+                c.fillStyle = ink.albumFill;
+                c.fill();
+            }
+            if (ink.albumStroke) {
+                c.strokeStyle = ink.albumStroke;
+                c.lineWidth = P.album.stroke * s.fx;
+                c.stroke();
+            }
+        }
+
+        /* The chrome: chevron, transport glyphs, then the disc and its triangle.
+           drawArt() places page-space paths by the page scale, so the transform
+           is an identity translate and a scale -- see PLAYER_ART. */
+        drawArt(c, PLAYER_ART.chrome, 0, 0, W, H, ink);
+
+        c.fillStyle = ink.ink;
+        P.dots.y.forEach((cy) => {
+            c.beginPath();
+            c.arc(P.dots.cx * s.fx, cy * s.fy, P.dots.r * s.fx, 0, Math.PI * 2);
+            c.fill();
+        });
+
+        c.beginPath();
+        c.arc(P.play.cx * s.fx, P.play.cy * s.fy, P.play.r * s.fx, 0, Math.PI * 2);
+        c.fill();
+        drawArt(c, PLAYER_ART.playIcon, 0, 0, W, H, ink);
+
+        drawArt(c, PLAYER_ART.heart, 0, 0, W, H, ink);
+
+        /* Title and artist. The right limit is the heart's left edge less a
+           little air, so neither line can run into it. */
+        c.textAlign = "left";
+        c.textBaseline = "alphabetic";
+        c.fillStyle = ink.ink;
+        if (state.song) {
+            const size = fitLine(c, state.song, P.title.size * s.fx,
+                (P.title.right - P.title.x) * s.fx, "700");
+            c.font = "700 " + size + "px " + fontStack(SCREEN_FONT);
+            c.fillText(state.song, P.title.x * s.fx, P.title.baseline * s.fy);
+        }
+        if (state.artist) {
+            const size = fitLine(c, state.artist, P.artist.size * s.fx,
+                (P.artist.right - P.artist.x) * s.fx, "400");
+            c.font = "400 " + size + "px " + fontStack(SCREEN_FONT);
+            c.fillText(state.artist, P.artist.x * s.fx, P.artist.baseline * s.fy);
+        }
+
+        /* The progress bar: the whole track dimmed, the played part solid over
+           it, then the knob. Drawn in that order because the two share an end
+           and a round cap on the dim one would otherwise sit on top. */
+        const x1 = P.track.x1 * s.fx;
+        const x2 = P.track.x2 * s.fx;
+        const ty = P.track.y * s.fy;
+        const played = x1 + (x2 - x1) * playedFraction();
+        c.save();
+        c.lineCap = "round";
+        c.lineWidth = P.track.width * s.fx;
+        c.globalAlpha = P.track.dim;
+        c.strokeStyle = ink.ink;
+        c.beginPath();
+        c.moveTo(x1, ty);
+        c.lineTo(x2, ty);
+        c.stroke();
+        c.globalAlpha = 1;
+        c.beginPath();
+        c.moveTo(x1, ty);
+        c.lineTo(played, ty);
+        c.stroke();
+        c.restore();
+
+        c.fillStyle = ink.ink;
+        c.beginPath();
+        c.arc(played, ty, P.knob.r * s.fx, 0, Math.PI * 2);
+        c.fill();
+
+        /* Both times on ONE baseline -- see the note on PLAYER -- and both
+           horizontally condensed to 0.87 the way the artwork sets them. */
+        const drawTime = (text, xPt, align) => {
+            if (!text) { return; }
+            c.save();
+            c.translate(xPt * s.fx, P.time.baseline * s.fy);
+            c.scale(P.time.squeeze, 1);
+            c.font = "400 " + (P.time.size * s.fx) + "px " + fontStack(SCREEN_FONT);
+            c.textAlign = align;
+            c.fillText(text, 0, 0);
+            c.restore();
+        };
+        drawTime(state.elapsed, P.time.leftX, "left");
+        drawTime(state.total, P.time.rightX, "left");
+
+        const code = codeRect(W, H);
+        if (photos[CODE_SLOT]) {
+            c.save();
+            c.beginPath();
+            c.rect(code.x, code.y, code.w, code.h);
+            c.clip();
+            drawCoverImage(c, photos[CODE_SLOT], code.x, code.y, code.w, code.h,
+                state.views[CODE_SLOT]);
+            c.restore();
+        }
+    }
+
     /* transparent=true skips the frame, matte and placeholder fills so a PNG
        exports with a genuinely empty background rather than a white one -- the
        toggle in the download panel does this and nothing else. */
@@ -1502,6 +1896,8 @@
             paintSplit(c, W, H, options, scale);
         } else if (frame.layout === "browser") {
             paintScreen(c, W, H, options);
+        } else if (frame.layout === "player") {
+            paintPlayer(c, W, H, options);
         } else {
             const FRAME_W = frame.frame ? 60 * scale : 0;
             const MATTE_W = frame.frame ? 50 * scale : 0;
@@ -1538,8 +1934,99 @@
         }
         paint(ctx, s.w, s.h);
         drawGridChrome();
+        drawPlayerChrome();
         drawSelection();
         syncQueryInput();
+    }
+
+    /* Preview-only prompts for the player's two empty slots.
+
+       Outside paint(), which every export renders through, and for two
+       different reasons. The album's empty state is the ARTWORK'S -- a white
+       panel on the dark theme, an outlined one on the light -- and it looks
+       finished, so printing "upload a photo" over it would put the editor's
+       furniture on somebody's wall. The scan code's empty state is nothing at
+       all, because a poster without a code is an ordinary thing to want, the
+       same argument the search screen's empty cards are built on.
+
+       Neither is discoverable without this, which is the whole point: both
+       boxes are clickable and a box that looks like artwork does not say so. */
+    function drawPlayerChrome() {
+        if (layoutOf(state.frame) !== "player") {
+            return;
+        }
+        const W = canvas.width;
+        const H = canvas.height;
+        const s = playerScale(W, H);
+        const ink = playerTheme();
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "400 " + (W * 0.028) + 'px "Inter", sans-serif';
+
+        if (!photos[0]) {
+            const a = albumRect(W, H);
+            /* On the dark theme the empty album is a WHITE panel, so the prompt
+               has to be dark on it -- the page colour, not the ink. On the light
+               theme the panel is the page, so the ink is right. Getting this
+               backwards is how a prompt ends up correct, well placed and
+               invisible, which this editor has already done once. */
+            ctx.fillStyle = ink.albumFill ? ink.page : ink.ink;
+            ctx.globalAlpha = 0.55;
+            ctx.fillText("Click to add the album artwork", a.x + a.w / 2, a.y + a.h / 2);
+            ctx.globalAlpha = 1;
+        }
+
+        if (!photos[CODE_SLOT]) {
+            const c = codeRect(W, H);
+            ctx.strokeStyle = ink.ink;
+            ctx.fillStyle = ink.ink;
+            ctx.globalAlpha = 0.45;
+            ctx.lineWidth = Math.max(1, W * 0.002);
+            ctx.setLineDash([W * 0.008, W * 0.006]);
+            roundRectPath(ctx, c.x, c.y, c.w, c.h, 8 * s.fx);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillText("Click to add your scan code", c.x + c.w / 2, c.y + c.h / 2);
+            ctx.globalAlpha = 1;
+        }
+
+        /* Which slot the controls are holding, said on the PREVIEW and not only
+           in the panel. The search screen has always rung its selected card;
+           this layout had nothing to ring until its two slots became separately
+           selectable, and a selection that moves a control without moving
+           anything the visitor can see is the milder half of the fault that
+           made it selectable in the first place. On a phone the preview is a
+           separate tab from the form, so the panel's label is not an answer
+           anyone can read while looking at the poster.
+
+           Same colour, dash and weight as the grid's ring, from the same
+           reasoning: two rings that mean the same thing should not look like
+           two different things. Preview only -- render() calls this and paint()
+           does not, so it is in no export.
+
+           Drawn INSIDE the box, inset, which the grid's ring does not do and
+           this one has to. Two reasons, both found by looking at it rather than
+           by measuring it. On the box's own edge the dash straddles the border
+           of a picture that runs edge to edge -- on the code's saturated green
+           that reads as a damaged border rather than a selection. And there is
+           no room OUTSIDE the album: its top sits 1.76pt below the lowest of
+           the three header dots, where the stroke alone is 2.4pt wide, so an
+           outside ring cuts through the chevron and touches the dots. Inset, it
+           collides with nothing and reads as the crop marquee it resembles. */
+        const sel = primarySlot();
+        const box = sel === CODE_SLOT ? codeRect(W, H) : albumRect(W, H);
+        const inset = Math.max(2, W * 0.007);
+        ctx.strokeStyle = "#8A6A3B";
+        ctx.lineWidth = Math.max(1.5, W * 0.004);
+        ctx.setLineDash([W * 0.01, W * 0.008]);
+        roundRectPath(ctx, box.x + inset, box.y + inset,
+            box.w - inset * 2, box.h - inset * 2,
+            Math.max(0, (sel === CODE_SLOT ? 8 : PLAYER.album.r) * s.fx - inset));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
     }
 
     /* Preview-only chrome for the search screen: a number on every empty card,
@@ -1565,6 +2052,11 @@
             ctx.setLineDash([W * 0.01, W * 0.008]);
         };
 
+        /* The ring reads the same answer the framing controls do, so the
+           highlighted card and the card the slider is holding cannot disagree
+           -- a selection left behind by another layout rings nothing at all. */
+        const selected = primarySlot();
+
         ctx.save();
         rects.forEach((r, i) => {
             if (!photos[i]) {
@@ -1574,7 +2066,7 @@
                 ctx.textBaseline = "middle";
                 ctx.fillText(String(i + 1), r.x + r.w / 2, r.y + r.h / 2);
             }
-            if (i === state.card) {
+            if (i === selected) {
                 selectRing();
                 roundRectPath(ctx, r.x, r.y, r.w, r.h, SCREEN.grid.radius * (W / SCREEN.page.w));
                 ctx.stroke();
@@ -1586,7 +2078,7 @@
            so the selection matches the shape that is actually clickable. It
            carries no number: it is not part of the numbered run, and a digit
            inside a 39pt circle would be furniture rather than help. */
-        if (state.card === AVATAR_SLOT) {
+        if (selected === AVATAR_SLOT) {
             const sc = screenScale(W, H);
             selectRing();
             ctx.beginPath();
@@ -1824,6 +2316,17 @@
         if (layout === "browser") {
             return cardAt(pt, W, H);
         }
+        /* The player owns two boxes and neither is photoRectFor()'s single
+           answer, so it branches here for the same reason the search screen
+           does -- and photoRectFor() is left without a case for either. */
+        if (layout === "player") {
+            const px = pt.x * W;
+            const py = pt.y * H;
+            const inside = (r) => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+            if (inside(albumRect(W, H))) { return 0; }
+            if (inside(codeRect(W, H))) { return CODE_SLOT; }
+            return -1;
+        }
         const r = photoRectFor(W, H);
         const x = pt.x * W;
         const y = pt.y * H;
@@ -1841,7 +2344,11 @@
 
     /* The box a given slot's photograph is drawn into. */
     function rectForSlot(i, W, H) {
-        if (layoutOf(state.frame) !== "browser") {
+        const layout = layoutOf(state.frame);
+        if (layout === "player") {
+            return i === CODE_SLOT ? codeRect(W, H) : albumRect(W, H);
+        }
+        if (layout !== "browser") {
             return photoRectFor(W, H);
         }
         return i === AVATAR_SLOT ? avatarRect(W, H) : gridRects(W, H)[i];
@@ -1877,7 +2384,9 @@
     function openUploadFor(i) {
         const layout = layoutOf(state.frame);
         let id = "p-image";
-        if (layout === "browser") {
+        if (layout === "player") {
+            id = i === CODE_SLOT ? "p-image-code" : "p-image";
+        } else if (layout === "browser") {
             id = i === AVATAR_SLOT ? "p-image-avatar" : "p-image-grid";
         } else if (layout === "split" && i === 1) {
             id = "p-image-b";
@@ -1911,12 +2420,18 @@
         }
         const hit = hitTest(pt);
         if (!hit) {
-            /* A click on a grid card selects it whether or not there is a
+            /* A click on a photo slot selects it whether or not there is a
                photograph in it, and then falls through to the drag below -- so
-               one press on a filled card both points the controls at it and
+               one press on a filled slot both points the controls at it and
                starts moving it, which is what the text elements have always
-               done. */
-            const card = cardAt(pt, canvas.width, canvas.height);
+               done.
+
+               slotAt() rather than cardAt(): cardAt() answers -1 on every
+               layout but the search screen, so on the player a click on the
+               scan code selected nothing and the size slider went on holding
+               the album. slotAt() delegates to cardAt() on the search screen,
+               so that layout's behaviour is unchanged. */
+            const card = slotAt(pt, canvas.width, canvas.height);
             if (card !== -1 && card !== state.card) {
                 state.card = card;
                 syncPhotoControls();
@@ -2113,7 +2628,15 @@
         syncPhotoControls();
     }
 
-    bindPhotoInput("p-image", "p-image-error", (img) => fillSlot(0, img));
+    /* An upload SELECTS the slot it filled. The framing group hides when the
+       selected slot is empty, so without this a player poster carrying a scan
+       code and no album offers no control to frame the code with -- the
+       selection would be sitting on an album nobody uploaded. On every layout
+       whose only slot is 0 this changes nothing. */
+    bindPhotoInput("p-image", "p-image-error", (img) => {
+        state.card = 0;
+        fillSlot(0, img);
+    });
     bindPhotoInput("p-image-b", "p-image-b-error", (img) => fillSlot(1, img));
     bindPhotoInput("p-image-avatar", "p-image-avatar-error", (img) => fillSlot(AVATAR_SLOT, img));
 
@@ -2189,19 +2712,102 @@
         });
     })();
 
-    /* Which framing the shared size slider drives: the selected card on the
-       search screen, and slot 0 on every other layout, which is the only
-       photograph they have. Read at event time rather than bound once, because
-       the selection moves. */
-    /* What a slot is called, in the one place both the menu and the slider
-       label read from, so they cannot disagree about which photograph the
-       controls are pointing at. */
-    function slotName(i) {
-        return i === AVATAR_SLOT ? "Profile circle" : "Card " + (i + 1);
+    /* The player's scan code. One more slot through the one mime gate. */
+    bindPhotoInput("p-image-code", "p-image-code-error", (img) => {
+        state.card = CODE_SLOT;
+        fillSlot(CODE_SLOT, img);
+    });
+
+    /* The four text fields. Same two events as the ranks and the query and for
+       the same reasons: typing coalesces into one history entry per burst, and
+       `change` catches a paste committed by blurring. */
+    [["p-song", "song", cleanLine], ["p-artist", "artist", cleanLine],
+     ["p-elapsed", "elapsed", cleanTime], ["p-total", "total", cleanTime]]
+        .forEach((entry) => {
+            const el = byId(entry[0]);
+            if (!el) {
+                return;
+            }
+            const apply = (coalesceKey) => {
+                const next = entry[2](el.value);
+                if (state[entry[1]] === next) {
+                    return;
+                }
+                beginChange();
+                state[entry[1]] = next;
+                commit(coalesceKey);
+            };
+            el.addEventListener("input", () => apply("player-" + entry[1]));
+            el.addEventListener("change", () => apply(null));
+        });
+
+    const playerThemeSelect = byId("p-player-theme");
+    if (playerThemeSelect) {
+        playerThemeSelect.addEventListener("change", () => {
+            beginChange();
+            state.playerTheme = PLAYER_THEMES[playerThemeSelect.value]
+                ? playerThemeSelect.value : DEFAULT_PLAYER_THEME;
+            commit();
+            render();
+        });
     }
 
+    /* Which slots a layout actually DRAWS, in the order the card menu lists
+       them. SLOT_COUNT is how long the photos array is; this is how many of
+       those slots the visitor can reach on the layout in front of them, and the
+       two stopped being the same number the moment the player added a scan
+       code. The menu, the selection clamp and the framing controls all read it
+       from here, so none of them can offer a slot this poster has no room for.
+
+       Slot 0 is on every list: it is "the photograph" that every single-photo
+       layout has always used, and switching templates is meant to carry the
+       picture across rather than lose it. */
+    function slotsFor(layout) {
+        if (layout === "browser") {
+            const out = [];
+            for (let i = 0; i < GRID_SLOTS; i += 1) { out.push(i); }
+            out.push(AVATAR_SLOT);
+            return out;
+        }
+        if (layout === "player") { return [0, CODE_SLOT]; }
+        if (layout === "split") { return [0, 1]; }
+        return [0];
+    }
+
+    /* What a slot is called, in the one place both the menu and the slider
+       label read from, so they cannot disagree about which photograph the
+       controls are pointing at. The layout is part of the answer: slot 0 is a
+       playing card's photograph and the player's ALBUM, and a slider labelled
+       "Card 1 Size" over a record sleeve names the wrong thing. */
+    function slotName(i, layout) {
+        if (i === AVATAR_SLOT) { return "Profile circle"; }
+        if (i === CODE_SLOT) { return "Scan code"; }
+        if ((layout || layoutOf(state.frame)) === "player") { return "Album"; }
+        return "Card " + (i + 1);
+    }
+
+    /* Which slot the FIRST framing slider holds: the selected one wherever this
+       layout owns it, so that clicking a photograph on the preview and then
+       dragging the slider move the same picture -- and the layout's first slot
+       when the selection belongs to a different layout, which is what a visitor
+       leaves behind every time they switch templates without touching anything.
+
+       It answered 0 for everything but the search screen, which was right while
+       every other layout had one photograph. The player has two, so selecting
+       its scan code and reaching for the size slider resized the album instead.
+
+       The split layout is the deliberate exception and still answers 0: its
+       lower half has a slider of its own, and both pointing at slot 1 would be
+       two controls fighting over one photograph.
+
+       Called at event time rather than bound once, because the selection
+       moves -- which is why the slider table below passes this function rather
+       than a slot number. */
     function primarySlot() {
-        return layoutOf(state.frame) === "browser" ? state.card : 0;
+        const layout = layoutOf(state.frame);
+        if (layout === "split") { return 0; }
+        const slots = slotsFor(layout);
+        return slots.indexOf(state.card) === -1 ? slots[0] : state.card;
     }
 
     /* The framing controls. The first pair serves whichever slot primarySlot()
@@ -2241,7 +2847,7 @@
     const cardClear = byId("p-card-clear");
     if (cardClear) {
         cardClear.addEventListener("click", () => {
-            fillSlot(state.card, null);
+            fillSlot(primarySlot(), null);
             render();
         });
     }
@@ -2260,7 +2866,9 @@
     const cardPick = byId("p-card-pick");
     if (cardPick) {
         cardPick.addEventListener("change", () => {
-            state.card = Math.min(SLOT_COUNT - 1, Math.max(0, Number(cardPick.value) || 0));
+            const want = Number(cardPick.value) || 0;
+            const slots = slotsFor(layoutOf(state.frame));
+            state.card = slots.indexOf(want) === -1 ? slots[0] : want;
             syncPhotoControls();
             render();
         });
@@ -2390,11 +2998,17 @@
         if (zoom) { zoom.value = Math.round(state.views[slot].zoom * 100); }
         if (zoomB) { zoomB.value = Math.round(state.views[1].zoom * 100); }
         if (group) { group.hidden = !photos[slot]; }
-        /* One slider serves six cards on the search screen, so it has to say
-           which one it is holding -- otherwise a visitor who selected card 4 is
-           given a control labelled for a photograph they are not looking at. */
+        /* One slider serves six cards on the search screen and two panels on
+           the player, so on either it has to say which one it is holding --
+           otherwise a visitor who selected card 4, or the scan code, is given a
+           control labelled for a photograph they are not looking at. The split
+           layout is left out on purpose: its two halves have a slider each, and
+           each is already labelled for its own. */
         if (label) {
-            label.textContent = grid ? slotName(slot) + " Size" : "Photo Size";
+            const named = layout !== "split" && slotsFor(layout).length > 1;
+            label.textContent = named
+                ? slotName(slot, layout) + " Size"
+                : "Photo Size";
         }
 
         const groupB = byId("p-zoom-b");
@@ -2408,14 +3022,15 @@
             /* Which cards are already taken, in the menu rather than only on the
                canvas: on a phone the preview is a separate tab, so the menu is
                the only place that answer can be while the form is open. */
-            Array.prototype.forEach.call(pick.options, (o, i) => {
-                const text = slotName(i) + (photos[i] ? "" : " (empty)");
+            Array.prototype.forEach.call(pick.options, (o) => {
+                const i = Number(o.value);
+                const text = slotName(i, "browser") + (photos[i] ? "" : " (empty)");
                 if (o.textContent !== text) { o.textContent = text; }
             });
         }
 
         const clear = byId("p-card-clear");
-        if (clear) { clear.disabled = !grid || !photos[state.card]; }
+        if (clear) { clear.disabled = !grid || !photos[slot]; }
     }
 
     /* ----------------------------------------------------------------------
@@ -2614,7 +3229,22 @@
         const gridFields = byId("p-grid-fields");
         if (gridFields) { gridFields.hidden = !grid; }
         const photoFields = byId("p-photo-fields");
+        /* The player keeps the single Photo Upload: its album IS slot 0, so the
+           control that fills slot 0 everywhere else is the right one here. */
         if (photoFields) { photoFields.hidden = grid; }
+
+        const player = style.layout === "player";
+        const playerFields = byId("p-player-fields");
+        if (playerFields) { playerFields.hidden = !player; }
+        [["p-song", "song"], ["p-artist", "artist"],
+         ["p-elapsed", "elapsed"], ["p-total", "total"]].forEach((entry) => {
+            const el = byId(entry[0]);
+            /* Compared before writing: assigning .value to what it already
+               holds still drops the caret to the end of the field mid-word. */
+            if (el && el.value !== state[entry[1]]) { el.value = state[entry[1]]; }
+        });
+        const pt = byId("p-player-theme");
+        if (pt) { pt.value = state.playerTheme; }
 
         syncPhotoControls();
     }
@@ -2977,16 +3607,123 @@
        between the two renderers. Anything else here and the export drifts, which
        on this page has happened before and is invisible until someone opens the
        file. */
-    function artSVG(art, x, y, w, h) {
+    function artSVG(art, x, y, w, h, theme) {
         const v = art.view;
-        const ink = screenTheme()[art.ink];
+        const ink = (theme || screenTheme())[art.ink];
         const t = "translate(" + x + " " + y + ") scale(" + (w / v[2]) + " " + (h / v[3]) +
             ") translate(" + (-v[0]) + " " + (-v[1]) + ")";
         return '<g transform="' + t + '">' + art.parts.map((p) => '<path d="' + p.d + '"' +
             (p.stroke
                 ? ' fill="none" stroke="' + ink + '" stroke-width="' + p.width + '"'
-                : ' fill="' + ink + '"') +
+                : ' fill="' + ink + '"' + (p.rule ? ' fill-rule="' + p.rule + '"' : "")) +
             "/>").join("") + "</g>";
+    }
+
+    /* SVG twin of paintPlayer(). Reads playerScale(), albumRect(), codeRect()
+       and playedFraction() -- the same four the canvas reads -- so the knob
+       cannot land at one fraction here and another there, and the two boxes
+       cannot be derived twice.
+
+       Both photographs need a real clip: a zoomed one is larger than the box it
+       fills, and preserveAspectRatio is not doing the cropping. */
+    function playerSVG(W, H, esc) {
+        const s = playerScale(W, H);
+        const P = PLAYER;
+        const ink = playerTheme();
+        const album = albumRect(W, H);
+        const code = codeRect(W, H);
+        const family = esc(fontStack(SCREEN_FONT).replace(/"/g, "'"));
+
+        let defs = "";
+        if (photos[0]) {
+            defs += '<clipPath id="tb-player-album"><rect x="' + album.x + '" y="' + album.y +
+                '" width="' + album.w + '" height="' + album.h +
+                '" rx="' + (P.album.r * s.fx) + '"/></clipPath>';
+        }
+        if (photos[CODE_SLOT]) {
+            defs += '<clipPath id="tb-player-code"><rect x="' + code.x + '" y="' + code.y +
+                '" width="' + code.w + '" height="' + code.h + '"/></clipPath>';
+        }
+
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + ink.page + '"/>';
+        if (defs) { out += "<defs>" + defs + "</defs>"; }
+
+        const albumBox = 'x="' + album.x + '" y="' + album.y + '" width="' + album.w +
+            '" height="' + album.h + '" rx="' + (P.album.r * s.fx) + '"';
+        if (photos[0]) {
+            out += '<g clip-path="url(#tb-player-album)">' +
+                photoImageSVG(photos[0], state.views[0], album.x, album.y, album.w, album.h) +
+                "</g>";
+        } else if (ink.albumFill) {
+            out += "<rect " + albumBox + ' fill="' + ink.albumFill + '"/>';
+        } else {
+            out += "<rect " + albumBox + ' fill="none" stroke="' + ink.albumStroke +
+                '" stroke-width="' + (P.album.stroke * s.fx) + '"/>';
+        }
+
+        out += artSVG(PLAYER_ART.chrome, 0, 0, W, H, ink);
+
+        P.dots.y.forEach((cy) => {
+            out += '<circle cx="' + (P.dots.cx * s.fx) + '" cy="' + (cy * s.fy) +
+                '" r="' + (P.dots.r * s.fx) + '" fill="' + ink.ink + '"/>';
+        });
+
+        out += '<circle cx="' + (P.play.cx * s.fx) + '" cy="' + (P.play.cy * s.fy) +
+            '" r="' + (P.play.r * s.fx) + '" fill="' + ink.ink + '"/>';
+        out += artSVG(PLAYER_ART.playIcon, 0, 0, W, H, ink);
+        out += artSVG(PLAYER_ART.heart, 0, 0, W, H, ink);
+
+        /* Measured on the live canvas context, because there is nothing in an
+           SVG string to measure with -- and it has to be the SAME number the
+           canvas used or a long title collides with the heart here and not
+           there. */
+        if (state.song) {
+            const size = fitLine(ctx, state.song, P.title.size * s.fx,
+                (P.title.right - P.title.x) * s.fx, "700");
+            out += '<text x="' + (P.title.x * s.fx) + '" y="' + (P.title.baseline * s.fy) +
+                '" font-family="' + family + '" font-size="' + size +
+                '" font-weight="700" fill="' + ink.ink + '">' + esc(state.song) + "</text>";
+        }
+        if (state.artist) {
+            const size = fitLine(ctx, state.artist, P.artist.size * s.fx,
+                (P.artist.right - P.artist.x) * s.fx, "400");
+            out += '<text x="' + (P.artist.x * s.fx) + '" y="' + (P.artist.baseline * s.fy) +
+                '" font-family="' + family + '" font-size="' + size +
+                '" fill="' + ink.ink + '">' + esc(state.artist) + "</text>";
+        }
+
+        const x1 = P.track.x1 * s.fx;
+        const x2 = P.track.x2 * s.fx;
+        const ty = P.track.y * s.fy;
+        const played = x1 + (x2 - x1) * playedFraction();
+        const lineAttrs = ' stroke="' + ink.ink + '" stroke-width="' + (P.track.width * s.fx) +
+            '" stroke-linecap="round"';
+        out += '<line x1="' + x1 + '" y1="' + ty + '" x2="' + x2 + '" y2="' + ty + '"' +
+            lineAttrs + ' stroke-opacity="' + P.track.dim + '"/>';
+        out += '<line x1="' + x1 + '" y1="' + ty + '" x2="' + played + '" y2="' + ty + '"' +
+            lineAttrs + "/>";
+        out += '<circle cx="' + played + '" cy="' + ty + '" r="' + (P.knob.r * s.fx) +
+            '" fill="' + ink.ink + '"/>';
+
+        /* The artwork's horizontal condense, as a transform rather than a
+           narrower face -- the same thing scale(0.87 1) does in the source. */
+        const timeAt = (text, xPt) => {
+            if (!text) { return ""; }
+            return '<text x="0" y="0" transform="translate(' + (xPt * s.fx) + " " +
+                (P.time.baseline * s.fy) + ") scale(" + P.time.squeeze + ' 1)"' +
+                ' font-family="' + family + '" font-size="' + (P.time.size * s.fx) +
+                '" fill="' + ink.ink + '">' + esc(text) + "</text>";
+        };
+        out += timeAt(state.elapsed, P.time.leftX);
+        out += timeAt(state.total, P.time.rightX);
+
+        if (photos[CODE_SLOT]) {
+            out += '<g clip-path="url(#tb-player-code)">' +
+                photoImageSVG(photos[CODE_SLOT], state.views[CODE_SLOT],
+                    code.x, code.y, code.w, code.h) + "</g>";
+        }
+
+        return out;
     }
 
     /* SVG twin of paintScreen(). Reads screenScale() and gridRects(), the same
@@ -3211,6 +3948,8 @@
             body += splitSVG(W, H, esc);
         } else if (frame.layout === "browser") {
             body += screenSVG(W, H, esc);
+        } else if (frame.layout === "player") {
+            body += playerSVG(W, H, esc);
         } else {
             if (frame.frame) {
                 body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
@@ -3579,6 +4318,15 @@
         /* Six cards, numbered as the preview numbers them. The "(empty)" half of
            each label is written by syncPhotoControls(), which is the only thing
            that knows what is in them. */
+        const playerTheme2 = byId("p-player-theme");
+        if (playerTheme2 && !playerTheme2.options.length) {
+            Object.keys(PLAYER_THEMES).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = PLAYER_THEMES[k].label;
+                playerTheme2.appendChild(o);
+            });
+        }
         const theme = byId("p-screen-theme");
         if (theme && !theme.options.length) {
             Object.keys(SCREEN_THEMES).forEach((k) => {
@@ -3588,14 +4336,19 @@
                 theme.appendChild(o);
             });
         }
+        /* The menu belongs to the search screen alone, so it lists THAT
+           layout's slots rather than every slot the photos array has room for.
+           Built from SLOT_COUNT it offered a "Card 8" -- the player's scan
+           code, a slot this poster never draws -- and the menu's own Remove
+           button then deleted the photograph sitting in it. */
         const pick = byId("p-card-pick");
         if (pick && !pick.options.length) {
-            for (let i = 0; i < SLOT_COUNT; i += 1) {
+            slotsFor("browser").forEach((i) => {
                 const o = document.createElement("option");
                 o.value = String(i);
-                o.textContent = slotName(i);
+                o.textContent = slotName(i, "browser");
                 pick.appendChild(o);
-            }
+            });
         }
     }
 
