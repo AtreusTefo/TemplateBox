@@ -115,6 +115,31 @@
             frame: null, trim: null, label: "Queen and King, Two Photos",
             layout: "split", suit: "hearts", ranks: { head: "Q", foot: "K" }
         },
+        /* The split layout's other three suits, added September 11, 2026.
+
+           It shipped in hearts alone while the single-photo card had all four,
+           which is the sort of gap nobody decides on -- hearts was simply what
+           the first one was written as. Each of these is one entry and nothing
+           else: the pip comes from `suit` through suitOf(), the corner letters
+           from `ranks`, the seam and the two photographs from the layout. No
+           renderer changed to accept them.
+
+           The pairings follow the single-photo cards: red leads with the queen,
+           black with the king. The key is prefixed rather than suffixed so the
+           four sort together in the Frame Style menu, which is built from the
+           order of this object. */
+        "split-spades": {
+            frame: null, trim: null, label: "King and Queen of Spades, Two Photos",
+            layout: "split", suit: "spades", ranks: { head: "K", foot: "Q" }
+        },
+        "split-diamonds": {
+            frame: null, trim: null, label: "Queen and King of Diamonds, Two Photos",
+            layout: "split", suit: "diamonds", ranks: { head: "Q", foot: "K" }
+        },
+        "split-clubs": {
+            frame: null, trim: null, label: "King and Queen of Clubs, Two Photos",
+            layout: "split", suit: "clubs", ranks: { head: "K", foot: "Q" }
+        },
         /* A third layout, and the first one that is not a playing card: a phone
            search-results screen with a masonry of six photographs in it. It
            carries `suit` for the row of pips along its foot -- the same traced
@@ -184,6 +209,23 @@
        The seam is expressed against the PANEL rather than the page, because it
        runs from the panel's left edge to its right edge and has to stay on
        them at every paper size. */
+    /* The empty panel's two halves, the artwork's own, for EVERY suit.
+
+       The upper half followed the suit's ink for about an hour on September 11,
+       2026, on the reasoning that the artwork's #BE1E2D is exactly
+       SUITS.hearts.ink so hearts would be unchanged and the black suits would
+       stop wearing a red plate under a black pip. The arithmetic was right and
+       the result was bad, which is only visible by looking at it:
+
+       the panel is ruled in black, so a black upper half SWALLOWS the rule
+       along the top and right edges and the poster stops reading as a card at
+       all -- and #00AEEF against pure black is a warning sign rather than a
+       print. Red and blue work together because they are saturated colours of
+       similar weight; black is not a colour in that sense, it is a hole.
+
+       So the plate is the artwork on all four, and the suit is carried where
+       the single-photo card carries it: the pip and the corner letters, on the
+       white margin outside the panel. */
     const SPLIT = {
         rule: 8 / 595.3,
         seam: { left: 171.8 / 724.5, right: 572.8 / 724.5 },

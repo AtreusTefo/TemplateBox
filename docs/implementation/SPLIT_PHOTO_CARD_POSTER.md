@@ -2,6 +2,7 @@
 
 Date: September 9, 2026
 Status: Implemented
+Updated: September 11, 2026 -- the other three suits
 
 ## Summary
 
@@ -113,6 +114,11 @@ placeholder -- the artwork's own colour version is a finished design. That does
 mean the upload prompt sits on strong red and strong blue, where the panel's
 usual grey-on-cream is illegible, so it is set in white over a dark halo.
 
+It stays the artwork's red and blue on ALL FOUR suits, and that was tried the
+other way first -- see below.
+
+None of it is on the page once both photographs are in.
+
 ## The SVG twin
 
 `splitSVG()` reads the same `splitGeometry()` and repeats the same construction:
@@ -146,12 +152,77 @@ tile rendered flat red until that was found.
 - The second upload and the rank fields are hidden for the styles that have no
   use for them.
 
+## The other three suits (September 11, 2026)
+
+The layout shipped in hearts alone while the single-photo card had all four.
+That was not a decision -- hearts was what the first one was written as, and the
+gap simply stayed.
+
+Closing it cost three entries in `FRAME_STYLES` and nothing else. The pip
+already came from `suit` through `suitOf()`, the corner letters from `ranks`,
+and the seam, the two uploads and both renderers never knew which suit they were
+drawing. The keys are prefixed -- `split-spades`, not `spades-split` -- so the
+four sort together in the Frame Style menu, which is built from the order of
+that object.
+
+The pairings follow the single-photo cards: red leads with the queen, black with
+the king. Which means the letters only arrive via the CATALOG, not the Frame
+Style control -- picking a style from that menu deliberately leaves whatever
+letters are already there, because that is an edit in progress rather than a
+request for the template as advertised. Worth knowing before testing: switching
+by menu shows the right pip with the OLD letters, and that is correct.
+
+Verified through the catalog route, which is the one that applies a pairing:
+
+| style | letters | pip |
+| --- | --- | --- |
+| `split` | Q / K | `#be1e2d` |
+| `split-spades` | K / Q | `#000000` |
+| `split-diamonds` | Q / K | `#be1e2d` |
+| `split-clubs` | K / Q | `#000000` |
+
+The plate is the artwork's red and blue on all four, so `split` renders exactly
+what it always did and the three new ones differ from it in the pip and the two
+letters and nothing else -- the same relationship the four single-photo cards
+have with each other.
+
+### The plate followed the suit for about an hour, and it was wrong
+
+The first version of this derived the empty plate's upper half from the suit's
+own ink. The reasoning was decent: the artwork's `#BE1E2D` is exactly
+`SUITS.hearts.ink`, so hearts and diamonds would be byte-identical and only the
+black suits would change, and it would stop them wearing a red plate under a
+black pip.
+
+Every measurement agreed. `split` sampled `#be1e2d` as before, `split-spades`
+sampled `#000000`, the catalog tiles matched, the suite passed.
+
+Then it was looked at, and two things were obvious in a second that no sample
+could report:
+
+- **The panel is ruled in black.** A black upper half swallows that rule along
+  the top and right edges, and the poster stops reading as a card at all.
+- **`#00AEEF` against pure black is a warning sign**, not a print. Red and blue
+  work together because they are saturated colours of similar weight. Black is
+  not a colour in that sense; it is a hole.
+
+So the plate is the artwork on every suit, and the suit is carried where the
+single-photo card carries it: the pip and the letters, on the white margin
+OUTSIDE the panel, where nothing has to share a value with the rule.
+
+The lesson is the one this project keeps relearning from the other end. Checking
+by measurement catches what reasoning misses -- and it cannot catch a thing that
+is numerically exactly what you asked for and visually wrong. The same day's
+work had already produced the mirror image of this: an upload prompt measured
+into precisely the right position, in white, on a near-white panel.
+
 ## Not done
 
-- **One suit.** The layout ships in hearts to match the artwork; the other three
-  are one `FRAME_STYLES` entry each, exactly as they were for the card layout.
 - **The seam is fixed.** A visitor cannot change its angle, and the two regions
   cannot be swapped without re-uploading both photographs the other way round.
-- **Neither photograph can be nudged or zoomed.** Both cover-fit the panel and
-  are cropped by it, which is what the artwork does, but a face landing near the
-  seam cannot be moved off it.
+
+Two entries were removed from this list rather than answered here. **One suit**
+was closed on September 11, 2026 -- see the section above. **Neither photograph
+can be nudged or zoomed** was closed earlier, by the framing work in
+`POSTER_PHOTO_FRAMING.md`: both halves carry their own zoom and position now,
+and the lower one's drag is negated twice because it is drawn upside down.

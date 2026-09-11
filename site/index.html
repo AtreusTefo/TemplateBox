@@ -791,6 +791,58 @@
                     </div>
                 </article>
 
+                <!-- The split layout's other three suits. Same tile as the one
+                     above with a different pip, and a black plate on the two
+                     black suits -- see splitUpper() in js/poster.js, which the
+                     stylesheet mirrors. -->
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="spades" data-layout="split">
+                                <span class="mk-index mk-index-head">K</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">Q</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="split-spades">King and Queen of Spades, Two Photos</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="diamonds" data-layout="split">
+                                <span class="mk-index mk-index-head">Q</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">K</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="split-diamonds">Queen and King of Diamonds, Two Photos</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="clubs" data-layout="split">
+                                <span class="mk-index mk-index-head">K</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">Q</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="split-clubs">King and Queen of Clubs, Two Photos</a></h3>
+                    </div>
+                </article>
+
                 <!-- The search-screen layout: a phone results page with six
                      photographs in it. The first poster tile that is not a
                      playing card, so it carries data-layout alone -- there is
@@ -1161,7 +1213,7 @@
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 39.
+                Try a broader term, or clear the search to see all 42.
             </p>
         </section>
 

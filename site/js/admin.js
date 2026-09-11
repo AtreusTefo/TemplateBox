@@ -1454,6 +1454,9 @@ body + '\n' +
         { id: "diamonds", title: "Queen and King of Diamonds", category: "canvas", doc: "diamonds" },
         { id: "clubs", title: "King and Queen of Clubs", category: "canvas", doc: "clubs" },
         { id: "split", title: "Queen and King, Two Photos", category: "canvas", doc: "split" },
+        { id: "split-spades", title: "King and Queen of Spades, Two Photos", category: "canvas", doc: "split-spades" },
+        { id: "split-diamonds", title: "Queen and King of Diamonds, Two Photos", category: "canvas", doc: "split-diamonds" },
+        { id: "split-clubs", title: "King and Queen of Clubs, Two Photos", category: "canvas", doc: "split-clubs" },
         { id: "browser", title: "Search Screen, Six Photos", category: "canvas", doc: "browser" },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
