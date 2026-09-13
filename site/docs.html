@@ -218,7 +218,7 @@
                          localStorage record as the typed fields. Nothing is
                          uploaded and there is nowhere for it to go: the site
                          has no server. -->
-                    <fieldset data-for="logo-invoice">
+                    <fieldset data-for="logo-invoice trade-receipt">
                         <legend>Logo</legend>
                         <div class="field">
                             <label for="f-logo">Logo Image</label>
@@ -238,7 +238,7 @@
                         <!-- Every type but the ruled invoice: that sheet shows the
                              business as a wordmark beside its logo and carries its
                              contact details in the footer strip instead. -->
-                        <div class="field" data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice warning-notice">
+                        <div class="field" data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice warning-notice trade-receipt">
                             <label for="f-issuer-details">Address and Contact (one item per line)</label>
                             <textarea id="f-issuer-details" data-bind="issuerDetails" maxlength="240" rows="4"></textarea>
                         </div>
@@ -249,6 +249,13 @@
                         <div class="field">
                             <label for="f-recipient-name" data-label="recipientName">Received From</label>
                             <input type="text" id="f-recipient-name" data-bind="recipientName" maxlength="70">
+                        </div>
+                        <!-- The trade receipt's header card carries a single
+                             Cell No. row rather than an address block: the
+                             artwork gives it one line beside Date and Client. -->
+                        <div class="field" data-for="trade-receipt">
+                            <label for="f-client-phone">Cell No.</label>
+                            <input type="tel" id="f-client-phone" data-bind="clientPhone" maxlength="32">
                         </div>
                         <div class="field" data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice logo-invoice">
                             <label for="f-recipient-details">Address and Contact (one item per line)</label>
@@ -272,7 +279,7 @@
                         </div>
                     </fieldset>
 
-                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice logo-invoice">
+                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice logo-invoice trade-receipt">
                         <legend>Currency</legend>
                         <div class="field">
                             <label for="f-currency">Currency</label>
@@ -322,15 +329,19 @@
                         </div>
                     </fieldset>
 
-                    <fieldset data-for="business-receipt sales-receipt invoice logo-invoice">
+                    <fieldset data-for="business-receipt sales-receipt invoice logo-invoice trade-receipt">
                         <legend>Line Items</legend>
                         <div id="item-list"></div>
                         <button type="button" class="btn btn-secondary btn-block" id="add-item">Add Line Item</button>
                     </fieldset>
 
-                    <fieldset data-for="business-receipt sales-receipt invoice logo-invoice">
+                    <fieldset data-for="business-receipt sales-receipt invoice logo-invoice trade-receipt">
                         <legend>Totals</legend>
-                        <div class="field">
+                        <!-- The trade receipt's totals block is three rows and the
+                             artwork gives it nowhere to put a discount or an amount
+                             already paid, so those two are held back rather than
+                             computed into a total that nothing on the sheet shows. -->
+                        <div class="field" data-for="business-receipt sales-receipt invoice logo-invoice">
                             <label for="f-discount">Discount Amount</label>
                             <input type="number" id="f-discount" data-bind="discount" min="0" max="99999999" step="0.01">
                         </div>
@@ -342,7 +353,7 @@
                             <label for="f-tax-rate">Tax Rate (percent)</label>
                             <input type="number" id="f-tax-rate" data-bind="taxRate" min="0" max="100" step="0.01">
                         </div>
-                        <div class="field">
+                        <div class="field" data-for="business-receipt sales-receipt invoice logo-invoice">
                             <label for="f-paid" data-label="paid">Amount Paid</label>
                             <input type="number" id="f-paid" data-bind="amountPaid" min="0" max="99999999" step="0.01">
                         </div>
@@ -363,9 +374,9 @@
                     <!-- Ruled invoice only: the icon contact strip along the
                          foot of the sheet, and the name printed under the
                          first signature rule. -->
-                    <fieldset data-for="logo-invoice">
-                        <legend>Contact Strip</legend>
-                        <div class="field">
+                    <fieldset data-for="logo-invoice trade-receipt">
+                        <legend>Contact Details</legend>
+                        <div class="field" data-for="logo-invoice">
                             <label for="f-contact-phone">Phone</label>
                             <input type="tel" id="f-contact-phone" data-bind="contactPhone" maxlength="32" placeholder="+1 (555) 018-2244">
                         </div>
@@ -377,9 +388,59 @@
                             <label for="f-contact-site">Website</label>
                             <input type="text" id="f-contact-site" data-bind="contactSite" maxlength="60" placeholder="www.example.com">
                         </div>
-                        <div class="field">
+                        <div class="field" data-for="logo-invoice">
                             <label for="f-signer">Name Above the Signature Line</label>
                             <input type="text" id="f-signer" data-bind="signerName" maxlength="70">
+                        </div>
+                    </fieldset>
+
+                    <!-- Trade receipt only. Seven fixed labels with a field each
+                         rather than the free-text block the invoices use: on this
+                         sheet the labels are printed furniture in a ruled block and
+                         their alignment is part of the design. Every one ships
+                         EMPTY, and nothing here carries a real account. -->
+                    <fieldset data-for="trade-receipt">
+                        <legend>Account Details</legend>
+                        <div class="field">
+                            <label for="f-acct-name">Account Name</label>
+                            <input type="text" id="f-acct-name" data-bind="acctName" maxlength="70">
+                        </div>
+                        <div class="field">
+                            <label for="f-bank-name">Bank Name</label>
+                            <input type="text" id="f-bank-name" data-bind="bankName" maxlength="70">
+                        </div>
+                        <div class="field">
+                            <label for="f-acct-number">Account Number</label>
+                            <input type="text" id="f-acct-number" data-bind="acctNumber" maxlength="34">
+                        </div>
+                        <div class="field">
+                            <label for="f-branch-name">Branch Name</label>
+                            <input type="text" id="f-branch-name" data-bind="branchName" maxlength="70">
+                        </div>
+                        <div class="field">
+                            <label for="f-branch-code">Branch Code</label>
+                            <input type="text" id="f-branch-code" data-bind="branchCode" maxlength="24">
+                        </div>
+                        <div class="field">
+                            <label for="f-swift-code">Swift Code</label>
+                            <input type="text" id="f-swift-code" data-bind="swiftCode" maxlength="24">
+                        </div>
+                        <div class="field">
+                            <label for="f-bank-address">Bank Address</label>
+                            <input type="text" id="f-bank-address" data-bind="bankAddress" maxlength="90">
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="trade-receipt">
+                        <legend>Terms and Conditions</legend>
+                        <div class="field">
+                            <label for="f-terms-intro">Line Above the Terms</label>
+                            <input type="text" id="f-terms-intro" data-bind="termsIntro" maxlength="90" placeholder="PLEASE NOTE THAT ALL GOODS SHOULD BE:">
+                        </div>
+                        <div class="field">
+                            <label for="f-terms">Terms (one per line, numbered automatically)</label>
+                            <textarea id="f-terms" data-bind="terms" maxlength="600" rows="6"></textarea>
+                            <p class="upload-hint">Leave this empty to print a general returns policy you can edit afterwards.</p>
                         </div>
                     </fieldset>
 
@@ -446,7 +507,7 @@
                         </div>
                     </fieldset>
 
-                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice">
+                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice trade-receipt">
                         <legend>Payment Method</legend>
                         <div class="check-grid" id="method-row">
                             <label class="radio-option"><input type="checkbox" data-check="cash"> Cash</label>

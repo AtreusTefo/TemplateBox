@@ -121,6 +121,31 @@
                 note: "Closing Line"
             }
         },
+        /* The trade counter receipt (September 11, 2026). Traced from a
+           supplied A4 artwork: a parts-counter receipt that carries the
+           seller's bank details on its face, so a customer paying later knows
+           where to send the money.
+
+           Same money model as every other itemised type and deliberately so --
+           it is a fifth SHEET, not a fifth set of arithmetic. What it adds is
+           the account block, a five-column ruled grid whose last column is the
+           currency's minor unit, and a terms list. What it drops is the
+           discount row and the amount-paid row, neither of which the artwork
+           has anywhere to put. */
+        "trade-receipt": {
+            layout: "trade-receipt",
+            heading: "RECEIPT",
+            file: "trade-receipt",
+            labels: {
+                issuerLegend: "Your Business",
+                issuerName: "Business Name",
+                recipientLegend: "Customer",
+                recipientName: "Client",
+                docNumber: "Receipt No.",
+                docDate: "Date",
+                note: "Footer Message"
+            }
+        },
         "warning-notice": {
             layout: "notice",
             heading: "EMPLOYEE WARNING NOTICE",
@@ -213,6 +238,183 @@
     const RULED_COLUMNS = ["Date", "Item Description", "Price", "Qty", "Total"];
     /* Proportions of the table width, in the order above. */
     const RULED_WIDTHS = [0.13, 0.39, 0.17, 0.11, 0.20];
+
+    /* The trade counter receipt (September 11, 2026). A fifth sheet, traced
+       from a supplied A4 artwork whose own units are POINTS -- 595.28 x 841.89
+       is exactly 210 x 297mm, so every figure below was converted once, here,
+       and is held in the millimetres the rest of this file works in.
+
+       The artwork's table spans x 45.40 to 546.65 points. Its left and right
+       edges land on 16.02mm and 192.84mm against this page's 16mm margins, so
+       they are squared up to the margins rather than kept: the difference is
+       under a fifth of a millimetre and keeping it would mean this one sheet
+       disagreeing with every other about where the page begins. The same is
+       NOT done to the artwork's top margin, which is a real 10mm against the
+       others' 16 and is part of how the form looks.
+
+       Thirteen rows, because that is what the artwork draws. Its own rows are
+       hand-placed and do not share a pitch -- ten are rects of 19.5pt at tops
+       that drift, three are not rects at all, and the first measures 20.99 --
+       so they are laid out here on ONE pitch across the same span. Copying
+       thirteen hand positions would reproduce a wobble nobody intended. */
+    const TRADE_MIN_ROWS = 13;
+
+    /* Two of the artwork's five columns carry no heading at all. They are not
+       decoration and both are named here, because a column a visitor cannot
+       name is a column they will not fill.
+
+       The evidence is in the totals: those three boxes span the LAST TWO
+       columns and are divided at the same x the Amount column is divided at,
+       while the 82.40pt column before Amount does not appear in them at all.
+       A column that is not totalled is a unit price; a narrow column that
+       carries the division through the totals is the currency's minor unit,
+       which is what lets handwritten figures line up on the decimal point on a
+       form that is meant to be completed by hand. */
+    const TRADE_COLUMNS = ["Quantity", "Descriptions", "Price", "Amount", ""];
+    /* 82.44, 212.11, 82.40, 82.74 and 41.56 points over a 501.25pt table. */
+    const TRADE_WIDTHS = [0.1645, 0.4232, 0.1644, 0.1650, 0.0829];
+
+    /* Seven fixed labels with a field each. Deliberately NOT the free-text
+       bankDetails textarea the invoice types use: on this sheet the labels are
+       printed furniture in a ruled block, and a visitor typing their own seven
+       lines would lose the alignment the block is made of. */
+    const TRADE_ACCOUNT_ROWS = [
+        { label: "Account Name", bind: "acctName" },
+        { label: "Bank Name", bind: "bankName" },
+        { label: "Account Number", bind: "acctNumber" },
+        { label: "Branch Name", bind: "branchName" },
+        { label: "Branch Code", bind: "branchCode" },
+        { label: "Swift Code", bind: "swiftCode" },
+        { label: "Bank Address", bind: "bankAddress" }
+    ];
+
+    /* The artwork's own palette. #231F20 rather than #000000 is what the
+       master file states, and it is the same rich black poster.js already uses
+       for the music player's ground. The greens in the source belong to a
+       logo this template does not draw, so they are not here. */
+    const TRADE_INK = "#231F20";
+    const TRADE_CREAM = "#F0E8CD";
+    const TRADE_GREY = "#DBD9D9";
+    const TRADE_RED = "#B92025";
+
+    /* The footer band, in ONE place because two painters draw it. The preview
+       builds an SVG from these paths; the PDF writer runs the same curves
+       through jsPDF. A decorative shape is exactly where a second, hand-copied
+       set of coordinates would drift without anything noticing.
+
+       Coordinates are a 600 x 60 box that both painters scale to their own
+       width, which is why the preview sets preserveAspectRatio="none". Three
+       sweeps, back to front: a grey-to-black wash, a black mass rising to the
+       right, and the red curve over both. */
+    const TRADE_BAND = {
+        w: 600,
+        h: 60,
+        gradients: [
+            { id: "tb-band-wash", stops: [["0", "#FFFFFF"], ["0.55", "#9A9A9A"], ["1", "#231F20"]] },
+            { id: "tb-band-dark", stops: [["0", "#6B6B66"], ["1", "#231F20"]] }
+        ],
+        /* Each sweep starts at `from`, runs the cubics in `curves` as
+           [c1x, c1y, c2x, c2y, endx, endy], then closes through `then`.
+           `fill` paints the screen, `pdfFill` the page -- see the note at the
+           PDF call site for why those differ. */
+        sweeps: [
+            {
+                fill: "url(#tb-band-wash)", pdfFill: "#8A8A88",
+                from: [0, 46],
+                curves: [[160, 26, 350, 14, 600, 7]],
+                then: [[600, 60], [0, 60]]
+            },
+            {
+                fill: "url(#tb-band-dark)", pdfFill: "#231F20",
+                from: [205, 60],
+                curves: [[345, 30, 465, 13, 600, 5]],
+                then: [[600, 60]]
+            },
+            {
+                fill: "#B92025", pdfFill: "#B92025",
+                from: [0, 38],
+                curves: [[150, 17, 340, 5, 600, 0]],
+                then: [[600, 12]],
+                tail: [[340, 17, 150, 29, 0, 50]]
+            }
+        ]
+    };
+
+    /* The SVG `d` for one sweep, generated rather than written out, so the
+       numbers above are the only place the shape exists. */
+    function tradeBandPath(sweep) {
+        const parts = ["M" + sweep.from[0] + "," + sweep.from[1]];
+        sweep.curves.forEach((c) => {
+            parts.push("C" + c[0] + "," + c[1] + " " + c[2] + "," + c[3] + " " + c[4] + "," + c[5]);
+        });
+        (sweep.then || []).forEach((p) => {
+            parts.push("L" + p[0] + "," + p[1]);
+        });
+        (sweep.tail || []).forEach((c) => {
+            parts.push("C" + c[0] + "," + c[1] + " " + c[2] + "," + c[3] + " " + c[4] + "," + c[5]);
+        });
+        parts.push("Z");
+        return parts.join(" ");
+    }
+
+    /* The same sweeps through jsPDF, which takes a start point and then
+       segments RELATIVE to the point before them -- so the absolute
+       coordinates above are differenced here rather than being held twice.
+
+       doc.lines() wants [dx, dy] for a line and
+       [dc1x, dc1y, dc2x, dc2y, dex, dey] for a cubic, every one of them
+       measured from the START of that segment, which is the part that is easy
+       to get wrong and impossible to see afterwards. */
+    function drawTradeBand(doc, x, y, w, h) {
+        const sx = w / TRADE_BAND.w;
+        const sy = h / TRADE_BAND.h;
+        TRADE_BAND.sweeps.forEach((sweep) => {
+            const segments = [];
+            let cx = sweep.from[0];
+            let cy = sweep.from[1];
+            const curve = (c) => {
+                segments.push([
+                    (c[0] - cx) * sx, (c[1] - cy) * sy,
+                    (c[2] - cx) * sx, (c[3] - cy) * sy,
+                    (c[4] - cx) * sx, (c[5] - cy) * sy
+                ]);
+                cx = c[4];
+                cy = c[5];
+            };
+            sweep.curves.forEach(curve);
+            (sweep.then || []).forEach((p) => {
+                segments.push([(p[0] - cx) * sx, (p[1] - cy) * sy]);
+                cx = p[0];
+                cy = p[1];
+            });
+            (sweep.tail || []).forEach(curve);
+            const rgb = [
+                parseInt(sweep.pdfFill.slice(1, 3), 16),
+                parseInt(sweep.pdfFill.slice(3, 5), 16),
+                parseInt(sweep.pdfFill.slice(5, 7), 16)
+            ];
+            doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+            doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+            doc.lines(segments, x + sweep.from[0] * sx, y + sweep.from[1] * sy,
+                [1, 1], "F", true);
+        });
+    }
+
+    /* The artwork opens its terms with a line introducing the numbered clauses,
+       and sets the whole block in capitals. Both are part of how that corner of
+       the sheet reads, so both are here -- as DEFAULTS, in wording of our own.
+       The source's five clauses are that company's policy and are not copied:
+       the shape of a counter returns policy is not anybody's property, the
+       sentences are. */
+    const TRADE_TERMS_INTRO = "PLEASE NOTE THAT ALL GOODS SHOULD BE:";
+
+    const TRADE_TERMS_DEFAULT = [
+        "RETURNED WITHIN 7 DAYS OF PURCHASE.",
+        "ACCOMPANIED BY THE ORIGINAL PROOF OF PURCHASE.",
+        "UNDAMAGED AND UNUSED.",
+        "IN THEIR ORIGINAL PACKAGING.",
+        "SUBJECT TO A HANDLING FEE WHERE ONE APPLIES."
+    ].join("\n");
 
     /* Uploaded logo. Downscaled to this longest edge before storage: a
        wordmark or a badge needs no more, and the encoded string is what has
@@ -1250,13 +1452,298 @@
         }
     }
 
+    /* --- Layout 5: trade counter receipt ---------------------------------- */
+
+    /* Money split at the decimal point: the major unit for the wide cell, the
+       minor unit for the narrow one beside it. That narrow column is what the
+       artwork's fifth column IS -- it runs the full height of the grid and
+       through all three totals rows, so a customer filling the form in by hand
+       has the decimal point in the same place on every line.
+
+       A currency with no minor unit (JPY) returns an empty second part rather
+       than "00", so the narrow cell is blank and the wide one carries the
+       whole figure. Reads as one number, which for a currency without cents is
+       what it is. */
+    function tradeAmountParts(value, cur, forPdf) {
+        const text = money(value, cur, forPdf);
+        if (cur.decimals === 0) {
+            return { major: text, minor: "" };
+        }
+        const cut = text.lastIndexOf(".");
+        return cut === -1
+            ? { major: text, minor: "" }
+            : { major: text.slice(0, cut), minor: text.slice(cut + 1) };
+    }
+
+    /* One grid row, as the two painters both understand it: the four typed
+       columns plus the split amount. Returns null for a row with nothing in
+       it so the caller can draw an empty ruled line instead. */
+    function tradeRowValues(item, cur) {
+        const d = TB.desanitize;
+        const qty = d(item.qty);
+        const description = d(item.description);
+        const price = d(item.price);
+        if (!qty && !description && !price) {
+            return null;
+        }
+        const amount = num(item.qty) * num(item.price);
+        const parts = tradeAmountParts(amount, cur);
+        return {
+            qty: qty,
+            description: description,
+            price: price ? money(num(item.price), cur) : "",
+            major: parts.major,
+            minor: parts.minor
+        };
+    }
+
+    function renderTradeReceipt(state) {
+        const config = DOC_TYPES[state.docType];
+        const cur = currencyOf(state);
+        const f = state.fields;
+        const d = TB.desanitize;
+        const blank = state.blankForm;
+        const totals = computeTotals(state);
+
+        /* The header card: logo and address on the left, the business's own
+           details and the three reference rows on the right. One rounded box
+           holding both halves, which is what the artwork draws. */
+        const card = el("div", "doc-trade-card");
+
+        const left = el("div", "doc-trade-card-left");
+        if (state.logo) {
+            const logo = document.createElement("img");
+            logo.className = "doc-trade-logo";
+            logo.alt = "";
+            logo.setAttribute("aria-hidden", "true");
+            logo.src = state.logo;
+            left.appendChild(logo);
+        } else {
+            /* The same control the ruled invoice uses, for the same reason:
+               until the logo is uploaded the only sign this template takes one
+               is a field further down the form. A button, so it is reachable
+               by keyboard and announced as a control. */
+            const slot = document.createElement("button");
+            slot.type = "button";
+            slot.className = "doc-logo-slot doc-trade-logo-slot";
+            slot.setAttribute("data-logo-slot", "");
+            slot.setAttribute("aria-label", "Add logo");
+            slot.setAttribute("title", "Add logo");
+            slot.textContent = "+";
+            left.appendChild(slot);
+        }
+        const address = el("div", "doc-trade-address");
+        appendLines(address, f.issuerDetails, "doc-trade-address-line");
+        left.appendChild(address);
+        card.appendChild(left);
+
+        const right = el("div", "doc-trade-card-right");
+        if (d(f.issuerName) || blank) {
+            right.appendChild(el("p", "doc-trade-business", d(f.issuerName)));
+        }
+        if (d(f.contactEmail) || blank) {
+            right.appendChild(el("p", "doc-trade-contact",
+                "Email " + d(f.contactEmail)));
+        }
+        if (d(f.contactSite) || blank) {
+            right.appendChild(el("p", "doc-trade-contact",
+                "Website: " + d(f.contactSite)));
+        }
+
+        /* Three labelled rows in a bordered box, the labels on a grey ground.
+           Drawn whether or not they carry a value: this is a form. */
+        const refs = el("div", "doc-trade-refs");
+        [[config.labels.docDate, formatDate(f.docDate)],
+         [config.labels.recipientName, d(f.recipientName)],
+         ["Cell No.", d(f.clientPhone)]].forEach((pair) => {
+            const row = el("div", "doc-trade-ref-row");
+            row.appendChild(el("span", "doc-trade-ref-label", pair[0]));
+            row.appendChild(el("span", "doc-trade-ref-value", pair[1] || ""));
+            refs.appendChild(row);
+        });
+        right.appendChild(refs);
+        card.appendChild(right);
+        sheet.appendChild(card);
+
+        /* The account block. Every row keeps its rule when empty, because the
+           sheet is a printed form before it is a record. */
+        const account = el("div", "doc-trade-account");
+        account.appendChild(el("p", "doc-trade-account-heading", "ACCOUNT DETAILS:"));
+        const grid = el("div", "doc-trade-account-grid");
+        TRADE_ACCOUNT_ROWS.forEach((entry) => {
+            grid.appendChild(el("span", "doc-trade-account-label", entry.label));
+            grid.appendChild(el("span", "doc-trade-account-colon", ":"));
+            grid.appendChild(el("span", "doc-trade-account-value",
+                d(f[entry.bind])));
+        });
+        account.appendChild(grid);
+        sheet.appendChild(account);
+
+        /* The grid. A real table element, so the header cells are header cells
+           and a screen reader can associate them with the rows. */
+        const table = document.createElement("table");
+        table.className = "doc-trade-table";
+        const colgroup = document.createElement("colgroup");
+        TRADE_WIDTHS.forEach((share) => {
+            const col = document.createElement("col");
+            col.style.width = (share * 100).toFixed(3) + "%";
+            colgroup.appendChild(col);
+        });
+        table.appendChild(colgroup);
+
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        TRADE_COLUMNS.forEach((title, index) => {
+            const th = document.createElement("th");
+            th.scope = "col";
+            th.textContent = title;
+            /* The minor-unit column has no heading in the artwork and none
+               here. It is not a column of its own to a reader -- it is the
+               right-hand half of Amount -- so it is marked as presentational
+               rather than given an invented title nobody would want printed. */
+            if (!title) {
+                th.className = "is-unlabelled";
+                th.setAttribute("aria-hidden", "true");
+            }
+            if (index === 2 || index === 3) {
+                th.className = (th.className ? th.className + " " : "") + "num";
+            }
+            headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        const rows = state.items.map((item) => tradeRowValues(item, cur))
+            .filter((row) => row !== null);
+        const drawn = Math.max(TRADE_MIN_ROWS, rows.length);
+        for (let i = 0; i < drawn; i += 1) {
+            const row = rows[i] || null;
+            const tr = document.createElement("tr");
+            if (!row) {
+                tr.className = "is-empty";
+            }
+            [[row ? row.qty : "", ""],
+             [row ? row.description : "", ""],
+             [row ? row.price : "", "num"],
+             [row ? row.major : "", "num"],
+             [row ? row.minor : "", "minor"]].forEach((cell) => {
+                const td = document.createElement("td");
+                if (cell[1]) { td.className = cell[1]; }
+                td.textContent = cell[0];
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        sheet.appendChild(table);
+
+        /* Payment method on the left, the three totals on the right, sharing
+           one row so the method sits on the Sub Total line as it does in the
+           artwork. */
+        const foot = el("div", "doc-trade-foot");
+        const method = el("div", "doc-trade-method");
+        method.appendChild(el("p", "doc-trade-method-label", "Payment Method:"));
+        const chosen = PAYMENT_METHODS
+            .filter((option) => state.methods[option.key])
+            .map((option) => option.label);
+        if (chosen.length || blank) {
+            method.appendChild(el("p", "doc-trade-method-value", chosen.join(", ")));
+        }
+        foot.appendChild(method);
+
+        const totalsBox = el("div", "doc-trade-totals");
+        [["Sub Total", totals.subtotal, ""],
+         [d(f.taxLabel) || "V.A.T Inclusive", totals.tax, ""],
+         ["TOTAL", totals.total, "is-total"]].forEach((entry) => {
+            const row = el("div", "doc-trade-total-row" + (entry[2] ? " " + entry[2] : ""));
+            row.appendChild(el("span", "doc-trade-total-label", entry[0]));
+            const parts = tradeAmountParts(entry[1], cur);
+            row.appendChild(el("span", "doc-trade-total-major", parts.major));
+            row.appendChild(el("span", "doc-trade-total-minor", parts.minor));
+            totalsBox.appendChild(row);
+        });
+        foot.appendChild(totalsBox);
+        sheet.appendChild(foot);
+
+        /* Terms, under a red rule that is the artwork's one flash of colour
+           besides the footer band. */
+        const termsText = d(f.terms) || (blank ? "" : TRADE_TERMS_DEFAULT);
+        if (termsText || blank) {
+            const terms = el("div", "doc-trade-terms");
+            terms.appendChild(el("p", "doc-trade-terms-heading", "TERMS & CONDITIONS"));
+            /* The line that introduces the numbered clauses. The PDF writer
+               draws it too; a block that appears on the sheet and not in the
+               export is the drift the two-painter discipline exists for, and
+               this file has already been caught by it once over the footer
+               band. */
+            const intro = d(f.termsIntro) || (blank ? "" : TRADE_TERMS_INTRO);
+            if (intro) {
+                terms.appendChild(el("p", "doc-trade-terms-intro", intro));
+            }
+            const list = document.createElement("ol");
+            list.className = "doc-trade-terms-list";
+            termsText.split("\n").forEach((line) => {
+                const text = line.trim();
+                if (!text) { return; }
+                list.appendChild(el("li", "doc-trade-terms-item", text));
+            });
+            terms.appendChild(list);
+            sheet.appendChild(terms);
+        }
+
+        if (d(f.note)) {
+            sheet.appendChild(el("p", "doc-trade-note", d(f.note)));
+        }
+
+        /* The artwork's footer band. An inline SVG rather than the CSS
+           gradients this started as: the artwork's sweeps are CURVES, and
+           linear-gradient can only give a straight edge, which came out as a
+           hard-edged red wedge that read as a rendering fault rather than as a
+           design. Only visible once it was rendered and looked at.
+
+           TRADE_BAND is shared with the PDF writer, which draws the same three
+           paths through jsPDF, so the two painters cannot disagree about a
+           shape neither of them can check against the other. */
+        const NS = "http://www.w3.org/2000/svg";
+        const band = document.createElementNS(NS, "svg");
+        band.setAttribute("class", "doc-trade-band");
+        band.setAttribute("viewBox", "0 0 " + TRADE_BAND.w + " " + TRADE_BAND.h);
+        band.setAttribute("preserveAspectRatio", "none");
+        band.setAttribute("aria-hidden", "true");
+        band.setAttribute("focusable", "false");
+        const defs = document.createElementNS(NS, "defs");
+        TRADE_BAND.gradients.forEach((entry) => {
+            const grad = document.createElementNS(NS, "linearGradient");
+            grad.setAttribute("id", entry.id);
+            grad.setAttribute("x1", "0");
+            grad.setAttribute("x2", "1");
+            entry.stops.forEach((stop) => {
+                const node = document.createElementNS(NS, "stop");
+                node.setAttribute("offset", stop[0]);
+                node.setAttribute("stop-color", stop[1]);
+                grad.appendChild(node);
+            });
+            defs.appendChild(grad);
+        });
+        band.appendChild(defs);
+        TRADE_BAND.sweeps.forEach((sweep) => {
+            const path = document.createElementNS(NS, "path");
+            path.setAttribute("d", tradeBandPath(sweep));
+            path.setAttribute("fill", sweep.fill);
+            band.appendChild(path);
+        });
+        sheet.appendChild(band);
+    }
+
     /* --- Renderer dispatch ----------------------------------------------- */
 
     const RENDERERS = {
         receipt: renderReceipt,
         itemized: renderItemized,
         notice: renderNotice,
-        "ruled-invoice": renderRuledInvoice
+        "ruled-invoice": renderRuledInvoice,
+        "trade-receipt": renderTradeReceipt
     };
 
     function renderPreview(state) {
@@ -1993,11 +2480,274 @@
             }
         }
 
+        /* --- Layout 5: trade counter receipt ------------------------------ */
+
+        /* Absolute placement rather than the flowing `y` cursor every other
+           writer uses. This sheet is a FORM: the grid, the totals block and
+           the footer band are at fixed heights on the page in the artwork, and
+           a cursor that advanced by content would put them somewhere else on
+           every receipt. Single page by construction -- thirteen rows is the
+           form, and a fourteenth item extends the grid downward into space the
+           layout reserves for it rather than starting a second sheet. */
+        function writeTradeReceipt() {
+            const totals = computeTotals(state);
+            const ink = hexToRgb(TRADE_INK);
+            const cream = hexToRgb(TRADE_CREAM);
+            const grey = hexToRgb(TRADE_GREY);
+            const red = hexToRgb(TRADE_RED);
+
+            /* Points to millimetres, once: 595.28pt is exactly 210mm. */
+            const TOP = 10;
+            const CARD_H = 55.25;
+            const cols = TRADE_WIDTHS.map((share) => W * share);
+            const x = [];
+            cols.reduce((leftEdge, width, index) => {
+                x[index] = leftEdge;
+                return leftEdge + width;
+            }, L);
+            x[TRADE_WIDTHS.length] = R;
+
+            function fill(rgb) {
+                doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+            }
+
+            /* ---- header card ---- */
+            stroke(ink, 0.3);
+            doc.roundedRect(L, TOP, W, CARD_H, 2.94, 2.94, "S");
+
+            const refX = 104.53;
+            const refW = 86.32;
+            const refLabelW = 20.48;
+            const refTop = 40.74;
+            const refH = 20.02;
+            const rowH = refH / 3;
+
+            /* The label column is the rounded LEFT END of the reference box,
+               so it is drawn as a rounded rect clipped back to square on its
+               right by the plain rect that follows. Drawing it as a plain grey
+               rect would leave two square corners sitting outside the box's
+               own rounding. */
+            fill(grey);
+            stroke(ink, 0.3);
+            doc.roundedRect(refX, refTop, refLabelW, refH, 2.94, 2.94, "FD");
+            fill(grey);
+            doc.rect(refX + refLabelW - 2.94, refTop, 2.94, refH, "F");
+            doc.roundedRect(refX, refTop, refW, refH, 2.94, 2.94, "S");
+            doc.line(refX + refLabelW, refTop, refX + refLabelW, refTop + refH);
+            doc.line(refX, refTop + rowH, refX + refW, refTop + rowH);
+            doc.line(refX, refTop + rowH * 2, refX + refW, refTop + rowH * 2);
+
+            if (state.logo && state.logoRatio > 0) {
+                let logoH = 22;
+                let logoW = logoH * state.logoRatio;
+                if (logoW > 62) {
+                    logoW = 62;
+                    logoH = logoW / state.logoRatio;
+                }
+                doc.addImage(state.logo, "PNG", L + 6, TOP + 4, logoW, logoH);
+            }
+
+            font("helvetica", "normal", 11, ink);
+            let addressY = TOP + 32;
+            String(d(f.issuerDetails) || "").split("\n").slice(0, 3)
+                .forEach((line) => {
+                    if (!line.trim()) { return; }
+                    doc.text(line.trim(), L + 6, addressY);
+                    addressY += 6.2;
+                });
+
+            font("helvetica", "normal", 12, ink);
+            let headY = TOP + 8;
+            [d(f.issuerName),
+             d(f.contactEmail) ? "Email " + d(f.contactEmail) : "",
+             d(f.contactSite) ? "Website: " + d(f.contactSite) : ""]
+                .forEach((line) => {
+                    if (line) { doc.text(line, refX, headY); }
+                    headY += 7;
+                });
+
+            font("helvetica", "normal", 10, ink);
+            [[config.labels.docDate, formatDate(f.docDate)],
+             [config.labels.recipientName, d(f.recipientName)],
+             ["Cell No.", d(f.clientPhone)]].forEach((pair, index) => {
+                const baseline = refTop + rowH * index + rowH / 2 + 1.4;
+                doc.text(pair[0], refX + 1.6, baseline);
+                if (pair[1]) {
+                    doc.text(String(pair[1]), refX + refLabelW + 2, baseline);
+                }
+            });
+
+            /* ---- account block ---- */
+            font("helvetica", "bold", 10, ink);
+            doc.text("ACCOUNT DETAILS:", L, 71.5);
+            const acctLabelX = L;
+            const acctColonX = 55;
+            const acctValueX = 69.6;
+            let acctY = 77.5;
+            TRADE_ACCOUNT_ROWS.forEach((entry) => {
+                font("helvetica", "normal", 10, ink);
+                doc.text(entry.label, acctLabelX, acctY);
+                doc.text(":", acctColonX, acctY);
+                const value = d(f[entry.bind]);
+                if (value) {
+                    doc.text(String(value), acctValueX, acctY);
+                }
+                acctY += 4.6;
+            });
+
+            /* ---- the grid ---- */
+            const HEAD_TOP = 111.74;
+            const HEAD_H = 8.24;
+            const BODY_TOP = HEAD_TOP + HEAD_H;
+            const BODY_BOTTOM = 209.48;
+            const rowsData = state.items.map((item) => tradeRowValues(item, cur))
+                .filter((row) => row !== null);
+            const drawn = Math.max(TRADE_MIN_ROWS, rowsData.length);
+            const pitch = (BODY_BOTTOM - BODY_TOP) / TRADE_MIN_ROWS;
+            const gridBottom = BODY_TOP + pitch * drawn;
+
+            fill(cream);
+            stroke(ink, 0.3);
+            doc.roundedRect(L, HEAD_TOP, W, HEAD_H, 2.2, 2.2, "FD");
+            fill(cream);
+            doc.rect(L, HEAD_TOP + HEAD_H - 2.4, W, 2.4, "F");
+            stroke(ink, 0.3);
+            doc.line(L, HEAD_TOP + HEAD_H, R, HEAD_TOP + HEAD_H);
+
+            font("helvetica", "normal", 12, ink);
+            TRADE_COLUMNS.forEach((title, index) => {
+                if (!title) { return; }
+                const mid = x[index] + cols[index] / 2;
+                doc.text(title, mid, HEAD_TOP + HEAD_H - 2.4, { align: "center" });
+            });
+
+            stroke(ink, 0.3);
+            doc.rect(L, BODY_TOP, W, gridBottom - BODY_TOP, "S");
+            for (let i = 1; i < drawn; i += 1) {
+                const lineY = BODY_TOP + pitch * i;
+                doc.line(L, lineY, R, lineY);
+            }
+            /* Every vertical runs from the head to the foot of the grid; the
+               last two continue into the totals block below, which is what
+               keeps the totals lined up with the Amount column above them. */
+            for (let i = 1; i < TRADE_WIDTHS.length; i += 1) {
+                doc.line(x[i], HEAD_TOP, x[i], gridBottom);
+            }
+
+            font("helvetica", "normal", 10, ink);
+            rowsData.slice(0, drawn).forEach((row, index) => {
+                const baseline = BODY_TOP + pitch * index + pitch - 2.2;
+                doc.text(row.qty, x[0] + cols[0] / 2, baseline, { align: "center" });
+                doc.text(row.description, x[1] + 2, baseline);
+                if (row.price) {
+                    doc.text(row.price, x[3] - 2, baseline, { align: "right" });
+                }
+                doc.text(row.major, x[4] - 2, baseline, { align: "right" });
+                if (row.minor) {
+                    doc.text(row.minor, x[4] + 2, baseline);
+                }
+            });
+
+            /* ---- totals ---- */
+            const TOTAL_ROWS = [
+                { label: "Sub Total", value: totals.subtotal, fillRow: false },
+                { label: d(f.taxLabel) || "V.A.T Inclusive", value: totals.tax, fillRow: false },
+                { label: "TOTAL", value: totals.total, fillRow: true }
+            ];
+            const totalH = 8.6;
+            TOTAL_ROWS.forEach((entry, index) => {
+                const top = gridBottom + totalH * index;
+                const last = index === TOTAL_ROWS.length - 1;
+                stroke(ink, 0.3);
+                if (entry.fillRow) {
+                    fill(cream);
+                    doc.roundedRect(x[3], top, R - x[3], totalH, 2.94, 2.94, "FD");
+                    fill(cream);
+                    doc.rect(x[3], top, R - x[3], totalH - 2.94, "F");
+                    stroke(ink, 0.3);
+                    doc.line(x[3], top, R, top);
+                    doc.line(x[3], top, x[3], top + totalH - 2.94);
+                    doc.line(R, top, R, top + totalH - 2.94);
+                } else {
+                    doc.rect(x[3], top, R - x[3], totalH, "S");
+                }
+                doc.line(x[4], top, x[4], top + totalH - (last ? 2.94 : 0));
+
+                const baseline = top + totalH - 2.6;
+                font("helvetica", last ? "bold" : "normal", last ? 13 : 12, ink);
+                doc.text(entry.label, x[3] - 3, baseline, { align: "right" });
+                const parts = tradeAmountParts(entry.value, cur, true);
+                font("helvetica", last ? "bold" : "normal", last ? 12 : 11, ink);
+                doc.text(parts.major, x[4] - 2, baseline, { align: "right" });
+                if (parts.minor) {
+                    doc.text(parts.minor, x[4] + 2, baseline);
+                }
+            });
+
+            font("helvetica", "bold", 13, ink);
+            doc.text("Payment Method:", L, gridBottom + 6.4);
+            const chosen = PAYMENT_METHODS
+                .filter((option) => state.methods[option.key])
+                .map((option) => option.label);
+            if (chosen.length) {
+                font("helvetica", "normal", 11, ink);
+                doc.text(chosen.join(", "), L, gridBottom + 13);
+            }
+
+            /* ---- terms ---- */
+            const termsTop = Math.max(245, gridBottom + totalH * 3 + 10);
+            font("helvetica", "normal", 10, red);
+            doc.text("TERMS & CONDITIONS", 26.1, termsTop);
+            stroke(red, 0.4);
+            doc.line(26.1, termsTop + 1.4, 67.1, termsTop + 1.4);
+
+            /* The introducing line, drawn here as well as on the sheet. It is
+               indented past the numbers the way the artwork has it: the
+               clauses hang off their figures and the intro sits inside them. */
+            let termsY = termsTop + 6.4;
+            const intro = d(f.termsIntro) || TRADE_TERMS_INTRO;
+            if (intro) {
+                font("helvetica", "normal", 9, ink);
+                doc.text(String(intro), 29.5, termsY);
+                termsY += 4.6;
+            }
+
+            const termsText = d(f.terms) || TRADE_TERMS_DEFAULT;
+            font("helvetica", "normal", 9, ink);
+            String(termsText).split("\n").forEach((line, index) => {
+                const text = line.trim();
+                /* The cutoff is 284 and not the band's own top edge at 270,
+                   because the band is a SWEEP: it rises from left to right, and
+                   these clauses are left-aligned at x=26-31 where its ink does
+                   not begin until about 287. Cutting at the band's highest
+                   point silently dropped the fifth clause while the preview,
+                   which flows, still showed all five -- the two painters
+                   disagreeing about the CONTENT rather than the geometry. */
+                if (!text || termsY > 284) { return; }
+                doc.text((index + 1) + ".", 26.1, termsY);
+                doc.text(text, 31.5, termsY);
+                termsY += 4.6;
+            });
+
+            /* ---- footer band ---- */
+            /* The same three sweeps the preview draws, from the same
+               TRADE_BAND coordinates, so the decoration cannot drift between
+               the two painters.
+
+               jsPDF has no gradients, so each wash is drawn as its darkest
+               stop. That is a real difference from the screen and it is the
+               right way round: a printed band of flat ink reproduces
+               predictably, where a gradient banding across a cheap printer
+               does not. */
+            drawTradeBand(doc, 0, 297 - 27, 210, 27);
+        }
+
         const WRITERS = {
             receipt: writeReceipt,
             itemized: writeItemized,
             notice: writeNotice,
-            "ruled-invoice": writeRuledInvoice
+            "ruled-invoice": writeRuledInvoice,
+            "trade-receipt": writeTradeReceipt
         };
         WRITERS[config.layout]();
 
@@ -2154,13 +2904,37 @@
         pane.insertBefore(notice, pane.firstChild);
     }
 
+    /* Sample values that differ by document type, overlaid on SAMPLE_FIELDS.
+       Only where the SHEET names a row differently: the trade receipt's middle
+       total is "V.A.T Inclusive" in its artwork, and seeding the shared "Sales
+       Tax" there would have the sample contradict the design it is sampling.
+       The field stays editable -- a visitor outside a VAT regime should be
+       able to type their own -- this only changes what it starts at.
+
+       Deliberately NOT seeded: that sheet's seven account fields. Sample data
+       elsewhere in this editor is a company nobody could mistake for real, and
+       a bank account number is the one field where a plausible-looking
+       placeholder left uncleared would be worse than an empty rule. The block
+       draws its labels and its rules when empty, which is what a form does. */
+    const SAMPLE_BY_TYPE = {
+        /* `note` is blanked rather than removed. The artwork has NOTHING
+           between its terms and the footer band, and a seeded closing line
+           lands exactly there -- but a footer message is a useful thing to be
+           able to add, so the field stays and only the sample stops filling
+           it. */
+        "trade-receipt": { taxLabel: "V.A.T Inclusive", taxRate: "14", note: "" }
+    };
+
     function applySampleContent() {
+        const overlay = SAMPLE_BY_TYPE[sessionDocType] || {};
         form.querySelectorAll("[data-bind]").forEach((input) => {
             const key = input.getAttribute("data-bind");
             if (input.tagName === "SELECT") {
                 return;
             }
-            if (Object.prototype.hasOwnProperty.call(SAMPLE_FIELDS, key)) {
+            if (Object.prototype.hasOwnProperty.call(overlay, key)) {
+                input.value = overlay[key];
+            } else if (Object.prototype.hasOwnProperty.call(SAMPLE_FIELDS, key)) {
                 input.value = SAMPLE_FIELDS[key];
             }
         });
@@ -2171,6 +2945,27 @@
     function init() {
         const saved = TB.storageGet(STORAGE_KEY);
         const state = saved && saved.fields ? saved : null;
+
+        /* A catalog card or landing-page CTA pre-selects which document opens.
+           The value is matched against DOC_TYPES, so an edited localStorage
+           entry can only ever resolve to a document this editor already ships,
+           and a direct visit with no preset and no saved work falls through to
+           DEFAULT_TYPE rather than to nothing.
+
+           This is the ONLY place the document type is decided; there is no
+           control that can change it afterwards. The saved-state branch is
+           what lets a returning visitor resume the document they were actually
+           working on instead of being reset to the default.
+
+           Resolved HERE, before the sample content below, because
+           applySampleContent() overlays values that differ by document type
+           and would otherwise read whichever type this variable still held
+           from its declaration. TB.takePreset() REMOVES the key as it reads,
+           so this must stay exactly one call. */
+        const preset = TB.takePreset();
+        sessionDocType = Object.prototype.hasOwnProperty.call(DOC_TYPES, preset)
+            ? preset
+            : (state && DOC_TYPES[state.docType] ? state.docType : DEFAULT_TYPE);
 
         if (docNameInput) {
             docNameInput.value = TB.desanitize((state && state.docName) || DEFAULT_DOC_NAME);
@@ -2214,21 +3009,6 @@
             applySampleContent();
             showSampleNotice();
         }
-
-        /* A catalog card or landing-page CTA pre-selects which document opens.
-           The value is matched against DOC_TYPES, so an edited localStorage
-           entry can only ever resolve to a document this editor already ships,
-           and a direct visit with no preset and no saved work falls through to
-           DEFAULT_TYPE rather than to nothing.
-
-           This is now the ONLY place the document type is decided; there is no
-           control that can change it afterwards. The saved-state branch is
-           what lets a returning visitor resume the document they were actually
-           working on instead of being reset to the default. */
-        const preset = TB.takePreset();
-        sessionDocType = Object.prototype.hasOwnProperty.call(DOC_TYPES, preset)
-            ? preset
-            : (state && DOC_TYPES[state.docType] ? state.docType : DEFAULT_TYPE);
 
         /* Real-time binding: one delegated listener covers every current and
            future input inside the form, including cloned line-item rows. */

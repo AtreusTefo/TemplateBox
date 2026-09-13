@@ -4058,6 +4058,288 @@ const GRAB_PDF = `
     };
 `;
 
+async function anniversaryCalendarChecks(page) {
+    section("13. Calendar posters: the calendar is a calculation");
+
+    /* All three calendar posters, through the same checks. They share
+       annivMonth() and annivCell() -- one set of arithmetic, deliberately,
+       because a second copy of a calendar is a second calendar to be wrong --
+       so what is worth proving is that every one of these LAYOUTS puts the
+       answer in the right square.
+
+       The scan window differs because the calendars sit in different parts of
+       their pages: the anniversary poster's is under its collage, the other
+       two are above theirs. Everything else here calibrates itself off the
+       drawing.
+
+       `rows` is how many rows of the grid the window reaches, and it exists
+       because of the tribute. That poster's window is bounded on BOTH sides by
+       drawing rather than by margin: its first photo box's red fill begins at
+       228.96pt of an 841.89pt page, and a six-row month's last row of dates
+       sits at 238.59. There is no window that holds row 5 and excludes a red
+       box, so this one stops at 227.3pt -- 2.5pt below the lowest ink of a row
+       4 marker and 1.7pt above the highest ink of a box.
+
+       That is safe for the ARTWORK, and for a reason worth writing down: row 5
+       only ever exists when a month's first weekday and length push the last
+       day past index 34, which puts that day in column 0 or column 1 and
+       nowhere else -- the far left of the page, where no photo box reaches.
+       The poster is right; it is only the pixel scan that cannot see down
+       there.
+
+       It is NOT automatically safe for a future CASE. A marker half inside the
+       window yields a clipped centroid, and a clipped centroid can still round
+       to the right row -- passing for the wrong reason, which is worse than
+       failing. So the expectation is compared against `rows` first and the
+       check fails loudly instead. */
+    const LAYOUTS = [
+        { preset: "anniversary", label: "anniversary", top: 0.62, bottom: 0.99 },
+        { preset: "birthday", label: "birthday", top: 0.10, bottom: 0.42 },
+        { preset: "tribute", label: "tribute", top: 0.09, bottom: 0.270, rows: 5 }
+    ];
+
+    for (const L of LAYOUTS) {
+        await oneCalendarPoster(page, L);
+    }
+}
+
+async function oneCalendarPoster(page, L) {
+
+    /* The supplied artwork labelled its grid NOVEMBER 2025 and drew the 1st
+       under M in five rows. 1 November 2025 was a SATURDAY and the month needs
+       six. Every date position in that source is hand-set to fit a month that
+       does not exist, which is why this layout computes the grid instead of
+       copying it -- and why the arithmetic is the part most worth a check.
+
+       What is asserted is WHERE THE MARKED DAY LANDS: its column and its row.
+       Both follow from the month's first weekday and its length, so a marker
+       in the right cell across these months is the calculation being right.
+       A day the month does not have must mark nothing at all.
+
+       The expectations are derived HERE, in Node, from the same calendar every
+       other program uses. They are deliberately not a second copy of the
+       page's formula: a check that reimplements the code it is checking agrees
+       with it even when both are wrong.
+
+       Measured from the DRAWING, and self-calibrating. An earlier version of
+       this check counted rows of ink instead, and could not be made to work:
+       the marker's heart overhangs its row by about a point, enough to fuse it
+       to the row below, and masking the heart out instead fragments a lone
+       marked "1" into three slivers. Day 1 is always in row 0 and day 8 always
+       in row 1, whatever the month, so the poster hands over its own row pitch
+       without being asked where it drew anything. */
+    const CASES = [
+        { y: 2025, m: 10, day: 29, note: "opens Saturday, 30 days, six rows" },
+        { y: 2026, m: 1, day: 14, note: "February opening Sunday, four rows" },
+        { y: 2026, m: 7, day: 1, note: "31 days opening Saturday, six rows" },
+        { y: 2024, m: 1, day: 29, note: "leap February" },
+        { y: 2027, m: 1, day: 29, note: "a 29th in a NON-leap February" },
+        { y: 2026, m: 8, day: 31, note: "a 31st in a 30-day month" }
+    ];
+
+    const expected = CASES.map((c) => {
+        const first = new Date(Date.UTC(c.y, c.m, 1)).getUTCDay();
+        const length = new Date(Date.UTC(c.y, c.m + 1, 0)).getUTCDate();
+        const valid = c.day >= 1 && c.day <= length;
+        const index = first + c.day - 1;
+        return valid ? { col: index % 7, row: Math.floor(index / 7) } : null;
+    });
+
+    await page.evaluate("(localStorage.clear(), localStorage.setItem(" +
+        "'tb_editor_preset', " + JSON.stringify(JSON.stringify(L.preset)) + "), true)");
+    await page.navigate(`http://localhost:${PORT}/poster.html`, 1440);
+
+    const got = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        await wait(400);
+
+        /* Wait for the poster to have been PAINTED rather than for a fixed
+           number of milliseconds. A flat 400ms is enough once the browser has
+           loaded this page a few times and is not enough on a cold first load,
+           which made this section pass or fail depending on what ran before it
+           -- the anniversary poster, which happens to be first in the table,
+           reported "no marker during calibration" when the section was run on
+           its own and passed in a full suite. An order-dependent check is not
+           a check. */
+        const ready = async () => {
+            const c = document.getElementById('poster-canvas');
+            if (!c || !c.width) { return false; }
+            const g = c.getContext('2d');
+            const px = g.getImageData(0, 0, c.width, Math.min(c.height, 40)).data;
+            for (let i = 0; i < px.length; i += 4) {
+                if (px[i + 3] > 0 && (px[i] || px[i + 1] || px[i + 2])) { return true; }
+            }
+            return false;
+        };
+        for (let tries = 0; tries < 40 && !await ready(); tries += 1) {
+            await wait(100);
+        }
+
+        const set = async (id, v) => {
+            const el = document.getElementById(id);
+            if (!el) { return false; }
+            el.value = String(v);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            await wait(60);
+            return true;
+        };
+        const canvas = document.getElementById('poster-canvas');
+        if (!canvas) { return { error: 'no canvas' }; }
+        const ctx = canvas.getContext('2d');
+
+        /* The marker's centroid, and the horizontal extent of the rule that
+           the columns are measured against. Both come out of the pixels. */
+        const readMarker = () => {
+            const W = canvas.width, H = canvas.height;
+            const d = ctx.getImageData(0, 0, W, H).data;
+            const bg = [d[0], d[1], d[2]];
+            const top = Math.round(H * ${L.top}), bottom = Math.round(H * ${L.bottom});
+
+            /* The rule FIRST: the longest UNBROKEN horizontal run of ink in
+               the band, which is the line under the day header. It is found
+               before the marker because it is what bounds the search for it.
+
+               An unbroken run, not a span. The first version of this took the
+               leftmost and rightmost ink on each row and accepted the widest
+               row that was at least 90 per cent filled, which is the same
+               answer on two of the three posters and no answer at all on the
+               third: the tribute hangs four hearts on strings from the top
+               edge and two of those strings cross the rule's own row, 150
+               points to its right. The span then ran from the rule's left end
+               to a string, came out 43 per cent filled, and was rejected --
+               leaving the marker search unbounded, which handed it four red
+               hearts that do not move when the day changes and a calibration
+               pitch of exactly zero.
+
+               No box is wider than its poster's rule inside any of these three
+               bands (the widest in band is 121pt against a 272pt rule on the
+               birthday, 67pt against 209pt on the tribute), so the longest run
+               is the rule on all of them. */
+            let ruleLo = -1, ruleHi = -1, best = 0;
+            for (let y = top; y <= bottom; y += 1) {
+                let runStart = -1;
+                for (let x = 0; x <= W; x += 1) {
+                    const i = ((y * W) + x) * 4;
+                    const ink = x < W && (Math.abs(d[i] - bg[0]) > 60 ||
+                        Math.abs(d[i + 1] - bg[1]) > 60 || Math.abs(d[i + 2] - bg[2]) > 60);
+                    if (ink) {
+                        if (runStart === -1) { runStart = x; }
+                    } else if (runStart !== -1) {
+                        if (x - runStart > best) {
+                            best = x - runStart; ruleLo = runStart; ruleHi = x - 1;
+                        }
+                        runStart = -1;
+                    }
+                }
+            }
+
+            /* The marker, searched ONLY across the calendar's own width.
+
+               Red is not by itself a marker. The birthday poster draws a red
+               keyline around every one of its twelve photo boxes, three of
+               which sit inside this band, and a whole-width scan put the
+               centroid out in column 9 of a seven-column grid -- and found a
+               marker in the two months that are supposed to have none. The
+               rule is what says where the calendar is. */
+            let hx = 0, hy = 0, hits = 0;
+            const mLo = ruleLo >= 0 ? ruleLo : 0;
+            const mHi = ruleHi >= 0 ? ruleHi : W - 1;
+            for (let y = top; y <= bottom; y += 1) {
+                for (let x = mLo; x <= mHi; x += 1) {
+                    const i = ((y * W) + x) * 4;
+                    if (d[i] > 180 && d[i + 1] < 90 && d[i + 2] < 90) {
+                        hx += x; hy += y; hits += 1;
+                    }
+                }
+            }
+            return {
+                hits: hits,
+                x: hits ? hx / hits : null,
+                y: hits ? hy / hits : null,
+                ruleLo: ruleLo, ruleHi: ruleHi
+            };
+        };
+
+        /* Calibration. Day 1 is row 0 and day 8 is row 1 in EVERY month, so
+           these two give the pitch and the origin without the page being asked
+           where it put anything. */
+        if (!await set('p-month', 0) || !await set('p-year', 2027) ||
+                !await set('p-day', 1)) {
+            return { error: 'missing month/year/day control' };
+        }
+        await wait(260);
+        const cal1 = readMarker();
+        await set('p-day', 8);
+        await wait(260);
+        const cal8 = readMarker();
+        if (!cal1.hits || !cal8.hits) { return { error: 'no marker during calibration' }; }
+        const pitch = cal8.y - cal1.y;
+        if (!(pitch > 2)) { return { error: 'calibration pitch came out ' + pitch }; }
+
+        const cases = ${JSON.stringify(CASES)};
+        const out = [];
+        for (const c of cases) {
+            await set('p-month', c.m);
+            await set('p-year', c.y);
+            await set('p-day', c.day);
+            await wait(260);
+            const m = readMarker();
+            out.push({
+                hits: m.hits,
+                col: m.hits && m.ruleLo >= 0
+                    ? Math.floor((m.x - m.ruleLo) / ((m.ruleHi - m.ruleLo) / 7))
+                    : null,
+                row: m.hits ? Math.round((m.y - cal1.y) / pitch) : null
+            });
+        }
+        return { pitch: pitch, origin: cal1.y, cases: out };
+    })()`);
+
+    if (!got || got.error) {
+        check(`13a. ${L.label}: the poster answered`, false,
+            got && got.error ? got.error : "no result");
+        return;
+    }
+
+    check(`13a. ${L.label}: row pitch calibrated from the poster`,
+        got.pitch > 2, `day 1 and day 8 are ${got.pitch} apart`);
+
+    CASES.forEach((c, i) => {
+        const want = expected[i];
+        const have = got.cases[i];
+        const label = `${L.label} ${c.y}-${String(c.m + 1).padStart(2, "0")} day ${c.day} (${c.note})`;
+
+        if (!want) {
+            /* A day the month does not have must mark NOTHING, rather than
+               something off the end of the grid. */
+            check(`13b. ${label}: nothing is marked`, have.hits === 0,
+                `found ${have.hits} marker pixels for a day not in the month`);
+            return;
+        }
+        /* Before anything is measured: does this layout's window even reach
+           the row the calendar should have used? A row outside it produces a
+           clipped centroid, which is a wrong answer that can look like a right
+           one. Say so plainly rather than let it round. */
+        const reach = L.rows === undefined ? 6 : L.rows;
+        if (want.row >= reach) {
+            check(`13b. ${label}: inside the scan window`, false,
+                `expected row ${want.row}, but this layout's window reaches ` +
+                `rows 0 to ${reach - 1} only -- see the LAYOUTS comment before ` +
+                "widening it, because the bound is drawing and not margin");
+            return;
+        }
+
+        check(`13b. ${label}: the day is marked`, have.hits > 0,
+            "no marker found");
+        if (!have.hits) { return; }
+        check(`13c. ${label}: column ${want.col}`, have.col === want.col,
+            `marker fell in column ${have.col}, expected ${want.col}`);
+        check(`13d. ${label}: row ${want.row}`, have.row === want.row,
+            `marker fell in row ${have.row}, expected ${want.row}`);
+    });
+}
+
 async function ruledInvoiceChecks(page) {
     section("12. Ruled invoice: the sheet, the arithmetic and the logo");
 
@@ -4502,6 +4784,7 @@ async function main() {
                     await posterExportChecks(page);
                     await mockupTemplateChecks(page);
                     await ruledInvoiceChecks(page);
+                    await anniversaryCalendarChecks(page);
                 } finally {
                     page.close();
                 }

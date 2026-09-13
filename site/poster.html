@@ -65,8 +65,8 @@
     <!-- Fonts loaded without blocking render: the print-media swap defers
          application until the sheet has arrived, and font-display:swap in
          the served CSS paints text immediately in the fallback face. -->
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Petit+Formal+Script&family=Inter:wght@400;500;600&display=swap">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Petit+Formal+Script&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
     <!-- Theme, applied before first paint so a returning visitor never sees a
          flash of the wrong one. Deliberately inline and synchronous: an
@@ -444,16 +444,124 @@
                         <p class="upload-hint">The dot on the progress bar follows these two. Anything that is not a time leaves it where the artwork put it.</p>
 
                         <div class="field">
+                            <label for="p-player-theme">Screen Mode</label>
+                            <select id="p-player-theme"></select>
+                        </div>
+                    </div>
+
+                    <!-- The anniversary poster: two names, the line beneath the
+                         collage, and the month it is built around. -->
+                    <!-- Shared by both calendar posters. One set of controls
+                         because there is one set of arithmetic: annivMonth()
+                         and annivCell() serve both layouts, and a second copy
+                         of either would be a second calendar to be wrong. -->
+                    <div id="p-calendar-fields" hidden>
+                        <div class="field field-row">
+                            <div>
+                                <label for="p-month">Month</label>
+                                <select id="p-month"></select>
+                            </div>
+                            <div>
+                                <label for="p-year">Year</label>
+                                <input type="number" id="p-year" min="1900" max="2999" step="1" autocomplete="off">
+                            </div>
+                        </div>
+                        <p class="upload-hint" id="p-year-hint">The year sets which weekday the month opens on.</p>
+
+                        <div class="field">
+                            <label for="p-day">Day to Mark</label>
+                            <input type="number" id="p-day" min="1" max="31" step="1" autocomplete="off">
+                            <p class="upload-hint">The heart goes behind this date. A month that has no such day simply leaves it unmarked.</p>
+                        </div>
+                    </div>
+
+                    <div id="p-anniv-fields" hidden>
+                        <div class="field field-row">
+                            <div>
+                                <label for="p-name-a">First Name</label>
+                                <input type="text" id="p-name-a" maxlength="40" autocomplete="off">
+                            </div>
+                            <div>
+                                <label for="p-name-b">Second Name</label>
+                                <input type="text" id="p-name-b" maxlength="40" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-tagline">Line Along the Foot</label>
+                            <input type="text" id="p-tagline" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field">
+                            <label for="p-anniv-swap">Move the Selected Photo</label>
+                            <select id="p-anniv-swap"></select>
+                            <p class="upload-hint">Click a box on the preview to choose it, then pick where it should go. The two photographs trade places, keeping the framing you gave each one. The boxes themselves do not move: their arrangement is what makes the heart.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-anniv-theme">Colour</label>
+                            <select id="p-anniv-theme"></select>
+                            <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. On the light one the empty photo boxes are outlined rather than filled, because a white box on white paper is not a box.</p>
+                        </div>
+
+                    </div>
+
+                    <div id="p-trib-fields" hidden>
+                        <div class="field">
+                            <label for="p-heading">Heading</label>
+                            <input type="text" id="p-heading" maxlength="60" autocomplete="off">
+                            <p class="upload-hint">Two spaces in a row mark where the heart goes, and it stands in for the letters you leave out. Write TO as T, two spaces, and the heart becomes the O.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-message">Message</label>
+                            <textarea id="p-message" maxlength="220" rows="3" autocomplete="off"></textarea>
+                            <p class="upload-hint">Sits under the heading and wraps to the space left of the photographs.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-title">Line Along the Foot</label>
+                            <input type="text" id="p-title" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Centred with its heart, the two together, so the words stay on the page's middle.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-trib-theme">Colour</label>
+                            <select id="p-trib-theme"></select>
+                            <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. The photo boxes stay red in both, because on this artwork the red IS the empty state; what changes is the keyline, which cannot be white on white paper.</p>
+                        </div>
+                    </div>
+
+                    <div id="p-hbd-fields" hidden>
+                        <div class="field">
+                            <label for="p-quote">Quote</label>
+                            <textarea id="p-quote" maxlength="220" rows="4" autocomplete="off"></textarea>
+                            <p class="upload-hint">Sits to the left of the photographs and wraps to fit. Line breaks are kept; runs of spaces are not.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-closing">Closing Line</label>
+                            <textarea id="p-closing" maxlength="220" rows="2" autocomplete="off"></textarea>
+                            <p class="upload-hint">Runs along the foot, with a heart after the last word.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-hbd-theme">Colour</label>
+                            <select id="p-hbd-theme"></select>
+                            <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. On the light one the empty photo boxes are outlined rather than filled, because a white box on white paper is not a box.</p>
+                        </div>
+                    </div>
+
+                    <!-- Shared by the music poster and the anniversary poster:
+                         both carry a scannable code and neither fetches one. -->
+                    <div id="p-code-fields" hidden>
+                        <div class="field">
                             <label for="p-image-code">Scan Code</label>
                             <input type="file" id="p-image-code" accept="image/*">
                             <p class="upload-hint">Optional. Save the code image from your music app's share menu, then upload it here. Nothing is fetched for you: this editor never talks to another service.</p>
                             <p class="form-error" id="p-image-code-error" role="alert"></p>
                         </div>
 
-                        <div class="field">
-                            <label for="p-player-theme">Screen Mode</label>
-                            <select id="p-player-theme"></select>
-                        </div>
                     </div>
 
                     <!-- Framing. The slider is the accessible route to what

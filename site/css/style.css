@@ -8872,3 +8872,962 @@ main:has(.mockup-layout) .editor-head {
         padding: 1.25rem;
     }
 }
+
+
+/* --------------------------------------------------------------------------
+   Trade counter receipt (docs.html, .doc-sheet.is-trade-receipt)
+   The fifth layout family: a parts-counter receipt traced from an A4 artwork,
+   carrying the seller's bank details on its face.
+
+   Proportions rather than the artwork's millimetres. The PDF writer places
+   this sheet at fixed heights because it is a form; the PREVIEW is a pane that
+   the visitor resizes, so the same figures are held here as percentages of the
+   sheet's own width and the grid keeps its shape at any size.
+
+   Four fills carry the design -- the grid header, the Total box, the reference
+   labels and the footer band -- and every one declares print-color-adjust:
+   browsers drop background colours from print output by default, and the loss
+   is invisible on screen until somebody prints.
+   -------------------------------------------------------------------------- */
+
+.doc-sheet.is-trade-receipt {
+    padding: 1.5rem 1.25rem 0;
+    color: #231F20;
+    display: flex;
+    flex-direction: column;
+}
+
+.doc-trade-card {
+    display: flex;
+    gap: 1rem;
+    border: 1px solid #231F20;
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 0.875rem;
+}
+
+.doc-trade-card-left,
+.doc-trade-card-right {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.doc-trade-card-left {
+    flex: 0 1 46%;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.doc-trade-card-right {
+    flex: 1 1 54%;
+    gap: 0.125rem;
+}
+
+.doc-trade-logo {
+    display: block;
+    max-width: 100%;
+    max-height: 4.5rem;
+    object-fit: contain;
+    object-position: left top;
+}
+
+/* Shorter than the logo it stands for, so the card does not change height when
+   there is nothing in it -- the preview would then be taller than the PDF,
+   which draws the logo from state and never reads this sheet. */
+.doc-trade-logo-slot {
+    align-self: flex-start;
+}
+
+.doc-trade-address-line {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+}
+
+.doc-trade-business {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
+.doc-trade-contact {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.doc-trade-refs {
+    margin-top: 0.5rem;
+    border: 1px solid #231F20;
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.doc-trade-ref-row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid #231F20;
+    min-height: 1.4rem;
+}
+
+.doc-trade-ref-row:last-child {
+    border-bottom: 0;
+}
+
+.doc-trade-ref-label {
+    flex: 0 0 23.7%;
+    background-color: #DBD9D9;
+    border-right: 1px solid #231F20;
+    padding: 0.0625rem 0.25rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.doc-trade-ref-value {
+    flex: 1 1 auto;
+    padding: 0.0625rem 0.375rem;
+    font-size: 0.875rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.doc-trade-account {
+    margin-bottom: 0.875rem;
+}
+
+.doc-trade-account-heading {
+    margin: 0 0 0.125rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+/* Three columns rather than a table: the labels are printed furniture and the
+   colon is a column of its own, which is what keeps every value on one left
+   edge however long the label beside it is. */
+.doc-trade-account-grid {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    column-gap: 1.25rem;
+    row-gap: 0.0625rem;
+    font-size: 0.875rem;
+}
+
+.doc-trade-account-colon {
+    text-align: center;
+}
+
+.doc-trade-account-value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.doc-trade-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.doc-trade-table th,
+.doc-trade-table td {
+    border: 1px solid #231F20;
+    padding: 0.1875rem 0.3125rem;
+    font-size: 0.8125rem;
+    vertical-align: top;
+    overflow-wrap: break-word;
+}
+
+.doc-trade-table th {
+    background-color: #F0E8CD;
+    font-weight: 400;
+    font-size: 1rem;
+    text-align: center;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.doc-trade-table td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* The minor-unit column. Left-aligned against the decimal division so figures
+   on consecutive lines stack the way they would if they were written in. */
+.doc-trade-table td.minor {
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Thirteen rows whether or not there is anything to put in them: the sheet is
+   a printed form before it is a record, and an empty row is somewhere to write. */
+.doc-trade-table tr.is-empty td {
+    height: 1.4rem;
+}
+
+.doc-trade-foot {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.doc-trade-method {
+    flex: 1 1 auto;
+    padding-top: 0.25rem;
+    min-width: 0;
+}
+
+.doc-trade-method-label {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.doc-trade-method-value {
+    margin: 0.125rem 0 0;
+    font-size: 0.8125rem;
+}
+
+/* The totals sit under the last two columns and are divided where those two
+   are divided, which is the whole reason the narrow column exists. The widths
+   below are TRADE_WIDTHS[3] and [4] of the table, so the block cannot drift
+   away from the column above it. */
+.doc-trade-totals {
+    flex: 0 0 24.79%;
+}
+
+.doc-trade-total-row {
+    display: flex;
+    border: 1px solid #231F20;
+    border-top: 0;
+    min-height: 1.5rem;
+    align-items: center;
+}
+
+.doc-trade-total-row:first-child {
+    border-top: 1px solid #231F20;
+}
+
+.doc-trade-total-row.is-total {
+    background-color: #F0E8CD;
+    border-radius: 0 0 0.5rem 0.5rem;
+    font-weight: 700;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+/* Outside the box and to its left, as the artwork has it. Absolute so a long
+   label cannot widen the block and pull it out of line with the column. */
+.doc-trade-total-label {
+    position: absolute;
+    right: 100%;
+    padding-right: 0.4rem;
+    white-space: nowrap;
+    font-size: 1rem;
+}
+
+.doc-trade-total-row {
+    position: relative;
+}
+
+.doc-trade-total-major {
+    flex: 0 0 66.56%;
+    text-align: right;
+    padding: 0 0.25rem;
+    border-right: 1px solid #231F20;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.doc-trade-total-minor {
+    flex: 1 1 auto;
+    padding: 0 0.25rem;
+    font-size: 0.875rem;
+}
+
+.doc-trade-terms {
+    margin-top: 1.25rem;
+}
+
+.doc-trade-terms-heading {
+    display: inline-block;
+    margin: 0 0 0.25rem 1.25rem;
+    padding-bottom: 0.0625rem;
+    border-bottom: 1px solid #B92025;
+    color: #B92025;
+    font-size: 0.8125rem;
+}
+
+/* Indented past the numbers, so the clauses hang off their figures and this
+   line sits inside them -- the arrangement the artwork has. */
+.doc-trade-terms-intro {
+    margin: 0 0 0.125rem 1.9rem;
+    font-size: 0.75rem;
+    line-height: 1.55;
+}
+
+.doc-trade-terms-list {
+    margin: 0;
+    padding-left: 2.5rem;
+    font-size: 0.75rem;
+    line-height: 1.55;
+}
+
+.doc-trade-note {
+    margin: 0.75rem 0 0;
+    font-size: 0.75rem;
+}
+
+/* The artwork's footer band, as two gradients and a red sweep. Decorative and
+   aria-hidden; it carries no content and exists so the sheet ends the way the
+   printed form does. margin-top: auto pins it to the foot however short the
+   receipt is, and the negative margins take it out to the sheet's own edges
+   past the padding. */
+.doc-trade-band {
+    display: block;
+    margin: auto -1.25rem 0;
+    width: calc(100% + 2.5rem);
+    height: 4.2rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+
+/* Trade counter receipt, catalog miniature. Carries only what identifies the
+   sheet at this size: the boxed header with its three ruled reference rows, the
+   account block as rules, the cream grid head over ruled rows, the cream total,
+   the red terms rule and the curved footer band.
+
+   Sized in em against .mock-doc's own 0.375rem base rather than in percentages.
+   The first version used percentage padding and gap inside a flex column, which
+   resolve against different axes and left the whole receipt stacked in the top
+   third of the tile with a void beneath it. */
+.mock-doc.trade {
+    gap: 0.45em;
+}
+
+/* Section heights follow the ARTWORK'S proportions of an A4 page, not
+   whatever is left over: header card 18.6 per cent, account block 12, grid and
+   totals 42, terms 11. Left to fill freely the grid took 68 per cent and its
+   rows came out as deep empty boxes -- a ruled form reads by having MANY thin
+   rules, not a few tall ones. */
+.mock-doc.trade .mk-tr-card {
+    display: flex;
+    gap: 0.8em;
+    align-items: stretch;
+    flex: 0 0 17%;
+    border: 1px solid #231F20;
+    border-radius: 2px;
+    padding: 0.6em;
+}
+
+.mock-doc.trade .mk-tr-brand {
+    flex: 0 0 42%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.3em;
+}
+
+/* Two solid bars for the logo, three rules for the address beneath it -- the
+   arrangement the artwork has in that corner. The bars carry the source's own
+   red and green, which are the only place those two colours appear. */
+.mock-doc.trade .mk-tr-brand b {
+    display: block;
+    height: 0.5em;
+    border-radius: 1px;
+    background-color: #B92025;
+}
+
+.mock-doc.trade .mk-tr-brand b:last-of-type {
+    width: 62%;
+    background-color: #056534;
+}
+
+.mock-doc.trade .mk-tr-brand span {
+    display: block;
+    height: 1px;
+    background-color: #B9BAC0;
+}
+
+.mock-doc.trade .mk-tr-brand span:nth-of-type(2) { width: 88%; }
+.mock-doc.trade .mk-tr-brand span:last-of-type { width: 74%; }
+
+.mock-doc.trade .mk-tr-refs {
+    flex: 1 1 auto;
+    align-self: flex-end;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #231F20;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.mock-doc.trade .mk-tr-refs span {
+    display: block;
+    height: 1em;
+    border-bottom: 1px solid #231F20;
+    background-image: linear-gradient(to right, #DBD9D9 0 24%, transparent 24%);
+}
+
+.mock-doc.trade .mk-tr-refs span:last-child {
+    border-bottom: 0;
+}
+
+.mock-doc.trade .mk-tr-acct {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 12%;
+    justify-content: space-between;
+    padding: 0.2em 0;
+}
+
+.mock-doc.trade .mk-tr-acct span {
+    display: block;
+    height: 1px;
+    background-color: #B9BAC0;
+}
+
+.mock-doc.trade .mk-tr-acct span:nth-child(odd) { width: 78%; }
+.mock-doc.trade .mk-tr-acct span:nth-child(even) { width: 64%; }
+
+/* The grid takes the slack, rather than a .mk-fill spacer below it. With a
+   spacer the receipt sat in the top 43 per cent of the tile and the rest was
+   white -- correct by every measurement and plainly wrong on sight. */
+.mock-doc.trade .mk-tr-grid {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 1px solid #231F20;
+}
+
+.mock-doc.trade .mk-tr-head {
+    display: flex;
+    background-color: #F0E8CD;
+    border-bottom: 1px solid #231F20;
+    line-height: 1.3;
+}
+
+.mock-doc.trade .mk-tr-head span {
+    text-align: center;
+    border-right: 1px solid #231F20;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* The artwork's own five proportions, so the miniature divides where the sheet
+   does. The fifth is the minor-unit column and carries no heading. */
+.mock-doc.trade .mk-tr-head span:nth-child(1) { flex: 0 0 16.45%; }
+.mock-doc.trade .mk-tr-head span:nth-child(2) { flex: 0 0 42.32%; }
+.mock-doc.trade .mk-tr-head span:nth-child(3) { flex: 0 0 16.44%; }
+.mock-doc.trade .mk-tr-head span:nth-child(4) { flex: 0 0 16.50%; }
+.mock-doc.trade .mk-tr-head span:nth-child(5) { flex: 1 1 auto; border-right: 0; }
+
+.mock-doc.trade .mk-tr-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.mock-doc.trade .mk-tr-row {
+    flex: 1 1 auto;
+    min-height: 0.8em;
+    border-bottom: 1px solid #231F20;
+    background-image: linear-gradient(to right,
+        transparent 0 calc(16.45% - 1px), #231F20 calc(16.45% - 1px) 16.45%,
+        transparent 16.45% calc(58.77% - 1px), #231F20 calc(58.77% - 1px) 58.77%,
+        transparent 58.77% calc(75.21% - 1px), #231F20 calc(75.21% - 1px) 75.21%,
+        transparent 75.21% calc(91.71% - 1px), #231F20 calc(91.71% - 1px) 91.71%,
+        transparent 91.71%);
+}
+
+.mock-doc.trade .mk-tr-row:last-child {
+    border-bottom: 0;
+}
+
+/* Under the last two columns and divided where they are, which is the whole
+   reason the artwork has a narrow fifth column. */
+.mock-doc.trade .mk-tr-totals {
+    align-self: flex-end;
+    width: 24.79%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mock-doc.trade .mk-tr-tot {
+    display: block;
+    height: 1em;
+    border: 1px solid #231F20;
+    border-top: 0;
+    background-image: linear-gradient(to right,
+        transparent 0 calc(66.56% - 1px), #231F20 calc(66.56% - 1px) 66.56%,
+        transparent 66.56%);
+}
+
+.mock-doc.trade .mk-tr-tot:first-child {
+    border-top: 1px solid #231F20;
+}
+
+.mock-doc.trade .mk-tr-tot.is-final {
+    background-color: #F0E8CD;
+    border-radius: 0 0 2px 2px;
+}
+
+.mock-doc.trade .mk-tr-terms {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 11%;
+    justify-content: space-between;
+    margin-left: 8%;
+    padding: 0.3em 0;
+}
+
+.mock-doc.trade .mk-tr-terms i {
+    display: block;
+    width: 34%;
+    height: 1px;
+    background-color: #B92025;
+}
+
+.mock-doc.trade .mk-tr-terms span {
+    display: block;
+    height: 1px;
+    width: 72%;
+    background-color: #B9BAC0;
+}
+
+.mock-doc.trade .mk-tr-terms span:last-child {
+    width: 58%;
+}
+
+/* Full bleed past the tile's padding, as it is on the sheet. */
+.mock-doc.trade .mk-tr-band {
+    display: block;
+    width: calc(100% + 1.25rem);
+    height: 1.6rem;
+    margin: 0 -0.625rem -0.625rem;
+}
+
+
+/* Anniversary calendar poster, catalog miniature. The heart is the identity,
+   so the eighteen boxes are placed as PERCENTAGES of their own container,
+   taken from the same artwork coordinates poster.js normalises -- the tile and
+   the poster cannot drift into different hearts. */
+.mock-doc.poster.anniv {
+    background-color: #050606;
+    gap: 0;
+    padding: 5% 6%;
+    justify-content: flex-start;
+}
+
+.mock-doc.poster.anniv .mk-an-names {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5%;
+    margin-bottom: 4%;
+}
+
+.mock-doc.poster.anniv .mk-an-names span {
+    display: block;
+    width: 26%;
+    height: 0.42rem;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+.mock-doc.poster.anniv .mk-an-names i {
+    display: block;
+    width: 0.34rem;
+    height: 0.3rem;
+    background-color: #E93625;
+    clip-path: polygon(50% 100%, 0 35%, 15% 0, 50% 18%, 85% 0, 100% 35%);
+}
+
+/* The collage. Aspect fixed to the artwork's own 441.37 x 367.47 so the heart
+   keeps its shape at any tile size, and 67 per cent wide because that is what
+   the poster gives it (400pt of 597.45). At full width the tile overflowed and
+   the calendar fell off the bottom -- a miniature has to be the same poster,
+   not the same elements at whatever size is left over. */
+.mock-doc.poster.anniv .mk-an-heart {
+    position: relative;
+    width: 67%;
+    margin: 0 auto 4%;
+    aspect-ratio: 441.37 / 367.47;
+}
+
+.mock-doc.poster.anniv .mk-an-heart b {
+    position: absolute;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.anniv .mk-an-code {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5%;
+    height: 0.34rem;
+    margin: 0 32% 4%;
+}
+
+.mock-doc.poster.anniv .mk-an-code span {
+    display: block;
+    flex: 0 0 4%;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+.mock-doc.poster.anniv .mk-an-code span:nth-child(odd) { height: 100%; }
+.mock-doc.poster.anniv .mk-an-code span:nth-child(even) { height: 52%; }
+
+.mock-doc.poster.anniv .mk-an-month {
+    margin: 0 0 3%;
+    text-align: center;
+    color: #FFFFFF;
+    font-family: var(--font-serif);
+    font-size: 0.34rem;
+    letter-spacing: 0.04em;
+}
+
+.mock-doc.poster.anniv .mk-an-cal {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0 14%;
+}
+
+.mock-doc.poster.anniv .mk-an-head {
+    display: flex;
+    color: #FFFFFF;
+    font-family: var(--font-serif);
+    font-size: 0.26rem;
+    line-height: 1;
+}
+
+.mock-doc.poster.anniv .mk-an-head span {
+    flex: 1 1 0;
+    text-align: center;
+}
+
+.mock-doc.poster.anniv .mk-an-rule {
+    height: 1px;
+    background-color: #FFFFFF;
+    margin: 6% 0 7%;
+}
+
+/* Six rules standing in for the weeks -- the worst case a month can need, and
+   what the poster draws for November 2025. At this size real numerals would be
+   two pixels tall and read as noise, but the ROW COUNT is what makes the block
+   look like a month, and with two rules the tile had a hole where the poster
+   has a calendar. */
+.mock-doc.poster.anniv .mk-an-grid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-top: 6%;
+}
+
+.mock-doc.poster.anniv .mk-an-grid span {
+    display: block;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Shorter rules at the ends, the way a month starts and finishes part-way
+   through a week. */
+.mock-doc.poster.anniv .mk-an-grid span:first-child { width: 16%; margin-left: auto; }
+.mock-doc.poster.anniv .mk-an-grid span:last-child { width: 30%; }
+
+.mock-doc.poster.anniv .mk-an-tag {
+    margin: auto 14% 0;
+    height: 0.34rem;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+
+/* Birthday calendar poster, catalog miniature. The cascade is the thing that
+   identifies it, so the twelve boxes are placed at the artwork's own fractions
+   of the page rather than redrawn by eye, and everything else is a bar. */
+.mock-doc.poster.hbd {
+    position: relative;
+    background-color: #231F20;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.poster.hbd .mk-hbd-boxes b {
+    position: absolute;
+    display: block;
+    background-color: #FFFFFF;
+    border: 1px solid #E93625;
+    box-sizing: border-box;
+}
+
+.mock-doc.poster.hbd .mk-hbd-month {
+    position: absolute;
+    left: 8.9%;
+    top: 4.2%;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 0.5rem;
+    line-height: 1;
+    color: #FFFFFF;
+}
+
+/* Sized to the share of the page the calendar actually occupies -- header
+   baseline 103.67 to last row 267, which is 19.4 per cent of 841.89. Left to
+   size itself the five rules bunched into a fifth of that and read as one
+   smudge under the header. */
+.mock-doc.poster.hbd .mk-hbd-cal {
+    position: absolute;
+    left: 6.1%;
+    top: 10.6%;
+    width: 45.7%;
+    height: 19.4%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mock-doc.poster.hbd .mk-hbd-head {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-serif);
+    font-size: 0.28rem;
+    line-height: 1.1;
+    color: #FFFFFF;
+}
+
+.mock-doc.poster.hbd .mk-hbd-rule {
+    height: 1px;
+    margin-top: 1px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.hbd .mk-hbd-grid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 8% 0 2%;
+}
+
+.mock-doc.poster.hbd .mk-hbd-grid span {
+    display: block;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.55);
+}
+
+/* The month opens part-way through its first week and ends part-way through
+   its last, which is what these two short rules are saying. */
+.mock-doc.poster.hbd .mk-hbd-grid span:first-child { width: 84%; margin-left: auto; }
+.mock-doc.poster.hbd .mk-hbd-grid span:last-child { width: 40%; }
+
+.mock-doc.poster.hbd .mk-hbd-garland {
+    position: absolute;
+    right: 4%;
+    top: 7%;
+    width: 34%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transform: rotate(-7deg);
+}
+
+.mock-doc.poster.hbd .mk-hbd-garland i {
+    display: block;
+    width: 0.3rem;
+    height: 0.3rem;
+    border-radius: 50% 50% 6% 50%;
+    background-color: #C190B7;
+    transform: rotate(45deg);
+}
+
+.mock-doc.poster.hbd .mk-hbd-garland i:nth-child(even) {
+    background-color: #A4B1C3;
+}
+
+.mock-doc.poster.hbd .mk-hbd-quote {
+    position: absolute;
+    left: 5.7%;
+    top: 35.4%;
+    width: 42%;
+    height: 21.7%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.mock-doc.poster.hbd .mk-hbd-quote span {
+    display: block;
+    height: 1.5px;
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.mock-doc.poster.hbd .mk-hbd-quote span:last-child { width: 46%; }
+
+.mock-doc.poster.hbd .mk-hbd-close {
+    position: absolute;
+    left: 5.7%;
+    bottom: 6%;
+    width: 78%;
+    height: 2px;
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+
+/* Birthday tribute poster, catalog miniature. The wall of red boxes is what
+   identifies it -- the sibling layout's cascade is white-filled with red
+   keylines and this one is the reverse -- so the boxes are placed at the
+   artwork's own fractions of the page and everything else is a bar. */
+.mock-doc.poster.trib {
+    position: relative;
+    background-color: #231F20;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.poster.trib .mk-tb-boxes b {
+    position: absolute;
+    display: block;
+    background-color: #E93625;
+    border: 1px solid #FFFFFF;
+    box-sizing: border-box;
+}
+
+.mock-doc.poster.trib .mk-tb-boxes b.tint {
+    background-color: #EF4136;
+}
+
+/* Four strings down from the top edge, at the artwork's own x positions and
+   each ending where its heart hangs. */
+.mock-doc.poster.trib .mk-tb-strings i {
+    position: absolute;
+    top: 1.2%;
+    width: 1px;
+    background-color: #ED1C24;
+}
+
+.mock-doc.poster.trib .mk-tb-strings i:nth-child(1) { left: 64.1%; height: 11.7%; }
+.mock-doc.poster.trib .mk-tb-strings i:nth-child(2) { left: 73.2%; height: 7.0%; }
+.mock-doc.poster.trib .mk-tb-strings i:nth-child(3) { left: 80.2%; height: 15.1%; }
+.mock-doc.poster.trib .mk-tb-strings i:nth-child(4) { left: 87.1%; height: 9.0%; }
+
+.mock-doc.poster.trib .mk-tb-strings i::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -0.16rem;
+    width: 0.2rem;
+    height: 0.2rem;
+    margin-left: -0.1rem;
+    border-radius: 50% 50% 6% 50%;
+    background-color: #E93625;
+    transform: rotate(45deg);
+}
+
+.mock-doc.poster.trib .mk-tb-month {
+    position: absolute;
+    left: 7.4%;
+    top: 4.6%;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 0.46rem;
+    line-height: 1;
+    color: #FFFFFF;
+}
+
+/* The calendar takes the share of the page it takes on the poster: header
+   baseline 90.88 to last row 216.47 is 14.9 per cent of 841.89. */
+.mock-doc.poster.trib .mk-tb-cal {
+    position: absolute;
+    left: 4.4%;
+    top: 9.0%;
+    width: 35.2%;
+    height: 16.5%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mock-doc.poster.trib .mk-tb-head {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-serif);
+    font-size: 0.26rem;
+    line-height: 1.1;
+    color: #FFFFFF;
+}
+
+.mock-doc.poster.trib .mk-tb-rule {
+    height: 1px;
+    margin-top: 1px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.trib .mk-tb-grid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 6% 0 2%;
+}
+
+.mock-doc.poster.trib .mk-tb-grid span {
+    display: block;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.55);
+}
+
+/* October opens on a Wednesday and ends on a Friday, which is what the two
+   short rules at the ends are saying. */
+.mock-doc.poster.trib .mk-tb-grid span:first-child { width: 57%; margin-left: auto; }
+.mock-doc.poster.trib .mk-tb-grid span:last-child { width: 86%; }
+
+.mock-doc.poster.trib .mk-tb-msg {
+    position: absolute;
+    left: 4.2%;
+    top: 40%;
+    width: 40%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+}
+
+.mock-doc.poster.trib .mk-tb-msg b {
+    display: block;
+    width: 62%;
+    height: 2px;
+    background-color: #E93625;
+}
+
+.mock-doc.poster.trib .mk-tb-msg span {
+    display: block;
+    height: 1.5px;
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+.mock-doc.poster.trib .mk-tb-msg span:last-child { width: 58%; }
+
+.mock-doc.poster.trib .mk-tb-title {
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    bottom: 4.5%;
+    height: 3px;
+    background-color: #FFFFFF;
+}

@@ -248,6 +248,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../cash-payment-receipt-template.html">Cash Payment Receipt</a></li>\n' +
 '                            <li><a href="../itemized-receipt-template.html">Itemized Business Receipt</a></li>\n' +
 '                            <li><a href="../sales-receipt-template.html">Sales Receipt Form</a></li>\n' +
+'                            <li><a href="../trade-counter-receipt-template.html">Trade Counter Receipt</a></li>\n' +
 '                            <li><a href="../free-invoice-template.html">Free Invoice Template</a></li>\n' +
 '                            <li><a href="../editable-invoice-template.html">Editable Invoice with Logo</a></li>\n' +
 '                            <li><a href="../employee-warning-notice-template.html">Employee Warning Notice</a></li>\n' +
@@ -259,6 +260,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../ats-resume-template.html">ATS Resume Template</a></li>\n' +
 '                            <li><a href="../poster-maker.html">Poster Maker</a></li>\n' +
 '                            <li><a href="../tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>\n' +
+'                            <li><a href="../anniversary-calendar-poster.html">Anniversary Calendar Poster</a></li>\n' +
 '                        </ul>\n' +
 '                    </div>\n' +
 '                    <div>\n' +
@@ -1421,6 +1423,7 @@ body + '\n' +
         { id: "sales-receipt", title: "Sales and Cash Receipt Form", category: "documents", doc: "sales-receipt" },
         { id: "invoice", title: "Professional Invoice", category: "documents", doc: "invoice" },
         { id: "logo-invoice", title: "Editable Invoice with Logo", category: "documents", doc: "logo-invoice" },
+        { id: "trade-receipt", title: "Trade Counter Receipt", category: "documents", doc: "trade-receipt" },
         { id: "warning-notice", title: "Employee Warning Notice", category: "documents", doc: "warning-notice" },
         { id: "grey-rail", title: "Modern Professional CV", category: "resumes", doc: "grey-rail" },
         { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: "minimalist-ats-resume" },
@@ -1459,6 +1462,9 @@ body + '\n' +
         { id: "split-clubs", title: "King and Queen of Clubs, Two Photos", category: "canvas", doc: "split-clubs" },
         { id: "browser", title: "Search Screen, Six Photos", category: "canvas", doc: "browser" },
         { id: "player", title: "Now Playing, Music Poster", category: "canvas", doc: "player" },
+        { id: "anniversary", title: "Anniversary Calendar, Photo Heart", category: "canvas", doc: "anniversary" },
+        { id: "birthday", title: "Birthday Calendar, Photo Cascade", category: "canvas", doc: "birthday" },
+        { id: "tribute", title: "Birthday Tribute, Photo Wall", category: "canvas", doc: "tribute" },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"

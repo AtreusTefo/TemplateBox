@@ -156,6 +156,37 @@
         player: {
             frame: null, trim: null, label: "Now Playing, Music Poster",
             layout: "player"
+        },
+        /* The fifth layout: a heart-shaped photo collage over a month, with the
+           day that matters marked. The supplied artwork is LANDSCAPE and this
+           is portrait -- the blocks are stacked rather than set side by side.
+           See paintAnniversary(). */
+        anniversary: {
+            frame: null, trim: null, label: "Anniversary Calendar, Photo Heart",
+            layout: "anniversary"
+        },
+        /* The sixth layout: a birthday tribute, from a supplied A4 portrait
+           artwork. Same page shape as the anniversary poster and the same
+           computed calendar -- deliberately the same arithmetic, not a second
+           copy of it -- over a cascade of twelve photographs, a quote and a
+           closing message. See paintBirthday(). */
+        birthday: {
+            frame: null, trim: null, label: "Birthday Calendar, Photo Cascade",
+            layout: "birthday"
+        },
+        /* The seventh layout, and the SIBLING of the sixth: a second artwork
+           from the same family, A4 portrait on the same ground with a month
+           top left, a computed calendar, a message on the left, a cascade of
+           photographs and a line along the foot.
+
+           Kept separate rather than folded into `birthday` because the boxes
+           differ in count and position, the decoration differs and the text
+           blocks differ -- but it shares the calendar, the wrapper, the
+           sparkle and the heart, because a second copy of any of those is a
+           second one to be wrong. See paintTribute(). */
+        tribute: {
+            frame: null, trim: null, label: "Birthday Tribute, Photo Wall",
+            layout: "tribute"
         }
     };
 
@@ -477,6 +508,662 @@
         PLAYER_ART[k].parts.forEach((p) => { p.path = new Path2D(p.d); });
     });
 
+    /* ----------------------------------------------------------------------
+       The anniversary calendar poster (September 11, 2026).
+
+       Traced from a supplied artwork that is A4 LANDSCAPE. This is PORTRAIT,
+       at the owner's instruction, so the arrangement is rebuilt rather than
+       copied: in the source the heart collage sits left with the code and the
+       calendar stacked to its right, and there is no room for that beside a
+       420pt-wide collage on a 597pt page. Here the four blocks stack -- names,
+       collage, code, calendar -- with the tagline on the foot.
+
+       What IS copied exactly is the collage's own geometry. Those eighteen
+       rectangles are the heart, and their proportions are the design; they are
+       held below in the SOURCE's coordinates and normalised into whatever box
+       this layout gives them, so the shape cannot drift while the page does.
+       ---------------------------------------------------------------------- */
+
+    /* The eighteen photo boxes, verbatim from the artwork's own artboard.
+
+       EIGHT of these carry a `transform="translate(a b) rotate(-180)"` in the
+       source and every one of them is a NO-OP: rotating an axis-aligned rect
+       180 degrees about the right point maps it onto itself, and measured,
+       each lands back within 0.01pt of its own x and y. The designer mirrored
+       the left half to build the right and the transform is what was left
+       over. They are dropped here. Applying them would double-transform the
+       right-hand half of the heart; skipping those rects as "already mirrored"
+       would lose it. */
+    const ANNIV_COLLAGE = [
+        { x: 151.99, y: 213.01, w: 188.46, h: 221.15 },
+        { x: 25.29, y: 177.59, w: 121.70, h: 101.83 },
+        { x: 86.15, y: 127.18, w: 60.85, h: 47.23 },
+        { x: 49.36, y: 143.98, w: 33.15, h: 30.43 },
+        { x: 151.99, y: 159.76, w: 69.62, h: 47.20 },
+        { x: 31.94, y: 283.20, w: 34.75, h: 34.75 },
+        { x: 70.09, y: 283.20, w: 76.91, h: 76.91 },
+        { x: 101.04, y: 363.82, w: 46.92, h: 46.92 },
+        { x: 173.23, y: 437.65, w: 35.68, h: 34.80 },
+        { x: 344.96, y: 177.59, w: 121.70, h: 101.83 },
+        { x: 344.96, y: 127.18, w: 60.85, h: 47.23 },
+        { x: 409.44, y: 143.98, w: 33.15, h: 30.43 },
+        { x: 270.34, y: 159.76, w: 69.62, h: 47.20 },
+        { x: 425.26, y: 283.20, w: 34.75, h: 34.75 },
+        { x: 344.96, y: 283.20, w: 76.91, h: 76.91 },
+        { x: 343.99, y: 363.82, w: 46.92, h: 46.92 },
+        { x: 284.47, y: 437.65, w: 35.68, h: 34.80 },
+        { x: 212.49, y: 437.65, w: 68.37, h: 57.00 }
+    ];
+
+    /* The collage's own bounding box in those coordinates, derived rather than
+       typed so it cannot disagree with the rectangles above it. */
+    const ANNIV_COLLAGE_BOX = (() => {
+        let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+        ANNIV_COLLAGE.forEach((r) => {
+            x1 = Math.min(x1, r.x);
+            y1 = Math.min(y1, r.y);
+            x2 = Math.max(x2, r.x + r.w);
+            y2 = Math.max(y2, r.y + r.h);
+        });
+        return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+    })();
+
+    /* Page geometry, in points on this editor's own portrait A4. */
+    const ANNIV = {
+        page: { w: 597.45, h: 841.89 },
+        names: { baseline: 84, size: 46, gap: 26 },
+        /* The heart between the names, and the one behind the marked day. The
+           artwork draws two paths at different sizes; they are the same shape
+           (aspect 1.092 and 1.093 measured), so one path serves both. */
+        nameHeart: { w: 42, cy: 66 },
+        collage: { x: 98.725, y: 100, w: 400, h: 0 },
+        code: { x: 188.725, y: 448, w: 220, h: 55 },
+        month: { baseline: 540, size: 26 },
+        head: { baseline: 573, size: 21 },
+        rule: { y: 583, x1: 148.725, x2: 448.725, width: 2 },
+        /* Six rows is the worst case -- a 31-day month opening on a Friday or
+           Saturday -- and the rhythm below is set so that row six clears the
+           tagline rather than so that five rows look comfortable. A layout
+           tuned to the common case and broken by August is the fault the
+           supplied artwork already has. */
+        grid: { top: 613, pitch: 27, size: 21 },
+        dayHeart: { w: 32 },
+        tagline: { baseline: 800, size: 34, maxW: 0.82 }
+    };
+    /* Height follows the collage's own proportions; typing it would let the
+       heart stretch the first time the width moved. */
+    ANNIV.collage.h = ANNIV.collage.w * (ANNIV_COLLAGE_BOX.h / ANNIV_COLLAGE_BOX.w);
+
+    /* Two colourways, holding COLOUR and nothing else, so the geometry above
+       cannot drift between them -- the same separation SCREEN/SCREEN_THEMES and
+       PLAYER/PLAYER_THEMES already make in this file.
+
+       `boxFill` and `boxStroke` are the pair that matters. An empty collage box
+       is WHITE on the artwork's black ground, and that is the design rather
+       than a placeholder: the heart reads as a heart before a single photograph
+       is in it. Invert the ground and a white box disappears, so the light
+       colourway outlines its boxes instead of filling them -- the same problem
+       and the same answer as the player's empty album panel. */
+    const ANNIV_THEMES = {
+        night: {
+            label: "Night",
+            page: "#050606",
+            ink: "#FFFFFF",
+            accent: "#E93625",
+            boxFill: "#FFFFFF",
+            boxStroke: null,
+            /* The marked day's number sits ON the heart, so its colour has to
+               contrast with THAT, not with the page. Both colourways keep the
+               same red heart, so both put white on it. */
+            onAccent: "#FFFFFF"
+        },
+        day: {
+            label: "Day",
+            page: "#FFFFFF",
+            ink: "#1A1A1A",
+            /* The heart keeps its red. It is the one colour in this poster
+               that is not carrying contrast against the ground, and flipping
+               it would be inventing a design the artwork does not have. */
+            accent: "#E93625",
+            boxFill: null,
+            boxStroke: "#1A1A1A",
+            onAccent: "#FFFFFF"
+        }
+    };
+
+    const DEFAULT_ANNIV_THEME = "night";
+
+    function annivTheme() {
+        return ANNIV_THEMES[state.annivTheme] || ANNIV_THEMES[DEFAULT_ANNIV_THEME];
+    }
+
+    /* The heart, verbatim from the artwork, with its MEASURED bounding box as
+       the view so drawArt() can place it in any rectangle. The box came from
+       getBBox() on the real path rather than from reading the numbers out of
+       the `d` string, which are relative deltas and do not bound anything. */
+    const ANNIV_HEART = {
+        view: [447.88, 43, 57.07, 52.27],
+        ink: "accent",
+        parts: [{ d: "M476.41,95.27l-2.93-2.63Q465.95,85.71,461,80.7a88,88,0,0,1-7.84-9,29.3,29.3,0,0,1-4.1-7.16,18.81,18.81,0,0,1-1.18-6.48,14.74,14.74,0,0,1,15-15A15.15,15.15,0,0,1,470.39,45a18.27,18.27,0,0,1,6,5.55,20.77,20.77,0,0,1,6.34-5.66A14.86,14.86,0,0,1,489.94,43a14.72,14.72,0,0,1,15,15,18.58,18.58,0,0,1-1.18,6.48,29.56,29.56,0,0,1-4.09,7.16,88.2,88.2,0,0,1-7.85,9q-4.92,5-12.46,11.94Z" }]
+    };
+    ANNIV_HEART.parts.forEach((p) => { p.path = new Path2D(p.d); });
+
+    /* ----------------------------------------------------------------------
+       The birthday calendar poster (September 12, 2026).
+
+       Traced from a supplied A4 PORTRAIT artwork, so unlike the anniversary
+       poster nothing had to be rearranged: the source's own page is this
+       editor's page and every figure below is the artwork's own.
+
+       Its calendar was CORRECT in the source -- September 2025 did open on a
+       Monday with thirty days in five rows, and its 15th was a Monday. That is
+       the opposite of the anniversary artwork, which claimed November 2025
+       opened on a Monday when it opened on a Saturday. Neither fact is a rule:
+       both were checked.
+
+       It is still computed rather than copied, because the source's positions
+       are hand-set -- one row sits at x 34.02, 78.99, 119.46, 165.13, 207.75,
+       242.21 and 282.24, gaps of 44.97, 40.47, 45.67, 42.62, 34.46 and 40.03 --
+       and because a visitor picking another month gets another first weekday,
+       another length and four to six rows.
+
+       annivMonth() and annivCell() do that arithmetic and are REUSED here. A
+       second calendar is a second calendar to be wrong.
+       ---------------------------------------------------------------------- */
+
+    /* The twelve photo boxes, verbatim from the artwork, in its own order.
+
+       They do NOT overlap, and the gaps between them are hand-set: measured,
+       3.8 to 9.6 points and never the same twice. The cascade reads as a
+       cascade BECAUSE the spacing is irregular, so these are kept exactly
+       rather than squared onto a grid, which would turn a scatter into a
+       table. */
+    const HBD_BOXES = [
+        { x: 326.20, y: 163.36, w: 121.16, h: 98.48 },
+        { x: 454.71, y: 208.49, w: 71.02, h: 125.93 },
+        { x: 464.21, y: 341.76, w: 103.55, h: 119.64 },
+        { x: 468.96, y: 471.05, w: 77.05, h: 107.47 },
+        { x: 322.36, y: 360.52, w: 131.42, h: 110.53 },
+        { x: 56.37, y: 520.15, w: 100.41, h: 142.55 },
+        { x: 161.54, y: 557.00, w: 100.41, h: 140.71 },
+        { x: 365.09, y: 575.69, w: 77.66, h: 112.40 },
+        { x: 266.70, y: 567.52, w: 93.63, h: 149.99 },
+        { x: 292.39, y: 477.27, w: 72.71, h: 85.76 },
+        { x: 369.02, y: 476.56, w: 89.51, h: 95.29 },
+        { x: 334.16, y: 266.33, w: 110.66, h: 90.40 }
+    ];
+
+    const HBD = {
+        page: { w: 595.28, h: 841.89 },
+        month: { baseline: 63.28, x: 53.1, size: 42.52 },
+        head: { baseline: 103.67, size: 23.93, track: 0.4 },
+        rule: { y: 114.44, x1: 36.4, x2: 308.39, width: 2 },
+        grid: { top: 151.88, pitch: 28.73, size: 23.93 },
+        dayHeart: { w: 30 },
+        quote: { x: 34.02, baseline: 321.97, size: 30.63, leading: 36.76, maxLines: 7 },
+        closing: { x: 34.02, baseline: 757.05, size: 29, leading: 34.8 },
+        /* The heart that closes the last line, sized and placed relative to
+           the line it follows rather than pinned to the artwork's 536.72 --
+           the message is visitor-typed and its last line will not be that
+           long. */
+        closingHeart: { w: 26 },
+        photoStroke: 1
+    };
+
+    const HBD_THEMES = {
+        night: {
+            label: "Night",
+            page: "#231F20",
+            ink: "#FFFFFF",
+            accent: "#E93625",
+            boxFill: "#FFFFFF",
+            boxStroke: "#E93625",
+            onAccent: "#FFFFFF",
+            garlandA: "#C190B7",
+            garlandB: "#A4B1C3",
+            sparkle: "#FDF5A2",
+            sparkleTip: "#FFFDE6"
+        },
+        day: {
+            label: "Day",
+            page: "#FFFFFF",
+            ink: "#231F20",
+            accent: "#E93625",
+            /* An empty box is a white panel on the artwork's black ground, and
+               that is the design rather than a placeholder. Invert the ground
+               and a white box disappears, so this colourway outlines instead --
+               the same problem and the same answer as the anniversary poster's
+               collage and the player's empty album. */
+            boxFill: null,
+            boxStroke: "#E93625",
+            onAccent: "#FFFFFF",
+            garlandA: "#9B6C92",
+            garlandB: "#7A8AA0",
+            /* Pale yellow on white is not a sparkle. */
+            sparkle: "#D8B24A",
+            sparkleTip: "#F3E3B0"
+        }
+    };
+
+    const DEFAULT_HBD_THEME = "night";
+
+    function hbdTheme() {
+        return HBD_THEMES[state.hbdTheme] || HBD_THEMES[DEFAULT_HBD_THEME];
+    }
+
+    const DEFAULT_HBD_QUOTE =
+        "Write the words you would say if you had the whole page for them.";
+    const DEFAULT_HBD_CLOSING =
+        "With all my love, always";
+
+    /* Five garland hearts on a string, across the top right. Positions and
+       sizes are the artwork's, as fractions of the page so they follow the
+       paper rather than a pixel size. Alternating colours, and the string is
+       drawn through their centres. */
+    const HBD_GARLAND = {
+        hearts: [
+            { cx: 384.0, cy: 96.5, w: 30.0, tint: "A" },
+            { cx: 420.6, cy: 88.5, w: 27.5, tint: "B" },
+            { cx: 456.0, cy: 82.0, w: 30.0, tint: "A" },
+            { cx: 492.5, cy: 75.0, w: 27.5, tint: "B" },
+            { cx: 528.0, cy: 66.5, w: 32.0, tint: "A" }
+        ],
+        string: { x1: 356.0, y1: 104.0, x2: 556.0, y2: 58.0, width: 1.4 },
+        /* The little tick marks at each end of the string in the artwork. */
+        ticks: [{ x: 352.0, y: 105.0 }, { x: 560.0, y: 57.0 }]
+    };
+
+    /* Five sparkle clusters. Each is a large four-pointed star with three
+       smaller ones around it; `r` is the large star's half-width and the
+       satellites are [dx, dy, r] relative to it.
+
+       The artwork draws the GLOW behind each spike as a raster mask -- 95
+       masks backed by 74 embedded PNGs, about 40KB and 44 per cent of that
+       file's weight. None of it is here. A four-pointed star is two crossed
+       tapered spikes and needs no mask; the softness the masks were adding is
+       a gradient, which costs nothing and travels through both painters.
+
+       These numbers are MEASURED from the artwork's paths, and the ones they
+       replace were not. Eyeballed, the clusters landed within a point or two
+       of the right place and then drew two-and-a-half times too large, square,
+       and with one satellite missing each -- the positions were near enough to
+       look deliberate, which is exactly why nobody caught the size. Reading
+       the file was the only thing that would have. */
+    const HBD_SPARKLES = [
+        { x: 476.9, y: 187.2, r: 5.04,
+          sats: [[6.25, -5.18, 1.88], [-5.04, -4.49, 1.73], [-4.3, 5.9, 1.77]] },
+        { x: 551.4, y: 296.5, r: 9.64,
+          sats: [[12.04, -9.93, 3.59], [-9.56, -8.56, 3.31], [-8.14, 11.32, 3.38]] },
+        { x: 254.3, y: 525.6, r: 11.73,
+          sats: [[14.67, -12.13, 4.37], [-11.6, -10.47, 4.02], [-9.9, 13.73, 4.11]] },
+        { x: 491.4, y: 635.1, r: 16.1,
+          sats: [[20.08, -16.62, 5.99], [-15.94, -14.33, 5.52], [-13.58, 18.85, 5.63]] },
+        { x: 64.25, y: 699.3, r: 13.25,
+          sats: [[16.55, -13.66, 4.91], [-13.11, -11.78, 4.55], [-11.15, 15.55, 4.64]] }
+    ];
+
+    /* ----------------------------------------------------------------------
+       The birthday tribute poster (September 12, 2026).
+
+       The sixth layout's sibling, from a second artwork in the same family.
+       Everything it can share it shares: annivMonth(), annivCell(), hbdWrap(),
+       hbdFont(), HBD_SPARK_PATH, ANNIV_HEART, scaleBoxes() and calGrid(). What
+       is here is what actually differs.
+       ---------------------------------------------------------------------- */
+
+    /* Four sparkle clusters, measured the same way as the birthday's five and
+       in the same shape, because it is the same star -- this artwork simply
+       scatters four of them instead of five and puts them elsewhere. Sharing
+       the DATA would have been the mistake; sharing HBD_SPARK_PATH and
+       hbdDrawSparkle() is the whole of what these two posters have in
+       common here. */
+    const TRIB_SPARKLES = [
+        { x: 418, y: 215.2, r: 5.93,
+          sats: [[7.37, -6.13, 2.21], [-5.86, -5.29, 2.04], [-5.01, 6.94, 2.06]] },
+        { x: 537.9, y: 302.8, r: 11.34,
+          sats: [[14.16, -11.71, 4.22], [-11.21, -10.09, 3.9], [-9.59, 13.28, 3.97]] },
+        { x: 221.9, y: 531.6, r: 13.8,
+          sats: [[17.23, -14.24, 5.13], [-13.66, -12.29, 4.73], [-11.61, 16.15, 4.86]] },
+        { x: 54.38, y: 711.1, r: 13.25,
+          sats: [[16.55, -13.67, 4.94], [-13.13, -11.79, 4.54], [-11.19, 15.54, 4.64]] }
+    ];
+
+    /* The glossy heart, six layers deep, verbatim from the artwork.
+
+       The flat heart this replaces was ANNIV_HEART -- one path, one fill --
+       borrowed from the anniversary poster because a heart is a heart. On this
+       artwork it is not. The four hanging hearts and the one at the foot are
+       MODELLED: a base red, a dark rim down the right, a lighter wash across
+       the belly with a wavy top edge, and a bright crescent on the upper-left
+       lobe. At 67 points across, flat red reads as a sticker where the source
+       reads as an object with a light on it, and nothing about the silhouette
+       was ever the problem.
+
+       So the six paths are kept exactly as drawn and each gradient is resolved
+       out of the source's own `gradientTransform` into this box's coordinates,
+       which is the only part that needed arithmetic. `view` is the TRUE
+       bounding box, sampled along the curves rather than taken from the path's
+       anchors -- a heart's widest points are mid-curve, and the anchors put it
+       16 points shorter than it draws.
+
+       Kept OUT of it: the day marker and the heading heart, which the artwork
+       itself draws flat, and both stay ANNIV_HEART. Gloss at eighteen points
+       is noise. */
+    const TRIB_HEART = {
+        view: [348.34, 93.64, 67.17, 59.85],
+        parts: [
+            { fill: "#EE3533",
+              d: "M415.5,114.32" +
+                 "c.46,21.52-32.77,33-32.9,39.17.08-6.43-33.8-16.23-34.26-37.74" +
+                 "s32.78-32.32,33.33-6.24C381.12,83.33,415.05,92.81,415.5,114.32Z" },
+            { grad: [381.87, 102.72, 359.03, 91.18], stops: [[0, "#D22026", 1], [1, "#D22026", 0]], rule: "evenodd",
+              d: "M366.11,95.12a33.52,33.52,0,0,1,9,2c3.58,1.6,5.57,7.52,5.6,9.19" +
+                 "a15,15,0,0,0,.44,3.16" +
+                 "s-1.43-5.93-5.4-8.64-12.56-3.83-15.15-3,5.71-2.73,5.53-2.73Z" },
+            { grad: [348.73, 119.88, 386.52, 119.49], stops: [[0, "#F15858", 1], [1, "#F15858", 0]], rule: "evenodd",
+              d: "M367.05,95.66c2.89-.06,7.09.41,8.15,6.35" +
+                 "s-2.54,12.35-5,20.79-2.3,14.39,3.56,18.55a28.46,28.46,0,0,1,8.19,8.4" +
+                 "s-7-6.19-10.6-8-12.3-7.74-16.68-13.44" +
+                 "c-7.47-9.71-5.45-20.18-.35-25.33,5.84-5.9,10-7.29,12.7-7.35Z" },
+            { grad: [369.52, 110.98, 396.22, 134.90], stops: [[0, "#FCD5D5", 1], [1, "#F7A8AA", 0]], rule: "evenodd", alpha: 0.4,
+              d: "M352.78,125.59a16.66,16.66,0,0,1,17.6-4.66" +
+                 "c11.25,3.3,18.35,4.08,23.68,1" +
+                 "s14.48-2.54,17.13-.92-3.5,10.69-10.48,15.5-16,9.84-17.46,11.36-13.94-6.78-18.67-10.41" +
+                 "S354.37,130.21,352.78,125.59Z" },
+            { grad: [410.94, 122.93, 392.81, 120.71], stops: [[0, "#D22026", 1], [1, "#D22026", 0]], rule: "evenodd",
+              d: "M386,100.85" +
+                 "s9.81-3,13.43.83,7.82,17.17,2.42,26-15.53,14.67-18.28,17.15-6.16-.61-9.73-2.4-10.19-5.93-10.19-5.93,8.89,6.14,12.29,8.68" +
+                 "a67.85,67.85,0,0,1,6.65,5.82" +
+                 "s11.91-9.57,16.68-13,12.71-15.74,14.12-19.3-.83-12.66-4.26-16.5-11.34-7.58-15.42-6.56-7.71,5.19-7.71,5.19" +
+                 "Z" },
+            { grad: [349.35, 111.88, 356.12, 114.13], stops: [[0, "#FCD5D5", 1], [1, "#F7A8AA", 0]], rule: "evenodd",
+              d: "M371.8,100.22S363,99.66,359,104.77a20.83,20.83,0,0,0-3.74,16.48" +
+                 "A32.75,32.75,0,0,0,364,135.6c3.61,3.09,11.21,10.19,11.21,10.19" +
+                 "s-14.93-10.11-19.37-17.1-5.31-13.49-3.23-20.8,9.84-10.27,13-10.15" +
+                 "S372.19,100.58,371.8,100.22Z" },
+            { grad: [391.88, 93.83, 392.71, 97.52], stops: [[0, "#F7A8AA", 1], [1, "#F7A8AA", 0]], rule: "evenodd",
+              d: "M384.22,105.73" +
+                 "s6.2-6.28,9.35-7.09,11,1.81,11,1.81-5.13-4.92-10.15-4.25-9.78,4.3-10.23,9.53" +
+                 "Z" },
+        ]
+    };
+
+    /* Fifteen photo boxes, verbatim from the artwork.
+
+       THESE OVERLAP, which the sibling layout's do not. Measured: boxes 1 and 9
+       by 108.2 x 2.5pt, 1 and 11 by 92.9 x 2.8, 2 and 12 by 80.3 x 2.4, and 8
+       and 9 by 5.0 x 51.0. The first three are edge kisses where the 2pt white
+       strokes coincide -- which is exactly how a stack of bordered photographs
+       reads -- and the fourth is a real overlap.
+
+       So DRAW ORDER is load-bearing here, and the hit test walks backwards to
+       break the tie the same way the paint does. The positions are not tidied.
+
+       `tint` marks the one box the artwork fills a lighter red. */
+    const TRIB_BOXES = [
+        { x: 333.59, y: 359.38, w: 113.00, h: 92.78 },
+        { x: 446.59, y: 403.92, w: 103.80, h: 228.83 },
+        { x: 149.41, y: 230.43, w: 64.32, h: 59.38 },
+        { x: 299.34, y: 568.00, w: 147.26, h: 168.78, tint: true },
+        { x: 213.73, y: 227.96, w: 63.70, h: 90.30 },
+        { x: 277.44, y: 223.01, w: 60.92, h: 108.24 },
+        { x: 338.36, y: 218.89, w: 67.11, h: 55.77 },
+        { x: 446.59, y: 310.83, w: 75.77, h: 93.08 },
+        { x: 338.36, y: 274.65, w: 113.18, h: 87.21 },
+        { x: 256.50, y: 452.16, w: 97.16, h: 115.85 },
+        { x: 353.66, y: 449.40, w: 92.94, h: 118.60 },
+        { x: 446.59, y: 630.36, w: 80.29, h: 73.28 },
+        { x: 183.25, y: 568.00, w: 115.88, h: 186.96 },
+        { x: 105.30, y: 597.98, w: 77.46, h: 131.56 },
+        { x: 24.49, y: 584.54, w: 79.82, h: 89.87 }
+    ];
+
+    const TRIB = {
+        page: { w: 595.28, h: 841.89 },
+        month: { baseline: 69.25, x: 44.12, size: 38.43 },
+        head: { baseline: 90.88, size: 18.42 },
+        rule: { y: 99.17, x1: 26.32, x2: 235.72, width: 2 },
+        grid: { top: 127.99, pitch: 22.12, size: 18.42 },
+        dayHeart: { w: 24 },
+        /* The heading and the three lines under it are ONE block in the
+           artwork and two here: the heading carries an inline heart and the
+           body wraps, and those are different jobs. */
+        heading: { x: 25.15, baseline: 357.37, size: 26.44, heart: 17, gap: 5 },
+        message: { x: 25.15, baseline: 389.1, size: 26.44, leading: 31.73, maxLines: 5 },
+        /* `heart` and `lift` are measured the same way: the foot heart draws
+           51.67 wide with its top 35 points above the title's baseline, which
+           is 0.75 of its own height. */
+        title: { x: 112.18, baseline: 816.33, size: 49.87, heart: 51.67,
+            gap: 4, lift: 0.75 },
+        boxStroke: 2,
+        /* Four hearts on strings from the top edge. Each string runs from y
+           `from` down to its own `to`, and the heart hangs in its cleft.
+
+           The widths are MEASURED off the reference -- the widest red run in
+           each heart's own column, at three samples per point -- and not read
+           off the path anchors, which come up short on a shape whose widest
+           points are mid-curve. The four had been 44, 36, 40 and 38, which is
+           roughly two thirds of the truth and is what a heart looks like when
+           somebody sized it by eye against a thumbnail. */
+        strings: [
+            { x: 381.63, from: 10.06, to: 108.55, w: 67.33 },
+            { x: 435.48, from: 10.06, to: 68.55, w: 42.00 },
+            { x: 477.64, from: 10.06, to: 137.37, w: 59.33 },
+            { x: 518.46, from: 10.06, to: 85.90, w: 49.00 }
+        ],
+        stringWidth: 3
+    };
+
+    const TRIB_THEMES = {
+        night: {
+            label: "Night",
+            page: "#231F20",
+            ink: "#FFFFFF",
+            accent: "#E93625",
+            /* An empty box is a RED panel here, not a white one: this artwork
+               fills its boxes and outlines them in white, the reverse of the
+               sibling's. That is the design, and it is why an unfilled poster
+               still reads as a wall of pictures. */
+            boxFill: "#E93625",
+            boxTint: "#EF4136",
+            boxStroke: "#FFFFFF",
+            onAccent: "#FFFFFF",
+            string: "#ED1C24",
+            /* Two tokens, because the sparkle is LIT rather than filled:
+               warm at the core, near-white out along the spikes. Measured off
+               the reference, which reads #FEF7AE at the core and #FFFDE6 at
+               the tips. */
+            sparkle: "#FDF5A2",
+            sparkleTip: "#FFFDE6"
+        },
+        day: {
+            label: "Day",
+            page: "#FFFFFF",
+            ink: "#231F20",
+            accent: "#E93625",
+            boxFill: "#E93625",
+            boxTint: "#EF4136",
+            /* The white keyline vanishes on white paper, so on this colourway
+               the boxes are separated by the ground itself and outlined in the
+               ink instead. */
+            boxStroke: "#231F20",
+            onAccent: "#FFFFFF",
+            string: "#C2161C",
+            /* On white paper the same lighting has to run the other way: a
+               near-white tip would disappear into the page, so the core is
+               gold and the tips stop at cream. */
+            sparkle: "#D8B24A",
+            sparkleTip: "#F3E3B0"
+        }
+    };
+
+    const DEFAULT_TRIB_THEME = "night";
+
+    function tribTheme() {
+        return TRIB_THEMES[state.tribTheme] || TRIB_THEMES[DEFAULT_TRIB_THEME];
+    }
+
+    /* Two spaces, and the T is deliberate: the heart stands in for the O, so
+       the default demonstrates the marker rather than describing it. */
+    const DEFAULT_TRIB_HEADING = "T  SOMEONE";
+    const DEFAULT_TRIB_MESSAGE =
+        "Write the few lines you would want them to read first.";
+    const DEFAULT_TRIB_TITLE = "Happy Birthday";
+
+    function tribRects(W, H) {
+        return scaleBoxes(TRIB_BOXES, TRIB.page, W, H);
+    }
+
+    function tribGrid(W, H) {
+        return calGrid(TRIB, W, H);
+    }
+
+    /* How wide the message may run before it reaches the photographs.
+
+       Box 9 is the leftmost box of the middle band -- the one the message
+       actually runs into -- and the 10 points are the gap the artwork leaves
+       between the two. Derived rather than typed, so moving that box moves the
+       wrap with it, and in ONE place because both painters need the same
+       answer and this file's standing hazard is two painters that disagree
+       quietly. */
+    const TRIB_MESSAGE_GUTTER = 10;
+
+    function tribMessageWidth(W) {
+        return (TRIB_BOXES[9].x - TRIB.message.x - TRIB_MESSAGE_GUTTER) *
+            (W / TRIB.page.w);
+    }
+
+    /* The heading: text, heart, text.
+
+       The artwork stores it as ONE string under xml:space="preserve", with
+       seven leading spaces and then five more between the first letter and the
+       rest -- and those five are not spacing, they are a HOLE the heart sits
+       in, punched by hand in Monotype Corsiva at 26.44px. Kept, they are a
+       ragged gap in any other face; stripped, the heart lands on a letter.
+
+       So the heading is split on the FIRST run of two or more spaces, the two
+       halves are measured, and the heart goes between them. A visitor who types
+       no double space gets a heading with the heart at the end, which is the
+       sensible reading of "no gap was asked for". */
+    function tribHeadingParts(text) {
+        const t = String(text || "");
+        const m = /\s{2,}/.exec(t.trim());
+        if (!m) { return { before: t.trim(), after: "" }; }
+        const trimmed = t.trim();
+        return {
+            before: trimmed.slice(0, m.index).trim(),
+            after: trimmed.slice(m.index + m[0].length).trim()
+        };
+    }
+
+    const ANNIV_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+    const ANNIV_MONTHS = ["January", "February", "March", "April", "May",
+        "June", "July", "August", "September", "October", "November",
+        "December"];
+
+    const DEFAULT_NAME_A = "Your Name";
+    const DEFAULT_NAME_B = "Their Name";
+    const DEFAULT_TAGLINE = "Years of togetherness";
+
+    /* Which weekday the month opens on, and how long it is.
+
+       Built through Date.UTC rather than by parsing a string. `new
+       Date("2025-11-01")` is UTC midnight, which is the previous DAY anywhere
+       west of Greenwich, and a calendar that silently starts on the wrong
+       weekday for half the planet is the defect this whole layout exists to
+       avoid -- the supplied artwork itself has November 2025 opening on a
+       Monday when it opened on a Saturday. */
+    function annivMonth(year, month) {
+        const y = Math.min(9999, Math.max(1, Math.round(Number(year) || 1)));
+        const m = Math.min(11, Math.max(0, Math.round(Number(month) || 0)));
+        const first = new Date(Date.UTC(y, m, 1)).getUTCDay();
+        const length = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+        return {
+            year: y,
+            month: m,
+            first: first,
+            length: length,
+            /* Four for a 28-day February opening on a Sunday, six for a
+               31-day month opening on a Friday or Saturday. Both are drawn. */
+            rows: Math.ceil((first + length) / 7)
+        };
+    }
+
+    /* Where one date sits, as a column and a row. Returns null for a day the
+       month does not have, so a visitor who picks the 31st and then a 30-day
+       month gets no marker rather than one off the end of the grid. */
+    function annivCell(info, day) {
+        const d = Math.round(Number(day) || 0);
+        if (d < 1 || d > info.length) {
+            return null;
+        }
+        const index = info.first + d - 1;
+        return { col: index % 7, row: Math.floor(index / 7), day: d };
+    }
+
+    /* The grid's own metrics. Seven columns across the rule beneath the
+       header, which is what the artwork centres its numbers against -- badly,
+       by hand, which is why none of its thirty positions are copied. */
+    function annivGrid(W, H) {
+        const fx = W / ANNIV.page.w;
+        const fy = H / ANNIV.page.h;
+        const x1 = ANNIV.rule.x1 * fx;
+        const span = (ANNIV.rule.x2 - ANNIV.rule.x1) * fx;
+        return {
+            fx: fx,
+            fy: fy,
+            x1: x1,
+            span: span,
+            col: span / 7,
+            centre: (i) => x1 + (span / 7) * (i + 0.5),
+            baseline: (r) => (ANNIV.grid.top + ANNIV.grid.pitch * r) * fy
+        };
+    }
+
+    /* The collage's eighteen boxes mapped from the artwork's coordinates into
+       this page's. One function, so the hit test, the painter and the SVG
+       exporter cannot disagree about where a photograph goes. */
+    function annivRects(W, H) {
+        const fx = W / ANNIV.page.w;
+        const fy = H / ANNIV.page.h;
+        const box = ANNIV.collage;
+        const src = ANNIV_COLLAGE_BOX;
+        return ANNIV_COLLAGE.map((r) => ({
+            x: (box.x + ((r.x - src.x) / src.w) * box.w) * fx,
+            y: (box.y + ((r.y - src.y) / src.h) * box.h) * fy,
+            w: ((r.w / src.w) * box.w) * fx,
+            h: ((r.h / src.h) * box.h) * fy
+        }));
+    }
+
+    function annivClampMonth(v) {
+        const n = Math.round(Number(v));
+        return Number.isFinite(n) ? Math.min(11, Math.max(0, n)) : new Date().getMonth();
+    }
+
+    function annivClampYear(v) {
+        const n = Math.round(Number(v));
+        return Number.isFinite(n) ? Math.min(2999, Math.max(1900, n)) : new Date().getFullYear();
+    }
+
+    /* 1 to 31 here rather than to the month's own length: the day survives a
+       change of month, so picking the 31st and then February leaves the marker
+       off until a 31-day month comes back round. annivCell() returns null for
+       a day the month does not have, which is where that is handled. */
+    function annivClampDay(v) {
+        const n = Math.round(Number(v));
+        return Number.isFinite(n) ? Math.min(31, Math.max(1, n)) : new Date().getDate();
+    }
+
+    function annivCodeRect(W, H) {
+        const fx = W / ANNIV.page.w;
+        const fy = H / ANNIV.page.h;
+        return {
+            x: ANNIV.code.x * fx, y: ANNIV.code.y * fy,
+            w: ANNIV.code.w * fx, h: ANNIV.code.h * fy
+        };
+    }
+
     /* Six cards in the masonry, plus the account circle above the search bar,
        which is a seventh photograph and not a decoration.
 
@@ -495,7 +1182,57 @@
        single-photo layout uses, so switching between the card and the player
        carries the picture across the way it already does everywhere else. */
     const CODE_SLOT = 7;
-    const SLOT_COUNT = 8;
+
+    /* The anniversary collage is eighteen boxes. The first of them is SLOT 0 --
+       "the photograph" every single-photo layout already uses -- so the picture
+       carries across when a visitor tries this template against the card or the
+       player, which is the rule slotsFor() is built on. The other seventeen are
+       appended, and the scan code reuses CODE_SLOT because it is the same kind
+       of thing the player draws.
+
+       Eighteen reachable slots is far more than any layout had before, and the
+       only reason that is safe is slotsFor(): SLOT_COUNT is the array's LENGTH
+       and nothing reads it as how many slots a visitor can reach. Before that
+       fix this change would have put ten phantom cards in the search screen's
+       menu, each able to delete a photograph from a different poster. */
+    const ANNIV_EXTRA = 17;
+    const ANNIV_FIRST = 8;
+
+    /* The birthday poster's twelve boxes, appended by the same rule again: its
+       first box is SLOT 0 so a photograph carries across, and the other eleven
+       take fresh indices rather than sharing the anniversary's. Sharing would
+       be tempting -- both are collages of rectangles -- and would mean a
+       visitor who arranged eighteen photographs into a heart, then looked at
+       the birthday poster, found twelve of them rearranged and six missing. A
+       slot is a place in ONE design. */
+    const HBD_EXTRA = 11;
+    const HBD_FIRST = ANNIV_FIRST + ANNIV_EXTRA;
+
+    /* The birthday tribute's fifteen boxes, appended by the same rule a third
+       time: its first box is SLOT 0 so a photograph carries across, and the
+       other fourteen take fresh indices. They are NOT shared with the birthday
+       calendar poster's twelve even though the two layouts are siblings -- a
+       visitor who arranged twelve photographs into one cascade and then opened
+       the other would find them redistributed through a different design. A
+       slot is a place in ONE arrangement. */
+    const TRIB_EXTRA = 14;
+    const TRIB_FIRST = HBD_FIRST + HBD_EXTRA;
+    const SLOT_COUNT = TRIB_FIRST + TRIB_EXTRA;
+
+    /* Collage box index (0..17) to photo slot. */
+    function annivSlot(i) {
+        return i === 0 ? 0 : ANNIV_FIRST + i - 1;
+    }
+
+    /* Birthday box index (0..11) to photo slot. */
+    function hbdSlot(i) {
+        return i === 0 ? 0 : HBD_FIRST + i - 1;
+    }
+
+    /* Tribute box index (0..14) to photo slot. */
+    function tribSlot(i) {
+        return i === 0 ? 0 : TRIB_FIRST + i - 1;
+    }
 
     /* The artwork's icons, kept in their SOURCE files' own coordinates and
        viewBoxes rather than normalised to a unit box like the suit pips above.
@@ -694,6 +1431,47 @@
        "forever", and a field that refuses anything but digits would be an
        editor arguing with a poster. playedFraction() reads it leniently and
        falls back when it cannot; it never rewrites what was typed. */
+    /* A paragraph rather than a line. Line BREAKS survive, because somebody
+       writing a message may want one; runs of spaces do not, which is what
+       flattens the supplied artwork's hand-typed indent -- its quote fakes a
+       centred last line with nineteen literal spaces under
+       xml:space="preserve", an indent that was only ever correct in Monotype
+       Corsiva at 30.63px and is meaningless in any other face. The wrapper
+       does the centring that indent was imitating. */
+    const BLOCK_MAX_CHARS = 220;
+
+    function cleanBlock(value) {
+        return String(value === null || value === undefined ? "" : value)
+            .replace(/\r\n?/g, "\n")
+            .replace(/[^\S\n]+/g, " ")
+            .replace(/\n{3,}/g, "\n\n")
+            .slice(0, BLOCK_MAX_CHARS);
+    }
+
+    /* The tribute heading, which is the one field in this editor where a RUN
+       of spaces is meaningful rather than sloppy.
+
+       Its artwork reads a single letter, a heart, then two more words -- the
+       heart is standing in for the second letter of a two-letter word, not
+       separating two phrases. The source punches the gap with five literal
+       spaces under xml:space="preserve", and that is the only instruction in
+       the file about where the heart belongs. (The artwork's own wording is a
+       real message between two people and is deliberately not repeated here.)
+
+       So two-or-more spaces are kept and mean "the heart goes here", and
+       cleanBlock() is deliberately NOT used: it collapses runs of spaces, which
+       is right for a paragraph and would silently delete the marker here. Runs
+       longer than two are normalised so a visitor leaning on the space bar gets
+       the same result as one pressing it twice. */
+    const HEADING_MAX_CHARS = 60;
+
+    function cleanHeading(value) {
+        return String(value === null || value === undefined ? "" : value)
+            .replace(/[\r\n]+/g, " ")
+            .replace(/ {3,}/g, "  ")
+            .slice(0, HEADING_MAX_CHARS);
+    }
+
     function cleanTime(value) {
         return String(value === null || value === undefined ? "" : value)
             .replace(/\s+/g, "")
@@ -858,6 +1636,24 @@
         query: DEFAULT_QUERY,
         screenTheme: DEFAULT_SCREEN_THEME,
         playerTheme: DEFAULT_PLAYER_THEME,
+        annivTheme: DEFAULT_ANNIV_THEME,
+        hbdTheme: DEFAULT_HBD_THEME,
+        tribTheme: DEFAULT_TRIB_THEME,
+        heading: DEFAULT_TRIB_HEADING,
+        message: DEFAULT_TRIB_MESSAGE,
+        title: DEFAULT_TRIB_TITLE,
+        quote: DEFAULT_HBD_QUOTE,
+        closing: DEFAULT_HBD_CLOSING,
+        nameA: DEFAULT_NAME_A,
+        nameB: DEFAULT_NAME_B,
+        tagline: DEFAULT_TAGLINE,
+        /* The month the poster opens on. Today's, so a visitor who changes
+           nothing still sees a real calendar rather than a fixed month from
+           whenever this was written -- which is exactly what the supplied
+           artwork did, and its month was wrong. */
+        month: new Date().getMonth(),
+        year: new Date().getFullYear(),
+        day: new Date().getDate(),
         song: DEFAULT_SONG,
         artist: DEFAULT_ARTIST,
         elapsed: DEFAULT_ELAPSED,
@@ -887,6 +1683,13 @@
             query: state.query, screenTheme: state.screenTheme,
             playerTheme: state.playerTheme, song: state.song, artist: state.artist,
             elapsed: state.elapsed, total: state.total,
+            annivTheme: state.annivTheme,
+            hbdTheme: state.hbdTheme,
+            tribTheme: state.tribTheme,
+            heading: state.heading, message: state.message, title: state.title,
+            quote: state.quote, closing: state.closing,
+            nameA: state.nameA, nameB: state.nameB, tagline: state.tagline,
+            month: state.month, year: state.year, day: state.day,
             views: state.views, texts: state.texts
         });
     }
@@ -907,6 +1710,23 @@
         state.artist = cleanLine(parsed.artist);
         state.elapsed = cleanTime(parsed.elapsed);
         state.total = cleanTime(parsed.total);
+        state.annivTheme = ANNIV_THEMES[parsed.annivTheme]
+            ? parsed.annivTheme : DEFAULT_ANNIV_THEME;
+        state.hbdTheme = HBD_THEMES[parsed.hbdTheme]
+            ? parsed.hbdTheme : DEFAULT_HBD_THEME;
+        state.tribTheme = TRIB_THEMES[parsed.tribTheme]
+            ? parsed.tribTheme : DEFAULT_TRIB_THEME;
+        state.heading = cleanHeading(parsed.heading);
+        state.message = cleanBlock(parsed.message);
+        state.title = cleanLine(parsed.title);
+        state.quote = cleanBlock(parsed.quote);
+        state.closing = cleanBlock(parsed.closing);
+        state.nameA = cleanLine(parsed.nameA);
+        state.nameB = cleanLine(parsed.nameB);
+        state.tagline = cleanLine(parsed.tagline);
+        state.month = annivClampMonth(parsed.month);
+        state.year = annivClampYear(parsed.year);
+        state.day = annivClampDay(parsed.day);
         state.views = normalizeViews(parsed.views);
         state.texts = parsed.texts;
         if (!state.texts.some((t) => t.id === state.sel)) {
@@ -998,6 +1818,20 @@
             artist: TB.sanitize(state.artist),
             elapsed: TB.sanitize(state.elapsed),
             total: TB.sanitize(state.total),
+            annivTheme: state.annivTheme,
+            hbdTheme: state.hbdTheme,
+            tribTheme: state.tribTheme,
+            heading: TB.sanitize(state.heading),
+            message: TB.sanitize(state.message),
+            title: TB.sanitize(state.title),
+            quote: TB.sanitize(state.quote),
+            closing: TB.sanitize(state.closing),
+            nameA: TB.sanitize(state.nameA),
+            nameB: TB.sanitize(state.nameB),
+            tagline: TB.sanitize(state.tagline),
+            month: state.month,
+            year: state.year,
+            day: state.day,
             size: state.size,
             texts: state.texts.map((t) => {
                 const copy = Object.assign({}, t);
@@ -1045,6 +1879,40 @@
             ? DEFAULT_ELAPSED : cleanTime(TB.desanitize(String(saved.elapsed)));
         state.total = saved.total === undefined
             ? DEFAULT_TOTAL : cleanTime(TB.desanitize(String(saved.total)));
+        /* Read back as untrusted input, like every other stored key: an
+           edited record can only ever resolve to a colourway this editor
+           ships. */
+        state.annivTheme = ANNIV_THEMES[saved.annivTheme]
+            ? saved.annivTheme : DEFAULT_ANNIV_THEME;
+        state.hbdTheme = HBD_THEMES[saved.hbdTheme]
+            ? saved.hbdTheme : DEFAULT_HBD_THEME;
+        state.tribTheme = TRIB_THEMES[saved.tribTheme]
+            ? saved.tribTheme : DEFAULT_TRIB_THEME;
+        state.heading = saved.heading === undefined
+            ? DEFAULT_TRIB_HEADING : cleanHeading(TB.desanitize(String(saved.heading)));
+        state.message = saved.message === undefined
+            ? DEFAULT_TRIB_MESSAGE : cleanBlock(TB.desanitize(String(saved.message)));
+        state.title = saved.title === undefined
+            ? DEFAULT_TRIB_TITLE : cleanLine(TB.desanitize(String(saved.title)));
+        state.quote = saved.quote === undefined
+            ? DEFAULT_HBD_QUOTE : cleanBlock(TB.desanitize(String(saved.quote)));
+        state.closing = saved.closing === undefined
+            ? DEFAULT_HBD_CLOSING : cleanBlock(TB.desanitize(String(saved.closing)));
+        state.nameA = saved.nameA === undefined
+            ? DEFAULT_NAME_A : cleanLine(TB.desanitize(String(saved.nameA)));
+        state.nameB = saved.nameB === undefined
+            ? DEFAULT_NAME_B : cleanLine(TB.desanitize(String(saved.nameB)));
+        state.tagline = saved.tagline === undefined
+            ? DEFAULT_TAGLINE : cleanLine(TB.desanitize(String(saved.tagline)));
+        /* A stored date is untrusted input like everything else here. Clamped
+           rather than rejected: an edited record should give a poster with a
+           real month on it, not a blank one. */
+        state.month = saved.month === undefined
+            ? new Date().getMonth() : annivClampMonth(saved.month);
+        state.year = saved.year === undefined
+            ? new Date().getFullYear() : annivClampYear(saved.year);
+        state.day = saved.day === undefined
+            ? new Date().getDate() : annivClampDay(saved.day);
         state.size = PAPER[saved.size] ? saved.size : "A3";
         state.name = TB.desanitize(String(saved.name || "")).trim() || "Untitled poster";
 
@@ -1883,6 +2751,1214 @@
     /* transparent=true skips the frame, matte and placeholder fills so a PNG
        exports with a genuinely empty background rather than a white one -- the
        toggle in the download panel does this and nothing else. */
+    /* ----------------------------------------------------------------------
+       The anniversary poster's painter.
+
+       One SERIF throughout, because the artwork's two faces -- Monotype
+       Corsiva for the names and Times New Roman for the calendar -- are both
+       Monotype's, both carry an explicit licence-agreement clause, and `site/`
+       is the publish directory. The same call the card layout made about
+       Algerian and the music player made about Helvetica World, and the
+       OPPOSITE of the trade counter receipt's Roboto, which turned out to be
+       OFL. Check the font you are handed, every time.
+
+       Playfair Display italic is what stands in for the script. It is a
+       different letter, and it is the one real loss in this template.
+       ---------------------------------------------------------------------- */
+
+    function annivFont(size, italic, weight) {
+        return (italic ? "italic " : "") + (weight || 700) + " " + size +
+            'px "Playfair Display", Georgia, serif';
+    }
+
+    /* A line set down to fit a width, never clipped. Same argument as the rank
+       letters and the search query: a name that vanishes halfway through with
+       nothing on screen to say why is worse than a smaller name. */
+    function annivFit(c, text, px, maxPx, italic, weight) {
+        let size = px;
+        c.font = annivFont(size, italic, weight);
+        let w = c.measureText(text).width;
+        if (w > maxPx && w > 0) {
+            size = Math.max(6, size * (maxPx / w));
+            c.font = annivFont(size, italic, weight);
+        }
+        return size;
+    }
+
+    /* The calendar is set in TIMES, and the display text is not.
+
+       All three artworks in this family say so in their own stylesheets, and
+       they agree: `MonotypeCorsiva` for the month name, the message and the
+       line along the foot, `TimesNewRomanPSMT` for the day letters and every
+       date. Two faces with two jobs -- a script for the words somebody chose,
+       a quiet book face for the grid.
+
+       We had been drawing the whole poster in Playfair Display: italic at 700
+       for the display text, upright at 600 for the dates. Upright was right;
+       Playfair at 600 was not. It is a Didone with heavy stems and abrupt
+       hairlines, so a grid of thirty-one dates came out as a wall of black
+       where the artwork has a light, even texture.
+
+       Times needs no webfont -- it is on every desktop that matters and the
+       fallbacks behind it are the same shape -- so this costs nothing to load
+       and is what the source actually specifies. Playfair Display italic still
+       stands in for Corsiva on the display text, which we cannot bundle.
+       See the note above annivFont(). */
+    const CAL_FACE = "Times New Roman, Times, Liberation Serif, serif";
+
+    function calFont(size) {
+        return "400 " + size + 'px "Times New Roman", Times, "Liberation Serif", serif';
+    }
+
+    /* The day letters are centred on their COLUMNS, not tracked as one string.
+
+       The artwork tracks them 0.4em, and copying that put the seven letters
+       across 147pt of a 300pt grid -- measured -- because its own grid was
+       narrower than this one. Tracking is how you space a line of type; this is
+       a HEADER ROW over seven columns, and the thing that makes it read as one
+       is each letter sitting over the dates it labels. */
+    function annivHead(c, letters, g, baseline, size) {
+        c.font = calFont(size);
+        c.textAlign = "center";
+        letters.forEach((ch, i) => {
+            c.fillText(ch, g.centre(i), baseline);
+        });
+    }
+
+    /* ----------------------------------------------------------------------
+       The birthday poster's painter.
+       ---------------------------------------------------------------------- */
+
+    /* The four-pointed sparkle, which is the ARTWORK'S OWN PATH now rather
+       than an approximation of it.
+
+       Both artworks draw thirty-six of these between them, at nine sizes, and
+       every one is this identical shape -- width over height between 0.618 and
+       0.625 -- so it is stored once at the size it happens to be drawn largest
+       and mapped onto whatever box a cluster asks for.
+
+       What it replaces was two crossed quadratics with their control points at
+       13 per cent of each half-axis. That is a plausible four-pointed star and
+       it is not this one. The source builds each spike as a CUBIC whose first
+       control sits on the tip itself and whose second sits barely off the
+       centre line, which is what draws out the long needle taper; a quadratic
+       cannot bend that way, so ours came out blunt and heavy at a third of the
+       apparent length. Reading the path was the only thing that would have
+       shown it -- the proportion was already right, and a fat star at the
+       correct proportion still looks like a star.
+
+       Note the arms do NOT cross at the middle of the box: the left and right
+       tips sit at y 535.05 where the box's own centre is 531.64, three and a
+       half points lower. That asymmetry is the artwork's and is kept, which is
+       why `cross` is carried separately rather than assumed to be 0.5. */
+    const HBD_SPARK = {
+        view: [208.09, 509.46, 27.59, 44.35],
+        cross: 0.5766,
+        d: "M221.89,509.46s1.67,25.64-13.8,25.59c0,0,14.07-1.2,14.12,18.76,0,0" +
+           "-.15-16.89,13.47-18.76C235.68,535.05,222.38,531.7,221.89,509.46Z"
+    };
+    HBD_SPARK.path = new Path2D(HBD_SPARK.d);
+
+    /* The glow. The source spends 40KB of embedded PNG masks on it -- 74 of
+       them across the two files, 44 per cent of one file's weight -- and all
+       they do is lift the spikes towards white and leave a faint haze just
+       beyond the tips. Measured off the reference: the core reads #FEF6AD, the
+       spikes #FFFDE6, and one point past a tip the page has lifted from
+       #231F20 to #2D2928.
+
+       That is a radial gradient, which costs nothing, needs no raster, and
+       travels through both painters: the theme's `sparkle` at the core, its
+       `sparkleTip` from 45 per cent out to the ends.
+
+       A soft HALO was tried here too and was wrong, which is worth recording
+       because it is the obvious reading of the word "glow". Four points to the
+       side of a spike the reference is pure page -- #231F20, not a lifted
+       #2D2925 -- so the masks are brightening the spikes and spilling nothing
+       around them. What looks like a haze in the artwork is the needle taper
+       plus its own antialiasing. Measure before adding light. */
+
+    /* Boxes in an artwork's own points, scaled onto the drawn page. Two
+       collage layouts use this; neither holds its own copy of four
+       multiplications. */
+    function scaleBoxes(boxes, page, W, H) {
+        const fx = W / page.w;
+        const fy = H / page.h;
+        return boxes.map((r) => ({
+            x: r.x * fx, y: r.y * fy, w: r.w * fx, h: r.h * fy
+        }));
+    }
+
+    /* A calendar's metrics, from the rule under its day header -- which is what
+       the columns are actually measured against, every one of these artworks
+       having hand-set its own thirty-odd date positions to no pitch at all.
+
+       Takes the layout's geometry rather than reading one layout's constants,
+       because there are three calendars drawn in this file now and they differ
+       only in where they sit. */
+    function calGrid(geo, W, H) {
+        const fx = W / geo.page.w;
+        const fy = H / geo.page.h;
+        const x1 = geo.rule.x1 * fx;
+        const span = (geo.rule.x2 - geo.rule.x1) * fx;
+        return {
+            fx: fx, fy: fy, x1: x1, span: span,
+            centre: (i) => x1 + (span / 7) * (i + 0.5),
+            baseline: (r) => (geo.grid.top + geo.grid.pitch * r) * fy
+        };
+    }
+
+    function hbdRects(W, H) {
+        return scaleBoxes(HBD_BOXES, HBD.page, W, H);
+    }
+
+    function hbdGrid(W, H) {
+        return calGrid(HBD, W, H);
+    }
+
+    /* The display face for these two posters: a stand-in for Monotype
+       Corsiva, which both artworks set every word in and neither may ship.
+
+       Playfair Display italic was the stand-in before, on the grounds that it
+       was already loaded and was the closest thing on hand. It is not close.
+       Corsiva is a CHANCERY -- rounded bowls, a shallow slope, semi-connected,
+       one weight -- and Playfair is a Didone: vertical stress, hairline
+       serifs, a much wider italic. Set side by side at the same size the two
+       do not read as the same kind of lettering, and on a poster whose words
+       are the whole design that is the largest thing separating ours from the
+       reference.
+
+       Petit Formal Script was picked by rendering five candidates against
+       Corsiva at the sizes these posters actually use -- the month name, the
+       foot line and a paragraph of the message -- and it is the nearest of
+       them by a distance. EB Garamond and the two Cormorants are book italics
+       and read as such.
+
+       It has ONE weight and it is already slanted, so nothing here asks for
+       bold or italic: both would be synthesised, and a browser's synthetic
+       oblique on an already-sloped script is a smear. That is why the
+       signature lost its `italic` and `weight` arguments rather than keeping
+       them and passing false.
+
+       The fallback chain keeps Playfair Display in second place, so a blocked
+       webfont degrades to what this used to be rather than to Georgia. */
+    const SCRIPT_FACE = '"Petit Formal Script", "Playfair Display", Georgia, serif';
+    const SCRIPT_SVG_FACE = "Petit Formal Script, Playfair Display, Georgia, serif";
+
+    /* Petit Formal Script draws BIGGER than Monotype Corsiva at the same
+       nominal size: 79 units of cap height per 100 of em against Corsiva's 65,
+       measured. Every size in these two artworks is written in Corsiva's em,
+       so each one is multiplied by this before it reaches the substitute --
+       otherwise the whole poster sets a fifth too large and the message
+       overruns the lines it is allowed.
+
+       Cap height and not width, deliberately. Matching widths instead would
+       need 0.66 and would leave the lettering visibly too small; cap height is
+       what the eye reads as "the same size". The substitute is still about a
+       fifth wider set at matched cap height, and the wrap and shrink-to-fit
+       rules are what absorb that. This is the same idea as CSS `size-adjust`
+       and exists for the same reason: a fallback face is never the metrics of
+       the one it stands in for. */
+    const SCRIPT_SIZE_ADJUST = 65 / 79;
+
+    /* Sizes are carried in the ARTWORK'S units everywhere except the two
+       places that have to emit a real px number -- here and in the SVG -- so
+       the adjustment is applied once, in both, and nowhere else. */
+    function hbdPx(size) {
+        return size * SCRIPT_SIZE_ADJUST;
+    }
+
+    function hbdFont(size) {
+        return "400 " + hbdPx(size) + "px " + SCRIPT_FACE;
+    }
+
+    /* annivFit(), in the display face. Same shrink-to-fit rule; the only
+       reason it is a second function is that the font builders differ. */
+    function hbdFit(c, text, px, maxPx) {
+        let size = px;
+        c.font = hbdFont(size);
+        const w = c.measureText(text).width;
+        if (w > maxPx && w > 0) {
+            size = Math.max(6, size * (maxPx / w));
+            c.font = hbdFont(size);
+        }
+        return size;
+    }
+
+    /* Wraps a visitor's block to a width, in the face it will be drawn in.
+       The artwork's quote is six hand-broken lines whose last one is centred by
+       nineteen literal spaces and xml:space="preserve" -- an indent that was
+       only ever right in Monotype Corsiva at 30.63px. None of that survives
+       contact with a field somebody types into, so the block wraps here and the
+       spaces are not reproduced. */
+    function hbdWrap(c, text, maxPx) {
+        const out = [];
+        String(text || "").split("\n").forEach((para) => {
+            const words = para.split(/\s+/).filter(Boolean);
+            if (!words.length) { out.push(""); return; }
+            let line = words[0];
+            for (let i = 1; i < words.length; i += 1) {
+                const next = line + " " + words[i];
+                if (c.measureText(next).width > maxPx) {
+                    out.push(line);
+                    line = words[i];
+                } else {
+                    line = next;
+                }
+            }
+            out.push(line);
+        });
+        return out;
+    }
+
+    /* Where a star of half-width `r` centred on (cx, cy) lands, in drawn
+       pixels, and where its arms cross inside that box. Shared so the canvas
+       and the SVG cannot disagree about it. */
+    function sparkBox(cx, cy, r, fx, fy) {
+        const v = HBD_SPARK.view;
+        const w = 2 * r * fx;
+        const h = 2 * r * (v[3] / v[2]) * fy;
+        return { x: cx * fx - w / 2, y: cy * fy - h / 2, w: w, h: h,
+            crossX: v[0] + v[2] / 2, crossY: v[1] + v[3] * HBD_SPARK.cross };
+    }
+
+    /* A gradient stop with its own opacity. Canvas takes one CSS colour per
+       stop and no separate alpha, where SVG carries stop-opacity beside the
+       colour -- and this artwork's gloss is built almost entirely out of stops
+       that fade a colour to NOTHING rather than to another colour. */
+    function stopColour(hex, alpha) {
+        if (alpha >= 1) { return hex; }
+        const n = parseInt(hex.slice(1), 16);
+        return "rgba(" + ((n >> 16) & 255) + ", " + ((n >> 8) & 255) + ", " +
+            (n & 255) + ", " + alpha + ")";
+    }
+
+    /* The glossy heart onto a box, on canvas. */
+    function tribDrawHeart(c, x, y, w, h) {
+        const v = TRIB_HEART.view;
+        c.save();
+        c.translate(x, y);
+        c.scale(w / v[2], h / v[3]);
+        c.translate(-v[0], -v[1]);
+        TRIB_HEART.parts.forEach((p) => {
+            if (!p.path) { p.path = new Path2D(p.d); }
+            if (p.fill) {
+                c.fillStyle = p.fill;
+            } else {
+                const gr = c.createLinearGradient(p.grad[0], p.grad[1],
+                    p.grad[2], p.grad[3]);
+                p.stops.forEach((st) => {
+                    gr.addColorStop(st[0], stopColour(st[1], st[2]));
+                });
+                c.fillStyle = gr;
+            }
+            /* Both of these are load-bearing and both were missed on the
+               first pass: the belly wash carries opacity 0.4 and came out
+               twice as bright without it, and every overlay is evenodd --
+               these are hollow slivers, and nonzero fills their middles. */
+            c.globalAlpha = p.alpha === undefined ? 1 : p.alpha;
+            c.fill(p.path, p.rule || "nonzero");
+            c.globalAlpha = 1;
+        });
+        c.restore();
+    }
+
+    /* The same heart as SVG. `tag` keeps the gradient ids unique: five of
+       these go into one document and an id collision silently paints four of
+       them with the fifth one's light. */
+    function tribHeartSVG(x, y, w, h, tag) {
+        const v = TRIB_HEART.view;
+        let defs = "";
+        let body = "";
+        TRIB_HEART.parts.forEach((p, i) => {
+            const opt = (p.rule ? ' fill-rule="' + p.rule + '"' : "") +
+                (p.alpha === undefined ? "" : ' opacity="' + p.alpha + '"');
+            if (p.fill) {
+                body += '<path d="' + p.d + '" fill="' + p.fill + '"' + opt + "/>";
+                return;
+            }
+            const id = "tb-th-" + tag + "-" + i;
+            defs += '<linearGradient id="' + id + '" gradientUnits="userSpaceOnUse"' +
+                ' x1="' + p.grad[0] + '" y1="' + p.grad[1] +
+                '" x2="' + p.grad[2] + '" y2="' + p.grad[3] + '">' +
+                p.stops.map((st) => '<stop offset="' + st[0] + '" stop-color="' +
+                    st[1] + '" stop-opacity="' + st[2] + '"/>').join("") +
+                "</linearGradient>";
+            body += '<path d="' + p.d + '" fill="url(#' + id + ')"' + opt + "/>";
+        });
+        return '<g transform="translate(' + x + " " + y + ') scale(' +
+            (w / v[2]) + " " + (h / v[3]) + ') translate(' + (-v[0]) + " " +
+            (-v[1]) + ')"><defs>' + defs + "</defs>" + body + "</g>";
+    }
+
+    /* Where a hanging heart sits. The string ends a quarter of the way DOWN
+       the heart, in its cleft, which is where a hanging thing is actually
+       tied -- measured at 0.27 on all four, and the reason the heart cannot
+       simply be hung from its own top edge. */
+    const TRIB_HEART_CLEFT = 0.249;
+
+    function tribHeartBox(st, fx, fy) {
+        const v = TRIB_HEART.view;
+        const w = st.w * fx;
+        const h = st.w * (v[3] / v[2]) * fy;
+        return { x: st.x * fx - w / 2, y: st.to * fy - h * TRIB_HEART_CLEFT,
+            w: w, h: h };
+    }
+
+    /* One sparkle cluster: a large star and its satellites, each lit from its
+       own centre and sitting in its own haze. */
+    function hbdDrawSparkle(c, spark, fx, fy, ink) {
+        const v = HBD_SPARK.view;
+        const put = (cx, cy, r) => {
+            const b = sparkBox(cx, cy, r, fx, fy);
+            c.save();
+            c.translate(b.x, b.y);
+            c.scale(b.w / v[2], b.h / v[3]);
+            c.translate(-v[0], -v[1]);
+
+            const lit = c.createRadialGradient(b.crossX, b.crossY, 0,
+                b.crossX, b.crossY, v[3] / 2);
+            lit.addColorStop(0, ink.sparkle);
+            lit.addColorStop(0.45, ink.sparkleTip || ink.sparkle);
+            lit.addColorStop(1, ink.sparkleTip || ink.sparkle);
+            c.fillStyle = lit;
+            c.fill(HBD_SPARK.path);
+            c.restore();
+        };
+        put(spark.x, spark.y, spark.r);
+        spark.sats.forEach((sat) => {
+            put(spark.x + sat[0], spark.y + sat[1], sat[2]);
+        });
+    }
+
+    /* The same cluster as SVG. One emitter, used by both posters, because two
+       copies of this is exactly how the two painters drift. `tag` keeps the
+       gradient ids unique within one document. */
+    function sparkleSVG(sparkles, fx, fy, ink, tag) {
+        const v = HBD_SPARK.view;
+        let out = "";
+        let n = 0;
+        sparkles.forEach((sp) => {
+            const put = (cx, cy, r) => {
+                const b = sparkBox(cx, cy, r, fx, fy);
+                const id = "tb-sp-" + tag + "-" + (n += 1);
+                const open = '<g transform="translate(' + b.x + " " + b.y +
+                    ') scale(' + (b.w / v[2]) + " " + (b.h / v[3]) +
+                    ') translate(' + (-v[0]) + " " + (-v[1]) + ')">';
+                const g = "<defs>" + '<radialGradient id="' + id + '" gradientUnits="userSpaceOnUse" cx="' +
+                    b.crossX + '" cy="' + b.crossY + '" r="' + (v[3] / 2) + '">' +
+                    '<stop offset="0" stop-color="' + ink.sparkle + '"/>' +
+                    '<stop offset="0.45" stop-color="' + (ink.sparkleTip || ink.sparkle) + '"/>' +
+                    '<stop offset="1" stop-color="' + (ink.sparkleTip || ink.sparkle) +
+                    '"/></radialGradient></defs>';
+                let body = '<path d="' + HBD_SPARK.d + '" fill="url(#' + id + ')"/>';
+                return open + g + body + "</g>";
+            };
+            out += put(sp.x, sp.y, sp.r);
+            sp.sats.forEach((sat) => {
+                out += put(sp.x + sat[0], sp.y + sat[1], sat[2]);
+            });
+        });
+        return out;
+    }
+
+    function hbdDrawGarland(c, W, H, ink) {
+        const fx = W / HBD.page.w;
+        const fy = H / HBD.page.h;
+        const g = HBD_GARLAND;
+        c.save();
+        c.strokeStyle = ink.ink;
+        c.lineWidth = Math.max(0.8, g.string.width * fx);
+        c.beginPath();
+        c.moveTo(g.string.x1 * fx, g.string.y1 * fy);
+        c.lineTo(g.string.x2 * fx, g.string.y2 * fy);
+        c.stroke();
+        /* The tick marks at each end, three short strokes fanned across the
+           string the way the artwork draws them. */
+        g.ticks.forEach((t) => {
+            for (let k = -1; k <= 1; k += 1) {
+                c.beginPath();
+                c.moveTo((t.x - 4) * fx, (t.y + k * 3 - 3) * fy);
+                c.lineTo((t.x + 4) * fx, (t.y + k * 3 + 3) * fy);
+                c.stroke();
+            }
+        });
+        c.restore();
+        g.hearts.forEach((h) => {
+            const w = h.w * fx;
+            const hh = w / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+            drawArt(c, ANNIV_HEART, h.cx * fx - w / 2, h.cy * fy - hh / 2, w, hh,
+                { accent: h.tint === "A" ? ink.garlandA : ink.garlandB });
+        });
+    }
+
+    function paintTribute(c, W, H, options) {
+        const fx = W / TRIB.page.w;
+        const fy = H / TRIB.page.h;
+        const ink = tribTheme();
+        const heartRatio = ANNIV_HEART.view[2] / ANNIV_HEART.view[3];
+
+        if (!options.transparent) {
+            c.fillStyle = ink.page;
+            c.fillRect(0, 0, W, H);
+        }
+
+        /* ---- sparkles, behind everything ---- */
+        TRIB_SPARKLES.forEach((sp) => hbdDrawSparkle(c, sp, fx, fy, ink));
+
+        /* ---- the hanging hearts ---- */
+        c.save();
+        c.strokeStyle = ink.string;
+        c.lineWidth = Math.max(1, TRIB.stringWidth * fx);
+        TRIB.strings.forEach((st) => {
+            c.beginPath();
+            c.moveTo(st.x * fx, st.from * fy);
+            c.lineTo(st.x * fx, st.to * fy);
+            c.stroke();
+        });
+        c.restore();
+        TRIB.strings.forEach((st) => {
+            const b = tribHeartBox(st, fx, fy);
+            tribDrawHeart(c, b.x, b.y, b.w, b.h);
+        });
+
+        /* ---- the month ---- */
+        c.textAlign = "left";
+        c.textBaseline = "alphabetic";
+        c.fillStyle = ink.ink;
+        const info = annivMonth(state.year, state.month);
+        const label = (ANNIV_MONTHS[info.month] || "").toUpperCase();
+        hbdFit(c, label, TRIB.month.size * fy,
+            (TRIB.rule.x2 - TRIB.month.x) * fx);
+        c.fillText(label, TRIB.month.x * fx, TRIB.month.baseline * fy);
+
+        /* ---- the calendar ---- */
+        const g = tribGrid(W, H);
+        annivHead(c, ANNIV_DAYS, g, TRIB.head.baseline * fy, TRIB.head.size * fy);
+
+        c.strokeStyle = ink.ink;
+        c.lineWidth = Math.max(1, TRIB.rule.width * fy);
+        c.beginPath();
+        c.moveTo(g.x1, TRIB.rule.y * fy);
+        c.lineTo(g.x1 + g.span, TRIB.rule.y * fy);
+        c.stroke();
+
+        /* The heart goes down first and the number on it, as the sibling
+           layout does. The ARTWORK covers its marked date with an opaque heart,
+           so the one square the poster exists to point at is the only one that
+           cannot be read; that is not copied. */
+        const cell = annivCell(info, state.day);
+        if (cell) {
+            const hw = TRIB.dayHeart.w * fx;
+            const hh = hw / heartRatio;
+            drawArt(c, ANNIV_HEART, g.centre(cell.col) - hw / 2,
+                g.baseline(cell.row) - hh * 0.62, hw, hh, ink);
+        }
+        c.textAlign = "center";
+        c.font = calFont(TRIB.grid.size * fy);
+        for (let d = 1; d <= info.length; d += 1) {
+            const at = annivCell(info, d);
+            c.fillStyle = (cell && cell.day === d) ? ink.onAccent : ink.ink;
+            c.fillText(String(d), g.centre(at.col), g.baseline(at.row));
+        }
+
+        /* ---- the photographs ---- */
+        /* Forwards, so a later box paints over an earlier one. Four pairs
+           overlap and that stacking IS the design. */
+        const rects = tribRects(W, H);
+        rects.forEach((r, i) => {
+            const slot = tribSlot(i);
+            if (photos[slot]) {
+                c.save();
+                c.beginPath();
+                c.rect(r.x, r.y, r.w, r.h);
+                c.clip();
+                drawCoverImage(c, photos[slot], r.x, r.y, r.w, r.h, state.views[slot]);
+                c.restore();
+            } else {
+                c.fillStyle = TRIB_BOXES[i].tint ? ink.boxTint : ink.boxFill;
+                c.fillRect(r.x, r.y, r.w, r.h);
+            }
+            c.strokeStyle = ink.boxStroke;
+            c.lineWidth = Math.max(1, TRIB.boxStroke * fx);
+            c.strokeRect(r.x, r.y, r.w, r.h);
+        });
+
+        /* ---- the heading, with its heart in the gap ---- */
+        c.textAlign = "left";
+        c.fillStyle = ink.ink;
+        const parts = tribHeadingParts(state.heading);
+        const hSize = TRIB.heading.size * fy;
+        c.font = hbdFont(hSize);
+        const hx = TRIB.heading.x * fx;
+        const hy = TRIB.heading.baseline * fy;
+        const beforeW = c.measureText(parts.before).width;
+        const hw2 = TRIB.heading.heart * fx;
+        const hh2 = hw2 / heartRatio;
+        const gap = TRIB.heading.gap * fx;
+        c.fillText(parts.before, hx, hy);
+        drawArt(c, ANNIV_HEART, hx + beforeW + gap, hy - hh2 * 0.82, hw2, hh2, ink);
+        if (parts.after) {
+            c.fillStyle = ink.ink;
+            c.fillText(parts.after, hx + beforeW + gap * 2 + hw2, hy);
+        }
+
+        /* ---- the message ---- */
+        const mSize = TRIB.message.size * fy;
+        c.font = hbdFont(mSize);
+        const mW = tribMessageWidth(W);
+        hbdWrap(c, state.message, mW).slice(0, TRIB.message.maxLines)
+            .forEach((line, i) => {
+                c.fillText(line, TRIB.message.x * fx,
+                    (TRIB.message.baseline + TRIB.message.leading * i) * fy);
+            });
+
+        /* ---- the foot title, with its heart ---- */
+        const tSize = TRIB.title.size * fy;
+        const tHeartW = TRIB.title.heart * fx;
+        const tHeartH = TRIB.title.heart * (TRIB_HEART.view[3] / TRIB_HEART.view[2]) * fy;
+        hbdFit(c, state.title, tSize, W - TRIB.title.x * fx * 2 - tHeartW);
+        const tW = c.measureText(state.title).width;
+        /* Centred as a UNIT -- the words and the heart together -- because the
+           artwork's title is centred on the page and a heart pinned to the end
+           of it would push the words off centre by half its width. */
+        const tx = (W - (tW + TRIB.title.gap * fx + tHeartW)) / 2;
+        const ty = TRIB.title.baseline * fy;
+        c.fillStyle = ink.ink;
+        c.fillText(state.title, tx, ty);
+        tribDrawHeart(c, tx + tW + TRIB.title.gap * fx,
+            ty - tHeartH * TRIB.title.lift, tHeartW, tHeartH);
+    }
+
+    function paintBirthday(c, W, H, options) {
+        const fx = W / HBD.page.w;
+        const fy = H / HBD.page.h;
+        const ink = hbdTheme();
+
+        if (!options.transparent) {
+            c.fillStyle = ink.page;
+            c.fillRect(0, 0, W, H);
+        }
+
+        /* ---- the sparkles, behind everything ---- */
+        HBD_SPARKLES.forEach((sp) => hbdDrawSparkle(c, sp, fx, fy, ink));
+
+        /* ---- the garland ---- */
+        hbdDrawGarland(c, W, H, ink);
+
+        /* ---- the month ---- */
+        c.textAlign = "left";
+        c.textBaseline = "alphabetic";
+        c.fillStyle = ink.ink;
+        const info = annivMonth(state.year, state.month);
+        const label = (ANNIV_MONTHS[info.month] || "").toUpperCase();
+        /* Measured and set down rather than allowed to run: SEPTEMBER fits the
+           artwork because the artwork was drawn around it, and FEBRUARY is
+           longer. The ceiling is the garland's own left end. */
+        hbdFit(c, label, HBD.month.size * fy,
+            (HBD_GARLAND.string.x1 - HBD.month.x - 12) * fx);
+        c.fillText(label, HBD.month.x * fx, HBD.month.baseline * fy);
+
+        /* ---- the calendar ---- */
+        const g = hbdGrid(W, H);
+        /* annivHead(), not a tracked string: the anniversary poster already
+           found that copying the artwork's 0.4em tracking spreads the seven
+           letters across half the grid, because the source's own grid is
+           narrower than the one they have to label here. */
+        annivHead(c, ANNIV_DAYS, g, HBD.head.baseline * fy, HBD.head.size * fy);
+
+        c.strokeStyle = ink.ink;
+        c.lineWidth = Math.max(1, HBD.rule.width * fy);
+        c.beginPath();
+        c.moveTo(g.x1, HBD.rule.y * fy);
+        c.lineTo(g.x1 + g.span, HBD.rule.y * fy);
+        c.stroke();
+
+        /* The marked day's heart goes down FIRST and the number is drawn on it.
+
+           The ARTWORK does the opposite: its 15 is still in the file, at the
+           same place as every other date, with an opaque heart drawn over it,
+           so the marked date cannot be read at all. That is a deliberate
+           departure. A calendar whose one important square is the only one you
+           cannot read is a poster arguing with itself, and the anniversary
+           poster already draws its number on the heart -- two layouts in one
+           editor disagreeing about that would be worse than either choice. */
+        const cell = annivCell(info, state.day);
+        if (cell) {
+            const hw = HBD.dayHeart.w * fx;
+            const hh = hw / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+            drawArt(c, ANNIV_HEART, g.centre(cell.col) - hw / 2,
+                g.baseline(cell.row) - hh * 0.62, hw, hh, ink);
+        }
+
+        c.textAlign = "center";
+        c.font = calFont(HBD.grid.size * fy);
+        for (let d = 1; d <= info.length; d += 1) {
+            const at = annivCell(info, d);
+            c.fillStyle = (cell && cell.day === d) ? ink.onAccent : ink.ink;
+            c.fillText(String(d), g.centre(at.col), g.baseline(at.row));
+        }
+
+        /* ---- the photographs ---- */
+        const rects = hbdRects(W, H);
+        rects.forEach((r, i) => {
+            const slot = hbdSlot(i);
+            if (photos[slot]) {
+                c.save();
+                c.beginPath();
+                c.rect(r.x, r.y, r.w, r.h);
+                c.clip();
+                drawCoverImage(c, photos[slot], r.x, r.y, r.w, r.h, state.views[slot]);
+                c.restore();
+            } else if (ink.boxFill) {
+                c.fillStyle = ink.boxFill;
+                c.fillRect(r.x, r.y, r.w, r.h);
+            }
+            /* The red keyline is on every box, filled or not: it is what holds
+               the cascade together as a set of pictures rather than a scatter
+               of rectangles, and the artwork draws it under the photograph. */
+            c.strokeStyle = ink.boxStroke;
+            c.lineWidth = Math.max(1, HBD.photoStroke * fx);
+            c.strokeRect(r.x, r.y, r.w, r.h);
+        });
+
+        /* ---- the quote ---- */
+        c.textAlign = "left";
+        c.fillStyle = ink.ink;
+        const quoteW = (HBD_BOXES[4].x - HBD.quote.x - 12) * fx;
+        c.font = hbdFont(HBD.quote.size * fy);
+        const qlines = hbdWrap(c, state.quote, quoteW).slice(0, HBD.quote.maxLines);
+        qlines.forEach((line, i) => {
+            c.fillText(line, HBD.quote.x * fx,
+                (HBD.quote.baseline + HBD.quote.leading * i) * fy);
+        });
+
+        /* ---- the closing message, with its heart on the last line ---- */
+        const heartW = HBD.closingHeart.w * fx;
+        const heartH = heartW / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+        const closeW = W - HBD.closing.x * fx * 2 - heartW - 6 * fx;
+        c.font = hbdFont(HBD.closing.size * fy);
+        const clines = hbdWrap(c, state.closing, closeW).slice(0, 3);
+        clines.forEach((line, i) => {
+            const y = (HBD.closing.baseline + HBD.closing.leading * i) * fy;
+            c.fillText(line, HBD.closing.x * fx, y);
+            if (i === clines.length - 1) {
+                const w = c.measureText(line).width;
+                drawArt(c, ANNIV_HEART, HBD.closing.x * fx + w + 6 * fx,
+                    y - heartH * 0.78, heartW, heartH, ink);
+            }
+        });
+    }
+
+    function paintAnniversary(c, W, H, options) {
+        const fx = W / ANNIV.page.w;
+        const fy = H / ANNIV.page.h;
+        const mid = W / 2;
+        const ink = annivTheme();
+
+        if (!options.transparent) {
+            c.fillStyle = ink.page;
+            c.fillRect(0, 0, W, H);
+        }
+
+        /* ---- the two names, with the heart between them ---- */
+        const heartW = ANNIV.nameHeart.w * fx;
+        const heartH = heartW / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+        const gap = ANNIV.names.gap * fx;
+        const half = (W - heartW - gap * 2) / 2;
+
+        c.textBaseline = "alphabetic";
+        c.fillStyle = ink.ink;
+        c.textAlign = "right";
+        const sizeA = annivFit(c, state.nameA, ANNIV.names.size * fy,
+            half - W * 0.06, true, 700);
+        c.fillText(state.nameA, mid - heartW / 2 - gap, ANNIV.names.baseline * fy);
+
+        c.textAlign = "left";
+        const sizeB = annivFit(c, state.nameB, ANNIV.names.size * fy,
+            half - W * 0.06, true, 700);
+        c.fillText(state.nameB, mid + heartW / 2 + gap, ANNIV.names.baseline * fy);
+
+        drawArt(c, ANNIV_HEART, mid - heartW / 2,
+            ANNIV.nameHeart.cy * fy - heartH / 2, heartW, heartH, ink);
+
+        /* ---- the collage ---- */
+        /* An empty box is drawn as a WHITE panel, which is the artwork's own
+           empty state: the heart reads as a heart before a single photograph
+           is in it. Nothing here is a placeholder to be replaced -- it is the
+           design, and a poster exported with empty boxes is a finished thing. */
+        const rects = annivRects(W, H);
+        rects.forEach((r, i) => {
+            const slot = annivSlot(i);
+            if (photos[slot]) {
+                c.save();
+                c.beginPath();
+                c.rect(r.x, r.y, r.w, r.h);
+                c.clip();
+                drawCoverImage(c, photos[slot], r.x, r.y, r.w, r.h, state.views[slot]);
+                c.restore();
+            } else if (ink.boxFill) {
+                c.fillStyle = ink.boxFill;
+                c.fillRect(r.x, r.y, r.w, r.h);
+            } else {
+                /* Outlined rather than filled: on a light ground a white box
+                   is not a box. Inset by half the stroke so the heart keeps
+                   its measured size instead of growing by a line width. */
+                const lw = Math.max(1, r.w * 0.012);
+                c.strokeStyle = ink.boxStroke;
+                c.lineWidth = lw;
+                c.strokeRect(r.x + lw / 2, r.y + lw / 2, r.w - lw, r.h - lw);
+            }
+        });
+
+        /* ---- the scan code ---- */
+        const code = annivCodeRect(W, H);
+        if (photos[CODE_SLOT]) {
+            c.save();
+            c.beginPath();
+            c.rect(code.x, code.y, code.w, code.h);
+            c.clip();
+            drawCoverImage(c, photos[CODE_SLOT], code.x, code.y, code.w, code.h,
+                state.views[CODE_SLOT]);
+            c.restore();
+        }
+
+        /* ---- the calendar ---- */
+        const info = annivMonth(state.year, state.month);
+        const g = annivGrid(W, H);
+
+        c.textAlign = "center";
+        c.fillStyle = ink.ink;
+        const label = (ANNIV_MONTHS[info.month] || "").toUpperCase() + " " + info.year;
+        annivFit(c, label, ANNIV.month.size * fy, g.span, false, 600);
+        c.fillText(label, mid, ANNIV.month.baseline * fy);
+
+        annivHead(c, ANNIV_DAYS, g, ANNIV.head.baseline * fy, ANNIV.head.size * fy);
+
+        c.strokeStyle = ink.ink;
+        c.lineWidth = Math.max(1, ANNIV.rule.width * fy);
+        c.beginPath();
+        c.moveTo(g.x1, ANNIV.rule.y * fy);
+        c.lineTo(g.x1 + g.span, ANNIV.rule.y * fy);
+        c.stroke();
+
+        /* The marked day's heart goes down FIRST, so the number sits on it.
+           The artwork does the same and keeps the number white, which is the
+           only reason it stays legible on that red. */
+        const cell = annivCell(info, state.day);
+        if (cell) {
+            const hw = ANNIV.dayHeart.w * fx;
+            const hh = hw / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+            drawArt(c, ANNIV_HEART, g.centre(cell.col) - hw / 2,
+                g.baseline(cell.row) - hh * 0.62, hw, hh, ink);
+        }
+
+        c.font = calFont(ANNIV.grid.size * fy);
+        for (let d = 1; d <= info.length; d += 1) {
+            const at = annivCell(info, d);
+            c.fillStyle = (cell && cell.day === d) ? ink.onAccent : ink.ink;
+            c.fillText(String(d), g.centre(at.col), g.baseline(at.row));
+        }
+
+        /* ---- the tagline ---- */
+        c.textAlign = "center";
+        annivFit(c, state.tagline, ANNIV.tagline.size * fy, W * ANNIV.tagline.maxW, true, 700);
+        c.fillText(state.tagline, mid, ANNIV.tagline.baseline * fy);
+    }
+
+    /* The same poster as vector. A SECOND renderer, which is exactly where this
+       editor has drifted before, so everything either painter needs is read
+       from the shared helpers above -- annivRects, annivGrid, annivMonth and
+       annivCell -- and neither holds a coordinate of its own. */
+    /* The birthday poster as vector. A SECOND renderer, which is where this
+       editor has drifted before, so everything either painter needs comes from
+       the shared helpers -- hbdRects, hbdGrid, annivMonth, annivCell, hbdWrap
+       -- and neither holds a coordinate of its own. */
+    /* The tribute poster as vector. Second renderer, so everything it needs
+       comes from the shared helpers -- tribRects, tribGrid, annivMonth,
+       annivCell, hbdWrap, tribHeadingParts -- and it holds no coordinate of
+       its own. */
+    function tributeSVG(W, H, esc) {
+        const fx = W / TRIB.page.w;
+        const fy = H / TRIB.page.h;
+        const ink = tribTheme();
+        const face = SCRIPT_SVG_FACE;
+        const ratio = ANNIV_HEART.view[2] / ANNIV_HEART.view[3];
+        const measure = document.createElement("canvas").getContext("2d");
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + ink.page + '"/>';
+
+        const heartSVG = (x, y, w, h, colour) => {
+            const v = ANNIV_HEART.view;
+            return '<g transform="translate(' + x + " " + y + ') scale(' +
+                (w / v[2]) + " " + (h / v[3]) + ') translate(' + (-v[0]) + " " +
+                (-v[1]) + ')"><path d="' + ANNIV_HEART.parts[0].d + '" fill="' +
+                colour + '"/></g>';
+        };
+        const textSVG = (x, y, size, fill, str, extra) =>
+            '<text x="' + x + '" y="' + y + '" font-family="' + face +
+            '" font-weight="400" font-size="' + hbdPx(size) +
+            '" fill="' + fill + '"' + (extra || "") + '>' + esc(str) + "</text>";
+
+        out += sparkleSVG(TRIB_SPARKLES, fx, fy, ink, "tb");
+
+        TRIB.strings.forEach((st) => {
+            out += '<line x1="' + (st.x * fx) + '" y1="' + (st.from * fy) +
+                '" x2="' + (st.x * fx) + '" y2="' + (st.to * fy) + '" stroke="' +
+                ink.string + '" stroke-width="' + Math.max(1, TRIB.stringWidth * fx) + '"/>';
+        });
+        TRIB.strings.forEach((st, i) => {
+            const b = tribHeartBox(st, fx, fy);
+            out += tribHeartSVG(b.x, b.y, b.w, b.h, "h" + i);
+        });
+
+        const info = annivMonth(state.year, state.month);
+        const label = (ANNIV_MONTHS[info.month] || "").toUpperCase();
+        const mSize = hbdFit(measure, label, TRIB.month.size * fy,
+            (TRIB.rule.x2 - TRIB.month.x) * fx);
+        out += textSVG(TRIB.month.x * fx, TRIB.month.baseline * fy, mSize, ink.ink, label);
+
+        const g = tribGrid(W, H);
+        ANNIV_DAYS.forEach((ch, i) => {
+            out += '<text x="' + g.centre(i) + '" y="' + (TRIB.head.baseline * fy) +
+                '" text-anchor="middle" font-family="' + CAL_FACE +
+                '" font-weight="400" font-size="' + (TRIB.head.size * fy) +
+                '" fill="' + ink.ink + '">' + esc(ch) + "</text>";
+        });
+        out += '<line x1="' + g.x1 + '" y1="' + (TRIB.rule.y * fy) + '" x2="' +
+            (g.x1 + g.span) + '" y2="' + (TRIB.rule.y * fy) + '" stroke="' + ink.ink +
+            '" stroke-width="' + Math.max(1, TRIB.rule.width * fy) + '"/>';
+
+        const cell = annivCell(info, state.day);
+        if (cell) {
+            const hw = TRIB.dayHeart.w * fx;
+            const hh = hw / ratio;
+            out += heartSVG(g.centre(cell.col) - hw / 2,
+                g.baseline(cell.row) - hh * 0.62, hw, hh, ink.accent);
+        }
+        for (let d = 1; d <= info.length; d += 1) {
+            const at = annivCell(info, d);
+            out += '<text x="' + g.centre(at.col) + '" y="' + g.baseline(at.row) +
+                '" text-anchor="middle" font-family="' + CAL_FACE +
+                '" font-weight="400" font-size="' + (TRIB.grid.size * fy) + '" fill="' +
+                ((cell && cell.day === d) ? ink.onAccent : ink.ink) + '">' + d + "</text>";
+        }
+
+        const rects = tribRects(W, H);
+        rects.forEach((r, i) => {
+            const slot = tribSlot(i);
+            if (photos[slot]) {
+                const id = "tb-trib-" + i;
+                out += '<defs><clipPath id="' + id + '"><rect x="' + r.x + '" y="' + r.y +
+                    '" width="' + r.w + '" height="' + r.h + '"/></clipPath></defs>' +
+                    '<g clip-path="url(#' + id + ')">' +
+                    photoImageSVG(photos[slot], state.views[slot], r.x, r.y, r.w, r.h) +
+                    "</g>";
+            } else {
+                out += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w +
+                    '" height="' + r.h + '" fill="' +
+                    (TRIB_BOXES[i].tint ? ink.boxTint : ink.boxFill) + '"/>';
+            }
+            out += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w +
+                '" height="' + r.h + '" fill="none" stroke="' + ink.boxStroke +
+                '" stroke-width="' + Math.max(1, TRIB.boxStroke * fx) + '"/>';
+        });
+
+        /* Heading: text, heart, text -- measured, never spaced. */
+        const parts = tribHeadingParts(state.heading);
+        const hSize = TRIB.heading.size * fy;
+        measure.font = hbdFont(hSize);
+        const beforeW = measure.measureText(parts.before).width;
+        const hw2 = TRIB.heading.heart * fx;
+        const hh2 = hw2 / ratio;
+        const gap = TRIB.heading.gap * fx;
+        const hx = TRIB.heading.x * fx;
+        const hy = TRIB.heading.baseline * fy;
+        out += textSVG(hx, hy, hSize, ink.ink, parts.before);
+        out += heartSVG(hx + beforeW + gap, hy - hh2 * 0.82, hw2, hh2, ink.accent);
+        if (parts.after) {
+            out += textSVG(hx + beforeW + gap * 2 + hw2, hy, hSize, ink.ink, parts.after);
+        }
+
+        const msgSize = TRIB.message.size * fy;
+        measure.font = hbdFont(msgSize);
+        const mW = tribMessageWidth(W);
+        hbdWrap(measure, state.message, mW).slice(0, TRIB.message.maxLines)
+            .forEach((line, i) => {
+                out += textSVG(TRIB.message.x * fx,
+                    (TRIB.message.baseline + TRIB.message.leading * i) * fy,
+                    msgSize, ink.ink, line);
+            });
+
+        const tHeartW = TRIB.title.heart * fx;
+        const tHeartH = TRIB.title.heart *
+            (TRIB_HEART.view[3] / TRIB_HEART.view[2]) * fy;
+        const tSize = hbdFit(measure, state.title, TRIB.title.size * fy,
+            W - TRIB.title.x * fx * 2 - tHeartW);
+        const tW = measure.measureText(state.title).width;
+        const tx = (W - (tW + TRIB.title.gap * fx + tHeartW)) / 2;
+        const ty = TRIB.title.baseline * fy;
+        out += textSVG(tx, ty, tSize, ink.ink, state.title);
+        out += tribHeartSVG(tx + tW + TRIB.title.gap * fx,
+            ty - tHeartH * TRIB.title.lift, tHeartW, tHeartH, "t");
+        return out;
+    }
+
+    function birthdaySVG(W, H, esc) {
+        const fx = W / HBD.page.w;
+        const fy = H / HBD.page.h;
+        const ink = hbdTheme();
+        const face = SCRIPT_SVG_FACE;
+        const measure = document.createElement("canvas").getContext("2d");
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + ink.page + '"/>';
+
+        const heartSVG = (x, y, w, h, colour) => {
+            const v = ANNIV_HEART.view;
+            return '<g transform="translate(' + x + " " + y + ') scale(' +
+                (w / v[2]) + " " + (h / v[3]) + ') translate(' + (-v[0]) + " " +
+                (-v[1]) + ')"><path d="' + ANNIV_HEART.parts[0].d + '" fill="' +
+                colour + '"/></g>';
+        };
+
+        /* ---- sparkles ---- */
+        out += sparkleSVG(HBD_SPARKLES, fx, fy, ink, "hb");
+
+        /* ---- garland ---- */
+        const g0 = HBD_GARLAND;
+        out += '<line x1="' + (g0.string.x1 * fx) + '" y1="' + (g0.string.y1 * fy) +
+            '" x2="' + (g0.string.x2 * fx) + '" y2="' + (g0.string.y2 * fy) +
+            '" stroke="' + ink.ink + '" stroke-width="' +
+            Math.max(0.8, g0.string.width * fx) + '"/>';
+        g0.ticks.forEach((t) => {
+            for (let k = -1; k <= 1; k += 1) {
+                out += '<line x1="' + ((t.x - 4) * fx) + '" y1="' + ((t.y + k * 3 - 3) * fy) +
+                    '" x2="' + ((t.x + 4) * fx) + '" y2="' + ((t.y + k * 3 + 3) * fy) +
+                    '" stroke="' + ink.ink + '" stroke-width="' +
+                    Math.max(0.8, g0.string.width * fx) + '"/>';
+            }
+        });
+        g0.hearts.forEach((h) => {
+            const w = h.w * fx;
+            const hh = w / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+            out += heartSVG(h.cx * fx - w / 2, h.cy * fy - hh / 2, w, hh,
+                h.tint === "A" ? ink.garlandA : ink.garlandB);
+        });
+
+        /* ---- month ---- */
+        const info = annivMonth(state.year, state.month);
+        const label = (ANNIV_MONTHS[info.month] || "").toUpperCase();
+        const monthSize = hbdFit(measure, label, HBD.month.size * fy,
+            (HBD_GARLAND.string.x1 - HBD.month.x - 12) * fx);
+        out += '<text x="' + (HBD.month.x * fx) + '" y="' + (HBD.month.baseline * fy) +
+            '" font-family="' + face + '" font-weight="400" font-size="' +
+            hbdPx(monthSize) + '" fill="' + ink.ink + '">' + esc(label) + "</text>";
+
+        /* ---- calendar ---- */
+        const g = hbdGrid(W, H);
+        /* Centred per column, the same way annivHead() does it on the canvas,
+           so the two painters land the letters on the same marks. */
+        const headSize = HBD.head.size * fy;
+        ANNIV_DAYS.forEach((ch, i) => {
+            out += '<text x="' + g.centre(i) + '" y="' + (HBD.head.baseline * fy) +
+                '" text-anchor="middle" font-family="' + CAL_FACE +
+                '" font-weight="400" font-size="' + headSize + '" fill="' + ink.ink +
+                '">' + esc(ch) + "</text>";
+        });
+
+        out += '<line x1="' + g.x1 + '" y1="' + (HBD.rule.y * fy) + '" x2="' +
+            (g.x1 + g.span) + '" y2="' + (HBD.rule.y * fy) + '" stroke="' + ink.ink +
+            '" stroke-width="' + Math.max(1, HBD.rule.width * fy) + '"/>';
+
+        const cell = annivCell(info, state.day);
+        if (cell) {
+            const hw = HBD.dayHeart.w * fx;
+            const hh = hw / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+            out += heartSVG(g.centre(cell.col) - hw / 2,
+                g.baseline(cell.row) - hh * 0.62, hw, hh, ink.accent);
+        }
+        for (let d = 1; d <= info.length; d += 1) {
+            const at = annivCell(info, d);
+            out += '<text x="' + g.centre(at.col) + '" y="' + g.baseline(at.row) +
+                '" text-anchor="middle" font-family="' + CAL_FACE +
+                '" font-weight="400" font-size="' + (HBD.grid.size * fy) + '" fill="' +
+                ((cell && cell.day === d) ? ink.onAccent : ink.ink) + '">' + d + "</text>";
+        }
+
+        /* ---- photographs ---- */
+        const rects = hbdRects(W, H);
+        rects.forEach((r, i) => {
+            const slot = hbdSlot(i);
+            if (photos[slot]) {
+                const id = "tb-hbd-" + i;
+                out += '<defs><clipPath id="' + id + '"><rect x="' + r.x + '" y="' + r.y +
+                    '" width="' + r.w + '" height="' + r.h + '"/></clipPath></defs>' +
+                    '<g clip-path="url(#' + id + ')">' +
+                    photoImageSVG(photos[slot], state.views[slot], r.x, r.y, r.w, r.h) +
+                    "</g>";
+            } else if (ink.boxFill) {
+                out += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w +
+                    '" height="' + r.h + '" fill="' + ink.boxFill + '"/>';
+            }
+            out += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w +
+                '" height="' + r.h + '" fill="none" stroke="' + ink.boxStroke +
+                '" stroke-width="' + Math.max(1, HBD.photoStroke * fx) + '"/>';
+        });
+
+        /* ---- quote ---- */
+        const quoteSize = HBD.quote.size * fy;
+        measure.font = hbdFont(quoteSize);
+        const quoteW = (HBD_BOXES[4].x - HBD.quote.x - 12) * fx;
+        hbdWrap(measure, state.quote, quoteW).slice(0, HBD.quote.maxLines)
+            .forEach((line, i) => {
+                out += '<text x="' + (HBD.quote.x * fx) + '" y="' +
+                    ((HBD.quote.baseline + HBD.quote.leading * i) * fy) +
+                    '" font-family="' + face +
+                    '" font-weight="400" font-size="' + hbdPx(quoteSize) +
+                    '" fill="' + ink.ink + '">' + esc(line) + "</text>";
+            });
+
+        /* ---- closing, with its heart on the last line ---- */
+        const closeSize = HBD.closing.size * fy;
+        measure.font = hbdFont(closeSize);
+        const heartW = HBD.closingHeart.w * fx;
+        const heartH = heartW / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+        const closeW = W - HBD.closing.x * fx * 2 - heartW - 6 * fx;
+        const clines = hbdWrap(measure, state.closing, closeW).slice(0, 3);
+        clines.forEach((line, i) => {
+            const y = (HBD.closing.baseline + HBD.closing.leading * i) * fy;
+            out += '<text x="' + (HBD.closing.x * fx) + '" y="' + y +
+                '" font-family="' + face +
+                '" font-weight="400" font-size="' + hbdPx(closeSize) +
+                '" fill="' + ink.ink + '">' + esc(line) + "</text>";
+            if (i === clines.length - 1) {
+                const w = measure.measureText(line).width;
+                out += heartSVG(HBD.closing.x * fx + w + 6 * fx,
+                    y - heartH * 0.78, heartW, heartH, ink.accent);
+            }
+        });
+        return out;
+    }
+
+    function anniversarySVG(W, H, esc) {
+        const fx = W / ANNIV.page.w;
+        const fy = H / ANNIV.page.h;
+        const mid = W / 2;
+        const ink = annivTheme();
+        const face = "Playfair Display, Georgia, serif";
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + ink.page + '"/>';
+
+        const measure = document.createElement("canvas").getContext("2d");
+
+        const heartW = ANNIV.nameHeart.w * fx;
+        const heartH = heartW / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+        const gap = ANNIV.names.gap * fx;
+        const half = (W - heartW - gap * 2) / 2;
+
+        const sizeA = annivFit(measure, state.nameA, ANNIV.names.size * fy,
+            half - W * 0.06, true, 700);
+        const sizeB = annivFit(measure, state.nameB, ANNIV.names.size * fy,
+            half - W * 0.06, true, 700);
+        out += '<text x="' + (mid - heartW / 2 - gap) + '" y="' +
+            (ANNIV.names.baseline * fy) + '" text-anchor="end" font-family="' + face +
+            '" font-style="italic" font-weight="700" font-size="' + sizeA +
+            '" fill="' + ink.ink + '">' + esc(state.nameA) + "</text>";
+        out += '<text x="' + (mid + heartW / 2 + gap) + '" y="' +
+            (ANNIV.names.baseline * fy) + '" text-anchor="start" font-family="' + face +
+            '" font-style="italic" font-weight="700" font-size="' + sizeB +
+            '" fill="' + ink.ink + '">' + esc(state.nameB) + "</text>";
+        out += annivHeartSVG(mid - heartW / 2, ANNIV.nameHeart.cy * fy - heartH / 2,
+            heartW, heartH);
+
+        const rects = annivRects(W, H);
+        rects.forEach((r, i) => {
+            const slot = annivSlot(i);
+            if (photos[slot]) {
+                const id = "tb-anniv-" + i;
+                out += '<defs><clipPath id="' + id + '"><rect x="' + r.x + '" y="' + r.y +
+                    '" width="' + r.w + '" height="' + r.h + '"/></clipPath></defs>' +
+                    '<g clip-path="url(#' + id + ')">' +
+                    photoImageSVG(photos[slot], state.views[slot], r.x, r.y, r.w, r.h) +
+                    "</g>";
+            } else if (ink.boxFill) {
+                out += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w +
+                    '" height="' + r.h + '" fill="' + ink.boxFill + '"/>';
+            } else {
+                /* The same half-stroke inset the canvas uses. An SVG stroke is
+                   centred on the path, so without it the outlined heart comes
+                   out a line width larger here than on screen -- small, and
+                   exactly the kind of difference that survives because nobody
+                   measures an empty box. */
+                const lw = Math.max(1, r.w * 0.012);
+                out += '<rect x="' + (r.x + lw / 2) + '" y="' + (r.y + lw / 2) +
+                    '" width="' + (r.w - lw) + '" height="' + (r.h - lw) +
+                    '" fill="none" stroke="' + ink.boxStroke +
+                    '" stroke-width="' + lw + '"/>';
+            }
+        });
+
+        const code = annivCodeRect(W, H);
+        if (photos[CODE_SLOT]) {
+            out += '<defs><clipPath id="tb-anniv-code"><rect x="' + code.x + '" y="' +
+                code.y + '" width="' + code.w + '" height="' + code.h +
+                '"/></clipPath></defs><g clip-path="url(#tb-anniv-code)">' +
+                photoImageSVG(photos[CODE_SLOT], state.views[CODE_SLOT],
+                    code.x, code.y, code.w, code.h) + "</g>";
+        }
+
+        const info = annivMonth(state.year, state.month);
+        const g = annivGrid(W, H);
+        const label = (ANNIV_MONTHS[info.month] || "").toUpperCase() + " " + info.year;
+        const labelSize = annivFit(measure, label, ANNIV.month.size * fy, g.span, false, 600);
+        out += '<text x="' + mid + '" y="' + (ANNIV.month.baseline * fy) +
+            '" text-anchor="middle" font-family="' + face + '" font-weight="600" font-size="' +
+            labelSize + '" fill="' + ink.ink + '">' + esc(label) + "</text>";
+
+        /* The header, on the same column centres the canvas uses. */
+        const headSize = ANNIV.head.size * fy;
+        ANNIV_DAYS.forEach((ch, i) => {
+            out += '<text x="' + g.centre(i) + '" y="' + (ANNIV.head.baseline * fy) +
+                '" text-anchor="middle" font-family="' + CAL_FACE +
+                '" font-weight="400" font-size="' + headSize + '" fill="' + ink.ink +
+                '">' + esc(ch) + "</text>";
+        });
+
+        out += '<line x1="' + g.x1 + '" y1="' + (ANNIV.rule.y * fy) + '" x2="' +
+            (g.x1 + g.span) + '" y2="' + (ANNIV.rule.y * fy) + '" stroke="' + ink.ink +
+            '" stroke-width="' + Math.max(1, ANNIV.rule.width * fy) + '"/>';
+
+        const cell = annivCell(info, state.day);
+        if (cell) {
+            const hw = ANNIV.dayHeart.w * fx;
+            const hh = hw / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
+            out += annivHeartSVG(g.centre(cell.col) - hw / 2,
+                g.baseline(cell.row) - hh * 0.62, hw, hh);
+        }
+
+        for (let d = 1; d <= info.length; d += 1) {
+            const at = annivCell(info, d);
+            out += '<text x="' + g.centre(at.col) + '" y="' + g.baseline(at.row) +
+                '" text-anchor="middle" font-family="' + CAL_FACE +
+                '" font-weight="400" font-size="' + (ANNIV.grid.size * fy) + '" fill="' +
+                ((cell && cell.day === d) ? ink.onAccent : ink.ink) + '">' + d + "</text>";
+        }
+
+        const tagSize = annivFit(measure, state.tagline, ANNIV.tagline.size * fy,
+            W * ANNIV.tagline.maxW, true, 700);
+        out += '<text x="' + mid + '" y="' + (ANNIV.tagline.baseline * fy) +
+            '" text-anchor="middle" font-family="' + face +
+            '" font-style="italic" font-weight="700" font-size="' + tagSize +
+            '" fill="' + ink.ink + '">' + esc(state.tagline) + "</text>";
+        return out;
+    }
+
+    /* The heart as a placed vector, for the exporter. artSVG() serves the
+       search screen's icons the same way; this is the one-part case. */
+    function annivHeartSVG(x, y, w, h) {
+        const v = ANNIV_HEART.view;
+        return '<g transform="translate(' + x + ' ' + y + ') scale(' + (w / v[2]) +
+            " " + (h / v[3]) + ') translate(' + (-v[0]) + " " + (-v[1]) + ')">' +
+            '<path d="' + ANNIV_HEART.parts[0].d + '" fill="' + annivTheme().accent +
+            '"/></g>';
+    }
+
     function paint(c, W, H, opts) {
         const options = opts || {};
         const frame = FRAME_STYLES[state.frame] || FRAME_STYLES.black;
@@ -1898,6 +3974,12 @@
             paintScreen(c, W, H, options);
         } else if (frame.layout === "player") {
             paintPlayer(c, W, H, options);
+        } else if (frame.layout === "anniversary") {
+            paintAnniversary(c, W, H, options);
+        } else if (frame.layout === "birthday") {
+            paintBirthday(c, W, H, options);
+        } else if (frame.layout === "tribute") {
+            paintTribute(c, W, H, options);
         } else {
             const FRAME_W = frame.frame ? 60 * scale : 0;
             const MATTE_W = frame.frame ? 50 * scale : 0;
@@ -1935,6 +4017,8 @@
         paint(ctx, s.w, s.h);
         drawGridChrome();
         drawPlayerChrome();
+        drawAnniversaryChrome();
+        drawCollageChrome();
         drawSelection();
         syncQueryInput();
     }
@@ -1951,6 +4035,86 @@
 
        Neither is discoverable without this, which is the whole point: both
        boxes are clickable and a box that looks like artwork does not say so. */
+    /* Preview-only prompts for the anniversary poster. render() calls this and
+       paint() does not, so none of it is in any export.
+
+       The collage's empty boxes are NOT prompted over. They are white panels
+       and that is the artwork's own empty state -- a heart of blank frames is a
+       finished-looking design, and printing "click to add" eighteen times would
+       put this editor's furniture on somebody's wall. Only the scan code, which
+       is invisible when empty, gets a prompt. */
+    function drawAnniversaryChrome() {
+        if (layoutOf(state.frame) !== "anniversary") {
+            return;
+        }
+        const W = canvas.width;
+        const H = canvas.height;
+        const code = annivCodeRect(W, H);
+        ctx.save();
+        if (!photos[CODE_SLOT]) {
+            ctx.strokeStyle = annivTheme().ink;
+            ctx.fillStyle = annivTheme().ink;
+            ctx.globalAlpha = 0.45;
+            ctx.lineWidth = Math.max(1, W * 0.002);
+            ctx.setLineDash([W * 0.008, W * 0.006]);
+            ctx.strokeRect(code.x, code.y, code.w, code.h);
+            ctx.setLineDash([]);
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.font = "400 " + (W * 0.024) + 'px "Inter", sans-serif';
+            ctx.fillText("Click to add your scan code",
+                code.x + code.w / 2, code.y + code.h / 2);
+            ctx.globalAlpha = 1;
+        }
+
+        ctx.restore();
+    }
+
+    /* The selected box, rung the way the search screen and the player ring
+       theirs, on every collage rather than on one of them.
+
+       It began as four lines inside the anniversary's chrome, justified there
+       by "with eighteen boxes this is the only thing on the preview that says
+       which one the size slider is holding". That argument was never about the
+       anniversary. The birthday has twelve boxes and shipped with no ring at
+       all; the tribute has fifteen, four pairs of which OVERLAP, so the box a
+       click lands in is the one painted last -- which is not a thing a visitor
+       can see, and is the strongest case of the three for saying it out loud.
+
+       Same colour, dash and weight as the other two rings, for the reason the
+       player's comment already gives: two rings that mean the same thing
+       should not look like two different things.
+
+       Preview only. render() calls this and paint() does not, so it is in no
+       export. */
+    function drawCollageChrome() {
+        const lay = layoutOf(state.frame);
+        if (lay !== "anniversary" && lay !== "birthday" && lay !== "tribute") {
+            return;
+        }
+        const W = canvas.width;
+        const H = canvas.height;
+        const sel = primarySlot();
+        /* The anniversary's scan code is the one selectable thing here that is
+           not one of the collage's boxes, so it is the one rect that does not
+           come from rectForSlot(). */
+        const box = (lay === "anniversary" && sel === CODE_SLOT)
+            ? annivCodeRect(W, H)
+            : rectForSlot(sel, W, H);
+        if (!box) {
+            return;
+        }
+        ctx.save();
+        const inset = Math.max(2, W * 0.006);
+        ctx.strokeStyle = "#8A6A3B";
+        ctx.lineWidth = Math.max(1.5, W * 0.004);
+        ctx.setLineDash([W * 0.01, W * 0.008]);
+        ctx.strokeRect(box.x + inset, box.y + inset,
+            box.w - inset * 2, box.h - inset * 2);
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+
     function drawPlayerChrome() {
         if (layoutOf(state.frame) !== "player") {
             return;
@@ -2327,6 +4491,52 @@
             if (inside(codeRect(W, H))) { return CODE_SLOT; }
             return -1;
         }
+        if (layout === "tribute") {
+            const px = pt.x * W;
+            const py = pt.y * H;
+            const rects = tribRects(W, H);
+            /* Backwards, and here it MATTERS: four pairs of these boxes
+               genuinely overlap, so the box a click finds has to be the one
+               painted last. */
+            for (let i = rects.length - 1; i >= 0; i -= 1) {
+                const r = rects[i];
+                if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) {
+                    return tribSlot(i);
+                }
+            }
+            return -1;
+        }
+        if (layout === "birthday") {
+            const px = pt.x * W;
+            const py = pt.y * H;
+            const rects = hbdRects(W, H);
+            /* Backwards, the same way the anniversary collage walks: these
+               boxes do not overlap, but they sit as little as 3.8pt apart and
+               a stroke straddles its own edge, so the tie breaks the way the
+               paint does. */
+            for (let i = rects.length - 1; i >= 0; i -= 1) {
+                const r = rects[i];
+                if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) {
+                    return hbdSlot(i);
+                }
+            }
+            return -1;
+        }
+        if (layout === "anniversary") {
+            const px = pt.x * W;
+            const py = pt.y * H;
+            const inside = (r) => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+            const rects = annivRects(W, H);
+            /* Last first: the collage's boxes do not overlap, but the centre
+               one is declared first and is much the largest, so walking
+               backwards costs nothing and keeps the small pieces reachable if
+               a future arrangement ever does overlap them. */
+            for (let i = rects.length - 1; i >= 0; i -= 1) {
+                if (inside(rects[i])) { return annivSlot(i); }
+            }
+            if (inside(annivCodeRect(W, H))) { return CODE_SLOT; }
+            return -1;
+        }
         const r = photoRectFor(W, H);
         const x = pt.x * W;
         const y = pt.y * H;
@@ -2347,6 +4557,28 @@
         const layout = layoutOf(state.frame);
         if (layout === "player") {
             return i === CODE_SLOT ? codeRect(W, H) : albumRect(W, H);
+        }
+        if (layout === "tribute") {
+            const rects = tribRects(W, H);
+            for (let k = 0; k < rects.length; k += 1) {
+                if (tribSlot(k) === i) { return rects[k]; }
+            }
+            return rects[0];
+        }
+        if (layout === "birthday") {
+            const rects = hbdRects(W, H);
+            for (let k = 0; k < rects.length; k += 1) {
+                if (hbdSlot(k) === i) { return rects[k]; }
+            }
+            return rects[0];
+        }
+        if (layout === "anniversary") {
+            if (i === CODE_SLOT) { return annivCodeRect(W, H); }
+            const rects = annivRects(W, H);
+            for (let k = 0; k < rects.length; k += 1) {
+                if (annivSlot(k) === i) { return rects[k]; }
+            }
+            return rects[0];
         }
         if (layout !== "browser") {
             return photoRectFor(W, H);
@@ -2386,6 +4618,8 @@
         let id = "p-image";
         if (layout === "player") {
             id = i === CODE_SLOT ? "p-image-code" : "p-image";
+        } else if (layout === "anniversary") {
+            id = i === CODE_SLOT ? "p-image-code" : "p-image-grid";
         } else if (layout === "browser") {
             id = i === AVATAR_SLOT ? "p-image-avatar" : "p-image-grid";
         } else if (layout === "split" && i === 1) {
@@ -2650,6 +4884,36 @@
        tell from a broken control. */
     function uploadTargets(count) {
         const out = [];
+        /* The collage layouts -- eighteen boxes on the anniversary poster,
+           twelve on the birthday one -- are not filled a box at a time by
+           anybody, so a batch fills them in the artwork's own order. Same two
+           rules as the search screen below (empty boxes first, then wrap from
+           the selection) expressed over the LAYOUT'S OWN slot list rather than
+           over the six grid cards.
+
+           One branch for both. A third near-copy of this allocator is how the
+           second collage ends up filling in a different order from the first
+           for no reason anybody chose. */
+        const upLayout = layoutOf(state.frame);
+        if (upLayout === "anniversary" || upLayout === "birthday" ||
+                upLayout === "tribute") {
+            const slots = slotsFor(upLayout)
+                .filter((i) => i !== CODE_SLOT);
+            const from = Math.max(0, slots.indexOf(primarySlot()));
+            if (count > 0 && !photos[slots[from]]) {
+                out.push(slots[from]);
+            }
+            slots.forEach((i) => {
+                if (out.length < count && !photos[i] && out.indexOf(i) === -1) {
+                    out.push(i);
+                }
+            });
+            for (let k = 0; k < slots.length && out.length < count; k += 1) {
+                const i = slots[(from + k) % slots.length];
+                if (out.indexOf(i) === -1) { out.push(i); }
+            }
+            return out;
+        }
         /* The SELECTED card first, when it is empty and there is a file for it.
            Clicking an empty card on the preview is now how the picker gets
            opened, and it also selects that card -- so a photograph that landed
@@ -2741,6 +5005,103 @@
             el.addEventListener("change", () => apply(null));
         });
 
+    /* Moves the SELECTED photograph into another box, trading places with
+       whatever was there. The boxes are fixed -- their arrangement is the heart
+       -- so the only thing worth moving is which picture is in which one, and
+       the thing a visitor actually wants is a particular photograph in the
+       large centre box.
+
+       Framings travel with their pictures. A view is a crop of ONE photograph,
+       so leaving them behind would apply somebody's crop of one picture to a
+       different picture, which is the same argument fillSlot() makes for
+       resetting the view on a fresh upload.
+
+       Writes NO history entry, for the reason cardClear() gives: photographs
+       are not in `state` and never have been, so a commit here would push an
+       entry that restores framings undo cannot bring photographs back to. An
+       undo that visibly does nothing is worse than one that is not offered. */
+    function swapSlots(a, b) {
+        if (a === b) { return; }
+        const photo = photos[a];
+        photos[a] = photos[b];
+        photos[b] = photo;
+        const view = state.views[a];
+        state.views[a] = state.views[b];
+        state.views[b] = view;
+        /* The selection follows the picture rather than staying on the box:
+           the visitor was pointing at a photograph, and it has moved. */
+        state.card = b;
+    }
+
+    const annivSwapSelect = byId("p-anniv-swap");
+    if (annivSwapSelect) {
+        annivSwapSelect.addEventListener("change", () => {
+            const target = Number(annivSwapSelect.value);
+            const slots = slotsFor(layoutOf(state.frame));
+            if (slots.indexOf(target) === -1) { return; }
+            swapSlots(primarySlot(), target);
+            syncPhotoControls();
+            render();
+        });
+    }
+
+    const tribThemeSelect = byId("p-trib-theme");
+    if (tribThemeSelect) {
+        tribThemeSelect.addEventListener("change", () => {
+            beginChange();
+            state.tribTheme = TRIB_THEMES[tribThemeSelect.value]
+                ? tribThemeSelect.value : DEFAULT_TRIB_THEME;
+            commit();
+            render();
+        });
+    }
+
+    /* The heading has its own cleaner: a run of spaces is the marker for where
+       the heart goes, and cleanBlock() would collapse it away. */
+    [["p-heading", "heading", cleanHeading],
+     ["p-message", "message", cleanBlock],
+     ["p-title", "title", cleanLine]].forEach((entry) => {
+        const el = byId(entry[0]);
+        if (!el) { return; }
+        el.addEventListener("input", () => {
+            beginChange();
+            state[entry[1]] = entry[2](el.value);
+            commit("trib-" + entry[1]);
+        });
+    });
+
+    const hbdThemeSelect = byId("p-hbd-theme");
+    if (hbdThemeSelect) {
+        hbdThemeSelect.addEventListener("change", () => {
+            beginChange();
+            state.hbdTheme = HBD_THEMES[hbdThemeSelect.value]
+                ? hbdThemeSelect.value : DEFAULT_HBD_THEME;
+            commit();
+            render();
+        });
+    }
+
+    [["p-quote", "quote"], ["p-closing", "closing"]].forEach((pair) => {
+        const el = byId(pair[0]);
+        if (!el) { return; }
+        el.addEventListener("input", () => {
+            beginChange();
+            state[pair[1]] = cleanBlock(el.value);
+            commit("hbd-" + pair[1]);
+        });
+    });
+
+    const annivThemeSelect = byId("p-anniv-theme");
+    if (annivThemeSelect) {
+        annivThemeSelect.addEventListener("change", () => {
+            beginChange();
+            state.annivTheme = ANNIV_THEMES[annivThemeSelect.value]
+                ? annivThemeSelect.value : DEFAULT_ANNIV_THEME;
+            commit();
+            render();
+        });
+    }
+
     const playerThemeSelect = byId("p-player-theme");
     if (playerThemeSelect) {
         playerThemeSelect.addEventListener("change", () => {
@@ -2770,6 +5131,22 @@
             return out;
         }
         if (layout === "player") { return [0, CODE_SLOT]; }
+        if (layout === "anniversary") {
+            const out = [];
+            for (let i = 0; i < ANNIV_COLLAGE.length; i += 1) { out.push(annivSlot(i)); }
+            out.push(CODE_SLOT);
+            return out;
+        }
+        if (layout === "birthday") {
+            const out = [];
+            for (let i = 0; i < HBD_BOXES.length; i += 1) { out.push(hbdSlot(i)); }
+            return out;
+        }
+        if (layout === "tribute") {
+            const out = [];
+            for (let i = 0; i < TRIB_BOXES.length; i += 1) { out.push(tribSlot(i)); }
+            return out;
+        }
         if (layout === "split") { return [0, 1]; }
         return [0];
     }
@@ -2780,9 +5157,22 @@
        playing card's photograph and the player's ALBUM, and a slider labelled
        "Card 1 Size" over a record sleeve names the wrong thing. */
     function slotName(i, layout) {
+        const lay = layout || layoutOf(state.frame);
         if (i === AVATAR_SLOT) { return "Profile circle"; }
         if (i === CODE_SLOT) { return "Scan code"; }
-        if ((layout || layoutOf(state.frame)) === "player") { return "Album"; }
+        if (lay === "player") { return "Album"; }
+        /* Eighteen boxes in a heart cannot be told apart by a number alone, so
+           the centre one is named for what it is and the rest are counted in
+           the order an upload fills them. */
+        if (lay === "anniversary") {
+            return i === 0 ? "Centre photo" : "Photo " + (i - ANNIV_FIRST + 2);
+        }
+        if (lay === "birthday") {
+            return i === 0 ? "Photo 1" : "Photo " + (i - HBD_FIRST + 2);
+        }
+        if (lay === "tribute") {
+            return i === 0 ? "Photo 1" : "Photo " + (i - TRIB_FIRST + 2);
+        }
         return "Card " + (i + 1);
     }
 
@@ -2862,6 +5252,37 @@
             render();
         });
     }
+
+    /* The anniversary poster's own controls. The three text lines coalesce
+       their history entries per field, the way the player's do, so typing a
+       name is one undo rather than one per keystroke. */
+    [["p-name-a", "nameA"], ["p-name-b", "nameB"], ["p-tagline", "tagline"]]
+        .forEach((entry) => {
+            const el = byId(entry[0]);
+            if (!el) { return; }
+            el.addEventListener("input", () => {
+                beginChange();
+                state[entry[1]] = cleanLine(el.value);
+                commit("anniv-" + entry[1]);
+            });
+        });
+
+    [["p-month", "month", annivClampMonth], ["p-year", "year", annivClampYear],
+     ["p-day", "day", annivClampDay]].forEach((entry) => {
+        const el = byId(entry[0]);
+        if (!el) { return; }
+        el.addEventListener("input", () => {
+            beginChange();
+            state[entry[1]] = entry[2](el.value);
+            commit("anniv-" + entry[1]);
+        });
+        el.addEventListener("change", () => {
+            /* On blur the field is written back from state, so a value the
+               clamp moved is visible rather than left showing what was typed. */
+            const v = String(state[entry[1]]);
+            if (el.value !== v) { el.value = v; }
+        });
+    });
 
     const cardPick = byId("p-card-pick");
     if (cardPick) {
@@ -3027,6 +5448,41 @@
                 const text = slotName(i, "browser") + (photos[i] ? "" : " (empty)");
                 if (o.textContent !== text) { o.textContent = text; }
             });
+        }
+
+        /* The move menu lists every box EXCEPT the one holding the
+           selection, because "swap with itself" is not an action. It is
+           rebuilt rather than relabelled: which entry is missing changes every
+           time the selection does, and an option list that is one item shorter
+           cannot be kept in step by editing text in place.
+
+           It reads "(empty)" the way the search screen's menu does, so moving
+           a photograph into a free box and trading with an occupied one are
+           told apart before the click rather than after it. */
+        const swap = byId("p-anniv-swap");
+        if (swap) {
+            const slots = slotsFor(layout).filter((i) => i !== slot);
+            const want = slots.map(
+                (i) => i + "|" + slotName(i, layout) + (photos[i] ? "" : " (empty)")
+            ).join(",");
+            if (swap.getAttribute("data-built") !== want) {
+                swap.setAttribute("data-built", want);
+                swap.replaceChildren();
+                const head = document.createElement("option");
+                head.value = "";
+                head.textContent = photos[slot]
+                    ? "Move it to..."
+                    : "Nothing selected to move";
+                swap.appendChild(head);
+                slots.forEach((i) => {
+                    const o = document.createElement("option");
+                    o.value = String(i);
+                    o.textContent = slotName(i, layout) + (photos[i] ? "" : " (empty)");
+                    swap.appendChild(o);
+                });
+            }
+            swap.value = "";
+            swap.disabled = !photos[slot];
         }
 
         const clear = byId("p-card-clear");
@@ -3236,6 +5692,57 @@
         const player = style.layout === "player";
         const playerFields = byId("p-player-fields");
         if (playerFields) { playerFields.hidden = !player; }
+
+        const anniv = style.layout === "anniversary";
+        const annivFields = byId("p-anniv-fields");
+        if (annivFields) { annivFields.hidden = !anniv; }
+
+        const hbd = style.layout === "birthday";
+        const hbdFields = byId("p-hbd-fields");
+        if (hbdFields) { hbdFields.hidden = !hbd; }
+
+        const trib = style.layout === "tribute";
+        const tribFields = byId("p-trib-fields");
+        if (tribFields) { tribFields.hidden = !trib; }
+
+        /* One calendar block for both posters, shown whenever either is open.
+           The YEAR is the awkward one: the anniversary poster prints it beside
+           the month and this one does not print it at all, so on the birthday
+           poster a control that reshapes the grid changes nothing a visitor can
+           see. The hint says so rather than leaving them to find out. */
+        const calFields = byId("p-calendar-fields");
+        if (calFields) { calFields.hidden = !anniv && !hbd && !trib; }
+        const yearHint = byId("p-year-hint");
+        if (yearHint) {
+            yearHint.textContent = (hbd || trib)
+                ? "The year sets which weekday the month opens on. This poster prints the month name only, so changing the year moves the dates without showing you a year."
+                : "The year sets which weekday the month opens on, and is printed beside the month name.";
+        }
+        /* The scan code is shared: the music poster and this one both carry
+           one, so its control belongs to neither block. */
+        const codeFields = byId("p-code-fields");
+        if (codeFields) { codeFields.hidden = !player && !anniv; }
+        /* The collage takes a batch, so it uses the grid's multi-file input
+           rather than the single Photo Upload -- the same swap the search
+           screen makes, for the same reason. */
+        if (gridFields) { gridFields.hidden = !grid && !anniv && !hbd && !trib; }
+        if (photoFields) { photoFields.hidden = grid || anniv || hbd || trib; }
+
+        [["p-name-a", "nameA"], ["p-name-b", "nameB"],
+         ["p-tagline", "tagline"]].forEach((entry) => {
+            const el = byId(entry[0]);
+            if (el && el.value !== state[entry[1]]) { el.value = state[entry[1]]; }
+        });
+        const monthSel = byId("p-month");
+        if (monthSel && monthSel.value !== String(state.month)) {
+            monthSel.value = String(state.month);
+        }
+        [["p-year", "year"], ["p-day", "day"]].forEach((entry) => {
+            const el = byId(entry[0]);
+            if (el && el.value !== String(state[entry[1]])) {
+                el.value = String(state[entry[1]]);
+            }
+        });
         [["p-song", "song"], ["p-artist", "artist"],
          ["p-elapsed", "elapsed"], ["p-total", "total"]].forEach((entry) => {
             const el = byId(entry[0]);
@@ -3245,6 +5752,23 @@
         });
         const pt = byId("p-player-theme");
         if (pt) { pt.value = state.playerTheme; }
+        const at = byId("p-anniv-theme");
+        if (at) { at.value = state.annivTheme; }
+        const ht = byId("p-hbd-theme");
+        if (ht) { ht.value = state.hbdTheme; }
+        const tt = byId("p-trib-theme");
+        if (tt) { tt.value = state.tribTheme; }
+        [["p-heading", "heading"], ["p-message", "message"],
+         ["p-title", "title"]].forEach((pair) => {
+            const el = byId(pair[0]);
+            if (el && el.value !== state[pair[1]]) { el.value = state[pair[1]]; }
+        });
+        [["p-quote", "quote"], ["p-closing", "closing"]].forEach((pair) => {
+            const el = byId(pair[0]);
+            /* Compared before writing: assigning .value to what it already
+               holds still drops the caret to the end of the field mid-word. */
+            if (el && el.value !== state[pair[1]]) { el.value = state[pair[1]]; }
+        });
 
         syncPhotoControls();
     }
@@ -3950,6 +6474,12 @@
             body += screenSVG(W, H, esc);
         } else if (frame.layout === "player") {
             body += playerSVG(W, H, esc);
+        } else if (frame.layout === "anniversary") {
+            body += anniversarySVG(W, H, esc);
+        } else if (frame.layout === "birthday") {
+            body += birthdaySVG(W, H, esc);
+        } else if (frame.layout === "tribute") {
+            body += tributeSVG(W, H, esc);
         } else {
             if (frame.frame) {
                 body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
@@ -4318,6 +6848,33 @@
         /* Six cards, numbered as the preview numbers them. The "(empty)" half of
            each label is written by syncPhotoControls(), which is the only thing
            that knows what is in them. */
+        const tribTheme2 = byId("p-trib-theme");
+        if (tribTheme2 && !tribTheme2.options.length) {
+            Object.keys(TRIB_THEMES).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = TRIB_THEMES[k].label;
+                tribTheme2.appendChild(o);
+            });
+        }
+        const hbdTheme2 = byId("p-hbd-theme");
+        if (hbdTheme2 && !hbdTheme2.options.length) {
+            Object.keys(HBD_THEMES).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = HBD_THEMES[k].label;
+                hbdTheme2.appendChild(o);
+            });
+        }
+        const annivTheme2 = byId("p-anniv-theme");
+        if (annivTheme2 && !annivTheme2.options.length) {
+            Object.keys(ANNIV_THEMES).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = ANNIV_THEMES[k].label;
+                annivTheme2.appendChild(o);
+            });
+        }
         const playerTheme2 = byId("p-player-theme");
         if (playerTheme2 && !playerTheme2.options.length) {
             Object.keys(PLAYER_THEMES).forEach((k) => {
@@ -4341,6 +6898,16 @@
            Built from SLOT_COUNT it offered a "Card 8" -- the player's scan
            code, a slot this poster never draws -- and the menu's own Remove
            button then deleted the photograph sitting in it. */
+        const months = byId("p-month");
+        if (months && !months.options.length) {
+            ANNIV_MONTHS.forEach((name, i) => {
+                const o = document.createElement("option");
+                o.value = String(i);
+                o.textContent = name;
+                months.appendChild(o);
+            });
+        }
+
         const pick = byId("p-card-pick");
         if (pick && !pick.options.length) {
             slotsFor("browser").forEach((i) => {
