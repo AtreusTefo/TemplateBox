@@ -442,10 +442,91 @@
                             </div>
                         </div>
                         <p class="upload-hint">The dot on the progress bar follows these two. Anything that is not a time leaves it where the artwork put it.</p>
+                        <p class="upload-hint">Every line on this poster can also be typed on the preview itself: double-click it there.</p>
 
                         <div class="field">
                             <label for="p-player-theme">Screen Mode</label>
                             <select id="p-player-theme"></select>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-code-pos">Scan Code Position</label>
+                            <select id="p-code-pos"></select>
+                            <p class="upload-hint">Below the buttons is where the artwork puts it. Above the song title makes room by drawing the album a little smaller, so the picture keeps its shape rather than being squashed.</p>
+                        </div>
+
+                        <!-- The same control the mockup editor uses for a
+                             product colour, from the same factory in
+                             js/color-picker.js. Not a lookalike: one picker,
+                             two editors. -->
+                        <div class="field">
+                            <label for="p-heart-trigger">Heart Colour</label>
+
+                            <div class="color-control">
+                                <button type="button" class="color-trigger" id="p-heart-trigger" aria-haspopup="dialog" aria-expanded="false">
+                                    <span class="color-trigger-dot" id="p-heart-dot"></span>
+                                    <span class="color-trigger-hex" id="p-heart-hex">#E93625</span>
+                                    <svg class="color-trigger-caret" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 10 5 5 5-5"/></svg>
+                                    <span class="sr-only">Open the colour picker</span>
+                                </button>
+
+                                <div class="color-popover" id="p-heart-popover" role="dialog" aria-label="Choose the heart colour" hidden>
+                                    <!-- Pointer-only and hidden from assistive
+                                         tech, as the mockup editor's are: the
+                                         Hex/R/G/B fields below set the same
+                                         value and are keyboard-operable, so
+                                         exposing the gradients too would
+                                         announce one control twice. -->
+                                    <div class="color-sv" id="p-heart-sv" aria-hidden="true">
+                                        <span class="color-sv-thumb" id="p-heart-sv-thumb"></span>
+                                    </div>
+
+                                    <div class="color-hue" id="p-heart-hue" aria-hidden="true">
+                                        <span class="color-hue-thumb" id="p-heart-hue-thumb"></span>
+                                    </div>
+
+                                    <div class="color-inputs">
+                                        <p class="color-input-cell">
+                                            <input type="text" id="p-heart-in-hex" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex value">
+                                            <span class="color-input-tag">Hex</span>
+                                        </p>
+                                        <p class="color-input-cell">
+                                            <input type="number" id="p-heart-in-r" min="0" max="255" step="1" aria-label="Red">
+                                            <span class="color-input-tag">R</span>
+                                        </p>
+                                        <p class="color-input-cell">
+                                            <input type="number" id="p-heart-in-g" min="0" max="255" step="1" aria-label="Green">
+                                            <span class="color-input-tag">G</span>
+                                        </p>
+                                        <p class="color-input-cell">
+                                            <input type="number" id="p-heart-in-b" min="0" max="255" step="1" aria-label="Blue">
+                                            <span class="color-input-tag">B</span>
+                                        </p>
+                                    </div>
+
+                                    <div class="color-presets" id="p-heart-presets" role="group" aria-label="Preset colours"></div>
+                                </div>
+                            </div>
+
+                            <!-- The popover's hue track's twin: same class,
+                                 same picker instance, so dragging here and
+                                 dragging inside the popover move one value. -->
+                            <div class="color-hue color-hue-inline" id="p-heart-strip" aria-hidden="true">
+                                <span class="color-hue-thumb" id="p-heart-strip-thumb"></span>
+                            </div>
+
+                            <p class="upload-hint">Only the heart changes. It keeps your colour when you switch between the dark and light screen.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-caption-head">Caption Heading</label>
+                            <input type="text" id="p-caption-head" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field">
+                            <label for="p-caption-body">Caption Line</label>
+                            <input type="text" id="p-caption-body" maxlength="80" autocomplete="off">
+                            <p class="upload-hint">Two lines under the buttons, for a lyric or a note. Leave them empty and nothing is drawn. If the scan code is also below the buttons it tucks in underneath, smaller, so the two never overlap.</p>
                         </div>
                     </div>
 
@@ -607,7 +688,7 @@
                         <div class="emoji-panel" id="emoji-panel" hidden>
                             <div class="emoji-grid" id="emoji-grid"></div>
                         </div>
-                        <p class="upload-hint">Click text on the canvas to select it, then drag to reposition.</p>
+                        <p class="upload-hint">Click text on the canvas to select it, then drag to reposition. Double-click it to type on the poster itself.</p>
                     </div>
 
                     <div class="field field-row">
@@ -687,6 +768,29 @@
                         <input type="text" id="p-query-live" class="query-live"
                                maxlength="40" autocomplete="off" spellcheck="false"
                                aria-label="Search text on the poster" hidden>
+
+                        <!-- Type on the poster itself. Double-click any text
+                             element on the canvas and this sits exactly over
+                             it, wearing its font, size, colour and alignment.
+
+                             Unlike #p-query-live above, this one is OPAQUE and
+                             the canvas stops drawing the element underneath
+                             while it is open. The search bar is one short line
+                             with no wrapping, so a transparent input can sit
+                             over the drawn glyphs and contribute only a caret.
+                             A text element wraps, can be centred or
+                             right-aligned and carries letter-spacing, and two
+                             wrap engines agreeing to the pixel is not
+                             something to rely on -- a few pixels out and the
+                             visitor sees every character twice. One renderer
+                             at a time is the honest way round.
+
+                             Never exported: exports render from the canvas,
+                             which draws the element again the moment editing
+                             ends. -->
+                        <textarea id="p-text-live" class="text-live" maxlength="240"
+                                  autocomplete="off" spellcheck="false" wrap="soft"
+                                  aria-label="Edit this text on the poster" hidden></textarea>
                     </div>
                 </div>
             </section>
@@ -722,6 +826,7 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/color-picker.js"></script>
     <script src="js/poster.js" defer></script>
 </body>
 </html>

@@ -6479,6 +6479,49 @@ textarea.rt-inline-editor {
     background: rgba(120, 160, 255, 0.45);
 }
 
+/* The on-canvas text editor. Sits over the element it is editing, wearing its
+   font, and the canvas stops drawing that element while it is open -- see the
+   note beside #p-text-live in poster.html for why this one is opaque where
+   .query-live is transparent.
+
+   Sized at 16px and SCALED by a transform, for the same reason .query-live is:
+   iOS zooms the page when it focuses a field computing under 16px, and poster
+   text is regularly far under it. Width, height and line-height are therefore
+   pre-transform lengths. */
+.text-live {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 16px;
+    transform-origin: 0 0;
+    z-index: 3;
+}
+
+.text-live::selection {
+    background: rgba(120, 160, 255, 0.45);
+}
+
+/* Editing one of a LAYOUT'S own fields. The canvas is still drawing the words
+   -- see the note beside #p-text-live -- so this contributes a caret and a
+   selection and no ink of its own. */
+.text-live.is-ghost {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+/* The selection has to read on a near-black poster and on a white one, so it
+   is a translucent wash rather than either ink. */
+.text-live.is-ghost::selection {
+    background: rgba(120, 160, 255, 0.55);
+}
+
 .query-live:focus-visible {
     outline: 0;
 }

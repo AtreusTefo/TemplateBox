@@ -427,6 +427,35 @@
         time: { baseline: 612.6, size: 19.75, squeeze: 0.87, leftX: 92.2, rightX: 472.31 },
         play: { cx: 299.62, cy: 667.67, r: 35.88 },
         code: { x: 68.6, y: 719.22, w: 460.8, h: 115.2 },
+
+        /* The two gaps the artwork itself sets, named because moving the code
+           re-uses them rather than inventing new ones. This page has NO slack:
+           57.28 + 182.43 + 15.67 + 115.2 + 7.47 is exactly the 378.05 points
+           below the album. Every number here is spent. */
+        codeGap: 15.67,        /* what sits above the code at the foot */
+        albumToTitle: 57.28,   /* album bottom to the song title's baseline */
+
+        /* The code when a CAPTION shares the page with it. Nothing is resized
+           by moving the code -- a swap is a swap -- but a caption is a new
+           element on a page with nothing spare, so the 60 points it needs come
+           out of the code, which is the only thing here that is optional and
+           the only thing whose size carries no information. The artwork's 4:1
+           is kept, because the box crops what is dropped into it and a code
+           cropped out of proportion does not scan.
+
+           ONE compact size, used in both positions, so that switching the
+           position while a caption is present still resizes nothing. */
+        codeCompact: { x: 202.73, w: 192, h: 48 },
+
+        /* Two optional lines under the transport row. Measured DOWN FROM the
+           transport row rather than pinned to the page, because that row moves
+           when the code changes places and the caption has to move with it.
+           `drop` is a gap of 8 plus the heading's own ascent. */
+        caption: {
+            x: 93.97, right: 505,
+            drop: 26.72, leading: 28, tail: 17,
+            headSize: 26, bodySize: 22
+        },
         /* The fallback when either time field is not a time: the artwork's own
            knob position, (198.63 - 92.2) / (507.52 - 92.2). */
         fallbackPlayed: 0.2563
@@ -443,7 +472,7 @@
                against a flat one. */
             page: "#231F20",
             ink: "#FFFFFF",
-            accent: "#55BA5D",
+            accent: "#e93625",
             albumFill: "#FFFFFF",
             albumStroke: null
         },
@@ -451,7 +480,7 @@
             label: "Light",
             page: "#FFFFFF",
             ink: "#231F20",
-            accent: "#55BA5D",
+            accent: "#e93625",
             /* The empty album is an OUTLINE here rather than a fill. A white
                box on white paper is not a box, which is the same problem the
                search screen's empty cards have and the same shape of answer. */
@@ -462,8 +491,37 @@
 
     const DEFAULT_PLAYER_THEME = "dark";
 
+    /* The heart is the one thing on this poster whose colour a visitor picks
+       outright, so it is NOT a theme token. It layers over whichever theme is
+       showing, which is why it survives a switch between dark and light --
+       recording it inside the two themes would mean choosing it twice and
+       getting it wrong once. */
+    const DEFAULT_HEART_COLOUR = "#e93625";
+    const DEFAULT_CODE_POS = "foot";
+
+    const CODE_POSITIONS = {
+        foot: { label: "Below the buttons" },
+        top: { label: "Above the song title" }
+    };
+
     function playerTheme() {
-        return PLAYER_THEMES[state.playerTheme] || PLAYER_THEMES[DEFAULT_PLAYER_THEME];
+        const base = PLAYER_THEMES[state.playerTheme] ||
+            PLAYER_THEMES[DEFAULT_PLAYER_THEME];
+        const heart = cleanColour(state.heartColour) || base.accent;
+        /* A copy, not a mutation: PLAYER_THEMES is shared and a painter that
+           wrote to it would change the OTHER colourway too. */
+        return Object.assign({}, base, { accent: heart });
+    }
+
+    function codePos() {
+        return CODE_POSITIONS[state.codePos] ? state.codePos : DEFAULT_CODE_POS;
+    }
+
+    /* True when the caption has anything in it, which is what decides whether
+       the code has to share the foot of the page. */
+    function hasCaption() {
+        return Boolean((state.captionHead || "").trim() ||
+            (state.captionBody || "").trim());
     }
 
     /* The player's glyphs, verbatim from the SVG and already in PAGE
@@ -479,10 +537,21 @@
     const PLAYER_VIEW = [0, 0, 597.45, 841.89];
 
     const PLAYER_ART = {
-        chrome: {
+        /* The chevron and the dots belong to the TOP of the screen and never
+           move. The transport glyphs belong to the controls row, which does
+           move when the code changes places -- so they are a separate group.
+           They were one `chrome` list until the code became movable, and a
+           single list is exactly what makes a chevron slide down the page
+           with the play button. */
+        chevron: {
             view: PLAYER_VIEW, ink: "ink",
             parts: [
-                { stroke: true, width: 3, d: "M100.37,24.63L109.36,35.29L117.99,24.63" },
+                { stroke: true, width: 3, d: "M100.37,24.63L109.36,35.29L117.99,24.63" }
+            ]
+        },
+        transport: {
+            view: PLAYER_VIEW, ink: "ink",
+            parts: [
                 { d: "M103.62,667.67l.78-1.1,1.32-1.83c-2.18-2.93-4.6-5.3-7.45-5.3H92.18v3.79h6.09c1.66,0,3.45,1.92,5.35,4.44Z" },
                 { d: "M119.75,670.76v4.7h-4.46c-1.79,0-3.5-1.94-5.27-4.46l-.46.69c-.47.71-.94,1.42-1.44,2.14,2.3,2.95,4.7,5.37,7.17,5.37h4.46v4.69l3.34-3.28,3.35-3.28L123.09,674Z" },
                 { d: "M123.09,658l-3.34-3.29v4.7h-4.46c-6.35,0-12.25,16-17,16H92.18v3.79h6.09c7.41,0,11.87-16,17-16h4.46v4.69l3.34-3.28,3.35-3.28Z" },
@@ -497,7 +566,10 @@
             view: PLAYER_VIEW, ink: "page",
             parts: [{ d: "M289.63,651.3v29.39l26-14.7Z" }]
         },
-        /* The one colour that does not flip between the themes. */
+        /* The one colour that does not flip between the themes, and the one
+           the visitor sets outright -- playerTheme() overlays their choice on
+           whichever colourway is showing, so "accent" here is only the
+           fallback for a value that fails cleanColour(). */
         heart: {
             view: PLAYER_VIEW, ink: "accent",
             parts: [{ d: "M490.06,512.22a11.35,11.35,0,0,0-9.67-5.88A10.19,10.19,0,0,0,470,516.71c0,11.41,6.23,13.14,20.05,26.27,13.83-13.13,20.06-14.86,20.06-26.27a10.19,10.19,0,0,0-10.38-10.37A11.37,11.37,0,0,0,490.06,512.22Z" }]
@@ -1472,6 +1544,24 @@
             .slice(0, HEADING_MAX_CHARS);
     }
 
+    /* A colour, and nothing else.
+
+       This one is not cosmetic hygiene like cleanLine(). The value goes
+       straight into ctx.fillStyle AND into a `fill="..."` attribute in the
+       exported SVG, so an unchecked string here is markup written into a file
+       a visitor then opens. Only the two hex forms a colour input can produce
+       are allowed through; anything else returns "" and the caller falls back
+       to the theme's own accent.
+
+       Normalised to lower case so the same colour cannot be stored two ways
+       and compare unequal. */
+    const COLOUR_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+    function cleanColour(value) {
+        const v = String(value === null || value === undefined ? "" : value).trim();
+        return COLOUR_RE.test(v) ? v.toLowerCase() : "";
+    }
+
     function cleanTime(value) {
         return String(value === null || value === undefined ? "" : value)
             .replace(/\s+/g, "")
@@ -1636,6 +1726,10 @@
         query: DEFAULT_QUERY,
         screenTheme: DEFAULT_SCREEN_THEME,
         playerTheme: DEFAULT_PLAYER_THEME,
+        heartColour: DEFAULT_HEART_COLOUR,
+        codePos: DEFAULT_CODE_POS,
+        captionHead: "",
+        captionBody: "",
         annivTheme: DEFAULT_ANNIV_THEME,
         hbdTheme: DEFAULT_HBD_THEME,
         tribTheme: DEFAULT_TRIB_THEME,
@@ -1683,6 +1777,8 @@
             query: state.query, screenTheme: state.screenTheme,
             playerTheme: state.playerTheme, song: state.song, artist: state.artist,
             elapsed: state.elapsed, total: state.total,
+            heartColour: state.heartColour, codePos: state.codePos,
+            captionHead: state.captionHead, captionBody: state.captionBody,
             annivTheme: state.annivTheme,
             hbdTheme: state.hbdTheme,
             tribTheme: state.tribTheme,
@@ -1706,6 +1802,11 @@
             ? parsed.screenTheme : DEFAULT_SCREEN_THEME;
         state.playerTheme = PLAYER_THEMES[parsed.playerTheme]
             ? parsed.playerTheme : DEFAULT_PLAYER_THEME;
+        state.heartColour = cleanColour(parsed.heartColour) || DEFAULT_HEART_COLOUR;
+        state.codePos = CODE_POSITIONS[parsed.codePos]
+            ? parsed.codePos : DEFAULT_CODE_POS;
+        state.captionHead = cleanLine(parsed.captionHead);
+        state.captionBody = cleanLine(parsed.captionBody);
         state.song = cleanLine(parsed.song);
         state.artist = cleanLine(parsed.artist);
         state.elapsed = cleanTime(parsed.elapsed);
@@ -1814,6 +1915,10 @@
             query: TB.sanitize(state.query),
             screenTheme: state.screenTheme,
             playerTheme: state.playerTheme,
+            heartColour: state.heartColour,
+            codePos: state.codePos,
+            captionHead: TB.sanitize(state.captionHead),
+            captionBody: TB.sanitize(state.captionBody),
             song: TB.sanitize(state.song),
             artist: TB.sanitize(state.artist),
             elapsed: TB.sanitize(state.elapsed),
@@ -1869,6 +1974,13 @@
             ? saved.screenTheme : DEFAULT_SCREEN_THEME;
         state.playerTheme = PLAYER_THEMES[saved.playerTheme]
             ? saved.playerTheme : DEFAULT_PLAYER_THEME;
+        state.heartColour = cleanColour(saved.heartColour) || DEFAULT_HEART_COLOUR;
+        state.codePos = CODE_POSITIONS[saved.codePos]
+            ? saved.codePos : DEFAULT_CODE_POS;
+        state.captionHead = saved.captionHead === undefined
+            ? "" : cleanLine(TB.desanitize(String(saved.captionHead)));
+        state.captionBody = saved.captionBody === undefined
+            ? "" : cleanLine(TB.desanitize(String(saved.captionBody)));
         /* Same rule as the ranks and the search query: only `undefined` takes
            the default, because an empty string is a line the visitor cleared. */
         state.song = saved.song === undefined
@@ -2587,14 +2699,69 @@
     function albumRect(W, H) {
         const s = playerScale(W, H);
         const a = PLAYER.album;
-        return { x: a.x * s.fx, y: a.y * s.fy, w: a.w * s.fx, h: a.h * s.fy };
+        return { x: a.x * s.fx, y: a.y * s.fy, w: a.w * s.fx, h: a.h * s.fy,
+            r: a.r * s.fx };
+    }
+
+    /* The whole vertical arrangement, in PAGE points, worked out once.
+
+       Moving the scan code above the song title is a SWAP, not a resize:
+       everything from the title down slides by one distance and keeps every
+       gap the artwork set. The numbers fall out exactly -- put the code under
+       the album with the same 15.67 gap it has above it at the foot, leave the
+       artwork's own 57.28 between the code and the title, and the controls
+       come to rest at 834.42, which is precisely where the code's bottom used
+       to be. The page margin stays 7.47. Nothing changes size.
+
+       A caption is the one thing that does cost something, because this page
+       has no slack at all. See PLAYER.codeCompact. */
+    function playerFlow() {
+        const P = PLAYER;
+        const top = codePos() === "top";
+        const caption = hasCaption();
+        /* Compact ONLY when a caption is present. Moving the code must not
+           resize it: with nothing else competing for the page the full box
+           fits in either position, and the swap is exact -- the controls come
+           to rest at 834.42, where the code's own bottom used to be. */
+        const box = caption ? P.codeCompact : P.code;
+        const albumBottom = P.album.y + P.album.h;
+
+        let codeY = P.code.y;
+        let shift = 0;
+        if (top) {
+            codeY = albumBottom + P.codeGap;
+            shift = (codeY + box.h + P.albumToTitle) - P.title.baseline;
+        }
+
+        const controlsBottom = P.play.cy + P.play.r + shift;
+        const headBaseline = controlsBottom + P.caption.drop;
+        const bodyBaseline = headBaseline + P.caption.leading;
+        if (!top && caption) {
+            /* The code follows the caption down rather than the caption
+               squeezing in above it: text under the buttons is what was
+               asked for, and the code is what gives way. */
+            codeY = bodyBaseline + P.caption.tail;
+        }
+
+        return {
+            shift: shift,
+            controlsBottom: controlsBottom,
+            headBaseline: headBaseline,
+            bodyBaseline: bodyBaseline,
+            code: { x: box.x === undefined ? P.code.x : box.x, y: codeY,
+                w: box.w, h: box.h }
+        };
     }
 
     /* The scannable code's box. Kept beside albumRect() so the two slots this
        layout owns are derived the same way. */
     function codeRect(W, H) {
         const s = playerScale(W, H);
-        const c = PLAYER.code;
+        /* Straight off the flow. Every caller reads this -- slotAt(),
+           rectForSlot() and the preview's prompt included -- so the code's box
+           only has to move HERE for the click target, the selection ring and
+           the framing slider to move with it. */
+        const c = playerFlow().code;
         return { x: c.x * s.fx, y: c.y * s.fy, w: c.w * s.fx, h: c.h * s.fy };
     }
 
@@ -2630,6 +2797,11 @@
         const s = playerScale(W, H);
         const P = PLAYER;
         const ink = playerTheme();
+        const flow = playerFlow();
+        /* Everything from the song title down rides this one offset, so the
+           row of glyphs, the disc, the heart, the bar and the type cannot
+           drift apart from each other when the code changes places. */
+        const dy = flow.shift * s.fy;
 
         if (!options.transparent) {
             c.fillStyle = ink.page;
@@ -2638,7 +2810,7 @@
 
         /* The album photograph, clipped to the artwork's rounded corners. */
         const album = albumRect(W, H);
-        roundRectPath(c, album.x, album.y, album.w, album.h, P.album.r * s.fx);
+        roundRectPath(c, album.x, album.y, album.w, album.h, album.r);
         if (photos[0]) {
             c.save();
             c.clip();
@@ -2656,10 +2828,12 @@
             }
         }
 
-        /* The chrome: chevron, transport glyphs, then the disc and its triangle.
-           drawArt() places page-space paths by the page scale, so the transform
-           is an identity translate and a scale -- see PLAYER_ART. */
-        drawArt(c, PLAYER_ART.chrome, 0, 0, W, H, ink);
+        /* The chrome. drawArt() places page-space paths by the page scale, so
+           the transform is a translate and a scale -- and the translate is
+           what carries the shift. The chevron and the dots sit at the top of
+           the screen and never move; everything else does. */
+        drawArt(c, PLAYER_ART.chevron, 0, 0, W, H, ink);
+        drawArt(c, PLAYER_ART.transport, 0, dy, W, H, ink);
 
         c.fillStyle = ink.ink;
         P.dots.y.forEach((cy) => {
@@ -2669,11 +2843,11 @@
         });
 
         c.beginPath();
-        c.arc(P.play.cx * s.fx, P.play.cy * s.fy, P.play.r * s.fx, 0, Math.PI * 2);
+        c.arc(P.play.cx * s.fx, P.play.cy * s.fy + dy, P.play.r * s.fx, 0, Math.PI * 2);
         c.fill();
-        drawArt(c, PLAYER_ART.playIcon, 0, 0, W, H, ink);
+        drawArt(c, PLAYER_ART.playIcon, 0, dy, W, H, ink);
 
-        drawArt(c, PLAYER_ART.heart, 0, 0, W, H, ink);
+        drawArt(c, PLAYER_ART.heart, 0, dy, W, H, ink);
 
         /* Title and artist. The right limit is the heart's left edge less a
            little air, so neither line can run into it. */
@@ -2684,13 +2858,20 @@
             const size = fitLine(c, state.song, P.title.size * s.fx,
                 (P.title.right - P.title.x) * s.fx, "700");
             c.font = "700 " + size + "px " + fontStack(SCREEN_FONT);
-            c.fillText(state.song, P.title.x * s.fx, P.title.baseline * s.fy);
+            c.fillText(state.song, P.title.x * s.fx, P.title.baseline * s.fy + dy);
+            noteText(c, "song", { x: P.title.x * s.fx, y: P.title.baseline * s.fy + dy - size,
+                w: (P.title.right - P.title.x) * s.fx, h: size * 1.3,
+                size: size, font: c.font, align: "left" });
         }
         if (state.artist) {
             const size = fitLine(c, state.artist, P.artist.size * s.fx,
                 (P.artist.right - P.artist.x) * s.fx, "400");
             c.font = "400 " + size + "px " + fontStack(SCREEN_FONT);
-            c.fillText(state.artist, P.artist.x * s.fx, P.artist.baseline * s.fy);
+            c.fillText(state.artist, P.artist.x * s.fx, P.artist.baseline * s.fy + dy);
+            noteText(c, "artist", { x: P.artist.x * s.fx,
+                y: P.artist.baseline * s.fy + dy - size,
+                w: (P.artist.right - P.artist.x) * s.fx, h: size * 1.3,
+                size: size, font: c.font, align: "left" });
         }
 
         /* The progress bar: the whole track dimmed, the played part solid over
@@ -2698,7 +2879,7 @@
            and a round cap on the dim one would otherwise sit on top. */
         const x1 = P.track.x1 * s.fx;
         const x2 = P.track.x2 * s.fx;
-        const ty = P.track.y * s.fy;
+        const ty = P.track.y * s.fy + dy;
         const played = x1 + (x2 - x1) * playedFraction();
         c.save();
         c.lineCap = "round";
@@ -2723,18 +2904,50 @@
 
         /* Both times on ONE baseline -- see the note on PLAYER -- and both
            horizontally condensed to 0.87 the way the artwork sets them. */
-        const drawTime = (text, xPt, align) => {
+        const drawTime = (key, text, xPt, align) => {
             if (!text) { return; }
+            const size = P.time.size * s.fx;
             c.save();
-            c.translate(xPt * s.fx, P.time.baseline * s.fy);
+            c.translate(xPt * s.fx, P.time.baseline * s.fy + dy);
             c.scale(P.time.squeeze, 1);
-            c.font = "400 " + (P.time.size * s.fx) + "px " + fontStack(SCREEN_FONT);
+            c.font = "400 " + size + "px " + fontStack(SCREEN_FONT);
             c.textAlign = align;
             c.fillText(text, 0, 0);
+            const runW = c.measureText(text).width;
             c.restore();
+            noteText(c, key, { x: xPt * s.fx,
+                y: P.time.baseline * s.fy + dy - size,
+                w: Math.max(runW, size * 2) * P.time.squeeze, h: size * 1.3,
+                size: size, font: c.font, align: "left",
+                squeeze: P.time.squeeze });
         };
-        drawTime(state.elapsed, P.time.leftX, "left");
-        drawTime(state.total, P.time.rightX, "left");
+        drawTime("elapsed", state.elapsed, P.time.leftX, "left");
+        drawTime("total", state.total, P.time.rightX, "left");
+
+        /* The caption, under the transport row. Two independent lines: a
+           heading and one line beneath it, either of which may be empty. Both
+           are set down to fit rather than clipped, the same call the title and
+           artist make. */
+        const cap = P.caption;
+        const capWidth = (cap.right - cap.x) * s.fx;
+        if (state.captionHead) {
+            const size = fitLine(c, state.captionHead, cap.headSize * s.fx,
+                capWidth, "700");
+            c.font = "700 " + size + "px " + fontStack(SCREEN_FONT);
+            c.fillText(state.captionHead, cap.x * s.fx, flow.headBaseline * s.fy);
+            noteText(c, "captionHead", { x: cap.x * s.fx,
+                y: flow.headBaseline * s.fy - size, w: capWidth, h: size * 1.3,
+                size: size, font: c.font, align: "left" });
+        }
+        if (state.captionBody) {
+            const size = fitLine(c, state.captionBody, cap.bodySize * s.fx,
+                capWidth, "400");
+            c.font = "400 " + size + "px " + fontStack(SCREEN_FONT);
+            c.fillText(state.captionBody, cap.x * s.fx, flow.bodyBaseline * s.fy);
+            noteText(c, "captionBody", { x: cap.x * s.fx,
+                y: flow.bodyBaseline * s.fy - size, w: capWidth, h: size * 1.3,
+                size: size, font: c.font, align: "left" });
+        }
 
         const code = codeRect(W, H);
         if (photos[CODE_SLOT]) {
@@ -3297,20 +3510,30 @@
         const gap = TRIB.heading.gap * fx;
         c.fillText(parts.before, hx, hy);
         drawArt(c, ANNIV_HEART, hx + beforeW + gap, hy - hh2 * 0.82, hw2, hh2, ink);
+        let headRun = beforeW;
         if (parts.after) {
             c.fillStyle = ink.ink;
             c.fillText(parts.after, hx + beforeW + gap * 2 + hw2, hy);
+            headRun = beforeW + gap * 2 + hw2 + c.measureText(parts.after).width;
         }
+        noteText(c, "heading", { x: hx, y: hy - hSize,
+            w: Math.max(headRun, hSize * 4), h: hSize * 1.3,
+            size: hSize, font: c.font, align: "left" });
 
         /* ---- the message ---- */
         const mSize = TRIB.message.size * fy;
         c.font = hbdFont(mSize);
         const mW = tribMessageWidth(W);
-        hbdWrap(c, state.message, mW).slice(0, TRIB.message.maxLines)
-            .forEach((line, i) => {
-                c.fillText(line, TRIB.message.x * fx,
-                    (TRIB.message.baseline + TRIB.message.leading * i) * fy);
-            });
+        const mLines = hbdWrap(c, state.message, mW).slice(0, TRIB.message.maxLines);
+        mLines.forEach((line, i) => {
+            c.fillText(line, TRIB.message.x * fx,
+                (TRIB.message.baseline + TRIB.message.leading * i) * fy);
+        });
+        noteText(c, "message", { x: TRIB.message.x * fx,
+            y: TRIB.message.baseline * fy - mSize, w: mW,
+            h: TRIB.message.leading * fy * Math.max(1, mLines.length),
+            size: mSize, font: c.font, align: "left",
+            multiline: true, leading: TRIB.message.leading * fy });
 
         /* ---- the foot title, with its heart ---- */
         const tSize = TRIB.title.size * fy;
@@ -3327,6 +3550,11 @@
         c.fillText(state.title, tx, ty);
         tribDrawHeart(c, tx + tW + TRIB.title.gap * fx,
             ty - tHeartH * TRIB.title.lift, tHeartW, tHeartH);
+        /* The words alone, not the unit: the heart is not editable and an
+           editor covering it would put the caret past the end of the text. */
+        noteText(c, "title", { x: tx, y: ty - tSize,
+            w: Math.max(tW, tSize * 3), h: tSize * 1.3,
+            size: tSize, font: c.font, align: "left" });
     }
 
     function paintBirthday(c, W, H, options) {
@@ -3426,18 +3654,32 @@
         c.fillStyle = ink.ink;
         const quoteW = (HBD_BOXES[4].x - HBD.quote.x - 12) * fx;
         c.font = hbdFont(HBD.quote.size * fy);
+        const qSize = HBD.quote.size * fy;
         const qlines = hbdWrap(c, state.quote, quoteW).slice(0, HBD.quote.maxLines);
         qlines.forEach((line, i) => {
             c.fillText(line, HBD.quote.x * fx,
                 (HBD.quote.baseline + HBD.quote.leading * i) * fy);
         });
+        /* A wrapped block: the box is the WRAP WIDTH and as many lines as the
+           cap allows, not the longest line -- an editor sized to the ink would
+           re-wrap differently the moment a word was added. */
+        noteText(c, "quote", { x: HBD.quote.x * fx, y: HBD.quote.baseline * fy - qSize,
+            w: quoteW, h: HBD.quote.leading * fy * Math.max(1, qlines.length),
+            size: qSize, font: c.font, align: "left",
+            multiline: true, leading: HBD.quote.leading * fy });
 
         /* ---- the closing message, with its heart on the last line ---- */
         const heartW = HBD.closingHeart.w * fx;
         const heartH = heartW / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]);
         const closeW = W - HBD.closing.x * fx * 2 - heartW - 6 * fx;
         c.font = hbdFont(HBD.closing.size * fy);
+        const cSize = HBD.closing.size * fy;
         const clines = hbdWrap(c, state.closing, closeW).slice(0, 3);
+        noteText(c, "closing", { x: HBD.closing.x * fx,
+            y: HBD.closing.baseline * fy - cSize, w: closeW,
+            h: HBD.closing.leading * fy * Math.max(1, clines.length),
+            size: cSize, font: c.font, align: "left",
+            multiline: true, leading: HBD.closing.leading * fy });
         clines.forEach((line, i) => {
             const y = (HBD.closing.baseline + HBD.closing.leading * i) * fy;
             c.fillText(line, HBD.closing.x * fx, y);
@@ -3472,11 +3714,19 @@
         const sizeA = annivFit(c, state.nameA, ANNIV.names.size * fy,
             half - W * 0.06, true, 700);
         c.fillText(state.nameA, mid - heartW / 2 - gap, ANNIV.names.baseline * fy);
+        noteText(c, "nameA", { x: mid - heartW / 2 - gap - (half - W * 0.06),
+            y: ANNIV.names.baseline * fy - sizeA,
+            w: half - W * 0.06, h: sizeA * 1.3,
+            size: sizeA, font: c.font, align: "right" });
 
         c.textAlign = "left";
         const sizeB = annivFit(c, state.nameB, ANNIV.names.size * fy,
             half - W * 0.06, true, 700);
         c.fillText(state.nameB, mid + heartW / 2 + gap, ANNIV.names.baseline * fy);
+        noteText(c, "nameB", { x: mid + heartW / 2 + gap,
+            y: ANNIV.names.baseline * fy - sizeB,
+            w: half - W * 0.06, h: sizeB * 1.3,
+            size: sizeB, font: c.font, align: "left" });
 
         drawArt(c, ANNIV_HEART, mid - heartW / 2,
             ANNIV.nameHeart.cy * fy - heartH / 2, heartW, heartH, ink);
@@ -3561,8 +3811,13 @@
 
         /* ---- the tagline ---- */
         c.textAlign = "center";
-        annivFit(c, state.tagline, ANNIV.tagline.size * fy, W * ANNIV.tagline.maxW, true, 700);
+        const tagSize = annivFit(c, state.tagline, ANNIV.tagline.size * fy,
+            W * ANNIV.tagline.maxW, true, 700);
         c.fillText(state.tagline, mid, ANNIV.tagline.baseline * fy);
+        noteText(c, "tagline", { x: mid - (W * ANNIV.tagline.maxW) / 2,
+            y: ANNIV.tagline.baseline * fy - tagSize,
+            w: W * ANNIV.tagline.maxW, h: tagSize * 1.3,
+            size: tagSize, font: c.font, align: "center" });
     }
 
     /* The same poster as vector. A SECOND renderer, which is exactly where this
@@ -3959,8 +4214,48 @@
             '"/></g>';
     }
 
+    /* ----------------------------------------------------------------------
+       Where each layout's own text actually landed.
+
+       The layouts draw their fields at their own sizes, and several SHRINK to
+       fit -- the song title, the anniversary names, the tribute's foot line.
+       An editor placed over them has to know the size that was used, not the
+       size that was asked for.
+
+       So the painters report, rather than the editor re-deriving. Each text a
+       visitor can edit calls noteText() at the point it is drawn, with the
+       numbers it just drew with. Nothing is recomputed and nothing can drift:
+       the region IS the drawing.
+
+       Recording is ADDITIVE. A field whose painter forgets to call this is
+       simply not editable on the canvas; it cannot come out drawn wrongly,
+       which is what a `skip this one` flag threaded through the same twenty
+       call sites would have risked.
+
+       Only the preview records -- render() asks for it. Exports paint at their
+       own scale, and letting one overwrite these would leave the editor
+       pointing at coordinates from a different canvas. */
+    let textRegions = [];
+    let recordingRegions = false;
+
+    /* x,y is the TOP-LEFT of the drawn run, w,h its size, all in canvas
+       pixels. `align` and `font` are what the context was set to. */
+    function noteText(c, key, box) {
+        if (recordingRegions) {
+            /* fillStyle is still the colour the words were just drawn in, so
+               the caret can match the ink without every call site repeating
+               it -- and a ghost editor whose caret inherited `transparent`
+               from its own text colour would be invisible. */
+            textRegions.push(Object.assign({ key: key, caret: c.fillStyle }, box));
+        }
+    }
+
     function paint(c, W, H, opts) {
         const options = opts || {};
+        if (options.record) {
+            textRegions = [];
+            recordingRegions = true;
+        }
         const frame = FRAME_STYLES[state.frame] || FRAME_STYLES.black;
         const scale = W / 1200;
 
@@ -4005,7 +4300,17 @@
             drawPhotoPanel(c, px, py, pw, ph, scale, options.transparent);
         }
 
-        state.texts.forEach((el) => drawTextElement(c, el, W, H));
+        /* One element is skipped while it is being edited on the canvas:
+           the DOM editor is drawing it instead. Passed in rather than read
+           from module scope so that EXPORTS, which call paint() without it,
+           always draw every element -- an export is never mid-edit. */
+        state.texts.forEach((el) => {
+            if (el.id !== options.skipTextId) {
+                drawTextElement(c, el, W, H);
+            }
+        });
+
+        recordingRegions = false;
     }
 
     function render() {
@@ -4014,13 +4319,14 @@
             canvas.width = s.w;
             canvas.height = s.h;
         }
-        paint(ctx, s.w, s.h);
+        paint(ctx, s.w, s.h, { skipTextId: editingTextId(), record: true });
         drawGridChrome();
         drawPlayerChrome();
         drawAnniversaryChrome();
         drawCollageChrome();
         drawSelection();
         syncQueryInput();
+        positionTextLive();
     }
 
     /* Preview-only prompts for the player's two empty slots.
@@ -4256,6 +4562,31 @@
 
     /* Selection chrome is drawn on the preview only and is never part of an
        export -- paint() has no knowledge of it. */
+    /* Where a text element actually lands on the canvas, in canvas pixels.
+
+       Three things need this box and each used to work it out again: the
+       selection ring, the hit test, and now the inline editor that sits over
+       it. Three copies of an alignment rule is three chances for the ring to
+       sit somewhere the click does not.
+
+       Leaves ctx's font and metrics SET, because every caller wants them --
+       the ring measures with them, and the editor reads ctx.font to copy the
+       face into the DOM. */
+    function textBox(el, W, H) {
+        const px = applyTextStyle(ctx, el, W);
+        const lines = layoutLines(ctx, el,
+            el.upper ? el.text.toUpperCase() : el.text, el.boxW * W);
+        let maxW = 0;
+        lines.forEach((l) => { maxW = Math.max(maxW, ctx.measureText(l).width); });
+        let x = el.x * W;
+        if (el.align === "center") { x -= maxW / 2; }
+        if (el.align === "right") { x -= maxW; }
+        return {
+            x: x, y: el.y * H - px, w: maxW, h: lines.length * px * el.line,
+            px: px, lines: lines, font: ctx.font
+        };
+    }
+
     function drawSelection() {
         const el = selected();
         if (!el || !el.text) {
@@ -4263,16 +4594,13 @@
         }
         const W = canvas.width;
         const H = canvas.height;
-        const px = applyTextStyle(ctx, el, W);
+        const box = textBox(el, W, H);
+        const px = box.px;
+        const maxW = box.w;
+        const h = box.h;
+        const x = box.x;
+        const y = box.y;
         ctx.globalAlpha = 1;
-        const lines = layoutLines(ctx, el, el.upper ? el.text.toUpperCase() : el.text, el.boxW * W);
-        let maxW = 0;
-        lines.forEach((l) => { maxW = Math.max(maxW, ctx.measureText(l).width); });
-        const h = lines.length * px * el.line;
-        let x = el.x * W;
-        if (el.align === "center") { x -= maxW / 2; }
-        if (el.align === "right") { x -= maxW; }
-        const y = el.y * H - px;
 
         ctx.save();
         ctx.strokeStyle = "#8A6A3B";
@@ -4285,6 +4613,285 @@
 
     function selected() {
         return state.texts.find((t) => t.id === state.sel) || null;
+    }
+
+    /* ----------------------------------------------------------------------
+       Typing on the poster itself.
+
+       A textarea parked over the element being edited, wearing its font. The
+       canvas stops drawing that one element while this is open, so there is
+       exactly one rendering of the words at any moment -- see the note beside
+       #p-text-live in poster.html.
+       ---------------------------------------------------------------------- */
+
+    /* Sixteen, and the transform does the sizing -- the same trick and the
+       same reason as QUERY_LIVE_FONT. */
+    const TEXT_LIVE_FONT = 16;
+
+    /* What is being edited on the canvas, or null. Two kinds, because the
+       two behave differently:
+
+         { kind: "text",  id }   a free text element -- the canvas SKIPS it and
+                                 the editor draws it, opaque.
+         { kind: "field", key }  a layout's own field -- the canvas keeps
+                                 drawing it and the editor is a GHOST over the
+                                 top, contributing only a caret and a
+                                 selection.
+
+       The layouts are ghosts for a practical reason. A free text element is
+       one object drawn in one place, so skipping it is a single condition. A
+       layout's fields are drawn inside four painters at fourteen different
+       call sites, several of them shrink-to-fit and three of them wrapped
+       blocks; threading a "not this one" flag through all of that would be
+       fourteen chances to break a poster that currently renders correctly.
+       Reading where they landed is additive and cannot. */
+    let editing = null;
+    const textLive = byId("p-text-live");
+
+    function editingTextId() {
+        return editing && editing.kind === "text" ? editing.id : null;
+    }
+
+    /* Which panel control each canvas-editable field mirrors, and the
+       sanitiser that field uses. Both have to match the panel exactly: two
+       ways to type one string, and the stricter of the two rules has to win
+       in both places or the poster changes depending on where it was typed.
+
+       cleanHeading for the tribute's heading, because the run of spaces in it
+       is the marker for where the heart goes and cleanBlock() would eat it. */
+    const LIVE_FIELDS = {
+        song: { field: "p-song", clean: cleanLine },
+        artist: { field: "p-artist", clean: cleanLine },
+        elapsed: { field: "p-elapsed", clean: cleanTime },
+        total: { field: "p-total", clean: cleanTime },
+        captionHead: { field: "p-caption-head", clean: cleanLine },
+        captionBody: { field: "p-caption-body", clean: cleanLine },
+        nameA: { field: "p-name-a", clean: cleanLine },
+        nameB: { field: "p-name-b", clean: cleanLine },
+        tagline: { field: "p-tagline", clean: cleanLine },
+        quote: { field: "p-quote", clean: cleanBlock },
+        closing: { field: "p-closing", clean: cleanBlock },
+        heading: { field: "p-heading", clean: cleanHeading },
+        message: { field: "p-message", clean: cleanBlock },
+        title: { field: "p-title", clean: cleanLine }
+    };
+
+    function regionFor(key) {
+        return textRegions.find((r) => r.key === key) || null;
+    }
+
+    /* The layout field under a point, if any. Searched backwards so a region
+       recorded later -- drawn on top -- wins, the same rule the overlapping
+       photo boxes follow. */
+    function fieldAt(pt, W, H) {
+        for (let i = textRegions.length - 1; i >= 0; i -= 1) {
+            const r = textRegions[i];
+            if (!LIVE_FIELDS[r.key]) { continue; }
+            const pad = r.size * 0.25;
+            if (pt.x * W >= r.x - pad && pt.x * W <= r.x + r.w + pad &&
+                    pt.y * H >= r.y - pad && pt.y * H <= r.y + r.h + pad) {
+                return r;
+            }
+        }
+        return null;
+    }
+
+    function positionTextLive() {
+        if (!textLive) {
+            return;
+        }
+        if (!editing) {
+            textLive.hidden = true;
+            return;
+        }
+        if (editing.kind === "field") {
+            positionFieldLive();
+            return;
+        }
+        const el = state.texts.find((t) => t.id === editing.id);
+        if (!el) {
+            textLive.hidden = true;
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) {
+            /* The preview is on the other tab. Leaving the box where it was
+               would strand an editable field over a pane it no longer sits on. */
+            return;
+        }
+        const W = canvas.width;
+        const H = canvas.height;
+        const box = textBox(el, W, H);
+        /* CSS pixels per canvas pixel. */
+        const k = rect.width / W;
+        const px = box.px * k;
+        const scale = px / TEXT_LIVE_FONT;
+
+        textLive.hidden = false;
+        /* The font the CANVAS just used, with only its size swapped for the
+           one the transform expects. Copying the shorthand rather than
+           rebuilding it means the editor cannot disagree with the drawing
+           about weight, slant or which family actually resolved. */
+        textLive.style.font = box.font.replace(
+            /(^|\s)(\d*\.?\d+)px(\s)/, "$1" + TEXT_LIVE_FONT + "px$3");
+        const track = (el.letter * box.px * k) / scale;
+        textLive.style.letterSpacing = (Number.isFinite(track) ? track : 0) + "px";
+        textLive.style.lineHeight = ((box.px * el.line * k) / scale) + "px";
+        textLive.style.color = el.color;
+        textLive.style.caretColor = el.color;
+        textLive.style.opacity = String(el.opacity);
+        textLive.style.textAlign = el.align;
+        textLive.style.textTransform = el.upper ? "uppercase" : "none";
+        textLive.style.transform = "scale(" + scale + ")";
+
+        /* The BOX, not the ink: an alignment other than left means the drawn
+           run sits inside a wider column, and the editor has to be that column
+           or the caret lands where the text is not. */
+        const colW = el.boxW * W * k;
+        let left = el.x * W * k;
+        if (el.align === "center") { left -= colW / 2; }
+        if (el.align === "right") { left -= colW; }
+        textLive.style.left = left + "px";
+        textLive.style.width = (colW / scale) + "px";
+        /* textBox()'s y is the first line's ascent top, which is where a
+           textarea's first line box starts too. */
+        textLive.style.top = (box.y * k) + "px";
+        textLive.style.height = ((box.h * k) / scale) + "px";
+
+        textLive.classList.remove("is-ghost");
+        if (textLive.value !== el.text) {
+            textLive.value = el.text;
+        }
+    }
+
+    /* A layout's own field. The canvas is still drawing the words, so this is
+       a GHOST: transparent ink, real caret, real selection. Everything about
+       the box comes from what the painter recorded, which is why a
+       shrink-to-fit title gets an editor at the size it actually printed. */
+    function positionFieldLive() {
+        const box = regionFor(editing.key);
+        if (!box) {
+            /* The field left the page -- a layout switch, or a caption
+               emptied. Nothing to sit over. */
+            textLive.hidden = true;
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) {
+            return;
+        }
+        const k = rect.width / canvas.width;
+        const px = box.size * k;
+        const scale = px / TEXT_LIVE_FONT;
+
+        textLive.hidden = false;
+        textLive.classList.add("is-ghost");
+        textLive.style.font = box.font.replace(
+            /(^|\s)(\d*\.?\d+)px(\s)/, "$1" + TEXT_LIVE_FONT + "px$3");
+        textLive.style.letterSpacing = "0px";
+        textLive.style.lineHeight =
+            (((box.leading || box.size * 1.3) * k) / scale) + "px";
+        textLive.style.color = "transparent";
+        textLive.style.caretColor = box.caret || "currentColor";
+        textLive.style.opacity = "1";
+        textLive.style.textAlign = box.align;
+        textLive.style.textTransform = "none";
+        /* The times carry the artwork's horizontal condense, so the editor
+           wears it too -- a caret on unsqueezed digits drifts further right
+           with every character. */
+        textLive.style.transform = "scale(" + (scale * (box.squeeze || 1)) +
+            ", " + scale + ")";
+        textLive.style.left = (box.x * k) + "px";
+        textLive.style.top = (box.y * k) + "px";
+        textLive.style.width = ((box.w * k) / (scale * (box.squeeze || 1))) + "px";
+        textLive.style.height = ((box.h * k) / scale) + "px";
+
+        const value = String(state[editing.key] === undefined ? "" : state[editing.key]);
+        if (textLive.value !== value) {
+            textLive.value = value;
+        }
+    }
+
+    function beginTextEdit(el) {
+        if (!textLive || !el) {
+            return;
+        }
+        state.sel = el.id;
+        editing = { kind: "text", id: el.id };
+        syncControls();
+        render();
+        textLive.focus();
+        textLive.setSelectionRange(textLive.value.length, textLive.value.length);
+    }
+
+    function beginFieldEdit(key) {
+        if (!textLive || !LIVE_FIELDS[key]) {
+            return;
+        }
+        editing = { kind: "field", key: key };
+        render();
+        textLive.focus();
+        textLive.setSelectionRange(textLive.value.length, textLive.value.length);
+    }
+
+    function endTextEdit() {
+        if (editing === null) {
+            return;
+        }
+        editing = null;
+        if (textLive) {
+            textLive.hidden = true;
+            textLive.classList.remove("is-ghost");
+        }
+        render();
+    }
+
+    if (textLive) {
+        textLive.addEventListener("input", () => {
+            if (editing && editing.kind === "field") {
+                const spec = LIVE_FIELDS[editing.key];
+                const next = spec.clean(textLive.value);
+                if (state[editing.key] === next) {
+                    return;
+                }
+                beginChange();
+                state[editing.key] = next;
+                /* Keyed on the field, so a burst of typing is one undo -- and
+                   the SAME key the panel control uses, so typing in one and
+                   then the other does not split into two entries either. */
+                commit("live:" + editing.key);
+                const panel = byId(spec.field);
+                if (panel && panel.value !== next) {
+                    panel.value = next;
+                }
+                render();
+                return;
+            }
+            const el = state.texts.find((t) => t.id === editingTextId());
+            if (!el || el.text === textLive.value) {
+                return;
+            }
+            beginChange();
+            el.text = textLive.value;
+            /* The same coalesce key the panel's own textarea uses, so a burst
+               of typing is one undo whichever of the two it was typed into. */
+            commit("text:" + el.id);
+            const panel = byId("t-caption");
+            if (panel && panel.value !== el.text) {
+                panel.value = el.text;
+            }
+            render();
+        });
+
+        textLive.addEventListener("keydown", (ev) => {
+            if (ev.key === "Escape") {
+                ev.preventDefault();
+                endTextEdit();
+                canvas.focus();
+            }
+        });
+
+        textLive.addEventListener("blur", endTextEdit);
     }
 
     /* ----------------------------------------------------------------------
@@ -4312,17 +4919,10 @@
         for (let i = state.texts.length - 1; i >= 0; i -= 1) {
             const el = state.texts[i];
             if (!el.text) { continue; }
-            const px = applyTextStyle(ctx, el, W);
-            const lines = layoutLines(ctx, el, el.upper ? el.text.toUpperCase() : el.text, el.boxW * W);
-            let maxW = 0;
-            lines.forEach((l) => { maxW = Math.max(maxW, ctx.measureText(l).width); });
-            const h = lines.length * px * el.line;
-            let x = el.x * W;
-            if (el.align === "center") { x -= maxW / 2; }
-            if (el.align === "right") { x -= maxW; }
-            const y = el.y * H - px;
-            const inX = pt.x * W >= x - px * 0.3 && pt.x * W <= x + maxW + px * 0.3;
-            const inY = pt.y * H >= y - px * 0.3 && pt.y * H <= y + h + px * 0.3;
+            const box = textBox(el, W, H);
+            const pad = box.px * 0.3;
+            const inX = pt.x * W >= box.x - pad && pt.x * W <= box.x + box.w + pad;
+            const inY = pt.y * H >= box.y - pad && pt.y * H <= box.y + box.h + pad;
             if (inX && inY) {
                 return el;
             }
@@ -4631,8 +5231,45 @@
         }
     }
 
+    /* Double-click a text element to type on it. A plain click still selects
+       and drags, which is what the panel has always promised; this is the
+       second gesture rather than a replacement for the first.
+
+       On pointerdown, ANY press outside the element being edited ends the
+       edit. The textarea's own blur would do it a moment later anyway, but not
+       before the press has already been handled -- so without this a click on
+       another text element would start dragging something the canvas was still
+       refusing to draw. */
+    canvas.addEventListener("dblclick", (ev) => {
+        const pt = canvasPoint(ev);
+        /* A free text element first: it is drawn ON TOP of the layout, so a
+           double-click where the two overlap should reach the one you can
+           see. */
+        const el = hitTest(pt);
+        if (el) {
+            ev.preventDefault();
+            beginTextEdit(el);
+            return;
+        }
+        const field = fieldAt(pt, canvas.width, canvas.height);
+        if (field) {
+            ev.preventDefault();
+            beginFieldEdit(field.key);
+        }
+    });
+
     canvas.addEventListener("pointerdown", (ev) => {
         const pt = canvasPoint(ev);
+        if (editing !== null) {
+            const over = hitTest(pt);
+            const sameText = editing.kind === "text" && over && over.id === editing.id;
+            const field = fieldAt(pt, canvas.width, canvas.height);
+            const sameField = editing.kind === "field" && field &&
+                field.key === editing.key;
+            if (!sameText && !sameField) {
+                endTextEdit();
+            }
+        }
         const corner = cardIndexAt(pt, canvas.width, canvas.height);
         if (corner) {
             focusRankFor(corner);
@@ -4982,11 +5619,18 @@
         fillSlot(CODE_SLOT, img);
     });
 
-    /* The four text fields. Same two events as the ranks and the query and for
-       the same reasons: typing coalesces into one history entry per burst, and
-       `change` catches a paste committed by blurring. */
+    /* The player's typed fields. Same two events as the ranks and the query
+       and for the same reasons: typing coalesces into one history entry per
+       burst, and `change` catches a paste committed by blurring.
+
+       The heart's colour is NOT in here. It is a picker rather than a field
+       now -- see initHeartPicker(), which does its own coalescing for the
+       same reason: dragging a hue track fires continuously, and one undo
+       entry per pixel of travel is not an undo history. */
     [["p-song", "song", cleanLine], ["p-artist", "artist", cleanLine],
-     ["p-elapsed", "elapsed", cleanTime], ["p-total", "total", cleanTime]]
+     ["p-elapsed", "elapsed", cleanTime], ["p-total", "total", cleanTime],
+     ["p-caption-head", "captionHead", cleanLine],
+     ["p-caption-body", "captionBody", cleanLine]]
         .forEach((entry) => {
             const el = byId(entry[0]);
             if (!el) {
@@ -5097,6 +5741,77 @@
             beginChange();
             state.annivTheme = ANNIV_THEMES[annivThemeSelect.value]
                 ? annivThemeSelect.value : DEFAULT_ANNIV_THEME;
+            commit();
+            render();
+        });
+    }
+
+    /* The heart's colour picker: the shared control from
+       js/color-picker.js, the same one the mockup editor drives for a product
+       colour. It owns its own nodes and reads and writes state.heartColour
+       through the two callbacks; nothing about it is poster-specific except
+       those.
+
+       `heartPicker` is module-level so syncControls() can repaint it after an
+       undo, which rewrites state wholesale and would otherwise leave the dot,
+       the hex and both hue tracks showing the colour before the undo. */
+    let heartPicker = null;
+
+    function syncHeartPicker() {
+        const hex = cleanColour(state.heartColour) || DEFAULT_HEART_COLOUR;
+        const dot = byId("p-heart-dot");
+        if (dot) { dot.style.backgroundColor = hex; }
+        const label = byId("p-heart-hex");
+        if (label) { label.textContent = hex.toUpperCase(); }
+        if (heartPicker) { heartPicker.sync(); }
+    }
+
+    function initHeartPicker() {
+        const trigger = byId("p-heart-trigger");
+        const popover = byId("p-heart-popover");
+        if (!trigger || !popover || !window.TBColor) {
+            return;
+        }
+        heartPicker = window.TBColor.createColorPicker({
+            trigger: trigger, popover: popover,
+            sv: byId("p-heart-sv"), svThumb: byId("p-heart-sv-thumb"),
+            hue: byId("p-heart-hue"), hueThumb: byId("p-heart-hue-thumb"),
+            hueInline: byId("p-heart-strip"),
+            hueInlineThumb: byId("p-heart-strip-thumb"),
+            inHex: byId("p-heart-in-hex"), inR: byId("p-heart-in-r"),
+            inG: byId("p-heart-in-g"), inB: byId("p-heart-in-b"),
+            presets: byId("p-heart-presets")
+        }, {
+            getHex: () => cleanColour(state.heartColour) || DEFAULT_HEART_COLOUR,
+            setHex: (hex) => {
+                const next = cleanColour(hex);
+                if (!next || next === state.heartColour) {
+                    /* Rejected or unchanged: no history entry and no repaint.
+                       The picker calls this on every pointermove. */
+                    return false;
+                }
+                beginChange();
+                state.heartColour = next;
+                /* One coalesce key for the whole drag, so a sweep across the
+                   hue strip is one undo rather than two hundred. */
+                commit("heart-colour");
+                render();
+                syncHeartPicker();
+                return true;
+            }
+        });
+        heartPicker.buildPresets();
+        syncHeartPicker();
+    }
+
+    initHeartPicker();
+
+    const codePosSelect = byId("p-code-pos");
+    if (codePosSelect) {
+        codePosSelect.addEventListener("change", () => {
+            beginChange();
+            state.codePos = CODE_POSITIONS[codePosSelect.value]
+                ? codePosSelect.value : DEFAULT_CODE_POS;
             commit();
             render();
         });
@@ -5744,7 +6459,9 @@
             }
         });
         [["p-song", "song"], ["p-artist", "artist"],
-         ["p-elapsed", "elapsed"], ["p-total", "total"]].forEach((entry) => {
+         ["p-elapsed", "elapsed"], ["p-total", "total"],
+         ["p-caption-head", "captionHead"],
+         ["p-caption-body", "captionBody"]].forEach((entry) => {
             const el = byId(entry[0]);
             /* Compared before writing: assigning .value to what it already
                holds still drops the caret to the end of the field mid-word. */
@@ -5752,6 +6469,9 @@
         });
         const pt = byId("p-player-theme");
         if (pt) { pt.value = state.playerTheme; }
+        const cp = byId("p-code-pos");
+        if (cp) { cp.value = codePos(); }
+        syncHeartPicker();
         const at = byId("p-anniv-theme");
         if (at) { at.value = state.annivTheme; }
         const ht = byId("p-hbd-theme");
@@ -6156,13 +6876,15 @@
         const ink = playerTheme();
         const album = albumRect(W, H);
         const code = codeRect(W, H);
+        const flow = playerFlow();
+        const dy = flow.shift * s.fy;
         const family = esc(fontStack(SCREEN_FONT).replace(/"/g, "'"));
 
         let defs = "";
         if (photos[0]) {
             defs += '<clipPath id="tb-player-album"><rect x="' + album.x + '" y="' + album.y +
                 '" width="' + album.w + '" height="' + album.h +
-                '" rx="' + (P.album.r * s.fx) + '"/></clipPath>';
+                '" rx="' + album.r + '"/></clipPath>';
         }
         if (photos[CODE_SLOT]) {
             defs += '<clipPath id="tb-player-code"><rect x="' + code.x + '" y="' + code.y +
@@ -6173,7 +6895,7 @@
         if (defs) { out += "<defs>" + defs + "</defs>"; }
 
         const albumBox = 'x="' + album.x + '" y="' + album.y + '" width="' + album.w +
-            '" height="' + album.h + '" rx="' + (P.album.r * s.fx) + '"';
+            '" height="' + album.h + '" rx="' + album.r + '"';
         if (photos[0]) {
             out += '<g clip-path="url(#tb-player-album)">' +
                 photoImageSVG(photos[0], state.views[0], album.x, album.y, album.w, album.h) +
@@ -6185,17 +6907,19 @@
                 '" stroke-width="' + (P.album.stroke * s.fx) + '"/>';
         }
 
-        out += artSVG(PLAYER_ART.chrome, 0, 0, W, H, ink);
+        out += artSVG(PLAYER_ART.chevron, 0, 0, W, H, ink);
+        out += artSVG(PLAYER_ART.transport, 0, dy, W, H, ink);
 
         P.dots.y.forEach((cy) => {
             out += '<circle cx="' + (P.dots.cx * s.fx) + '" cy="' + (cy * s.fy) +
                 '" r="' + (P.dots.r * s.fx) + '" fill="' + ink.ink + '"/>';
         });
 
-        out += '<circle cx="' + (P.play.cx * s.fx) + '" cy="' + (P.play.cy * s.fy) +
-            '" r="' + (P.play.r * s.fx) + '" fill="' + ink.ink + '"/>';
-        out += artSVG(PLAYER_ART.playIcon, 0, 0, W, H, ink);
-        out += artSVG(PLAYER_ART.heart, 0, 0, W, H, ink);
+        out += '<circle cx="' + (P.play.cx * s.fx) + '" cy="' +
+            (P.play.cy * s.fy + dy) + '" r="' + (P.play.r * s.fx) +
+            '" fill="' + ink.ink + '"/>';
+        out += artSVG(PLAYER_ART.playIcon, 0, dy, W, H, ink);
+        out += artSVG(PLAYER_ART.heart, 0, dy, W, H, ink);
 
         /* Measured on the live canvas context, because there is nothing in an
            SVG string to measure with -- and it has to be the SAME number the
@@ -6204,21 +6928,23 @@
         if (state.song) {
             const size = fitLine(ctx, state.song, P.title.size * s.fx,
                 (P.title.right - P.title.x) * s.fx, "700");
-            out += '<text x="' + (P.title.x * s.fx) + '" y="' + (P.title.baseline * s.fy) +
+            out += '<text x="' + (P.title.x * s.fx) + '" y="' +
+                (P.title.baseline * s.fy + dy) +
                 '" font-family="' + family + '" font-size="' + size +
                 '" font-weight="700" fill="' + ink.ink + '">' + esc(state.song) + "</text>";
         }
         if (state.artist) {
             const size = fitLine(ctx, state.artist, P.artist.size * s.fx,
                 (P.artist.right - P.artist.x) * s.fx, "400");
-            out += '<text x="' + (P.artist.x * s.fx) + '" y="' + (P.artist.baseline * s.fy) +
+            out += '<text x="' + (P.artist.x * s.fx) + '" y="' +
+                (P.artist.baseline * s.fy + dy) +
                 '" font-family="' + family + '" font-size="' + size +
                 '" fill="' + ink.ink + '">' + esc(state.artist) + "</text>";
         }
 
         const x1 = P.track.x1 * s.fx;
         const x2 = P.track.x2 * s.fx;
-        const ty = P.track.y * s.fy;
+        const ty = P.track.y * s.fy + dy;
         const played = x1 + (x2 - x1) * playedFraction();
         const lineAttrs = ' stroke="' + ink.ink + '" stroke-width="' + (P.track.width * s.fx) +
             '" stroke-linecap="round"';
@@ -6234,12 +6960,28 @@
         const timeAt = (text, xPt) => {
             if (!text) { return ""; }
             return '<text x="0" y="0" transform="translate(' + (xPt * s.fx) + " " +
-                (P.time.baseline * s.fy) + ") scale(" + P.time.squeeze + ' 1)"' +
+                (P.time.baseline * s.fy + dy) + ") scale(" + P.time.squeeze + ' 1)"' +
                 ' font-family="' + family + '" font-size="' + (P.time.size * s.fx) +
                 '" fill="' + ink.ink + '">' + esc(text) + "</text>";
         };
         out += timeAt(state.elapsed, P.time.leftX);
         out += timeAt(state.total, P.time.rightX);
+
+        /* The caption, measured on the live canvas context for the same reason
+           the title is: fitLine() has to return the SAME number in both
+           painters or a long line sets smaller in one of them. */
+        const cap = P.caption;
+        const capWidth = (cap.right - cap.x) * s.fx;
+        const capLine = (text, baseline, px, weight) => {
+            if (!text) { return ""; }
+            const size = fitLine(ctx, text, px * s.fx, capWidth, weight);
+            return '<text x="' + (cap.x * s.fx) + '" y="' + (baseline * s.fy) +
+                '" font-family="' + family + '" font-size="' + size +
+                '" font-weight="' + weight + '" fill="' + ink.ink + '">' +
+                esc(text) + "</text>";
+        };
+        out += capLine(state.captionHead, flow.headBaseline, cap.headSize, "700");
+        out += capLine(state.captionBody, flow.bodyBaseline, cap.bodySize, "400");
 
         if (photos[CODE_SLOT]) {
             out += '<g clip-path="url(#tb-player-code)">' +
@@ -6873,6 +7615,15 @@
                 o.value = k;
                 o.textContent = ANNIV_THEMES[k].label;
                 annivTheme2.appendChild(o);
+            });
+        }
+        const codePos2 = byId("p-code-pos");
+        if (codePos2 && !codePos2.options.length) {
+            Object.keys(CODE_POSITIONS).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = CODE_POSITIONS[k].label;
+                codePos2.appendChild(o);
             });
         }
         const playerTheme2 = byId("p-player-theme");
