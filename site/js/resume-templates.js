@@ -945,5 +945,225 @@ window.TB_RESUME_TEMPLATES = [
                       ],
                       entryGap: 16 } }
         ]
+    },
+    {
+        /* Traced from a supplied reference at A4, and the first template here
+           that the registry could not carry alone: two capabilities went into
+           the engine for it, both narrow, both documented where they live.
+
+           Its shape is five ruled bands, each with its heading in a left
+           GUTTER and its content in a column beside it, under a masthead whose
+           photograph and name sit side by side. Every other template in this
+           file stacks its heading above its body, which is why
+           `type.heading.gutter` had to exist; and every other one that carries
+           a photograph puts it in a sidebar the main column never sees, which
+           is why `inset` had to.
+
+           See docs/implementation/LABELLED_SECTIONS_CV.md. */
+        id: "label-rail",
+        title: "Labelled Sections CV",
+        catalog: true,
+
+        /* No defaultAccent, for the reason `classic` declares none: this
+           design has no opinion about colour, so arriving on its catalog card
+           must not reset the accent a returning visitor chose.
+
+           The display name, the headings and the rules nevertheless name the
+           ACCENT role rather than ink. The reference is pure near-black, and
+           an untouched document's accent IS #1A1A1A -- so it opens monochrome,
+           exactly as traced, while the editor's swatch row still does
+           something. A template that named no accent role anywhere would
+           present a live control that changes nothing, which is the worse of
+           the two ways to be faithful. */
+
+        page: { width: 595, height: 842 },
+
+        layout: {
+            kind: "single-column",
+            /* The TEXT column, 42 to 553. The rules are wider than it on both
+               sides -- they run 26.8 to 568.4 on the reference -- and that
+               bleed is carried by the heading's own rule spec rather than by
+               widening the column, because widening it would move the gutter
+               labels out with it.
+
+               `bottom` is a reservation boundary, not the last baseline:
+               ensureRoom breaks the page when baseline + lineHeight passes it,
+               so the deepest line this template sets is 838 - 22 = 816.
+
+               The reference's own last baseline is at 825, which this engine
+               cannot reach: 825 + 22 is past the paper. That is the line-height
+               reservation being conservative, and it is the right kind of
+               conservative -- a CV whose last line sits 6mm from the edge is
+               one many printers clip. 816 puts it at 9mm and still fits the
+               content volume the reference itself carries on one page. */
+            main: {
+                left: 42, right: 42,
+                firstBaseline: 86,
+                bottom: 838
+            }
+        },
+
+        palette: {
+            ink:   "#1A1A1A",   /* body, entries, bullets -- never the accent */
+            /* What fills the hollows in a contact glyph. These sit straight on
+               the sheet with no disc behind them, so the knockout has to be
+               the sheet's own white or the pin's hole comes out black. */
+            sheet: "#FFFFFF"
+        },
+
+        type: {
+            displayName: { family: "sans", weight: "bold", size: 29,
+                           lineHeight: 33, color: "accent" },
+
+            /* The five gutter labels. `gutter.width` is what the label wraps
+               inside -- the longest of them sets two lines on the reference,
+               which is the measurement that fixes this number -- and 127 is
+               the distance from the label's own x to the body column's.
+
+               gapBefore is the space from a band's last line to the NEXT
+               band's rule; ruleBefore.gapAfter is the space from that rule
+               down to the first baseline of both the label and the body. The
+               reference hand-sets those at 15 to 18 and 21 to 32
+               respectively; one value each is used here, because a rhythm
+               that varies per band for no expressible reason is a defect to
+               inherit rather than a feature. */
+            heading:     { family: "sans", weight: "bold", size: 12.5,
+                           color: "accent", uppercase: true,
+                           gapBefore: 16,
+                           gutter: { width: 127, lineHeight: 18 },
+                           ruleBefore: { color: "accent", width: 1,
+                                         gapAfter: 22,
+                                         /* 26.8 to 568.4, from a column that
+                                            runs 42 to 553. */
+                                         bleedLeft: 15.2, length: 1.0293 } },
+
+            body:        { family: "sans", weight: "normal", size: 11,
+                           lineHeight: 22, color: "ink" },
+
+            /* 22 everywhere: the reference's paragraph lines, its experience
+               bullets and its skills bullets are all 22 apart, so the whole
+               sheet keeps one rhythm and a band's height is always a whole
+               number of them. */
+            bullet:      { family: "sans", weight: "normal", size: 11,
+                           lineHeight: 22, color: "ink",
+                           marker: "•", indent: 12, itemGap: 22 },
+
+            entryHead:   { family: "sans", weight: "bold",   size: 11, color: "ink" },
+            /* The dates, ranged right on the head's own baseline. Bold, which
+               is the reference's own weight for them and is what makes the two
+               ends of that line read as one. */
+            entryDate:   { family: "sans", weight: "bold",   size: 11, color: "ink" },
+            entryMeta:   { family: "sans", weight: "normal", size: 11, color: "ink" },
+            entrySub:    { family: "sans", weight: "normal", size: 11, color: "ink" },
+
+            /* The two masthead rows. Tighter than the body: they are one line
+               each and a 22pt leading between a location and a phone number
+               would open a hole in the middle of the masthead. */
+            sidebarContact: { family: "sans", weight: "normal", size: 11,
+                              lineHeight: 14, color: "ink", rowGap: 15 }
+        },
+
+        blocks: [
+            /* The masthead is THREE blocks in one column and they end up side
+               by side, which is worth reading once because nothing else in
+               this file does it.
+
+               The name and the contact rows are `inset` past the photograph's
+               width, so they set to the right of it. They come FIRST so that
+               they advance the cursor themselves; the photo block then follows
+               and only ever pushes the cursor DOWN -- `Math.max(cursor, top +
+               h + gapAfter)` -- so whichever of the two sides is taller closes
+               the masthead. No second pass, and no third column.
+
+               With NO photograph the block draws a short prompt and does not
+               advance the cursor at all, so the masthead closes up to whatever
+               the text needed. The inset stays either way, deliberately:
+               adding a photograph then does not reflow the sheet, and the
+               prompt marks the space it will occupy. The prompt is preview
+               only -- paintPdf returns on it -- so an export with no photo has
+               clean white there rather than a placeholder. */
+            { column: "main", kind: "display", field: "name", type: "displayName",
+              uppercase: true, fallback: "Your Name",
+              inset: { left: 141 }, gapAfter: 36 },
+
+            /* Bare glyphs on the sheet, no discs: this design draws a solid
+               pin and a solid handset rather than the chips photo-rail sets in
+               its pale panel. Inset 10pt further than the name, which is where
+               the reference hangs them. */
+            { column: "main", kind: "contact",
+              inset: { left: 151 },
+              iconSize: 12, textOffset: 20,
+              glyph: "ink", knockout: "sheet",
+              rows: [
+                  { icon: "pin",      fields: ["location"] },
+                  { icon: "phone",    fields: ["phone", "phoneAlt"], separator: ", " },
+                  /* Not on the reference, which carries no email address.
+                     Drawn only when there is one to draw, and a CV without an
+                     email address is the rarer document. */
+                  { icon: "envelope", fields: ["email"] }
+              ] },
+
+            /* 110 wide, not the reference's 119. PHOTO_RATIO is 4/5 and is not
+               a template's to choose -- js/resume.js crops every upload to it,
+               and a descriptor naming both dimensions could stretch a face
+               silently. The reference's box is close to square, so one of the
+               two had to give: the width was kept near enough to hold the
+               name's own x, and the height that 4/5 then forces (137.5) still
+               clears the first rule. */
+            { column: "main", kind: "photo", top: 48, width: 110,
+              border: { color: "ink", width: 1 } },
+
+            { column: "main", kind: "section", label: "Objective",
+              body: { kind: "paragraph", field: "summary" } },
+
+            { column: "main", kind: "section", label: "Experience",
+              body: { kind: "entries", source: "experience",
+                      head: { runs: [
+                          { field: "role",    type: "entryHead" },
+                          { literal: ", ",    type: "entryHead" },
+                          { field: "company", type: "entryHead" }
+                      ]},
+                      /* Flush right on the head's own baseline. */
+                      aside: { runs: [{ field: "dates", type: "entryDate" }] },
+                      sub: [
+                          { runs: [{ field: "place", type: "entryMeta" }],
+                            gapBefore: 16 }
+                      ],
+                      bullets: { field: "description", split: "\n",
+                                 type: "bullet", gapBefore: 25 },
+                      entryGap: 26 } },
+
+            /* The SCHOOL is the head here, where classic leads with the
+               degree. That is the reference's own order, and it is the one
+               that degrades well: this design is as likely to be used by
+               somebody with no degree to name as by somebody with one, and a
+               head that is empty half the time drops its whole line. The
+               degree still sets, on the line under it, and is skipped without
+               consuming its gap when there is none. */
+            { column: "main", kind: "section", label: "Education",
+              body: { kind: "entries", source: "education",
+                      head: { runs: [{ field: "school", type: "entryHead" }] },
+                      sub: [
+                          { runs: [{ field: "degree", type: "entryMeta" }],
+                            gapBefore: 21 },
+                          { runs: [
+                              { field: "dates", type: "entryMeta" },
+                              { literal: ", ",  type: "entryMeta" },
+                              { field: "place", type: "entryMeta" }
+                          ], gapBefore: 21 }
+                      ],
+                      entryGap: 20 } },
+
+            /* The fourth band reads `accomplishments` under a heading of its
+               own. A block's label is free text, so this costs nothing; adding
+               a form field to carry one template's wording would put a control
+               on every other template's form. */
+            { column: "main", kind: "section", label: "Personal Attributes",
+              body: { kind: "list", field: "accomplishments", split: "\n" } },
+
+            { column: "main", kind: "section", label: "Skills",
+              body: { kind: "list", field: "skills", split: "," } }
+        ]
     }
 ];
+

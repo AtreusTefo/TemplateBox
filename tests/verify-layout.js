@@ -3393,8 +3393,24 @@ async function resumeTemplateChecks(page) {
                        and it paints as nothing rather than erroring. */
                     const unresolved = ops.filter((o) => {
                         if (o.op === 'image') { return false; }
-                        const c = o.fill || o.color;
-                        return !c || !HEX.test(c);
+                        /* A stroke joined fill and color as a colour-bearing
+                           key when the rect op learned a keyline on September
+                           14, 2026. (No back-ticks in here: this whole block
+                           is inside a template literal, and one closes it.) A
+                           stroke-only rect -- the frame around a photograph --
+                           carries its colour there and nowhere else, so a
+                           check reading the other two saw an op with no colour
+                           at all and reported it unresolved.
+
+                           EVERY colour an op carries is tested now rather than
+                           the first one found, and an op carrying none is
+                           still a failure. That is stricter than what this
+                           replaced, not a loosening to accommodate the new
+                           op. */
+                        const found = ['fill', 'color', 'stroke']
+                            .map((k) => o[k]).filter(Boolean);
+                        if (!found.length) { return true; }
+                        return found.some((c) => !HEX.test(c));
                     }).length;
 
                     /* Geometry. Anchors and boxes inside the paper. Text ops

@@ -9881,6 +9881,150 @@ main:has(.mockup-layout) .editor-head {
    the dark ground with a page-coloured mount around three of them, which is
    the reverse of the tribute's red-on-white and is the whole difference
    between the two at thumbnail size. */
+/* The Labelled Sections CV's tile. What identifies this design at thumbnail
+   size is the left LABEL COLUMN and the ruled bands across it, so those are
+   what the tile draws at full strength; the body is bars, as the other resume
+   tiles are. The masthead is the photo box and the name side by side, which is
+   the second thing that tells it apart from Ruled Serif above. */
+.mock-doc.labelled {
+    gap: 0;
+    padding: 0.5rem 0.45rem;
+}
+
+.mock-doc.labelled .mk-lb-head {
+    display: flex;
+    gap: 0.35rem;
+    align-items: flex-start;
+    padding: 0.1rem 0.15rem 0.32rem;
+}
+
+/* A keyline box, as the sheet draws it, rather than a filled block: an empty
+   frame is what a visitor sees before they upload anything. */
+.mock-doc.labelled .mk-lb-photo {
+    flex: 0 0 18%;
+    aspect-ratio: 4 / 5;
+    border: 1px solid var(--color-text);
+    box-sizing: border-box;
+}
+
+.mock-doc.labelled .mk-lb-id {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-top: 0.15rem;
+}
+
+.mock-doc.labelled .mk-lb-id .mk-name {
+    margin: 0 0 0.16rem;
+    /* Sans, like the sheet. The shared .mk-name is a serif, which is right for
+       Ruled Serif above and wrong for this one. */
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 0.5rem;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: var(--mk-accent);
+}
+
+.mock-doc.labelled .mk-lb-id .mk-contact {
+    margin: 0 0 0.1rem;
+    font-size: 0.33rem;
+    line-height: 1.3;
+    opacity: 0.75;
+}
+
+/* One band: the rule across the top, then the label and the body beside it.
+   The rule is a border on the BAND rather than a separate element, so a band
+   and its rule cannot drift apart. */
+.mock-doc.labelled .mk-lb-band {
+    display: flex;
+    gap: 0.35rem;
+    align-items: flex-start;
+    border-top: 1px solid var(--mk-accent);
+    padding: 0.26rem 0.15rem 0.28rem;
+    /* The five bands share whatever height the masthead leaves. A sheet of
+       this design fills its page, so a tile whose rules all bunch into the top
+       half misrepresents it -- and the tile has no content of its own to grow
+       with. */
+    flex: 1 1 auto;
+}
+
+/* The marker, and it is NOT called `dot`: this stylesheet already has a
+   site-wide `.dot` -- a 14px bordered circle used for colour swatches -- and
+   the first version of this tile inherited it, which turned every bullet bar
+   into a small ring. A generic class name in one shared stylesheet is a
+   collision waiting for whoever writes the next tile. */
+
+.mock-doc.labelled .mk-lb-label {
+    flex: 0 0 24%;
+    margin: 0;
+    font-weight: 700;
+    font-size: 0.36rem;
+    line-height: 1.25;
+    text-transform: uppercase;
+    color: var(--mk-accent);
+}
+
+.mock-doc.labelled .mk-lb-body {
+    /* Basis ZERO, not auto. The entry line inside carries a role and a date
+       range with nothing breakable between them, so an auto basis sizes this
+       column to that line's own width and the bars then run past the sheet's
+       right margin. */
+    flex: 1 1 0;
+    min-width: 0;
+    /* The entry line below can be wider than the space it is given -- a role
+       and a date range with nothing breakable between them -- and without this
+       it draws past the sheet's own right margin. */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.16rem;
+    padding-top: 0.03rem;
+}
+
+.mock-doc.labelled .mk-lb-role {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.3rem;
+    margin: 0 0 0.06rem;
+    font-weight: 700;
+    font-size: 0.34rem;
+    line-height: 1.2;
+}
+
+.mock-doc.labelled .mk-lb-role b { min-width: 0; overflow: hidden; white-space: nowrap; }
+.mock-doc.labelled .mk-lb-role em { font-style: normal; white-space: nowrap; }
+
+.mock-doc.labelled .mk-lb-body span {
+    display: block;
+    height: 1px;
+    background-color: currentColor;
+    opacity: 0.55;
+}
+
+.mock-doc.labelled .mk-lb-body span.mk-li-short { width: 62%; }
+
+.mock-doc.labelled .mk-lb-body span.mk-li {
+    position: relative;
+    width: auto;
+    height: 1px;
+    border: 0;
+    border-radius: 0;
+    margin-left: 0.28rem;
+}
+
+.mock-doc.labelled .mk-lb-body span.mk-li::before {
+    content: "";
+    position: absolute;
+    left: -0.28rem;
+    top: -0.06rem;
+    width: 0.13rem;
+    height: 0.13rem;
+    border-radius: 50%;
+    background-color: currentColor;
+    opacity: 0.9;
+}
+
 .mock-doc.poster.love {
     position: relative;
     background-color: #231F20;

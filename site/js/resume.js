@@ -100,16 +100,33 @@
             email: "adaeze.nwosu@example.com",
             phone: "+1 (555) 014-8820",
             location: "Chicago, IL",
-            /* SIZED TO ONE PAGE. Every length in this object is load-bearing:
-               Classic finishes at y=741.7 against a 790.87 boundary and
-               grey-rail at 721 against 800, so roughly four lines of slack
-               on the tighter of the two. Adding to any field here can cost
-               a whole page, and not gradually -- see the note on references
-               below. Re-measure rather than eyeball it. */
+            /* SIZED TO ONE PAGE. Every length in this object is load-bearing,
+               and the margin is NO LONGER four lines: Labelled Sections is the
+               binding template now and it has none.
+
+               Measured, last baseline against each template's own boundary:
+               Labelled Sections 802 against 838 at a 22pt line height, which
+               is zero further lines; Classic 714.13 against 790.87; grey-rail
+               721 against 800; Photo Profile 528.5. Ruled Serif is
+               structurally two pages at any content volume and constrains
+               nothing here.
+
+               Zero is not an estimate. A sixth skill was added back and
+               measured: it puts one bullet on a second page. Adding to any
+               field in this object now costs Labelled Sections a whole page,
+               and not gradually -- see the note on references below.
+               Re-measure rather than eyeball it. */
             summary: "Operations leader with fifteen years running supply chain and fulfilment teams across three continents. Known for turning underperforming depots into reliable, measurable operations.",
             /* No commas INSIDE a skill: the field splits on commas, so
-               "Friendly, positive attitude" would become two skills. */
-            skills: "Supply chain strategy, Vendor negotiation, Lean process design, Demand forecasting, Team leadership, SAP, Power BI",
+               "Friendly, positive attitude" would become two skills.
+
+               FIVE, not the seven this carried until September 14, 2026. The
+               last two -- both short, both trailing -- were the whole of what
+               spilled onto a second page on Labelled Sections, which sets its
+               skills one per line where Classic and Photo Profile set them
+               tighter and grey-rail puts them in a sidebar. Removing them
+               gives every other template slack rather than costing it. */
+            skills: "Supply chain strategy, Vendor negotiation, Lean process design, Demand forecasting, Team leadership",
             languages: "English: Native\nSpanish: Upper intermediate (B2)",
             accomplishments: "Named Operations Leader of the Year by the Midwest Logistics Council.\nSpeaker on depot automation at the 2024 Supply Chain Summit.",
             /* Only the two-column template draws these; the others compose

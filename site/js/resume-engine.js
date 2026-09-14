@@ -333,6 +333,31 @@ window.TBResume = (() => {
        SAME x -- jsPDF's align option and SVG's text-anchor agree on what the
        coordinate means -- so alignment is decided once here rather than
        measured separately in each medium. */
+    /* Runs `fn` with one column temporarily narrowed.
+
+       Everything downstream reads `ctx.cols[key]` at the moment it draws --
+       wrapping width, alignment anchors, bullet boxes, an entry's dates ranged
+       to the right edge -- so narrowing the column is all it takes to put a
+       block BESIDE something instead of under it, and nothing else in the
+       engine has to learn about it. The cursor is untouched, which is what
+       keeps pagination working inside an inset block.
+
+       Restored in a `finally`: a throw part way through a block must not leave
+       the column narrowed for the rest of the page. */
+    function withColumn(ctx, key, narrowed, fn) {
+        const full = ctx.cols[key];
+        ctx.cols[key] = narrowed;
+        try { return fn(); } finally { ctx.cols[key] = full; }
+    }
+
+    function insetOf(col, inset) {
+        const left = inset.left || 0;
+        const right = inset.right || 0;
+        return Object.assign({}, col, {
+            x: col.x + left, width: col.width - left - right
+        });
+    }
+
     function anchorX(col, align) {
         if (align === "center") return col.x + col.width / 2;
         if (align === "right") return col.x + col.width;
@@ -407,7 +432,24 @@ window.TBResume = (() => {
         return { entry: { list: ref.list, index: ref.index, key: key } };
     }
 
+    /* `inset` puts a block in part of its column rather than all of it. The
+       masthead of a photo-beside-name sheet is the case it exists for: the
+       name and the contact rows are inset past the photograph's width, and the
+       photo block that follows them only ever pushes the cursor DOWN, so the
+       three end up side by side with no second layout pass.
+
+       It is deliberately not a property of the column: two blocks in one
+       column may want different insets, and a column that carried one would
+       have to be un-narrowed by whatever came next. */
     function layoutBlock(ctx, block, key, cursor, started, pageOf) {
+        if (!block.inset) {
+            return layoutBlockIn(ctx, block, key, cursor, started, pageOf);
+        }
+        return withColumn(ctx, key, insetOf(ctx.cols[key], block.inset),
+            () => layoutBlockIn(ctx, block, key, cursor, started, pageOf));
+    }
+
+    function layoutBlockIn(ctx, block, key, cursor, started, pageOf) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
         const page = pageOf[key];
@@ -618,6 +660,16 @@ window.TBResume = (() => {
                 });
             }
             ctx.ops.push({ op: "image", page: page, url: url, x: x, y: top, w: w, h: h });
+            /* A keyline ON the photograph's edge, drawn after it so the image
+               cannot cover it. Straddles the edge by half its width, which is
+               what a frame drawn in a vector editor does. */
+            if (block.border) {
+                ctx.ops.push({
+                    op: "rect", page: page, x: x, y: top, w: w, h: h,
+                    stroke: colorOf(block.border.color, ctx.template, ctx.state),
+                    strokeWidth: block.border.width || 1
+                });
+            }
             /* Never ABOVE where the column already was: a photograph placed
                high on the page must not pull a cursor backwards. */
             cursor[key] = Math.max(cursor[key], top + h + (block.gapAfter || 0));
@@ -646,6 +698,17 @@ window.TBResume = (() => {
             if (started[key]) cursor[key] += t.gapBefore || 0;
 
             const label = t.uppercase ? block.label.toUpperCase() : block.label;
+
+            /* A GUTTER heading is a different assembly from a stacked one: the
+               label sits to the LEFT of the body rather than above it, both
+               start on the same baseline, and the band is as deep as whichever
+               of the two runs longer. */
+            if (t.gutter) {
+                layoutGutterSection(ctx, block, t, label, key, cursor, pageOf, col);
+                started[key] = true;
+                return;
+            }
+
             /* Enough room for the whole heading assembly AND the first line of
                what it introduces, so a page can break neither between a rule
                and its heading nor between a heading and its body.
@@ -681,6 +744,51 @@ window.TBResume = (() => {
             cursor[key] += (block.gapAfter === undefined ? (t.gapAfter || 0) : block.gapAfter);
             layoutBody(ctx, block.body, key, cursor, pageOf);
             started[key] = true;
+        }
+    }
+
+    /* A section whose label sits in a gutter beside its body.
+
+       The label WRAPS inside the gutter -- the longest of these labels sets
+       two lines on the artwork this was built from, which is how you know the
+       gutter's width is the constraint rather than the label's -- so the room
+       reserved is the taller of the wrapped label and the body's own first
+       line, never their sum.
+
+       The body is laid into the same column narrowed to the right of the
+       gutter, so paragraphs wrap to it, bullets indent from it and an entry's
+       dates range to its right edge, all without a second code path.
+
+       Page breaks are handled by NOT taking the maximum across one. If the
+       body broke, the label is on the page above and the cursor belongs to the
+       page below; comparing the two would push the new page's first band down
+       by the height of a label that is not on it. */
+    function layoutGutterSection(ctx, block, t, label, key, cursor, pageOf, col) {
+        const T = ctx.template.type;
+        const lh = t.gutter.lineHeight || t.lineHeight || t.size;
+        const lines = ctx.wrap(label, t, t.gutter.width);
+
+        ensureRoom(ctx, key, cursor, pageOf,
+                   (t.ruleBefore ? (t.ruleBefore.gapAfter || 0) : 0) +
+                   Math.max(lines.length * lh, bodyFirstLine(block.body, T)));
+
+        if (t.ruleBefore) {
+            emitRule(ctx, pageOf[key], col, t.ruleBefore, cursor[key]);
+            cursor[key] += t.ruleBefore.gapAfter || 0;
+        }
+
+        const top = cursor[key];
+        const page = pageOf[key];
+        lines.forEach((line, i) => {
+            text(ctx, page, col.x, top + i * lh, line, t);
+        });
+        const labelBottom = top + (lines.length - 1) * lh;
+
+        withColumn(ctx, key, insetOf(col, { left: t.gutter.width }),
+            () => layoutBody(ctx, block.body, key, cursor, pageOf));
+
+        if (pageOf[key] === page) {
+            cursor[key] = Math.max(cursor[key], labelBottom);
         }
     }
 
@@ -1320,7 +1428,14 @@ window.TBResume = (() => {
             n = document.createElementNS(SVG_NS, "rect");
             n.setAttribute("x", o.x); n.setAttribute("y", o.y);
             n.setAttribute("width", o.w); n.setAttribute("height", o.h);
-            n.setAttribute("fill", o.fill);
+            /* A rect may be a fill, a keyline, or both. "none" rather than an
+               omitted attribute: SVG's default fill is black, so a stroked
+               box with no fill named would come out solid. */
+            n.setAttribute("fill", o.fill || "none");
+            if (o.stroke) {
+                n.setAttribute("stroke", o.stroke);
+                n.setAttribute("stroke-width", o.strokeWidth || 1);
+            }
         } else if (o.op === "roundrect") {
             n = document.createElementNS(SVG_NS, "rect");
             n.setAttribute("x", o.x); n.setAttribute("y", o.y);
@@ -1449,10 +1564,21 @@ window.TBResume = (() => {
 
     function pdfOp(doc, o) {
         if (o.op === "rect" || o.op === "roundrect") {
-            const c = hexToRgb(o.fill);
-            doc.setFillColor(c[0], c[1], c[2]);
-            if (o.op === "rect") doc.rect(o.x, o.y, o.w, o.h, "F");
-            else doc.roundedRect(o.x, o.y, o.w, o.h, o.r, o.r, "F");
+            if (o.fill) {
+                const c = hexToRgb(o.fill);
+                doc.setFillColor(c[0], c[1], c[2]);
+            }
+            if (o.stroke) {
+                const sc = hexToRgb(o.stroke);
+                doc.setDrawColor(sc[0], sc[1], sc[2]);
+                doc.setLineWidth(o.strokeWidth || 1);
+            }
+            /* jsPDF takes the style as a string: fill, stroke, or both. An
+               op with neither would draw nothing, so it falls back to a fill
+               and matches what this did before strokes existed. */
+            const style = o.fill && o.stroke ? "FD" : (o.stroke ? "S" : "F");
+            if (o.op === "rect") doc.rect(o.x, o.y, o.w, o.h, style);
+            else doc.roundedRect(o.x, o.y, o.w, o.h, o.r, o.r, style);
             return;
         }
         if (o.op === "circle") {
