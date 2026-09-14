@@ -379,14 +379,33 @@
                          every phone's picker; the select is what the size
                          slider and the remove button point at, and it doubles
                          as the way in for anyone not using the preview. -->
-                    <div id="p-grid-fields" hidden>
+                    <!-- The batch photo input, on its own.
+
+                         It used to live inside #p-grid-fields, which the three
+                         collage posters also show because they fill from the
+                         same multi-file control. That dragged the SEARCH
+                         SCREEN'S other four controls onto every collage: a
+                         Profile Photo slot the layout has no circle for, a
+                         Selected Photo menu built from the search screen's own
+                         seven slots, a Search Text field with no search bar to
+                         type into, and a Screen Mode select that changed a
+                         colourway the poster on screen does not use.
+
+                         That last one is the reason this moved. Every one of
+                         those posters has a Screen Mode of its own further
+                         down the panel, so the visitor met TWO controls with
+                         the same name, reached the first, and watched it do
+                         nothing. -->
+                    <div id="p-batch-fields" hidden>
                         <div class="field">
                             <label for="p-image-grid">Photos</label>
                             <input type="file" id="p-image-grid" accept="image/*" multiple>
-                            <p class="upload-hint">Choose up to six at once. Each one fills the next empty card, numbered on the preview.</p>
+                            <p class="upload-hint">Choose several at once. Each one fills the next empty box on the preview.</p>
                             <p class="form-error" id="p-image-grid-error" role="alert"></p>
                         </div>
+                    </div>
 
+                    <div id="p-grid-fields" hidden>
                         <!-- The account circle above the search bar is a photo
                              slot in its own right, with its own input: a batch
                              of six chosen for the masonry must never silently
@@ -580,7 +599,7 @@
                         </div>
 
                         <div class="field">
-                            <label for="p-anniv-theme">Colour</label>
+                            <label for="p-anniv-theme">Screen Mode</label>
                             <select id="p-anniv-theme"></select>
                             <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. On the light one the empty photo boxes are outlined rather than filled, because a white box on white paper is not a box.</p>
                         </div>
@@ -607,7 +626,7 @@
                         </div>
 
                         <div class="field">
-                            <label for="p-trib-theme">Colour</label>
+                            <label for="p-trib-theme">Screen Mode</label>
                             <select id="p-trib-theme"></select>
                             <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. The photo boxes stay red in both, because on this artwork the red IS the empty state; what changes is the keyline, which cannot be white on white paper.</p>
                         </div>
@@ -627,7 +646,7 @@
                         </div>
 
                         <div class="field">
-                            <label for="p-hbd-theme">Colour</label>
+                            <label for="p-hbd-theme">Screen Mode</label>
                             <select id="p-hbd-theme"></select>
                             <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. On the light one the empty photo boxes are outlined rather than filled, because a white box on white paper is not a box.</p>
                         </div>

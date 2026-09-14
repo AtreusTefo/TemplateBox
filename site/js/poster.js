@@ -678,7 +678,7 @@
        and the same answer as the player's empty album panel. */
     const ANNIV_THEMES = {
         night: {
-            label: "Night",
+            label: "Dark",
             page: "#050606",
             ink: "#FFFFFF",
             accent: "#E93625",
@@ -690,7 +690,7 @@
             onAccent: "#FFFFFF"
         },
         day: {
-            label: "Day",
+            label: "Light",
             page: "#FFFFFF",
             ink: "#1A1A1A",
             /* The heart keeps its red. It is the one colour in this poster
@@ -703,6 +703,11 @@
         }
     };
 
+    /* The option labels read Dark and Light, matching the music player's, so
+       all four posters that carry a colourway describe it the same way. The
+       stored KEYS stay "night" and "day": they are in every saved poster and
+       in the history, and renaming them to tidy a label would invalidate work
+       somebody already has open. */
     const DEFAULT_ANNIV_THEME = "night";
 
     function annivTheme() {
@@ -784,7 +789,7 @@
 
     const HBD_THEMES = {
         night: {
-            label: "Night",
+            label: "Dark",
             page: "#231F20",
             ink: "#FFFFFF",
             accent: "#E93625",
@@ -797,7 +802,7 @@
             sparkleTip: "#FFFDE6"
         },
         day: {
-            label: "Day",
+            label: "Light",
             page: "#FFFFFF",
             ink: "#231F20",
             accent: "#E93625",
@@ -1028,7 +1033,7 @@
 
     const TRIB_THEMES = {
         night: {
-            label: "Night",
+            label: "Dark",
             page: "#231F20",
             ink: "#FFFFFF",
             accent: "#E93625",
@@ -1049,7 +1054,7 @@
             sparkleTip: "#FFFDE6"
         },
         day: {
-            label: "Day",
+            label: "Light",
             page: "#FFFFFF",
             ink: "#231F20",
             accent: "#E93625",
@@ -6437,10 +6442,22 @@
            one, so its control belongs to neither block. */
         const codeFields = byId("p-code-fields");
         if (codeFields) { codeFields.hidden = !player && !anniv; }
-        /* The collage takes a batch, so it uses the grid's multi-file input
-           rather than the single Photo Upload -- the same swap the search
-           screen makes, for the same reason. */
-        if (gridFields) { gridFields.hidden = !grid && !anniv && !hbd && !trib; }
+        /* The collage takes a batch, so it uses the multi-file input rather
+           than the single Photo Upload -- the same swap the search screen
+           makes, for the same reason.
+
+           The BATCH input is what they share, and nothing else. It used to sit
+           inside #p-grid-fields, so showing it here showed the search screen's
+           Profile Photo, Selected Photo, Search Text and Screen Mode as well:
+           four controls that do nothing on a collage, and the last of them
+           with the same name as the poster's own colourway select further down
+           the panel. A visitor reached the first Screen Mode they saw and it
+           did nothing. The two blocks are separate now, and #p-grid-fields is
+           gated on the search screen alone, above. */
+        const batchFields = byId("p-batch-fields");
+        if (batchFields) {
+            batchFields.hidden = !grid && !anniv && !hbd && !trib;
+        }
         if (photoFields) { photoFields.hidden = grid || anniv || hbd || trib; }
 
         [["p-name-a", "nameA"], ["p-name-b", "nameB"],
