@@ -4092,10 +4092,21 @@ async function anniversaryCalendarChecks(page) {
        to the right row -- passing for the wrong reason, which is worse than
        failing. So the expectation is compared against `rows` first and the
        check fails loudly instead. */
+    /* `ruleTop`/`ruleBottom` narrow the search for the RULE alone, and only
+       the love story calendar needs them. The other three rely on no shape in
+       their band being wider than their own rule; that poster draws a white
+       cradle under the final row which is 239pt across against a 208pt rule,
+       so the longest run in its band is the cradle whenever a short month
+       brings the cradle up into the window. Bounding the rule's own search to
+       the dozen points it lives in is the honest fix: the alternative is a
+       marker window too shallow to reach row 4, which two of the six cases
+       need. */
     const LAYOUTS = [
         { preset: "anniversary", label: "anniversary", top: 0.62, bottom: 0.99 },
         { preset: "birthday", label: "birthday", top: 0.10, bottom: 0.42 },
-        { preset: "tribute", label: "tribute", top: 0.09, bottom: 0.270, rows: 5 }
+        { preset: "tribute", label: "tribute", top: 0.09, bottom: 0.270, rows: 5 },
+        { preset: "love", label: "love", top: 0.09, bottom: 0.265, rows: 5,
+          ruleTop: 0.105, ruleBottom: 0.119 }
     ];
 
     for (const L of LAYOUTS) {
@@ -4195,6 +4206,8 @@ async function oneCalendarPoster(page, L) {
             const d = ctx.getImageData(0, 0, W, H).data;
             const bg = [d[0], d[1], d[2]];
             const top = Math.round(H * ${L.top}), bottom = Math.round(H * ${L.bottom});
+            const ruleTop = Math.round(H * ${L.ruleTop === undefined ? L.top : L.ruleTop});
+            const ruleBottom = Math.round(H * ${L.ruleBottom === undefined ? L.bottom : L.ruleBottom});
 
             /* The rule FIRST: the longest UNBROKEN horizontal run of ink in
                the band, which is the line under the day header. It is found
@@ -4217,7 +4230,7 @@ async function oneCalendarPoster(page, L) {
                birthday, 67pt against 209pt on the tribute), so the longest run
                is the rule on all of them. */
             let ruleLo = -1, ruleHi = -1, best = 0;
-            for (let y = top; y <= bottom; y += 1) {
+            for (let y = ruleTop; y <= ruleBottom; y += 1) {
                 let runStart = -1;
                 for (let x = 0; x <= W; x += 1) {
                     const i = ((y * W) + x) * 4;

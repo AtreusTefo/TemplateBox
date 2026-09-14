@@ -9874,3 +9874,188 @@ main:has(.mockup-layout) .editor-head {
     height: 3px;
     background-color: #FFFFFF;
 }
+
+/* The love story calendar's tile. The same idea as the tribute's above: the
+   photo boxes are what identifies the layout, so they sit at the artwork's own
+   fractions of the page and everything else is a bar. Its cascade is WHITE on
+   the dark ground with a page-coloured mount around three of them, which is
+   the reverse of the tribute's red-on-white and is the whole difference
+   between the two at thumbnail size. */
+.mock-doc.poster.love {
+    position: relative;
+    background-color: #231F20;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.poster.love .mk-lv-boxes b {
+    position: absolute;
+    display: block;
+    background-color: #FFFFFF;
+    box-sizing: border-box;
+}
+
+/* The three boxes the artwork mounts: a page-coloured border is exactly what
+   the outer rectangle is doing on the poster, so the tile draws it the same
+   way rather than as a second element. */
+.mock-doc.poster.love .mk-lv-boxes b.mount {
+    border: 2px solid #231F20;
+}
+
+/* A ring, not a disc: the portrait sits inside it and the ring is what reads
+   at this size. */
+.mock-doc.poster.love .mk-lv-ring {
+    position: absolute;
+    left: 5.161%;
+    top: 9.207%;
+    width: 38.167%;
+    height: 27.355%;
+    border: 2px solid #FFFFFF;
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.mock-doc.poster.love .mk-lv-toprule {
+    position: absolute;
+    left: 53.907%;
+    top: 2.870%;
+    width: 41.093%;
+    height: 1px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-month {
+    position: absolute;
+    left: 57.479%;
+    top: 3.563%;
+    width: 34.920%;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 0.34rem;
+    line-height: 1;
+    text-align: center;
+    color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-cal {
+    position: absolute;
+    left: 57.479%;
+    top: 8.552%;
+    width: 34.920%;
+    height: 17.104%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mock-doc.poster.love .mk-lv-head {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-serif);
+    font-size: 0.26rem;
+    line-height: 1.1;
+    color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-rule {
+    height: 1px;
+    margin-top: 1px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-grid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 8% 0 2%;
+}
+
+.mock-doc.poster.love .mk-lv-grid span {
+    display: block;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.55);
+}
+
+/* September opens on a Monday in the artwork's own grid and ends on a
+   Saturday, which is what the two short rules at the ends are saying. */
+.mock-doc.poster.love .mk-lv-grid span:first-child { width: 86%; margin-left: auto; }
+.mock-doc.poster.love .mk-lv-grid span:last-child { width: 43%; }
+
+/* The cradle under the grid, as the bar and two turned-up ends it reads as. */
+.mock-doc.poster.love .mk-lv-tray {
+    position: absolute;
+    left: 54.786%;
+    top: 24.0%;
+    width: 40.248%;
+    height: 4.2%;
+    border: 2px solid #FFFFFF;
+    border-top: 0;
+    border-radius: 0 0 30% 30%;
+    box-sizing: border-box;
+}
+
+.mock-doc.poster.love .mk-lv-msg {
+    position: absolute;
+    left: 57.874%;
+    top: 32.308%;
+    width: 34.525%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.16rem;
+}
+
+.mock-doc.poster.love .mk-lv-msg span {
+    display: block;
+    height: 1.5px;
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+.mock-doc.poster.love .mk-lv-msg span:last-child { width: 72%; }
+
+/* The last line of the first paragraph, with the pair of pink hearts on the
+   END of it -- which is where the poster puts them. On its own row they read
+   as a seventh line of a message that has six. */
+.mock-doc.poster.love .mk-lv-msg em {
+    display: flex;
+    align-items: center;
+    gap: 4%;
+}
+
+.mock-doc.poster.love .mk-lv-msg em span { flex: 0 0 58%; }
+
+.mock-doc.poster.love .mk-lv-msg i {
+    display: block;
+    flex: 0 0 14%;
+    height: 2.5px;
+    background-color: #EF5692;
+}
+
+.mock-doc.poster.love .mk-lv-title {
+    position: absolute;
+    left: 62%;
+    width: 26%;
+    top: 60.578%;
+    height: 2.5px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-div {
+    position: absolute;
+    left: 59.775%;
+    width: 30.455%;
+    top: 64.304%;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.7);
+}
+
+.mock-doc.poster.love .mk-lv-div.low { top: 71.851%; }
+
+.mock-doc.poster.love .mk-lv-names {
+    position: absolute;
+    left: 60.5%;
+    width: 29%;
+    top: 67.705%;
+    height: 3px;
+    background-color: #FFFFFF;
+}

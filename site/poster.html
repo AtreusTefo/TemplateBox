@@ -575,7 +575,12 @@
                         </div>
                     </div>
 
-                    <div id="p-anniv-fields" hidden>
+                    <!-- The two names are shared: the anniversary calendar and
+                         the love story calendar both print a pair with a heart
+                         between them, and neither wants the other's remaining
+                         controls. Their own block, with its own gate, for the
+                         reason #p-batch-fields has one. -->
+                    <div id="p-names-fields" hidden>
                         <div class="field field-row">
                             <div>
                                 <label for="p-name-a">First Name</label>
@@ -586,7 +591,9 @@
                                 <input type="text" id="p-name-b" maxlength="40" autocomplete="off">
                             </div>
                         </div>
+                    </div>
 
+                    <div id="p-anniv-fields" hidden>
                         <div class="field">
                             <label for="p-tagline">Line Along the Foot</label>
                             <input type="text" id="p-tagline" maxlength="40" autocomplete="off">
@@ -629,6 +636,26 @@
                             <label for="p-trib-theme">Screen Mode</label>
                             <select id="p-trib-theme"></select>
                             <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. The photo boxes stay red in both, because on this artwork the red IS the empty state; what changes is the keyline, which cannot be white on white paper.</p>
+                        </div>
+                    </div>
+
+                    <div id="p-love-fields" hidden>
+                        <div class="field">
+                            <label for="p-love-message">Message</label>
+                            <textarea id="p-love-message" maxlength="220" rows="5" autocomplete="off"></textarea>
+                            <p class="upload-hint">Sits under the calendar and wraps to the column. A blank line starts a second paragraph, which is set a little further down than a new line would be, and the two small hearts follow the end of the first one.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-love-title">Greeting</label>
+                            <input type="text" id="p-love-title" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Centred on the column, above the names.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-love-theme">Screen Mode</label>
+                            <select id="p-love-theme"></select>
+                            <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. The empty photo boxes take the ink rather than the page, so they stay visible on both.</p>
                         </div>
                     </div>
 

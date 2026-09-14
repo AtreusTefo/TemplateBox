@@ -187,6 +187,15 @@
         tribute: {
             frame: null, trim: null, label: "Birthday Tribute, Photo Wall",
             layout: "tribute"
+        },
+        /* The eighth layout, and the fifth calendar: a circular portrait over a
+           cascade of eight photographs down the left, with the month, a
+           two-paragraph message and two names down the right. Shares the
+           calendar arithmetic, the heart and the sparkle with its four
+           siblings; everything else about it is its own. See paintLove(). */
+        love: {
+            frame: null, trim: null, label: "Love Story Calendar, Photo Cascade",
+            layout: "love"
         }
     };
 
@@ -1133,6 +1142,479 @@
         };
     }
 
+    /* ----------------------------------------------------------------------
+       The love story calendar (September 14, 2026).
+
+       The EIGHTH layout, and the fifth in the calendar family: a circular
+       portrait over a cascade of eight photographs down the left, and a
+       calendar, a message and two names down the right. Traced from a supplied
+       A4 portrait artwork whose page is already this editor's page.
+
+       Its calendar is WRONG in the source, which is now the third of four
+       artworks to be so and the reason none of them is ever copied. The file
+       is labelled for a month that opened on a Friday and draws a generic
+       Monday-opening grid over it: 1 under M, 30 under T, five rows. Computed
+       here, as the other four are, by annivMonth() and annivCell().
+
+       This one's font split is the REVERSE of its three siblings. There Corsiva
+       carried every word and Times only the grid; here Times carries the month,
+       the grid, the message and the greeting, and Corsiva appears on the two
+       names alone. Read the artwork, not the sibling.
+       ---------------------------------------------------------------------- */
+
+    /* The eight rectangles, verbatim from the artwork, in its own order.
+
+       THEY OVERLAP -- box 2 lies over box 1 and box 5 over box 8 -- so draw
+       order is load-bearing and slotAt() walks backwards, the same rule the
+       tribute's fifteen follow.
+
+       `inner` is a KEYLINE, not a second slot. Three of these boxes are drawn
+       twice in the source: an outer rectangle in the PAGE colour and an inner
+       one holding the picture, which is how the artwork separates a box that
+       sits on top of another from the one underneath. One box, one photograph,
+       a mount around three of them. */
+    const LOVE_BOXES = [
+        { x: 17.89, y: 274.83, w: 131.26, h: 243.96 },
+        { x: 111.49, y: 304.53, w: 134.71, h: 186.68,
+          inner: { x: 118.05, y: 316.80, w: 120.78, h: 161.04 } },
+        { x: 153.92, y: 499.16, w: 134.71, h: 178.73 },
+        { x: 17.89, y: 525.19, w: 131.26, h: 152.70 },
+        { x: 388.17, y: 683.35, w: 146.19, h: 137.08,
+          inner: { x: 394.09, y: 688.05, w: 133.64, h: 126.37 } },
+        /* The source draws this one box twice at two DIFFERENT widths: an
+           unfilled 164.98 and a white-filled 166.33. The fill is what shows, so
+           166.33 is the one carried. It is the only box of the eight where the
+           two disagree, and taking the other left it 1.4 points narrow against
+           the reference render. */
+        { x: 17.89, y: 694.63, w: 166.33, h: 121.69 },
+        { x: 193.15, y: 694.63, w: 145.68, h: 119.35 },
+        { x: 310.09, y: 706.29, w: 93.42, h: 104.57,
+          inner: { x: 314.77, y: 710.87, w: 83.66, h: 94.78 } }
+    ];
+
+    const LOVE = {
+        page: { w: 595.28, h: 841.89 },
+        /* The portrait is TWO shapes and they are not concentric: the white
+           ring is centred 192.66 and the picture 195.76, three points lower.
+           Kept, because the ring reading slightly heavier along the top is
+           what it does in the artwork. */
+        ring: { cx: 144.32, cy: 192.66, rx: 113.60, ry: 115.15 },
+        portrait: { cx: 144.36, cy: 195.76, r: 108.77, line: 2 },
+        topRule: { y: 24.16, x1: 320.90, x2: 565.52, width: 2 },
+        month: { baseline: 48.45, size: 21.94 },
+        head: { baseline: 85.74, size: 18.29 },
+        rule: { y: 93.98, x1: 342.16, x2: 550.03, width: 2 },
+        /* 21.96 is the source's own row pitch, averaged over its five hand-set
+           rows (122.16, 144.54, 166.50, 188.46, 210.42). The tray below moves
+           with the LAST row rather than sitting at a fixed y, so a six-row
+           month pushes it down instead of setting its dates inside it. */
+        grid: { top: 122.16, pitch: 21.96, size: 18.29 },
+        dayHeart: { w: 26.71 },
+        /* The cradle under the grid: a bracket whose ends turn up either side
+           of the final row. `lift` is how far its top sits ABOVE that row's
+           baseline in the artwork, which is what anchors it. */
+        tray: { lift: 15.09 },
+        message: { x: 344.51, baseline: 289.30, size: 21.02, leading: 25.23,
+            para: 30.53, maxLines: 8 },
+        /* The two pink hearts the artwork sets at the end of the first
+           paragraph. In the source they are a raster emoji; here they follow
+           the last line of that paragraph so a longer or shorter message
+           carries them with it. */
+        emoji: { w: 17.83, small: 13.31, gap: 6, lift: 8.54, dx: 12.91, dy: -9.46 },
+        title: { baseline: 521.72, size: 21.02 },
+        names: { baseline: 583.52, size: 26.51, heart: 24.11, gap: 6 },
+        /* Two of these, above and below the names. Each is three rule segments
+           with ten diamond glyphs along them, not one line -- see
+           LOVE_DIVIDER, which holds the upper one and mirrors it. */
+        /* The strings the hearts hang from, top centre. `opacity` is the
+           source's own: the strings are drawn at 0.6 so they read as thread
+           rather than as rules. */
+        strings: [
+            { x: 175.15, from: 22.28, to: 39.20 },
+            { x: 208.91, from: 23.63, to: 40.06 },
+            { x: 229.91, from: 24.38, to: 47.34 },
+            { x: 250.42, from: 22.28, to: 80.97 }
+        ],
+        stringWidth: 1,
+        stringAlpha: 0.6,
+        /* One size for all twenty-two sparkles: measured, every one of them is
+           2.31 wide in the source. */
+        spark: 1.155
+    };
+
+    /* The two dividers, element by element, in the artwork's own coordinates.
+
+       Only the UPPER one is stored. The lower is this reflected about `axis`
+       and shifted `dx` across, which is proved rather than assumed: every
+       element's two y values sum to 1146.29 within a hundredth of a point, and
+       573.145 is the heart between the names.
+
+       Each diamond is a RECT under a 45-degree rotate in the source, so it
+       spans its own side times root two on the page -- and those rects are NOT
+       square. Reading the height from the width, which is what this did first,
+       left the centre diamond 1.3 points short against the reference. The two
+       largest glyphs are written as polygons rather than rects and are square
+       at 14.53; the rest are not.
+
+       The y values are not all equal, and they are kept as they are: the row
+       was placed by hand and leans about 1.7 points across its own width. */
+    const LOVE_DIVIDER = {
+        axis: 573.145,
+        dx: 0.46,
+        segs: [
+            [355.83, 541.68, 396.34, 541.37],
+            [410.17, 541.37, 482.47, 540.19],
+            [496.60, 539.96, 537.12, 539.96]
+        ],
+        segWidth: 1,
+        pipWidth: 0.5,
+        pips: [
+            { x: 353.305, y: 541.615, w: 6.72, h: 7.20 },
+            { x: 403.045, y: 541.455, w: 6.72, h: 7.20 },
+            { x: 403.205, y: 541.615, w: 14.53, h: 14.53, stroke: true },
+            { x: 429.825, y: 541.280, w: 12.06, h: 12.93, stroke: true },
+            { x: 446.650, y: 540.765, w: 18.04, h: 19.33, stroke: true },
+            { x: 446.445, y: 540.555, w: 8.64, h: 9.26 },
+            { x: 463.215, y: 540.200, w: 12.06, h: 12.93, stroke: true },
+            { x: 489.735, y: 540.205, w: 14.53, h: 14.53, stroke: true },
+            { x: 489.895, y: 540.045, w: 6.72, h: 7.20 },
+            { x: 538.415, y: 539.955, w: 6.72, h: 7.20 }
+        ]
+    };
+
+    /* The nine hearts in the hanging cluster: four on the strings above and
+       five loose around them. Only the width is carried -- every one of them
+       measures 1.09 wide for 1 tall, which is ANNIV_HEART's own proportion, so
+       the height is derived rather than typed and cannot drift from the path.
+       `role` names a theme token; `stroke` is the outline's width in the
+       ARTWORK'S points, which is what the source gives it -- one of them is
+       drawn at 2 and the rest at 1.
+
+       Not "one device pixel", which is what it was and is what made the two
+       painters disagree: Math.max(1, fx) clamps at the paper's scale and not
+       at the canvas's, so the same heart came out with a 1.7px outline on
+       screen and a 3.3px one in the export. Every width in this layout is in
+       the artwork's own units for that reason. */
+    const LOVE_HEARTS = [
+        { x: 200.32, y: 40.10, w: 17.12, role: "ink" },
+        { x: 221.97, y: 47.90, w: 15.88, role: "ink", stroke: 1 },
+        { x: 167.21, y: 40.06, w: 15.88, role: "ink", stroke: 1 },
+        { x: 243.69, y: 82.75, w: 11.87, role: "ink", stroke: 1 },
+        { x: 231.00, y: 67.65, w: 15.72, role: "heart" },
+        { x: 183.10, y: 51.39, w: 12.78, role: "heart" },
+        { x: 178.36, y: 20.86, w: 17.11, role: "heart" },
+        { x: 190.55, y: 69.53, w: 18.37, role: "heart", stroke: 2 },
+        { x: 211.44, y: 90.50, w: 11.87, role: "heart", stroke: 1 }
+    ];
+
+    /* Twenty-two sparkles through the cluster, as the CENTRES the star is
+       drawn on. Nineteen take the theme's own light and three are warm, which
+       is the source's own split.
+
+       The source spends twenty-two luminosity masks and twenty-two filters on
+       the glow around these -- about a third of the file -- and none of it
+       ships, for the reason the birthday poster's seventy-four embedded PNGs
+       did not: HBD_SPARK's radial gradient is the same light at no weight. */
+    const LOVE_SPARKS = [
+        [259.25, 77.17], [255.04, 92.71], [257.66, 57.82], [247.27, 42.11],
+        [246.11, 27.83], [234.84, 34.00], [257.66, 38.26], [225.49, 28.85],
+        [223.80, 43.36], [224.97, 64.71], [208.16, 66.96], [213.42, 29.74],
+        [196.63, 32.97], [192.23, 39.20], [170.78, 61.05], [165.21, 53.25],
+        [169.31, 26.80], [229.42, 93.62], [241.59, 99.76]
+    ];
+    const LOVE_SPARKS_WARM = [
+        [184.83, 73.78], [227.26, 80.02], [212.23, 85.62]
+    ];
+
+    function loveSparkles(list) {
+        return list.map((p) => ({ x: p[0], y: p[1], r: LOVE.spark, sats: [] }));
+    }
+
+    /* One palm frond, and three placements of it.
+
+       The source draws thirty-nine leaflets in each of three corners -- a
+       hundred and seventeen paths, fifteen kilobytes -- and they are the SAME
+       thirty-nine each time. Fitted over all thirty-nine leaflet centres, the
+       second is the first turned 179.2 degrees at 0.956 and the third is its
+       MIRROR turned 55.0 at 1.156, to a worst-case error of 0.12 and 1.00
+       points respectively. So one frond is stored and placed by matrix, which
+       is a third of the data and, more to the point, one shape to be wrong
+       instead of three.
+
+       The matrices are in the artwork's own coordinates and the page scale is
+       applied outside them, so the canvas and the SVG build the same transform
+       from the same six numbers. */
+    const LOVE_FROND = {
+        view: [10.65, 58.85, 92.54, 150.68],
+        d: "M93.28,58.9A22,22,0,0,0,90.17,64c-1.12,2.76-4.6,5-4.6,5S87,64,89.84,61.57A" +
+           "30.93,30.93,0,0,1,93.28,58.9ZM84.46,70.59s2.27-2.57,4.64-3.2a41.49,41.49,0" +
+           ",0,1,6-.88s-2.82,3.1-5.28,3.43S84.46,70.59,84.46,70.59ZM86.46,58.85a14.79," +
+           "14.79,0,0,1-.25,3.93c-.44,2.47-1.75,7.81-1.75,7.81a19,19,0,0,1-.17-6.69A18" +
+           ".09,18.09,0,0,1,86.46,58.85ZM83.81,59.14s-.69,5-1.11,8.22a45.55,45.55,0,0," +
+           "1-2.27,8,23.73,23.73,0,0,1,.1-7.66A25,25,0,0,1,83.81,59.14ZM93.41,69.8s-4." +
+           "27,3.4-6.68,4.33a29.31,29.31,0,0,1-6.3,1.26,26.54,26.54,0,0,1,7.45-4.33C91" +
+           ".86,69.7,93.41,69.8,93.41,69.8ZM93.92,72.19a76.33,76.33,0,0,0-10.06,3.67,6" +
+           "7.27,67.27,0,0,0-6.75,4.27,59.71,59.71,0,0,0,10.58-3.89A47,47,0,0,0,93.92," +
+           "72.19ZM94.32,75.48s-8.23,2.8-12.8,4.86a29.52,29.52,0,0,0-8.4,6.37s7-4.29,1" +
+           "0.58-5.2S94.32,75.48,94.32,75.48ZM94.34,79.09s-9.16,3-14.32,6.42a130,130,0" +
+           ",0,0-11.33,8.83,109.37,109.37,0,0,0,15.5-8C92.35,81.34,94.34,79.09,94.34,7" +
+           "9.09ZM97.71,82.35s-6.11,1.31-17.95,9.71-17.19,14.26-17.19,14.26,12.37-7.73" +
+           ",19.7-12.7S97.71,82.35,97.71,82.35ZM99.19,86.32l-.25.13c-1.58.83-10.58,5.6" +
+           "6-21.57,12.76C65.24,107,60.06,112.83,60.06,112.83a184.39,184.39,0,0,0,19-1" +
+           "1.15A211,211,0,0,0,99.19,86.32ZM100.92,91.8S90.3,99.91,83.46,103.12s-18.11" +
+           ",11.2-21.66,14-5,4.18-5,4.18,14.69-9,23.35-13S100.92,91.8,100.92,91.8ZM102" +
+           ".78,99.47l-.24.09a179.89,179.89,0,0,0-23.27,11.17A152.16,152.16,0,0,0,55,1" +
+           "27.81s5.92-1.59,13.9-7.22,9.62-7.31,16.3-11S102.78,99.47,102.78,99.47ZM101" +
+           ".89,103.52a182.16,182.16,0,0,0-25.14,14.37c-12.07,8.42-25,20.88-25,20.88a1" +
+           "46.48,146.48,0,0,0,15.47-9.6C75.73,123.14,101.89,103.52,101.89,103.52ZM80." +
+           "64,61.49s-.68,5.1-1.23,7.58-.33,5.73-1.2,8.06-1.1,3-1.1,3a14,14,0,0,1-.36-" +
+           "6.2C77.36,70.74,79.36,63.8,80.64,61.49ZM77.36,62s-1.46,6.29-1.85,10a67.06," +
+           "67.06,0,0,0-.7,8.24c.08,2.25-1.73,6-1.73,6a31.9,31.9,0,0,1,0-7.83C73.62,73" +
+           ".5,75,65.9,77.36,62ZM72.76,61.65s-.47,10.18-.57,15.77S68.7,93.68,68.7,93.6" +
+           "8l-.51,1S68.92,82.1,70,75.24,72.76,61.65,72.76,61.65ZM68.38,65.83a100.34,1" +
+           "00.34,0,0,1-1.21,19.92c-1.73,9.35-4.33,19.6-4.33,19.6l-.6,1.24A158.19,158." +
+           "19,0,0,1,64.1,83.94,180.43,180.43,0,0,1,68.38,65.83ZM62.75,67s-1.28,9.72-." +
+           "89,16.16-1.53,25-1.68,26.57a25.23,25.23,0,0,1-.53,3.09l-.3.71s-.85-22.39.1" +
+           "8-30.41A139,139,0,0,1,62.75,67ZM54.54,66.22A60.94,60.94,0,0,1,57.43,85c-.1" +
+           ",10.28-1.09,19.91-.93,24.52s.39,10.47.39,10.47S53.71,103.36,53.8,92.2,55.8" +
+           "6,70.49,54.54,66.22ZM47.26,74.19s4.29,17,5.09,25.43,1.28,22.71,1.91,25.55-" +
+           ".19,3.91-.19,3.91-2.66-20.63-4-27.3S47,74.21,47.26,74.19ZM41,78.69s5.43,22" +
+           ".37,6.52,31.87,2.86,29.66,2.86,29.66l-.07,1.26s-5.11-27.68-7.22-38.78A150." +
+           "71,150.71,0,0,1,41,78.69ZM48.71,148.54s-4.48-32-7.62-47.33A229.38,229.38,0" +
+           ",0,0,35.36,78s3.45,30.25,6.27,44.12,6.83,26.57,6.83,26.57ZM49.92,148.07S65" +
+           ".81,137.83,76,129.93s17.82-14,20.53-16.15a68.48,68.48,0,0,1,6.66-4.56s-6.7" +
+           "8,1.84-21.86,12.53S49.92,148.07,49.92,148.07ZM101.18,115.68s-12.48,8.52-26" +
+           ".44,18.4S48.2,154.15,48.2,154.15l.07.71A189.78,189.78,0,0,0,76,136.46C90.9" +
+           "3,124.65,101.18,115.68,101.18,115.68ZM31.64,82.45s3.56,22.5,7,36.18,7,34.4" +
+           "5,7.54,36.51a34.46,34.46,0,0,1,.79,4.33s-6.83-17.89-9.94-31.54S30.07,87.73" +
+           ",31.64,82.45ZM21.62,92.17S32.22,122,37.11,137.38,45.23,169,45.23,169,36,14" +
+           "7.6,30.55,127.55,21.62,92.17,21.62,92.17ZM94.82,127.69s-10.51,13.44-26.44," +
+           "21.78-21.11,10.22-21.11,10.22l.67-1.07S63.44,150,76.17,141,94.82,127.69,94" +
+           ".82,127.69ZM98.62,135.9s-4.36.26-21,9.85S45.79,169.9,45.79,169.9s11.14-6.2" +
+           "6,23.53-15.06S90.33,139.42,98.62,135.9ZM99.61,139S87.48,147.5,78.49,152.5s" +
+           "-27.09,17.74-30,20.19-3.14,2.71-3.14,2.71,14.18-8.07,24.22-13.93S97.7,141." +
+           "56,99.61,139ZM19.54,100.43s8.52,22.88,13.62,39.22,8.48,28.41,9.86,31.07a34" +
+           ",34,0,0,0,2.25,3.87l-.15.53s-5.84-7.35-12.1-25.41S19.54,100.43,19.54,100.4" +
+           "3ZM11.28,116.51s6.08,7.07,12.88,22.1S39.85,171,41.34,175.16a18.76,18.76,0," +
+           "0,0,3.25,6.06s-.27,2.34-9.55-13.31S18.4,132.06,15.88,126A81,81,0,0,0,11.28" +
+           ",116.51ZM96.32,147.49s-15.58,8.31-26.54,15.92c-10.36,7.18-23.54,17.05-25,1" +
+           "8.12l-.12.1a206.8,206.8,0,0,0,30.7-17.77C89.9,153.45,96.32,147.49,96.32,14" +
+           "7.49ZM90.4,158.45s-16.11,10.37-27,16.31S45,185.46,45,185.46a125,125,0,0,0," +
+           "19.7-8C76.72,171.52,90.4,158.45,90.4,158.45ZM10.72,131.22s7.4,11.34,14.66," +
+           "24.4,14.27,24.73,16.14,27.06,3.1,3.58,3.1,3.58-5.94-2.8-17-18.8S10.72,131." +
+           "22,10.72,131.22ZM10.65,152.76s8.35,8.64,18.07,19.3,15.86,18.53,15.86,18.53" +
+           "-8.94-5.2-19.31-17.28S10.65,152.76,10.65,152.76ZM93.64,165S70.3,177.48,62." +
+           "16,181.34,44.53,190,44.53,190a103.39,103.39,0,0,0,20.16-6.22C76.48,179,93." +
+           "64,165,93.64,165ZM44.46,195.29S54.78,189.1,63.37,187s18.26-5.52,18.26-5.52" +
+           "S69,189.1,61,191.28,44.46,195.29,44.46,195.29ZM18.53,172.89s6.78,6.23,13.2" +
+           "4,11.65,12.69,10.75,12.69,10.75-1.71.09-8.22-3.85S18.53,172.89,18.53,172.8" +
+           "9ZM44,208s-3.78-30.87,4.43-61.61S64.31,101.78,65.82,98.8s9.89-17.12,11.26-" +
+           "19,10-12.86,10-12.86l-.32,1S79.56,75.53,70.9,91.06s-16.33,34.29-18.51,44.5" +
+           "7-8.3,38.52-7.76,48,.85,25.9.85,25.9Z"
+    };
+    LOVE_FROND.path = new Path2D(LOVE_FROND.d);
+
+    const LOVE_FRONDS = [
+        [1, 0, 0, 1, 0, 0],
+        [-0.9555, -0.0133, 0.0133, -0.9555, 296.2973, 369.1968],
+        [-0.6630, 0.9473, 0.9473, 0.6630, 324.4983, 542.6102]
+    ];
+
+    /* The cradle under the calendar: one closed path, verbatim. Its ends turn
+       up either side of the final row and its bar runs beneath it. Drawn at
+       the artwork's x and at a y that follows the last row. */
+    const LOVE_TRAY = {
+        view: [326.13, 195.33, 239.59, 51.08],
+        d: "M339,242.33l-9.58-14.79a19.08,19.08,0,0,1-3.08-10.21l-.21-22,13,24.76a8.87" +
+           ",8.87,0,0,0,7.86,4.75H544.66a8.87,8.87,0,0,0,7.86-4.75l13-24.76.2,21.67a19" +
+           ".11,19.11,0,0,1-3.23,10.82l-9.82,14.66a8.88,8.88,0,0,1-7.38,3.93H346.46A8." +
+           "86,8.86,0,0,1,339,242.33Z"
+    };
+    LOVE_TRAY.path = new Path2D(LOVE_TRAY.d);
+
+    /* Both colourways ship in the source -- the first artwork in this family to
+       supply the light one rather than leave it to be derived -- so these are
+       read off the pair rather than guessed.
+
+       The empty photo box is the INK and the mount behind it is the PAGE, in
+       both files. That one rule is what makes the light colourway work: invert
+       the ground and the white boxes would vanish, and the source's answer is
+       to fill them near-black instead, which is the same problem and the same
+       answer as the anniversary poster's `boxFill: null`. */
+    const LOVE_THEMES = {
+        night: {
+            label: "Dark",
+            page: "#231F20",
+            ink: "#FFFFFF",
+            accent: "#ED2024",
+            /* The hearts are a shade warmer than the fronds in the source, and
+               both are kept: #ED2024 on the leaves, #E93827 on the hearts. */
+            heart: "#E93827",
+            pink: "#EF5692",
+            pinkDeep: "#DB2E75",
+            onAccent: "#FFFFFF",
+            /* The portrait is a WHITE RING here: a white ellipse with a
+               page-coloured circle punched out of it, and no keyline. */
+            circleFill: "#231F20",
+            circleLine: null,
+            sparkle: "#FFFFFF",
+            sparkleTip: "#FFFDE6",
+            sparkleWarm: "#ED5F52",
+            sparkleWarmTip: "#F6A99F"
+        },
+        day: {
+            label: "Light",
+            page: "#FFFFFF",
+            ink: "#231F20",
+            accent: "#ED2024",
+            heart: "#E93827",
+            pink: "#EF5692",
+            pinkDeep: "#DB2E75",
+            onAccent: "#FFFFFF",
+            /* NOT the inverse of the dark one, and this had to be read rather
+               than derived. The light file fills the whole ellipse with the ink
+               and puts a two-point WHITE keyline on the picture circle, so the
+               empty portrait is a solid dark disc with a hairline inside its
+               edge -- which matches its ink-filled boxes. Inverting the dark
+               colourway instead gave a white disc inside a heavy black band,
+               and the reference has no such thing. */
+            circleFill: "#231F20",
+            circleLine: "#FFFFFF",
+            /* On white paper a white star is nothing, so the light colourway
+               lights its sparkles gold and stops the tips at cream -- the same
+               inversion the tribute poster makes, for the same reason. */
+            sparkle: "#D8B24A",
+            sparkleTip: "#F3E3B0",
+            sparkleWarm: "#ED5F52",
+            sparkleWarmTip: "#C9483C"
+        }
+    };
+
+    const DEFAULT_LOVE_THEME = "night";
+
+    function loveTheme() {
+        return LOVE_THEMES[state.loveTheme] || LOVE_THEMES[DEFAULT_LOVE_THEME];
+    }
+
+    /* Two paragraphs, demonstrated rather than described: the blank line is
+       what the poster reads as the wider gap between them. */
+    const DEFAULT_LOVE_MESSAGE =
+        "Write the few lines you would want them to read first.\n\n" +
+        "Leave a blank line and the second paragraph begins here.";
+    const DEFAULT_LOVE_TITLE = "Happy Anniversary";
+
+    function loveRects(W, H) {
+        return scaleBoxes(LOVE_BOXES, LOVE.page, W, H);
+    }
+
+    /* The box a photograph actually goes in: the inner rectangle where the
+       artwork draws a mount, and the whole box where it does not. One
+       function, so the painter, the hit test and the SVG cannot disagree. */
+    function loveInner(i, W, H) {
+        const fx = W / LOVE.page.w;
+        const fy = H / LOVE.page.h;
+        const src = LOVE_BOXES[i].inner || LOVE_BOXES[i];
+        return { x: src.x * fx, y: src.y * fy, w: src.w * fx, h: src.h * fy };
+    }
+
+    function loveGrid(W, H) {
+        return calGrid(LOVE, W, H);
+    }
+
+    /* Where the cradle sits, given how many rows the month needs. It hangs off
+       the LAST row rather than off a fixed y: the artwork's month has five
+       rows, and a six-row one at the same fixed position would set its final
+       week inside the bracket. */
+    function loveTrayRect(rows, W, H) {
+        const fx = W / LOVE.page.w;
+        const fy = H / LOVE.page.h;
+        const last = LOVE.grid.top + LOVE.grid.pitch * Math.max(0, rows - 1);
+        const v = LOVE_TRAY.view;
+        return { x: v[0] * fx, y: (last - LOVE.tray.lift) * fy,
+            w: v[2] * fx, h: v[3] * fy };
+    }
+
+    /* The message, wrapped, with the paragraph breaks kept as breaks.
+
+       The source sets it as two <text> blocks 30.53 apart against a 25.23
+       leading, which is a paragraph gap and not a loose line. Flattening the
+       two into seven lines would lose the only structure the message has, so a
+       blank line in the field is a paragraph here and carries the wider gap. */
+    function loveLines(c, text, maxPx) {
+        const out = [];
+        String(text || "").split(/\n{2,}/).forEach((para, p) => {
+            const lines = hbdWrap(c, para.replace(/\n+/g, " "), maxPx);
+            lines.forEach((line, i) => {
+                out.push({ text: line, para: p > 0 && i === 0 });
+            });
+        });
+        return out;
+    }
+
+    /* Where each wrapped line's baseline lands, in the artwork's own units. */
+    function loveBaselines(lines) {
+        let y = LOVE.message.baseline;
+        return lines.map((line, i) => {
+            if (i > 0) { y += line.para ? LOVE.message.para : LOVE.message.leading; }
+            return y;
+        });
+    }
+
+    function loveMessageWidth(W) {
+        return (LOVE.rule.x2 - LOVE.message.x) * (W / LOVE.page.w);
+    }
+
+    /* Times, in the two weights this artwork asks of it. CAL_FACE is the same
+       stack the calendar already uses -- there is no webfont here and none is
+       needed -- and the only thing this adds is the bold and the italic the
+       message and the greeting are set in. */
+    function loveFont(size, weight, italic) {
+        return (italic ? "italic " : "") + (weight || 400) + " " + size +
+            'px "Times New Roman", Times, "Liberation Serif", serif';
+    }
+
+    /* annivFit(), in Times. Same shrink-to-fit rule as everywhere else in this
+       editor: a greeting wider than its column is set smaller rather than
+       clipped, because a line that vanishes halfway through says nothing about
+       why. */
+    function loveFit(c, text, px, maxPx, weight, italic) {
+        let size = px;
+        c.font = loveFont(size, weight, italic);
+        const w = c.measureText(text).width;
+        if (w > maxPx && w > 0) {
+            size = Math.max(6, size * (maxPx / w));
+            c.font = loveFont(size, weight, italic);
+        }
+        return size;
+    }
+
+    /* The two names and the heart between them, fitted as ONE unit.
+
+       Everything in the row scales together -- both names and the heart --
+       because the total width is linear in the size, so one ratio is exact
+       rather than an approximation to iterate on. Shrinking only the type
+       would leave a heart the size it was between two names that are no
+       longer, which is the version of this that looks broken rather than
+       small.
+
+       It is needed here and not on the anniversary poster because the stand-in
+       for Monotype Corsiva sets about a fifth wider than Corsiva at matched
+       cap height (see SCRIPT_SIZE_ADJUST), and this artwork gives the pair a
+       208-point column rather than the width of the page. */
+    function loveNamesFit(c, size, heartW, gap, maxPx) {
+        c.font = hbdFont(size);
+        const w = c.measureText(state.nameA).width + gap * 2 + heartW +
+            c.measureText(state.nameB).width;
+        const k = (w > maxPx && w > 0) ? maxPx / w : 1;
+        if (k < 1) { c.font = hbdFont(size * k); }
+        return { size: size * k, heart: heartW * k, gap: gap * k };
+    }
+
+    function loveSvgFont(size, weight, italic) {
+        return ' font-family="' + CAL_FACE + '" font-weight="' + (weight || 400) +
+            '" font-size="' + size + '"' + (italic ? ' font-style="italic"' : "");
+    }
+
     const ANNIV_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
     const ANNIV_MONTHS = ["January", "February", "March", "April", "May",
         "June", "July", "August", "September", "October", "November",
@@ -1294,7 +1776,17 @@
        slot is a place in ONE arrangement. */
     const TRIB_EXTRA = 14;
     const TRIB_FIRST = HBD_FIRST + HBD_EXTRA;
-    const SLOT_COUNT = TRIB_FIRST + TRIB_EXTRA;
+
+    /* The love story calendar's nine, and the one place in this file where the
+       carried-across slot is NOT a rectangle: its slot 0 is the circular
+       PORTRAIT, which is the photograph that layout is built around, and all
+       eight of its boxes take fresh indices. So a picture set on the card, the
+       player or any of the three collages arrives in the circle here, which is
+       the same rule as everywhere else applied to the shape this artwork
+       actually leads with. */
+    const LOVE_EXTRA = 8;
+    const LOVE_FIRST = TRIB_FIRST + TRIB_EXTRA;
+    const SLOT_COUNT = LOVE_FIRST + LOVE_EXTRA;
 
     /* Collage box index (0..17) to photo slot. */
     function annivSlot(i) {
@@ -1309,6 +1801,12 @@
     /* Tribute box index (0..14) to photo slot. */
     function tribSlot(i) {
         return i === 0 ? 0 : TRIB_FIRST + i - 1;
+    }
+
+    /* Love story box index (0..7) to photo slot. None of them is slot 0: that
+       one is the circle above them. */
+    function loveSlot(i) {
+        return LOVE_FIRST + i;
     }
 
     /* The artwork's icons, kept in their SOURCE files' own coordinates and
@@ -1738,6 +2236,9 @@
         annivTheme: DEFAULT_ANNIV_THEME,
         hbdTheme: DEFAULT_HBD_THEME,
         tribTheme: DEFAULT_TRIB_THEME,
+        loveTheme: DEFAULT_LOVE_THEME,
+        loveMessage: DEFAULT_LOVE_MESSAGE,
+        loveTitle: DEFAULT_LOVE_TITLE,
         heading: DEFAULT_TRIB_HEADING,
         message: DEFAULT_TRIB_MESSAGE,
         title: DEFAULT_TRIB_TITLE,
@@ -1787,6 +2288,8 @@
             annivTheme: state.annivTheme,
             hbdTheme: state.hbdTheme,
             tribTheme: state.tribTheme,
+            loveTheme: state.loveTheme,
+            loveMessage: state.loveMessage, loveTitle: state.loveTitle,
             heading: state.heading, message: state.message, title: state.title,
             quote: state.quote, closing: state.closing,
             nameA: state.nameA, nameB: state.nameB, tagline: state.tagline,
@@ -1822,6 +2325,10 @@
             ? parsed.hbdTheme : DEFAULT_HBD_THEME;
         state.tribTheme = TRIB_THEMES[parsed.tribTheme]
             ? parsed.tribTheme : DEFAULT_TRIB_THEME;
+        state.loveTheme = LOVE_THEMES[parsed.loveTheme]
+            ? parsed.loveTheme : DEFAULT_LOVE_THEME;
+        state.loveMessage = cleanBlock(parsed.loveMessage);
+        state.loveTitle = cleanLine(parsed.loveTitle);
         state.heading = cleanHeading(parsed.heading);
         state.message = cleanBlock(parsed.message);
         state.title = cleanLine(parsed.title);
@@ -1931,6 +2438,9 @@
             annivTheme: state.annivTheme,
             hbdTheme: state.hbdTheme,
             tribTheme: state.tribTheme,
+            loveTheme: state.loveTheme,
+            loveMessage: TB.sanitize(state.loveMessage),
+            loveTitle: TB.sanitize(state.loveTitle),
             heading: TB.sanitize(state.heading),
             message: TB.sanitize(state.message),
             title: TB.sanitize(state.title),
@@ -2005,6 +2515,12 @@
             ? saved.hbdTheme : DEFAULT_HBD_THEME;
         state.tribTheme = TRIB_THEMES[saved.tribTheme]
             ? saved.tribTheme : DEFAULT_TRIB_THEME;
+        state.loveTheme = LOVE_THEMES[saved.loveTheme]
+            ? saved.loveTheme : DEFAULT_LOVE_THEME;
+        state.loveMessage = saved.loveMessage === undefined
+            ? DEFAULT_LOVE_MESSAGE : cleanBlock(TB.desanitize(String(saved.loveMessage)));
+        state.loveTitle = saved.loveTitle === undefined
+            ? DEFAULT_LOVE_TITLE : cleanLine(TB.desanitize(String(saved.loveTitle)));
         state.heading = saved.heading === undefined
             ? DEFAULT_TRIB_HEADING : cleanHeading(TB.desanitize(String(saved.heading)));
         state.message = saved.message === undefined
@@ -4245,6 +4761,529 @@
 
     /* x,y is the TOP-LEFT of the drawn run, w,h its size, all in canvas
        pixels. `align` and `font` are what the context was set to. */
+    /* A heart from ANNIV_HEART's path, filled or outlined, in any colour.
+       drawArt() reads its colour out of a theme token by name, and this layout
+       needs the same path in four different roles including a stroke, so the
+       two share the path and nothing else. */
+    function loveHeart(c, x, y, w, colour, stroke, lineW) {
+        const v = ANNIV_HEART.view;
+        const h = w / (v[2] / v[3]);
+        c.save();
+        c.translate(x, y);
+        c.scale(w / v[2], h / v[3]);
+        c.translate(-v[0], -v[1]);
+        if (stroke) {
+            c.strokeStyle = colour;
+            c.lineWidth = (lineW || 1) / (w / v[2]);
+            c.stroke(ANNIV_HEART.parts[0].path);
+        } else {
+            c.fillStyle = colour;
+            c.fill(ANNIV_HEART.parts[0].path);
+        }
+        c.restore();
+    }
+
+    function loveHeartSVG(x, y, w, colour, stroke, lineW) {
+        const v = ANNIV_HEART.view;
+        const h = w / (v[2] / v[3]);
+        const k = w / v[2];
+        return '<g transform="translate(' + x + " " + y + ") scale(" + k + " " +
+            (h / v[3]) + ") translate(" + (-v[0]) + " " + (-v[1]) + ')">' +
+            '<path d="' + ANNIV_HEART.parts[0].d + '" ' + (stroke
+                ? 'fill="none" stroke="' + colour + '" stroke-width="' +
+                  ((lineW || 1) / k) + '"'
+                : 'fill="' + colour + '"') + "/></g>";
+    }
+
+    /* One frond, placed by one of LOVE_FRONDS' matrices. The page scale goes on
+       OUTSIDE the matrix in both painters, so the three placements are the same
+       six numbers wherever they are read. */
+    function loveDrawFrond(c, m, fx, fy, colour) {
+        c.save();
+        c.scale(fx, fy);
+        c.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+        c.fillStyle = colour;
+        c.fill(LOVE_FROND.path);
+        c.restore();
+    }
+
+    function loveFrondSVG(m, fx, fy, colour) {
+        return '<g transform="scale(' + fx + " " + fy + ") matrix(" +
+            m.join(" ") + ')"><path d="' + LOVE_FROND.d + '" fill="' + colour +
+            '"/></g>';
+    }
+
+    /* A diamond, which is how every glyph on the two dividers is drawn. Its
+       width and its height are separate: the source's rects are not square. */
+    function loveDiamond(c, cx, cy, w, h, colour, stroke, lineW) {
+        const rx = w / 2;
+        const ry = h / 2;
+        c.beginPath();
+        c.moveTo(cx, cy - ry);
+        c.lineTo(cx + rx, cy);
+        c.lineTo(cx, cy + ry);
+        c.lineTo(cx - rx, cy);
+        c.closePath();
+        if (stroke) {
+            c.strokeStyle = colour;
+            c.lineWidth = lineW;
+            c.stroke();
+        } else {
+            c.fillStyle = colour;
+            c.fill();
+        }
+    }
+
+    function loveDiamondSVG(cx, cy, w, h, colour, stroke, lineW) {
+        const rx = w / 2;
+        const ry = h / 2;
+        const pts = [cx + " " + (cy - ry), (cx + rx) + " " + cy,
+            cx + " " + (cy + ry), (cx - rx) + " " + cy].join(" L");
+        return '<path d="M' + pts + 'Z" ' + (stroke
+            ? 'fill="none" stroke="' + colour + '" stroke-width="' + lineW + '"'
+            : 'fill="' + colour + '"') + "/>";
+    }
+
+    /* Where one of the two dividers' elements lands. `lower` reflects the
+       stored upper row about the axis between them and shifts it across, which
+       is the whole of the difference between the two. */
+    function lovePlace(x, y, lower) {
+        const D = LOVE_DIVIDER;
+        return lower
+            ? { x: x + D.dx, y: 2 * D.axis - y }
+            : { x: x, y: y };
+    }
+
+    function loveDrawDivider(c, lower, fx, fy, ink) {
+        const D = LOVE_DIVIDER;
+        c.strokeStyle = ink.ink;
+        c.lineWidth = D.segWidth * fx;
+        D.segs.forEach((sg) => {
+            const a = lovePlace(sg[0], sg[1], lower);
+            const b = lovePlace(sg[2], sg[3], lower);
+            c.beginPath();
+            c.moveTo(a.x * fx, a.y * fy);
+            c.lineTo(b.x * fx, b.y * fy);
+            c.stroke();
+        });
+        D.pips.forEach((p) => {
+            const at = lovePlace(p.x, p.y, lower);
+            loveDiamond(c, at.x * fx, at.y * fy, p.w * fx, p.h * fy, ink.ink,
+                p.stroke, D.pipWidth * fx);
+        });
+    }
+
+    function loveDividerSVG(lower, fx, fy, ink) {
+        const D = LOVE_DIVIDER;
+        let out = "";
+        D.segs.forEach((sg) => {
+            const a = lovePlace(sg[0], sg[1], lower);
+            const b = lovePlace(sg[2], sg[3], lower);
+            out += '<line x1="' + (a.x * fx) + '" y1="' + (a.y * fy) + '" x2="' +
+                (b.x * fx) + '" y2="' + (b.y * fy) + '" stroke="' + ink.ink +
+                '" stroke-width="' + (D.segWidth * fx) + '"/>';
+        });
+        D.pips.forEach((p) => {
+            const at = lovePlace(p.x, p.y, lower);
+            out += loveDiamondSVG(at.x * fx, at.y * fy, p.w * fx, p.h * fy,
+                ink.ink, p.stroke, D.pipWidth * fx);
+        });
+        return out;
+    }
+
+    function paintLove(c, W, H, options) {
+        const fx = W / LOVE.page.w;
+        const fy = H / LOVE.page.h;
+        const ink = loveTheme();
+        const warm = { sparkle: ink.sparkleWarm, sparkleTip: ink.sparkleWarmTip };
+
+        if (!options.transparent) {
+            c.fillStyle = ink.page;
+            c.fillRect(0, 0, W, H);
+        }
+
+        /* ---- the three fronds, behind everything ----
+           All three, before the portrait and before the boxes, because that is
+           the source's own order: its thirty-nine leaflets per corner are the
+           FIRST paths in the file and the ring, the circle and the boxes come
+           after them.
+
+           Two of them used to be painted after the portrait, and the frond
+           beside the circle then lay ACROSS the white ring and over the
+           photograph instead of tucking behind them. Nearly half of that
+           frond overlaps the circle -- it starts at x 199 where the circle
+           reaches 253 -- so the order is most of what that shape looks
+           like. */
+        LOVE_FRONDS.forEach((m) => loveDrawFrond(c, m, fx, fy, ink.accent));
+
+        /* ---- the hanging cluster ---- */
+        loveSparkles(LOVE_SPARKS).forEach((sp) => hbdDrawSparkle(c, sp, fx, fy, ink));
+        loveSparkles(LOVE_SPARKS_WARM).forEach((sp) => hbdDrawSparkle(c, sp, fx, fy, warm));
+        c.save();
+        c.globalAlpha = LOVE.stringAlpha;
+        c.strokeStyle = ink.ink;
+        c.lineWidth = LOVE.stringWidth * fx;
+        LOVE.strings.forEach((st) => {
+            c.beginPath();
+            c.moveTo(st.x * fx, st.from * fy);
+            c.lineTo(st.x * fx, st.to * fy);
+            c.stroke();
+        });
+        c.restore();
+        LOVE_HEARTS.forEach((ht) => {
+            loveHeart(c, ht.x * fx, ht.y * fy, ht.w * fx, ink[ht.role],
+                !!ht.stroke, (ht.stroke || 1) * fx);
+        });
+
+        /* ---- the portrait: a white ring, then the picture clipped to the
+               CIRCLE inside it. The two are not concentric and that is the
+               artwork's; see LOVE.ring. ---- */
+        const R = LOVE.ring;
+        const P = LOVE.portrait;
+        c.save();
+        c.fillStyle = ink.ink;
+        c.beginPath();
+        c.ellipse(R.cx * fx, R.cy * fy, R.rx * fx, R.ry * fy, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = ink.circleFill;
+        c.beginPath();
+        c.ellipse(P.cx * fx, P.cy * fy, P.r * fx, P.r * fy, 0, 0, Math.PI * 2);
+        c.fill();
+        if (photos[0]) {
+            c.save();
+            c.clip();
+            drawCoverImage(c, photos[0], (P.cx - P.r) * fx, (P.cy - P.r) * fy,
+                P.r * 2 * fx, P.r * 2 * fy, state.views[0]);
+            c.restore();
+        }
+        /* The keyline goes on last, over the photograph, because that is what
+           it is for: on the light colourway it is the only thing separating
+           the picture from the ring, both being the same ink. */
+        if (ink.circleLine) {
+            c.strokeStyle = ink.circleLine;
+            c.lineWidth = P.line * fx;
+            c.stroke();
+        }
+        c.restore();
+
+        /* ---- the photographs ----
+           Forwards, so a later box lands on an earlier one: box 2 sits over
+           box 1 and box 5 over box 8, and that stacking is the design. A
+           mounted box paints its OUTER rectangle in the page colour first,
+           which is the dark margin the artwork separates them with. */
+        const rects = loveRects(W, H);
+        rects.forEach((r, i) => {
+            if (LOVE_BOXES[i].inner) {
+                c.fillStyle = ink.page;
+                c.fillRect(r.x, r.y, r.w, r.h);
+            }
+            const box = loveInner(i, W, H);
+            const slot = loveSlot(i);
+            if (photos[slot]) {
+                c.save();
+                c.beginPath();
+                c.rect(box.x, box.y, box.w, box.h);
+                c.clip();
+                drawCoverImage(c, photos[slot], box.x, box.y, box.w, box.h,
+                    state.views[slot]);
+                c.restore();
+            } else {
+                c.fillStyle = ink.ink;
+                c.fillRect(box.x, box.y, box.w, box.h);
+            }
+        });
+
+        /* ---- the calendar ---- */
+        c.textBaseline = "alphabetic";
+        c.strokeStyle = ink.ink;
+        c.lineWidth = LOVE.topRule.width * fy;
+        c.beginPath();
+        c.moveTo(LOVE.topRule.x1 * fx, LOVE.topRule.y * fy);
+        c.lineTo(LOVE.topRule.x2 * fx, LOVE.topRule.y * fy);
+        c.stroke();
+
+        const info = annivMonth(state.year, state.month);
+        const g = loveGrid(W, H);
+        const label = (ANNIV_MONTHS[info.month] || "").toUpperCase() + " " + info.year;
+        c.fillStyle = ink.ink;
+        c.textAlign = "center";
+        c.font = loveFont(LOVE.month.size * fy);
+        c.fillText(label, g.x1 + g.span / 2, LOVE.month.baseline * fy);
+
+        annivHead(c, ANNIV_DAYS, g, LOVE.head.baseline * fy, LOVE.head.size * fy);
+        c.strokeStyle = ink.ink;
+        c.lineWidth = LOVE.rule.width * fy;
+        c.beginPath();
+        c.moveTo(g.x1, LOVE.rule.y * fy);
+        c.lineTo(g.x1 + g.span, LOVE.rule.y * fy);
+        c.stroke();
+
+        /* The cradle, under the final row rather than at a fixed y. */
+        const tray = loveTrayRect(info.rows, W, H);
+        const tv = LOVE_TRAY.view;
+        c.save();
+        c.translate(tray.x, tray.y);
+        c.scale(tray.w / tv[2], tray.h / tv[3]);
+        c.translate(-tv[0], -tv[1]);
+        c.fillStyle = ink.ink;
+        c.fill(LOVE_TRAY.path);
+        c.restore();
+
+        /* The heart goes down first and the numeral on it -- which is what the
+           artwork does here, unlike the two birthday sources that hid their
+           marked date under an opaque heart. */
+        const cell = annivCell(info, state.day);
+        if (cell) {
+            const hw = LOVE.dayHeart.w * fx;
+            loveHeart(c, g.centre(cell.col) - hw / 2,
+                g.baseline(cell.row) - (hw / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3])) * 0.72,
+                hw, ink.heart);
+        }
+        c.textAlign = "center";
+        c.font = loveFont(LOVE.grid.size * fy);
+        for (let d = 1; d <= info.length; d += 1) {
+            const at = annivCell(info, d);
+            c.fillStyle = (cell && cell.day === d) ? ink.onAccent : ink.ink;
+            c.fillText(String(d), g.centre(at.col), g.baseline(at.row));
+        }
+
+        /* ---- the message ---- */
+        const mSize = LOVE.message.size * fy;
+        const mW = loveMessageWidth(W);
+        c.textAlign = "left";
+        c.fillStyle = ink.ink;
+        c.font = loveFont(mSize, 700, true);
+        const lines = loveLines(c, state.loveMessage, mW)
+            .slice(0, LOVE.message.maxLines);
+        const ys = loveBaselines(lines);
+        lines.forEach((line, i) => {
+            c.fillText(line.text, LOVE.message.x * fx, ys[i] * fy);
+        });
+        /* The two pink hearts follow the end of the FIRST paragraph, which is
+           where the artwork's emoji sits. Clamped to the column so a long last
+           line pushes them onto the rule rather than off the page. */
+        let firstEnd = -1;
+        for (let i = 0; i < lines.length; i += 1) {
+            if (lines[i + 1] && lines[i + 1].para) { firstEnd = i; break; }
+        }
+        if (firstEnd >= 0) {
+            const runW = c.measureText(lines[firstEnd].text).width;
+            const ex = Math.min(LOVE.message.x * fx + runW + LOVE.emoji.gap * fx,
+                LOVE.rule.x2 * fx - LOVE.emoji.w * fx);
+            const ey = ys[firstEnd] * fy;
+            loveHeart(c, ex, ey - LOVE.emoji.lift * fy, LOVE.emoji.w * fx, ink.pink);
+            loveHeart(c, ex + LOVE.emoji.dx * fx,
+                ey - (LOVE.emoji.lift - LOVE.emoji.dy) * fy,
+                LOVE.emoji.small * fx, ink.pinkDeep);
+        }
+        noteText(c, "loveMessage", { x: LOVE.message.x * fx,
+            y: LOVE.message.baseline * fy - mSize, w: mW,
+            h: (ys[ys.length - 1] - LOVE.message.baseline + LOVE.message.leading) * fy,
+            size: mSize, font: c.font, align: "left",
+            multiline: true, leading: LOVE.message.leading * fy });
+
+        /* ---- the greeting, centred on the column ---- */
+        const tSize = loveFit(c, state.loveTitle, LOVE.title.size * fy,
+            g.span, 700);
+        c.fillStyle = ink.ink;
+        const tW = c.measureText(state.loveTitle).width;
+        const tx = g.x1 + g.span / 2 - tW / 2;
+        const ty = LOVE.title.baseline * fy;
+        c.fillText(state.loveTitle, tx, ty);
+        noteText(c, "loveTitle", { x: tx, y: ty - tSize,
+            w: Math.max(tW, tSize * 3), h: tSize * 1.3,
+            size: tSize, font: c.font, align: "left" });
+
+        /* ---- the two dividers and the names between them ---- */
+        loveDrawDivider(c, false, fx, fy, ink);
+        loveDrawDivider(c, true, fx, fy, ink);
+
+        const nFit = loveNamesFit(c, LOVE.names.size * fy,
+            LOVE.names.heart * fx, LOVE.names.gap * fx, g.span);
+        const nSize = nFit.size;
+        const nHeart = nFit.heart;
+        const nGap = nFit.gap;
+        const aW = c.measureText(state.nameA).width;
+        const bW = c.measureText(state.nameB).width;
+        /* Centred as a UNIT -- both names and the heart together -- because a
+           heart pinned to the end of the first name would push the pair off
+           the column's middle by half its width, the same reasoning the
+           tribute's foot line uses. */
+        const nx = g.x1 + g.span / 2 - (aW + nGap * 2 + nHeart + bW) / 2;
+        const ny = LOVE.names.baseline * fy;
+        c.fillStyle = ink.ink;
+        c.fillText(state.nameA, nx, ny);
+        loveHeart(c, nx + aW + nGap, ny - nHeart / (ANNIV_HEART.view[2] / ANNIV_HEART.view[3]),
+            nHeart, ink.heart);
+        c.fillText(state.nameB, nx + aW + nGap * 2 + nHeart, ny);
+        noteText(c, "nameA", { x: nx, y: ny - nSize,
+            w: Math.max(aW, nSize * 2), h: nSize * 1.3,
+            size: nSize, font: c.font, align: "left" });
+        noteText(c, "nameB", { x: nx + aW + nGap * 2 + nHeart, y: ny - nSize,
+            w: Math.max(bW, nSize * 2), h: nSize * 1.3,
+            size: nSize, font: c.font, align: "left" });
+    }
+
+    /* SVG twin of paintLove(). Reads loveRects(), loveInner(), loveGrid(),
+       loveTrayRect(), loveLines() and loveBaselines() -- the same six the
+       canvas reads -- so neither painter derives a position of its own. */
+    function loveSVG(W, H, esc) {
+        const fx = W / LOVE.page.w;
+        const fy = H / LOVE.page.h;
+        const ink = loveTheme();
+        const warm = { sparkle: ink.sparkleWarm, sparkleTip: ink.sparkleWarmTip };
+        const measure = document.createElement("canvas").getContext("2d");
+        const ratio = ANNIV_HEART.view[2] / ANNIV_HEART.view[3];
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + ink.page + '"/>';
+
+        LOVE_FRONDS.forEach((m) => { out += loveFrondSVG(m, fx, fy, ink.accent); });
+        out += sparkleSVG(loveSparkles(LOVE_SPARKS), fx, fy, ink, "lv");
+        out += sparkleSVG(loveSparkles(LOVE_SPARKS_WARM), fx, fy, warm, "lw");
+        LOVE.strings.forEach((st) => {
+            out += '<line x1="' + (st.x * fx) + '" y1="' + (st.from * fy) + '" x2="' +
+                (st.x * fx) + '" y2="' + (st.to * fy) + '" stroke="' + ink.ink +
+                '" stroke-opacity="' + LOVE.stringAlpha + '" stroke-width="' +
+                (LOVE.stringWidth * fx) + '"/>';
+        });
+        LOVE_HEARTS.forEach((ht) => {
+            out += loveHeartSVG(ht.x * fx, ht.y * fy, ht.w * fx, ink[ht.role],
+                !!ht.stroke, (ht.stroke || 1) * fx);
+        });
+
+        const R = LOVE.ring;
+        const P = LOVE.portrait;
+        out += '<ellipse cx="' + (R.cx * fx) + '" cy="' + (R.cy * fy) + '" rx="' +
+            (R.rx * fx) + '" ry="' + (R.ry * fy) + '" fill="' + ink.ink + '"/>';
+        out += '<ellipse cx="' + (P.cx * fx) + '" cy="' + (P.cy * fy) + '" rx="' +
+            (P.r * fx) + '" ry="' + (P.r * fy) + '" fill="' + ink.circleFill + '"/>';
+        if (photos[0]) {
+            out += '<defs><clipPath id="tb-love-ring"><ellipse cx="' + (P.cx * fx) +
+                '" cy="' + (P.cy * fy) + '" rx="' + (P.r * fx) + '" ry="' +
+                (P.r * fy) + '"/></clipPath></defs><g clip-path="url(#tb-love-ring)">' +
+                photoImageSVG(photos[0], state.views[0], (P.cx - P.r) * fx,
+                    (P.cy - P.r) * fy, P.r * 2 * fx, P.r * 2 * fy) + "</g>";
+        }
+        if (ink.circleLine) {
+            out += '<ellipse cx="' + (P.cx * fx) + '" cy="' + (P.cy * fy) + '" rx="' +
+                (P.r * fx) + '" ry="' + (P.r * fy) + '" fill="none" stroke="' +
+                ink.circleLine + '" stroke-width="' + (P.line * fx) + '"/>';
+        }
+        const rects = loveRects(W, H);
+        rects.forEach((r, i) => {
+            if (LOVE_BOXES[i].inner) {
+                out += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w +
+                    '" height="' + r.h + '" fill="' + ink.page + '"/>';
+            }
+            const box = loveInner(i, W, H);
+            const slot = loveSlot(i);
+            if (photos[slot]) {
+                const id = "tb-love-" + i;
+                out += '<defs><clipPath id="' + id + '"><rect x="' + box.x + '" y="' +
+                    box.y + '" width="' + box.w + '" height="' + box.h +
+                    '"/></clipPath></defs><g clip-path="url(#' + id + ')">' +
+                    photoImageSVG(photos[slot], state.views[slot], box.x, box.y,
+                        box.w, box.h) + "</g>";
+            } else {
+                out += '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.w +
+                    '" height="' + box.h + '" fill="' + ink.ink + '"/>';
+            }
+        });
+
+        out += '<line x1="' + (LOVE.topRule.x1 * fx) + '" y1="' + (LOVE.topRule.y * fy) +
+            '" x2="' + (LOVE.topRule.x2 * fx) + '" y2="' + (LOVE.topRule.y * fy) +
+            '" stroke="' + ink.ink + '" stroke-width="' +
+            (LOVE.topRule.width * fy) + '"/>';
+
+        const info = annivMonth(state.year, state.month);
+        const g = loveGrid(W, H);
+        const label = (ANNIV_MONTHS[info.month] || "").toUpperCase() + " " + info.year;
+        out += '<text x="' + (g.x1 + g.span / 2) + '" y="' + (LOVE.month.baseline * fy) +
+            '" text-anchor="middle"' + loveSvgFont(LOVE.month.size * fy) +
+            ' fill="' + ink.ink + '">' + esc(label) + "</text>";
+        ANNIV_DAYS.forEach((ch, i) => {
+            out += '<text x="' + g.centre(i) + '" y="' + (LOVE.head.baseline * fy) +
+                '" text-anchor="middle"' + loveSvgFont(LOVE.head.size * fy) +
+                ' fill="' + ink.ink + '">' + esc(ch) + "</text>";
+        });
+        out += '<line x1="' + g.x1 + '" y1="' + (LOVE.rule.y * fy) + '" x2="' +
+            (g.x1 + g.span) + '" y2="' + (LOVE.rule.y * fy) + '" stroke="' + ink.ink +
+            '" stroke-width="' + (LOVE.rule.width * fy) + '"/>';
+
+        const tray = loveTrayRect(info.rows, W, H);
+        const tv = LOVE_TRAY.view;
+        out += '<g transform="translate(' + tray.x + " " + tray.y + ") scale(" +
+            (tray.w / tv[2]) + " " + (tray.h / tv[3]) + ") translate(" + (-tv[0]) +
+            " " + (-tv[1]) + ')"><path d="' + LOVE_TRAY.d + '" fill="' + ink.ink +
+            '"/></g>';
+
+        const cell = annivCell(info, state.day);
+        if (cell) {
+            const hw = LOVE.dayHeart.w * fx;
+            out += loveHeartSVG(g.centre(cell.col) - hw / 2,
+                g.baseline(cell.row) - (hw / ratio) * 0.72, hw, ink.heart);
+        }
+        for (let d = 1; d <= info.length; d += 1) {
+            const at = annivCell(info, d);
+            out += '<text x="' + g.centre(at.col) + '" y="' + g.baseline(at.row) +
+                '" text-anchor="middle"' + loveSvgFont(LOVE.grid.size * fy) +
+                ' fill="' + ((cell && cell.day === d) ? ink.onAccent : ink.ink) +
+                '">' + d + "</text>";
+        }
+
+        const mSize = LOVE.message.size * fy;
+        const mW = loveMessageWidth(W);
+        measure.font = loveFont(mSize, 700, true);
+        const lines = loveLines(measure, state.loveMessage, mW)
+            .slice(0, LOVE.message.maxLines);
+        const ys = loveBaselines(lines);
+        lines.forEach((line, i) => {
+            out += '<text x="' + (LOVE.message.x * fx) + '" y="' + (ys[i] * fy) + '"' +
+                loveSvgFont(mSize, 700, true) + ' fill="' + ink.ink + '">' +
+                esc(line.text) + "</text>";
+        });
+        let firstEnd = -1;
+        for (let i = 0; i < lines.length; i += 1) {
+            if (lines[i + 1] && lines[i + 1].para) { firstEnd = i; break; }
+        }
+        if (firstEnd >= 0) {
+            const runW = measure.measureText(lines[firstEnd].text).width;
+            const ex = Math.min(LOVE.message.x * fx + runW + LOVE.emoji.gap * fx,
+                LOVE.rule.x2 * fx - LOVE.emoji.w * fx);
+            const ey = ys[firstEnd] * fy;
+            out += loveHeartSVG(ex, ey - LOVE.emoji.lift * fy, LOVE.emoji.w * fx, ink.pink);
+            out += loveHeartSVG(ex + LOVE.emoji.dx * fx,
+                ey - (LOVE.emoji.lift - LOVE.emoji.dy) * fy,
+                LOVE.emoji.small * fx, ink.pinkDeep);
+        }
+
+        const tSize = loveFit(measure, state.loveTitle, LOVE.title.size * fy,
+            g.span, 700);
+        const tW = measure.measureText(state.loveTitle).width;
+        out += '<text x="' + (g.x1 + g.span / 2 - tW / 2) + '" y="' +
+            (LOVE.title.baseline * fy) + '"' + loveSvgFont(tSize, 700) + ' fill="' +
+            ink.ink + '">' + esc(state.loveTitle) + "</text>";
+
+        out += loveDividerSVG(false, fx, fy, ink);
+        out += loveDividerSVG(true, fx, fy, ink);
+
+        const nFit = loveNamesFit(measure, LOVE.names.size * fy,
+            LOVE.names.heart * fx, LOVE.names.gap * fx, g.span);
+        const nSize = nFit.size;
+        const nHeart = nFit.heart;
+        const nGap = nFit.gap;
+        const aW = measure.measureText(state.nameA).width;
+        const bW = measure.measureText(state.nameB).width;
+        const nx = g.x1 + g.span / 2 - (aW + nGap * 2 + nHeart + bW) / 2;
+        const ny = LOVE.names.baseline * fy;
+        const nameSVG = (x, str) => '<text x="' + x + '" y="' + ny +
+            '" font-family="' + SCRIPT_SVG_FACE + '" font-weight="400" font-size="' +
+            hbdPx(nSize) + '" fill="' + ink.ink + '">' + esc(str) + "</text>";
+        out += nameSVG(nx, state.nameA);
+        out += loveHeartSVG(nx + aW + nGap, ny - nHeart / ratio, nHeart, ink.heart);
+        out += nameSVG(nx + aW + nGap * 2 + nHeart, state.nameB);
+        return out;
+    }
+
     function noteText(c, key, box) {
         if (recordingRegions) {
             /* fillStyle is still the colour the words were just drawn in, so
@@ -4280,6 +5319,8 @@
             paintBirthday(c, W, H, options);
         } else if (frame.layout === "tribute") {
             paintTribute(c, W, H, options);
+        } else if (frame.layout === "love") {
+            paintLove(c, W, H, options);
         } else {
             const FRAME_W = frame.frame ? 60 * scale : 0;
             const MATTE_W = frame.frame ? 50 * scale : 0;
@@ -4400,7 +5441,8 @@
        export. */
     function drawCollageChrome() {
         const lay = layoutOf(state.frame);
-        if (lay !== "anniversary" && lay !== "birthday" && lay !== "tribute") {
+        if (lay !== "anniversary" && lay !== "birthday" && lay !== "tribute" &&
+                lay !== "love") {
             return;
         }
         const W = canvas.width;
@@ -4678,7 +5720,9 @@
         closing: { field: "p-closing", clean: cleanBlock },
         heading: { field: "p-heading", clean: cleanHeading },
         message: { field: "p-message", clean: cleanBlock },
-        title: { field: "p-title", clean: cleanLine }
+        title: { field: "p-title", clean: cleanLine },
+        loveMessage: { field: "p-love-message", clean: cleanBlock },
+        loveTitle: { field: "p-love-title", clean: cleanLine }
     };
 
     function regionFor(key) {
@@ -5111,6 +6155,30 @@
             }
             return -1;
         }
+        if (layout === "love") {
+            const px = pt.x * W;
+            const py = pt.y * H;
+            const P = LOVE.portrait;
+            const fx = W / LOVE.page.w;
+            const fy = H / LOVE.page.h;
+            const rects = loveRects(W, H);
+            /* Backwards, and here it MATTERS: box 2 is drawn over box 1 and
+               box 5 over box 8, so the box a click finds has to be the one
+               painted last. */
+            for (let i = rects.length - 1; i >= 0; i -= 1) {
+                const r = rects[i];
+                if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) {
+                    return loveSlot(i);
+                }
+            }
+            /* The circle last and as a CIRCLE: its bounding box overlaps the
+               top of box 1, so a square hit test here would take clicks meant
+               for the photograph beneath it. */
+            const dx = (px - P.cx * fx) / (P.r * fx);
+            const dy = (py - P.cy * fy) / (P.r * fy);
+            if (dx * dx + dy * dy <= 1) { return 0; }
+            return -1;
+        }
         if (layout === "birthday") {
             const px = pt.x * W;
             const py = pt.y * H;
@@ -5176,6 +6244,22 @@
                 if (hbdSlot(k) === i) { return rects[k]; }
             }
             return rects[0];
+        }
+        if (layout === "love") {
+            if (i === 0) {
+                const P = LOVE.portrait;
+                const fx = W / LOVE.page.w;
+                const fy = H / LOVE.page.h;
+                return { x: (P.cx - P.r) * fx, y: (P.cy - P.r) * fy,
+                    w: P.r * 2 * fx, h: P.r * 2 * fy };
+            }
+            /* The INNER rectangle wherever the artwork draws a mount: that is
+               where the photograph actually goes, so it is what a drag
+               measures against and what the selection ring marks. */
+            for (let k = 0; k < LOVE_BOXES.length; k += 1) {
+                if (loveSlot(k) === i) { return loveInner(k, W, H); }
+            }
+            return loveInner(0, W, H);
         }
         if (layout === "anniversary") {
             if (i === CODE_SLOT) { return annivCodeRect(W, H); }
@@ -5538,7 +6622,7 @@
            for no reason anybody chose. */
         const upLayout = layoutOf(state.frame);
         if (upLayout === "anniversary" || upLayout === "birthday" ||
-                upLayout === "tribute") {
+                upLayout === "tribute" || upLayout === "love") {
             const slots = slotsFor(upLayout)
                 .filter((i) => i !== CODE_SLOT);
             const from = Math.max(0, slots.indexOf(primarySlot()));
@@ -5719,6 +6803,28 @@
         });
     });
 
+    const loveThemeSelect = byId("p-love-theme");
+    if (loveThemeSelect) {
+        loveThemeSelect.addEventListener("change", () => {
+            beginChange();
+            state.loveTheme = LOVE_THEMES[loveThemeSelect.value]
+                ? loveThemeSelect.value : DEFAULT_LOVE_THEME;
+            commit();
+            render();
+        });
+    }
+
+    [["p-love-message", "loveMessage", cleanBlock],
+     ["p-love-title", "loveTitle", cleanLine]].forEach((entry) => {
+        const el = byId(entry[0]);
+        if (!el) { return; }
+        el.addEventListener("input", () => {
+            beginChange();
+            state[entry[1]] = entry[2](el.value);
+            commit("love-" + entry[1]);
+        });
+    });
+
     const hbdThemeSelect = byId("p-hbd-theme");
     if (hbdThemeSelect) {
         hbdThemeSelect.addEventListener("change", () => {
@@ -5867,6 +6973,13 @@
             for (let i = 0; i < TRIB_BOXES.length; i += 1) { out.push(tribSlot(i)); }
             return out;
         }
+        /* The circle FIRST, because it is the portrait the artwork is built
+           around and a batch should start there rather than in the cascade. */
+        if (layout === "love") {
+            const out = [0];
+            for (let i = 0; i < LOVE_BOXES.length; i += 1) { out.push(loveSlot(i)); }
+            return out;
+        }
         if (layout === "split") { return [0, 1]; }
         return [0];
     }
@@ -5892,6 +7005,9 @@
         }
         if (lay === "tribute") {
             return i === 0 ? "Photo 1" : "Photo " + (i - TRIB_FIRST + 2);
+        }
+        if (lay === "love") {
+            return i === 0 ? "Portrait circle" : "Photo " + (i - LOVE_FIRST + 1);
         }
         return "Card " + (i + 1);
     }
@@ -6425,13 +7541,22 @@
         const tribFields = byId("p-trib-fields");
         if (tribFields) { tribFields.hidden = !trib; }
 
+        const love = style.layout === "love";
+        const loveFields = byId("p-love-fields");
+        if (loveFields) { loveFields.hidden = !love; }
+
+        /* Two posters print a pair of names, and the rest of the anniversary
+           poster's block belongs to it alone. */
+        const namesFields = byId("p-names-fields");
+        if (namesFields) { namesFields.hidden = !anniv && !love; }
+
         /* One calendar block for both posters, shown whenever either is open.
            The YEAR is the awkward one: the anniversary poster prints it beside
            the month and this one does not print it at all, so on the birthday
            poster a control that reshapes the grid changes nothing a visitor can
            see. The hint says so rather than leaving them to find out. */
         const calFields = byId("p-calendar-fields");
-        if (calFields) { calFields.hidden = !anniv && !hbd && !trib; }
+        if (calFields) { calFields.hidden = !anniv && !hbd && !trib && !love; }
         const yearHint = byId("p-year-hint");
         if (yearHint) {
             yearHint.textContent = (hbd || trib)
@@ -6456,9 +7581,11 @@
            gated on the search screen alone, above. */
         const batchFields = byId("p-batch-fields");
         if (batchFields) {
-            batchFields.hidden = !grid && !anniv && !hbd && !trib;
+            batchFields.hidden = !grid && !anniv && !hbd && !trib && !love;
         }
-        if (photoFields) { photoFields.hidden = grid || anniv || hbd || trib; }
+        if (photoFields) {
+            photoFields.hidden = grid || anniv || hbd || trib || love;
+        }
 
         [["p-name-a", "nameA"], ["p-name-b", "nameB"],
          ["p-tagline", "tagline"]].forEach((entry) => {
@@ -6495,6 +7622,13 @@
         if (ht) { ht.value = state.hbdTheme; }
         const tt = byId("p-trib-theme");
         if (tt) { tt.value = state.tribTheme; }
+        const lt = byId("p-love-theme");
+        if (lt) { lt.value = state.loveTheme; }
+        [["p-love-message", "loveMessage"], ["p-love-title", "loveTitle"]]
+            .forEach((pair) => {
+                const el = byId(pair[0]);
+                if (el && el.value !== state[pair[1]]) { el.value = state[pair[1]]; }
+            });
         [["p-heading", "heading"], ["p-message", "message"],
          ["p-title", "title"]].forEach((pair) => {
             const el = byId(pair[0]);
@@ -7239,6 +8373,8 @@
             body += birthdaySVG(W, H, esc);
         } else if (frame.layout === "tribute") {
             body += tributeSVG(W, H, esc);
+        } else if (frame.layout === "love") {
+            body += loveSVG(W, H, esc);
         } else {
             if (frame.frame) {
                 body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
@@ -7614,6 +8750,15 @@
                 o.value = k;
                 o.textContent = TRIB_THEMES[k].label;
                 tribTheme2.appendChild(o);
+            });
+        }
+        const loveTheme2 = byId("p-love-theme");
+        if (loveTheme2 && !loveTheme2.options.length) {
+            Object.keys(LOVE_THEMES).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = LOVE_THEMES[k].label;
+                loveTheme2.appendChild(o);
             });
         }
         const hbdTheme2 = byId("p-hbd-theme");
