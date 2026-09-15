@@ -10237,6 +10237,100 @@ main:has(.mockup-layout) .editor-head {
     opacity: 0.9;
 }
 
+/* The ninth poster's tile. What identifies this design at thumbnail size is
+   the three-by-three grid over a heavy word, so those two lead and everything
+   below them is a rule.
+
+   The one tile in this set that can be a CSS GRID rather than nine positioned
+   boxes: its cells are regular, where every other collage here has an
+   artwork's hand-set rectangles to reproduce. The single `gap` covers both
+   axes exactly, which is arithmetic rather than luck -- the gutter is the same
+   fraction of the grid's width as of its height, the grid being square.
+
+   Prefixed mk-cp- because a generic name in a stylesheet this size is a
+   collision waiting to happen: a tile's bullet markers were once called `dot`
+   here beside an existing `.dot`, and it failed silently. */
+.mock-doc.poster.couple {
+    position: relative;
+    background-color: #FBF9F5;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.poster.couple .mk-cp-grid {
+    position: absolute;
+    left: 8.087%;
+    right: 8.087%;
+    top: 13.066%;
+    bottom: 27.664%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 2.806%;
+}
+
+.mock-doc.poster.couple .mk-cp-grid b {
+    display: block;
+    background-color: #DFDAD2;
+}
+
+/* The headword, as a block rather than as type: at this size a real word is
+   four illegible marks, and the block is what the eye reads as "heavy serif". */
+.mock-doc.poster.couple .mk-cp-word {
+    position: absolute;
+    left: 8.087%;
+    top: 73.53%;
+    width: 24%;
+    height: 5.7%;
+    background-color: #161514;
+}
+
+.mock-doc.poster.couple .mk-cp-brk {
+    position: absolute;
+    left: 34.5%;
+    top: 78.1%;
+    width: 7.5%;
+    height: 1.6%;
+    background-color: #5F5A55;
+}
+
+.mock-doc.poster.couple .mk-cp-def {
+    position: absolute;
+    left: 8.087%;
+    right: 8.087%;
+    top: 81.36%;
+}
+
+.mock-doc.poster.couple .mk-cp-def span {
+    display: block;
+    height: 1.5px;
+    background-color: #161514;
+    opacity: 0.85;
+}
+
+/* 7.5px on a 1.5px rule is a 9px pitch, which is the poster's 21.5-point
+   leading at the size this tile actually renders. In px like every other rule
+   in this set, rather than as a percentage: a percentage margin resolves
+   against the container's WIDTH even when it is a vertical one, which is a
+   trap rather than a scaling. */
+.mock-doc.poster.couple .mk-cp-def span + span {
+    margin-top: 7.5px;
+}
+
+/* Ragged right, which is what makes four rules read as a paragraph rather
+   than as a table. */
+.mock-doc.poster.couple .mk-cp-def span:nth-child(3) { width: 92%; }
+.mock-doc.poster.couple .mk-cp-def span:nth-child(4) { width: 38%; }
+
+.mock-doc.poster.couple .mk-cp-close {
+    position: absolute;
+    left: 8.087%;
+    top: 92.77%;
+    width: 46%;
+    height: 2px;
+    background-color: #5F5A55;
+}
+
 .mock-doc.poster.love {
     position: relative;
     background-color: #231F20;

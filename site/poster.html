@@ -659,6 +659,46 @@
                         </div>
                     </div>
 
+                    <div id="p-couple-fields" hidden>
+                        <div class="field">
+                            <label for="p-couple-word">Word</label>
+                            <input type="text" id="p-couple-word" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">The headword, set large in the serif. It shrinks to fit the column with the bracket beside it, so a long word is set smaller rather than cut off.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-couple-bracket">Initials</label>
+                            <input type="text" id="p-couple-bracket" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Sits on the word's own baseline, in the sans. The square brackets are drawn by the template, so type only what goes between them. Leave it empty and the bracket is not drawn at all.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-couple-def">Definition</label>
+                            <textarea id="p-couple-def" maxlength="220" rows="4" autocomplete="off"></textarea>
+                            <p class="upload-hint">Wraps to the grid's width, up to five lines. Line breaks you type are kept, and the closing line moves down to follow.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-couple-closing">Closing Line</label>
+                            <input type="text" id="p-couple-closing" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Follows the definition, and switches back to the serif. It moves down as the definition grows.</p>
+                        </div>
+
+                        <div class="field">
+                            <label class="radio-option">
+                                <input type="checkbox" id="p-couple-grey">
+                                Black and white photographs
+                            </label>
+                            <p class="upload-hint">On by default, because the nine photographs being greyscale is part of this design rather than a property of the pictures. Turn it off to keep your own colour. It applies to the preview, the PNG and the SVG alike.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-couple-theme">Screen Mode</label>
+                            <select id="p-couple-theme"></select>
+                            <p class="upload-hint">The same poster on paper or on a dark ground. Only the colours change, never the layout. An empty cell takes a tone of its own so the grid still reads before any photograph is in it.</p>
+                        </div>
+                    </div>
+
                     <div id="p-hbd-fields" hidden>
                         <div class="field">
                             <label for="p-quote">Quote</label>

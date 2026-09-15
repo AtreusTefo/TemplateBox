@@ -4794,6 +4794,241 @@ async function templateStudioChecks(page) {
         r.docLayout > 0, "an invented layout name was accepted");
 }
 
+async function definitionPosterChecks(page) {
+    section("15. Definition poster: greyscale, and the four faces");
+
+    /* The ninth poster is the only layout in this editor that CONVERTS a
+       photograph, and the conversion is written twice -- ctx.filter for the
+       canvas, an feColorMatrix for the SVG. Two painters that must agree is
+       this file's standing hazard, and a greyscale that agrees on the screen
+       and not in the export is invisible until somebody opens the file.
+
+       So this is not a rendering check. It samples the two renders as NUMBERS
+       and compares them, and it reads the export as MARKUP to see which face
+       each of the four text roles actually carries -- because the failure this
+       design invites is setting the closing line in the sans, which looks
+       almost right.
+
+       The photographs are flat colour on purpose. A shape inside one
+       antialiases differently in two rasterisers, and those edge pixels would
+       be counted as the painters disagreeing when they are only the scaler
+       disagreeing with itself. */
+    await page.navigate(`http://localhost:${PORT}/poster.html`, 1440);
+
+    const r = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+        try {
+        const sel = document.getElementById('p-frame');
+        if (!sel) { return { error: 'no frame select on poster.html' }; }
+        sel.value = 'couple';
+        if (sel.value !== 'couple') { return { error: 'no couple option in the frame select' }; }
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(700);
+
+        const HUES = [0, 45, 90, 135, 180, 225, 270, 315, 20];
+        const files = [];
+        for (let i = 0; i < 9; i += 1) {
+            const cv = document.createElement('canvas');
+            cv.width = 400; cv.height = 500;
+            const g = cv.getContext('2d');
+            g.fillStyle = 'hsl(' + HUES[i] + ', 90%, 55%)';
+            g.fillRect(0, 0, 400, 500);
+            const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+            files.push(new File([blob], 'c' + i + '.png', { type: 'image/png' }));
+        }
+        const input = document.getElementById('p-image-grid');
+        if (!input) { return { error: 'no batch photo input' }; }
+        const dt = new DataTransfer();
+        files.forEach((f) => dt.items.add(f));
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(2500);
+
+        /* The export, captured rather than downloaded. */
+        const grab = async () => {
+            let blob = null;
+            const realCreate = URL.createObjectURL;
+            const realClick = HTMLAnchorElement.prototype.click;
+            HTMLAnchorElement.prototype.click = function () {};
+            URL.createObjectURL = function (b) {
+                if (b && b.type && b.type.indexOf('svg') >= 0) { blob = b; }
+                return realCreate.call(URL, b);
+            };
+            const type = document.getElementById('dl-type');
+            type.value = 'svg';
+            type.dispatchEvent(new Event('change', { bubbles: true }));
+            document.getElementById('dl-go').click();
+            await wait(900);
+            URL.createObjectURL = realCreate;
+            HTMLAnchorElement.prototype.click = realClick;
+            return blob ? blob.text() : null;
+        };
+
+        const canvas = document.getElementById('poster-canvas');
+        const W = canvas.width, H = canvas.height;
+        const raster = async (text) => {
+            const img = new Image();
+            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+            await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+            const cv = document.createElement('canvas');
+            cv.width = W; cv.height = H;
+            cv.getContext('2d').drawImage(img, 0, 0, W, H);
+            return cv.getContext('2d').getImageData(0, 0, W, H).data;
+        };
+
+        const svgText = await grab();
+        if (!svgText) { return { error: 'the SVG export produced nothing' }; }
+        const a = canvas.getContext('2d').getImageData(0, 0, W, H).data;
+        const b = await raster(svgText);
+
+        /* One sample from the middle of each of the nine cells, in both. The
+           cell centres come from the design's own numbers: a 157-point cell on
+           a 171-point step from a margin of 48.14, over a 595.28 by 841.89
+           page whose grid starts at 110. */
+        const at = (data, fx, fy) => {
+            const i = (Math.round(H * fy) * W + Math.round(W * fx)) * 4;
+            return [data[i], data[i + 1], data[i + 2]];
+        };
+        const cells = [];
+        for (let row = 0; row < 3; row += 1) {
+            for (let col = 0; col < 3; col += 1) {
+                const fx = (48.14 + col * 171 + 78.5) / 595.28;
+                const fy = (110 + row * 171 + 78.5) / 841.89;
+                cells.push({ canvas: at(a, fx, fy), svg: at(b, fx, fy) });
+            }
+        }
+        const isGrey = (p) => p[0] === p[1] && p[1] === p[2];
+        const near = (p, q) => Math.max(Math.abs(p[0] - q[0]), Math.abs(p[1] - q[1]),
+            Math.abs(p[2] - q[2]));
+        const out = {
+            greyCanvas: cells.filter((c) => isGrey(c.canvas)).length,
+            greySvg: cells.filter((c) => isGrey(c.svg)).length,
+            worstDelta: Math.max(...cells.map((c) => near(c.canvas, c.svg))),
+            /* Nine flat hues must not all convert to the same grey, or the
+               check would pass just as well against a solid fill. */
+            distinctGreys: new Set(cells.map((c) => c.canvas[0])).size
+        };
+
+        /* The type must NOT be greyed. The word is drawn in the theme's ink
+           over the page, both neutral, so a leaked filter would be invisible
+           there -- this asks the canvas directly whether the filter is still
+           standing after the cells are painted. */
+        out.filterAfterPaint = canvas.getContext('2d').filter;
+
+        /* What the export says about the four roles. */
+        const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+        const texts = Array.from(doc.querySelectorAll('text')).map((t) => ({
+            family: (t.getAttribute('font-family') || '').split(',')[0].replace(/'/g, ''),
+            weight: t.getAttribute('font-weight'),
+            size: Number(t.getAttribute('font-size')),
+            y: Number(t.getAttribute('y')),
+            text: t.textContent || ''
+        }));
+        out.faces = texts.map((t) => t.family + ' ' + t.weight);
+        out.first = texts[0] || null;
+        out.last = texts[texts.length - 1] || null;
+        out.brackets = texts.length > 1 &&
+            texts[1].text.charAt(0) === '[' &&
+            texts[1].text.charAt(texts[1].text.length - 1) === ']';
+        /* The one thing about this design that could be READ off the
+           reference rather than derived: the word and the bracket end their
+           ink on the same pixel row, so they share a baseline. */
+        out.sameBaseline = texts.length > 1 && texts[0].y === texts[1].y;
+        out.smallerBracket = texts.length > 1 && texts[1].size < texts[0].size / 2;
+        out.filters = Array.from(doc.querySelectorAll('filter')).map((f) => ({
+            id: f.getAttribute('id'),
+            space: f.getAttribute('color-interpolation-filters'),
+            matrix: f.querySelector('feColorMatrix')
+                ? f.querySelector('feColorMatrix').getAttribute('values') : null
+        }));
+        out.greyedGroups = doc.querySelectorAll('g[filter]').length;
+
+        /* And with the treatment turned OFF the cells must come back coloured,
+           in both painters. A toggle that only moves the preview is the other
+           half of the same defect. */
+        const box = document.getElementById('p-couple-grey');
+        if (!box) { return { error: 'no black and white control' }; }
+        box.checked = false;
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(800);
+        const colourText = await grab();
+        const ca = canvas.getContext('2d').getImageData(0, 0, W, H).data;
+        const cb = await raster(colourText);
+        const colour = [];
+        for (let row = 0; row < 3; row += 1) {
+            for (let col = 0; col < 3; col += 1) {
+                const fx = (48.14 + col * 171 + 78.5) / 595.28;
+                const fy = (110 + row * 171 + 78.5) / 841.89;
+                colour.push({ canvas: at(ca, fx, fy), svg: at(cb, fx, fy) });
+            }
+        }
+        out.colourCanvas = colour.filter((c) => !isGrey(c.canvas)).length;
+        out.colourSvg = colour.filter((c) => !isGrey(c.svg)).length;
+        out.colourWorstDelta = Math.max(...colour.map((c) => near(c.canvas, c.svg)));
+        out.colourFilters = new DOMParser()
+            .parseFromString(colourText, 'image/svg+xml')
+            .querySelectorAll('filter').length;
+        return out;
+        } catch (err) {
+            return { error: String((err && err.stack) || err) };
+        }
+    })()`);
+
+    if (!r || r.error) {
+        check("15a. the definition poster answered", false,
+            r && r.error ? r.error : "no result");
+        return;
+    }
+
+    check("15a. all nine cells are greyscale on the canvas",
+        r.greyCanvas === 9, r.greyCanvas + " of 9 cells came back neutral");
+    check("15b. all nine cells are greyscale in the SVG export",
+        r.greySvg === 9, r.greySvg + " of 9 cells came back neutral");
+    /* Within one level. The two rasterisers round the same matrix
+       differently in the last bit and nothing else; anything larger is the
+       linearRGB default coming back. */
+    check("15c. the two painters agree on the grey",
+        r.worstDelta <= 2, "worst channel difference " + r.worstDelta +
+        " -- check color-interpolation-filters is still sRGB");
+    check("15d. nine different hues make nine different greys",
+        r.distinctGreys >= 7, "only " + r.distinctGreys +
+        " distinct values, so this would pass against a flat fill");
+    check("15e. the canvas filter does not leak past the photographs",
+        r.filterAfterPaint === "none", "filter left as " + r.filterAfterPaint);
+
+    check("15f. the export declares the filter in sRGB",
+        r.filters.length === 1 && r.filters[0].space === "sRGB" &&
+        r.filters[0].matrix === "0",
+        JSON.stringify(r.filters));
+    check("15g. every filled cell is greyed in the export",
+        r.greyedGroups === 9, r.greyedGroups + " of 9 groups carry the filter");
+
+    /* The four faces, in the order they are drawn: the word, the bracket, the
+       definition's lines, and the closing line LAST. */
+    const faces = r.faces || [];
+    check("15h. the word is a heavy serif",
+        faces[0] === "Playfair Display 700", "first text is " + faces[0]);
+    check("15i. the bracket is a bold sans on the word's own baseline",
+        faces[1] === "Inter 600" && r.sameBaseline && r.smallerBracket && r.brackets,
+        "second text is " + faces[1] + ", same baseline: " + r.sameBaseline +
+        ", smaller: " + r.smallerBracket + ", bracketed: " + r.brackets);
+    check("15j. the definition is a sans",
+        faces.slice(2, -1).length > 0 &&
+        faces.slice(2, -1).every((f) => f === "Inter 400"),
+        faces.slice(2, -1).join(" | "));
+    check("15k. the closing line switches BACK to the serif",
+        faces[faces.length - 1] === "Playfair Display 400",
+        "last text is " + faces[faces.length - 1]);
+
+    check("15l. turning the treatment off restores colour on the canvas",
+        r.colourCanvas === 9, r.colourCanvas + " of 9 cells came back coloured");
+    check("15m. turning it off restores colour in the export too",
+        r.colourSvg === 9 && r.colourFilters === 0,
+        r.colourSvg + " of 9 coloured, " + r.colourFilters + " filters still declared");
+    check("15n. the two painters agree on the colour as well",
+        r.colourWorstDelta <= 2, "worst channel difference " + r.colourWorstDelta);
+}
+
 async function ruledInvoiceChecks(page) {
     section("12. Ruled invoice: the sheet, the arithmetic and the logo");
 
@@ -5241,6 +5476,7 @@ async function main() {
                     await ruledInvoiceChecks(page);
                     await anniversaryCalendarChecks(page);
                     await templateStudioChecks(page);
+                    await definitionPosterChecks(page);
                 } finally {
                     page.close();
                 }

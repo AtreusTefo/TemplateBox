@@ -1469,6 +1469,7 @@ body + '\n' +
         { id: "birthday", title: "Birthday Calendar, Photo Cascade", category: "canvas", doc: "birthday" },
         { id: "tribute", title: "Birthday Tribute, Photo Wall", category: "canvas", doc: "tribute" },
         { id: "love", title: "Love Story Calendar, Photo Cascade", category: "canvas", doc: "love" },
+        { id: "couple", title: "Anniversary Definition, Nine Photos", category: "canvas", doc: "couple" },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"

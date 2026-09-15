@@ -196,6 +196,16 @@
         love: {
             frame: null, trim: null, label: "Love Story Calendar, Photo Cascade",
             layout: "love"
+        },
+        /* The ninth layout, and the first in this file with no artwork behind
+           it: a three-by-three grid of photographs over a dictionary entry --
+           a word, a bracketed pair of initials, a definition and a closing
+           line. The reference for it is a photograph of a framed print rather
+           than a file, so its geometry is DERIVED rather than traced, which is
+           written out at COUPLE. See paintCouple(). */
+        couple: {
+            frame: null, trim: null, label: "Anniversary Definition, Nine Photos",
+            layout: "couple"
         }
     };
 
@@ -1615,6 +1625,276 @@
             '" font-size="' + size + '"' + (italic ? ' font-style="italic"' : "");
     }
 
+    /* ----------------------------------------------------------------------
+       The ninth layout: a three-by-three grid of photographs over a
+       dictionary-definition block.
+
+       Every other layout in this file is TRACED. Its numbers come from an SVG
+       the designer handed over, and the standing instruction has been to read
+       the coordinates rather than eyeball them. This one has no artwork file
+       at all -- the reference is a photograph of a framed print, held at an
+       angle behind glass -- so every number below is DERIVED, and the two
+       kinds must not be confused. The photograph can be trusted for ratios and
+       for roles. It cannot be trusted for a single length: row three's three
+       cells measure 134, 167 and 179 pixels wide in it where the design's are
+       plainly equal. That spread is a projective transform, not a design.
+
+       So the derivation in full, so a later reader can disagree with it:
+
+       - The page is A4 in points, like the four calendar posters, because
+         every paper size this editor offers is 1:sqrt(2) and a design space of
+         any other shape would be stretched to fit one.
+       - The cells are SQUARE. The reference's three rows measure 164, 162 and
+         168 pixels tall against a middle column 167 wide, and the middle
+         column is the one perspective distorts least.
+       - The side margin is 8.1 per cent of the width, which is where the
+         reference's first cell edge sits, and the gutter is 2.35 per cent,
+         from its 15 and 17 pixel gutters in a 736-pixel image. Those two
+         choose the cell: three cells and two gutters fill what is left.
+       - The text block's vertical rhythm is the reference's, scaled by the
+         ratio of the two grid widths -- 499 points here against 545 pixels
+         there, a factor of 0.9156.
+
+       The one thing the reference could NOT supply is the height. Its print is
+       1.22 times as tall as it is wide and A4 is 1.41, so carrying its
+       proportions straight across leaves about eighty points of slack. That
+       slack is spent on the TOP margin, which is why 110 sits over sides of
+       48. That is a strong head margin and it is deliberate: rendered with the
+       slack at the foot instead, the whole composition reads as having slid up
+       the page and left a hole under it. The foot then lands between 92 points
+       clear on a two-line definition and 28 on a five, which is the range
+       maxLines is set to keep it inside. */
+    const COUPLE = {
+        page: { w: 595.28, h: 841.89 },
+        margin: 48.14,
+        grid: { top: 110, cell: 157, gutter: 14, cols: 3, rows: 3 },
+        /* The word and its bracket share a baseline. That is measured rather
+           than derived, and it is the one measurement in this design that
+           survives the perspective: both runs of ink end on the same pixel row
+           of the reference, 831, whatever the transform did to them. The
+           bracket's own ink is 15 pixels tall against the word's 52, which is
+           where a quarter comes from. */
+        word: { baseline: 667, size: 68 },
+        bracket: { size: 17, gap: 24 },
+        def: { top: 696, size: 15.5, leading: 21.5, maxLines: 5 },
+        /* A third more than the definition's leading rather than equal to it.
+           The reference sets the two at almost the same pitch, and at equal
+           pitch the closing line reads as a fourth line of the definition --
+           which is the one thing the change of face is there to prevent. */
+        closing: { gap: 32, size: 17 }
+    };
+
+    /* Two colourways, the pair every other layout here offers. The reference
+       is ink on paper, so LIGHT is the default: the four calendar posters
+       default dark because their artworks are dark, and this one is not.
+
+       `empty` is the third colour and the one that earns its place. A cell
+       with no photograph in it is filled with this rather than left as page,
+       so an empty grid still reads as a grid -- a shade off the paper on the
+       light ground and a shade off the page in the other direction on the
+       dark one.
+
+       There is NO second ink, and that was measured rather than assumed. The
+       first build set the bracket and the closing line in a grey, on the
+       reasoning that it gives the block three tonal levels instead of two.
+       Sampling the darkest four per cent of each run in the reference says
+       otherwise: the bracket reads 9 against the word's 22 and the closing
+       line 43 against the definition's 34 and 38, which is a serif's
+       hairlines antialiasing against a sans's even strokes and not a lighter
+       ink. One ink, and the four roles are told apart by face and size, which
+       is what the design actually does. */
+    const COUPLE_THEMES = {
+        day: {
+            label: "Light",
+            page: "#FBF9F5",
+            ink: "#161514",
+            empty: "#DFDAD2"
+        },
+        night: {
+            label: "Dark",
+            page: "#1A1918",
+            ink: "#F5F2EC",
+            empty: "#38352F"
+        }
+    };
+
+    const DEFAULT_COUPLE_THEME = "day";
+
+    function coupleTheme() {
+        return COUPLE_THEMES[state.coupleTheme] || COUPLE_THEMES[DEFAULT_COUPLE_THEME];
+    }
+
+    /* The starting copy. None of it comes from the reference: its word is a
+       dictionary headword and everything else here is written for this file.
+       The initials are letters that are nobody's. */
+    const DEFAULT_COUPLE_WORD = "Love";
+    const DEFAULT_COUPLE_BRACKET = "A & B";
+    const DEFAULT_COUPLE_DEF = "noun. the quiet arithmetic by which two " +
+        "ordinary days add up to something neither of them could have managed " +
+        "on its own; the habit of choosing the same person again on a morning " +
+        "that gives you no particular reason to.";
+    const DEFAULT_COUPLE_CLOSING = "Here is to every year that follows.";
+
+    /* The nine cells, left to right and top to bottom -- reading order, which
+       is also the order a batch upload fills them in.
+
+       Computed rather than listed. Every other layout in this file lists its
+       boxes because its artwork set them by hand and no arithmetic would
+       reproduce them; this one is a grid with one cell size and one gutter, so
+       nine literal rectangles would be nine chances to mistype a number the
+       arithmetic cannot get wrong. */
+    function coupleCells(W, H) {
+        const fx = W / COUPLE.page.w;
+        const fy = H / COUPLE.page.h;
+        const g = COUPLE.grid;
+        const step = g.cell + g.gutter;
+        const out = [];
+        for (let row = 0; row < g.rows; row += 1) {
+            for (let col = 0; col < g.cols; col += 1) {
+                out.push({
+                    x: (COUPLE.margin + col * step) * fx,
+                    y: (g.top + row * step) * fy,
+                    w: g.cell * fx,
+                    h: g.cell * fy
+                });
+            }
+        }
+        return out;
+    }
+
+    function coupleTextLeft(W) {
+        return COUPLE.margin * (W / COUPLE.page.w);
+    }
+
+    /* The type column is the GRID's width, not the page's less its margins.
+       They are the same number today and they are not the same idea: the text
+       is ranged on the grid, so if the grid ever moves the text goes with it
+       rather than staying where the page put it. */
+    function coupleTextWidth(W) {
+        const g = COUPLE.grid;
+        return (g.cell * g.cols + g.gutter * (g.cols - 1)) * (W / COUPLE.page.w);
+    }
+
+    /* Four faces on one poster, which is what this design is most likely to be
+       built wrong. It reads as a dictionary entry, so the assumption is one
+       serif throughout, or a serif over a serif. Enlarged, the reference is a
+       heavy serif word, a bold sans bracket, a sans definition, and a closing
+       line that switches BACK to the serif. That last one was checked
+       specifically, because it is the row a build would quietly drop.
+
+       Both stacks are already loaded by poster.html. No webfont is added. */
+    function coupleSerif(size, weight) {
+        return (weight || 400) + " " + size + "px " + fontStack("playfair");
+    }
+
+    function coupleSans(size, weight) {
+        return (weight || 400) + " " + size + "px " + fontStack("inter");
+    }
+
+    function coupleSvgFont(id, size, weight) {
+        return ' font-family="' + fontStack(id).replace(/"/g, "'") +
+            '" font-weight="' + (weight || 400) + '" font-size="' + size + '"';
+    }
+
+    /* The square brackets belong to the TEMPLATE, not to what is typed into
+       the field: a visitor types the initials and the layout draws the pair
+       around them. Somebody who types their own anyway would otherwise get two
+       sets, so one matching pair is taken off here -- one, and only a matching
+       one, because a field holding a single bracket is a bracket somebody
+       wanted. */
+    function coupleBracketText(raw) {
+        let s = String(raw || "").trim();
+        if (s.length >= 2 && s.charAt(0) === "[" && s.charAt(s.length - 1) === "]") {
+            s = s.slice(1, -1).trim();
+        }
+        return s;
+    }
+
+    /* The reference's nine photographs are all black and white, and that is
+       the DESIGN rather than a property of the photographs: one colour
+       snapshot dropped into this grid breaks it. Nothing else in this editor
+       converts a photograph, so this is the one genuinely new capability the
+       layout needed, and it has to say the same thing in both painters.
+
+       Canvas gets ctx.filter, SVG gets an feColorMatrix -- and the SVG one
+       needs color-interpolation-filters="sRGB" spelled out. An SVG filter
+       works in linearRGB unless told otherwise, where the same saturate(0)
+       comes out visibly darker than the canvas's, so the export would differ
+       from the preview in exactly the way this file has been bitten by before.
+
+       It defaults ON and is a toggle rather than a fixed treatment. A visitor
+       who wants their colour photographs should be able to have them, and the
+       poster still works with them: the grid is what this design is, not the
+       absence of hue. */
+    const COUPLE_GREY_ID = "tb-couple-grey";
+    const COUPLE_GREY_FILTER = '<filter id="' + COUPLE_GREY_ID +
+        '" color-interpolation-filters="sRGB">' +
+        '<feColorMatrix type="saturate" values="0"/></filter>';
+
+    function coupleGrey() {
+        return state.coupleGrey !== false;
+    }
+
+    /* The definition, wrapped to the column in the face it will be drawn in.
+       hbdWrap() already keeps typed line breaks as breaks, so a second wrapper
+       here would be a second one to be wrong. */
+    function coupleDefLines(c, text, maxPx) {
+        return hbdWrap(c, text, maxPx).slice(0, COUPLE.def.maxLines);
+    }
+
+    /* Where the definition's baselines land and where the closing line goes
+       under them, in the page's own units. One function, so the canvas, the
+       SVG and the editable-region box cannot each decide it separately.
+
+       The closing line follows the definition rather than sitting at a fixed
+       baseline: the definition is a field whose length the visitor controls,
+       and a fixed foot would open a hole in the middle of the block every time
+       somebody wrote a short one. */
+    function coupleFlow(count) {
+        const ys = [];
+        for (let i = 0; i < count; i += 1) {
+            ys.push(COUPLE.def.top + COUPLE.def.leading * i);
+        }
+        const last = count ? ys[ys.length - 1] : COUPLE.word.baseline;
+        return { def: ys, closing: last + COUPLE.closing.gap };
+    }
+
+    /* The word and its bracket, fitted as ONE unit to the column.
+
+       Everything in the row scales together, because the total width is linear
+       in the size and one ratio is therefore exact rather than something to
+       iterate towards -- the same reasoning loveNamesFit() uses for the two
+       names and the heart between them. Fitting the word alone would leave a
+       bracket the size it was beside a word that is no longer, and push the
+       pair off the column besides.
+
+       Sizes in and out are DRAWN pixels, not page points, so no call site has
+       to remember which of the two this one wanted. */
+    function coupleWordFit(c, word, bracket, maxPx, basePx) {
+        const kb = COUPLE.bracket.size / COUPLE.word.size;
+        const kg = COUPLE.bracket.gap / COUPLE.word.size;
+        c.font = coupleSerif(basePx, 700);
+        let span = c.measureText(word).width;
+        if (bracket) {
+            c.font = coupleSans(basePx * kb, 600);
+            span += basePx * kg + c.measureText("[" + bracket + "]").width;
+        }
+        const size = (span > maxPx && span > 0)
+            ? Math.max(10, basePx * (maxPx / span)) : basePx;
+        return { size: size, bracket: size * kb, gap: size * kg };
+    }
+
+    /* One line shrunk to a width, in whichever face it is set in. Shared
+       because the closing line is fitted in both painters, and this editor has
+       already learned what a second copy of a measurement costs. */
+    function coupleFitLine(c, text, basePx, maxPx, font) {
+        c.font = font(basePx);
+        const w = c.measureText(text).width;
+        const size = (w > maxPx && w > 0) ? Math.max(6, basePx * (maxPx / w)) : basePx;
+        c.font = font(size);
+        return size;
+    }
+
     const ANNIV_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
     const ANNIV_MONTHS = ["January", "February", "March", "April", "May",
         "June", "July", "August", "September", "October", "November",
@@ -1786,7 +2066,16 @@
        actually leads with. */
     const LOVE_EXTRA = 8;
     const LOVE_FIRST = TRIB_FIRST + TRIB_EXTRA;
-    const SLOT_COUNT = LOVE_FIRST + LOVE_EXTRA;
+
+    /* The definition poster's nine cells, appended by the same rule a fifth
+       time -- except that here the carried-across slot is a rectangle again.
+       Cell 0 is the top left of the grid, so a photograph set anywhere else in
+       this editor arrives where the eye starts reading. The other eight take
+       fresh indices rather than sharing the love poster's, for the reason
+       every one of these comments gives: a slot is a place in ONE design. */
+    const COUPLE_EXTRA = 8;
+    const COUPLE_FIRST = LOVE_FIRST + LOVE_EXTRA;
+    const SLOT_COUNT = COUPLE_FIRST + COUPLE_EXTRA;
 
     /* Collage box index (0..17) to photo slot. */
     function annivSlot(i) {
@@ -1807,6 +2096,11 @@
        one is the circle above them. */
     function loveSlot(i) {
         return LOVE_FIRST + i;
+    }
+
+    /* Definition grid cell index (0..8) to photo slot. Cell 0 IS slot 0. */
+    function coupleSlot(i) {
+        return i === 0 ? 0 : COUPLE_FIRST + i - 1;
     }
 
     /* The artwork's icons, kept in their SOURCE files' own coordinates and
@@ -2239,6 +2533,15 @@
         loveTheme: DEFAULT_LOVE_THEME,
         loveMessage: DEFAULT_LOVE_MESSAGE,
         loveTitle: DEFAULT_LOVE_TITLE,
+        coupleTheme: DEFAULT_COUPLE_THEME,
+        /* True unless the visitor turns it off, which is why every read goes
+           through coupleGrey() rather than testing the key: `undefined` from
+           a record saved before this existed has to mean ON. */
+        coupleGrey: true,
+        coupleWord: DEFAULT_COUPLE_WORD,
+        coupleBracket: DEFAULT_COUPLE_BRACKET,
+        coupleDef: DEFAULT_COUPLE_DEF,
+        coupleClosing: DEFAULT_COUPLE_CLOSING,
         heading: DEFAULT_TRIB_HEADING,
         message: DEFAULT_TRIB_MESSAGE,
         title: DEFAULT_TRIB_TITLE,
@@ -2290,6 +2593,9 @@
             tribTheme: state.tribTheme,
             loveTheme: state.loveTheme,
             loveMessage: state.loveMessage, loveTitle: state.loveTitle,
+            coupleTheme: state.coupleTheme, coupleGrey: state.coupleGrey,
+            coupleWord: state.coupleWord, coupleBracket: state.coupleBracket,
+            coupleDef: state.coupleDef, coupleClosing: state.coupleClosing,
             heading: state.heading, message: state.message, title: state.title,
             quote: state.quote, closing: state.closing,
             nameA: state.nameA, nameB: state.nameB, tagline: state.tagline,
@@ -2329,6 +2635,13 @@
             ? parsed.loveTheme : DEFAULT_LOVE_THEME;
         state.loveMessage = cleanBlock(parsed.loveMessage);
         state.loveTitle = cleanLine(parsed.loveTitle);
+        state.coupleTheme = COUPLE_THEMES[parsed.coupleTheme]
+            ? parsed.coupleTheme : DEFAULT_COUPLE_THEME;
+        state.coupleGrey = parsed.coupleGrey !== false;
+        state.coupleWord = cleanLine(parsed.coupleWord);
+        state.coupleBracket = cleanLine(parsed.coupleBracket);
+        state.coupleDef = cleanBlock(parsed.coupleDef);
+        state.coupleClosing = cleanLine(parsed.coupleClosing);
         state.heading = cleanHeading(parsed.heading);
         state.message = cleanBlock(parsed.message);
         state.title = cleanLine(parsed.title);
@@ -2441,6 +2754,12 @@
             loveTheme: state.loveTheme,
             loveMessage: TB.sanitize(state.loveMessage),
             loveTitle: TB.sanitize(state.loveTitle),
+            coupleTheme: state.coupleTheme,
+            coupleGrey: state.coupleGrey,
+            coupleWord: TB.sanitize(state.coupleWord),
+            coupleBracket: TB.sanitize(state.coupleBracket),
+            coupleDef: TB.sanitize(state.coupleDef),
+            coupleClosing: TB.sanitize(state.coupleClosing),
             heading: TB.sanitize(state.heading),
             message: TB.sanitize(state.message),
             title: TB.sanitize(state.title),
@@ -2521,6 +2840,19 @@
             ? DEFAULT_LOVE_MESSAGE : cleanBlock(TB.desanitize(String(saved.loveMessage)));
         state.loveTitle = saved.loveTitle === undefined
             ? DEFAULT_LOVE_TITLE : cleanLine(TB.desanitize(String(saved.loveTitle)));
+        state.coupleTheme = COUPLE_THEMES[saved.coupleTheme]
+            ? saved.coupleTheme : DEFAULT_COUPLE_THEME;
+        state.coupleGrey = saved.coupleGrey !== false;
+        state.coupleWord = saved.coupleWord === undefined
+            ? DEFAULT_COUPLE_WORD : cleanLine(TB.desanitize(String(saved.coupleWord)));
+        state.coupleBracket = saved.coupleBracket === undefined
+            ? DEFAULT_COUPLE_BRACKET
+            : cleanLine(TB.desanitize(String(saved.coupleBracket)));
+        state.coupleDef = saved.coupleDef === undefined
+            ? DEFAULT_COUPLE_DEF : cleanBlock(TB.desanitize(String(saved.coupleDef)));
+        state.coupleClosing = saved.coupleClosing === undefined
+            ? DEFAULT_COUPLE_CLOSING
+            : cleanLine(TB.desanitize(String(saved.coupleClosing)));
         state.heading = saved.heading === undefined
             ? DEFAULT_TRIB_HEADING : cleanHeading(TB.desanitize(String(saved.heading)));
         state.message = saved.message === undefined
@@ -5284,6 +5616,174 @@
         return out;
     }
 
+    function paintCouple(c, W, H, options) {
+        const fx = W / COUPLE.page.w;
+        const fy = H / COUPLE.page.h;
+        const ink = coupleTheme();
+        const grey = coupleGrey();
+
+        if (!options.transparent) {
+            c.fillStyle = ink.page;
+            c.fillRect(0, 0, W, H);
+        }
+
+        /* ---- the nine cells ----
+           Reading order, and nothing overlaps: unlike every collage in this
+           file, the paint order here carries no stacking and is only the order
+           an upload fills them in. */
+        const cells = coupleCells(W, H);
+        cells.forEach((r, i) => {
+            const slot = coupleSlot(i);
+            if (photos[slot]) {
+                c.save();
+                c.beginPath();
+                c.rect(r.x, r.y, r.w, r.h);
+                c.clip();
+                /* Set INSIDE the save that already holds the clip, so one
+                   restore takes both off together. A filter left standing
+                   would grey the type as well, and on the light colourway
+                   that is nearly invisible until somebody opens an export. */
+                if (grey) { c.filter = "grayscale(1)"; }
+                drawCoverImage(c, photos[slot], r.x, r.y, r.w, r.h, state.views[slot]);
+                c.restore();
+            } else {
+                c.fillStyle = ink.empty;
+                c.fillRect(r.x, r.y, r.w, r.h);
+            }
+        });
+
+        c.textBaseline = "alphabetic";
+        c.textAlign = "left";
+
+        /* ---- the word, and the bracket on the word's own baseline ---- */
+        const left = coupleTextLeft(W);
+        const colW = coupleTextWidth(W);
+        const bracket = coupleBracketText(state.coupleBracket);
+        const fit = coupleWordFit(c, state.coupleWord, bracket, colW,
+            COUPLE.word.size * fy);
+        const wy = COUPLE.word.baseline * fy;
+        c.font = coupleSerif(fit.size, 700);
+        c.fillStyle = ink.ink;
+        const wordW = c.measureText(state.coupleWord).width;
+        c.fillText(state.coupleWord, left, wy);
+        noteText(c, "coupleWord", { x: left, y: wy - fit.size,
+            w: Math.max(wordW, fit.size), h: fit.size * 1.3,
+            size: fit.size, font: c.font, align: "left" });
+
+        if (bracket) {
+            const bx = left + wordW + fit.gap;
+            c.font = coupleSans(fit.bracket, 600);
+            c.fillText("[" + bracket + "]", bx, wy);
+            /* The editable region covers the INITIALS, not the brackets: a
+               caret dropped on the preview types into coupleBracket, which
+               holds what is between them. A region over the whole run would
+               put the caret on characters the field does not contain. */
+            const openW = c.measureText("[").width;
+            noteText(c, "coupleBracket", { x: bx + openW, y: wy - fit.bracket,
+                w: Math.max(c.measureText(bracket).width, fit.bracket * 2),
+                h: fit.bracket * 1.4, size: fit.bracket, font: c.font,
+                align: "left" });
+        }
+
+        /* ---- the definition ---- */
+        const defSize = COUPLE.def.size * fy;
+        c.font = coupleSans(defSize, 400);
+        const lines = coupleDefLines(c, state.coupleDef, colW);
+        const flow = coupleFlow(lines.length);
+        c.fillStyle = ink.ink;
+        lines.forEach((line, i) => {
+            c.fillText(line, left, flow.def[i] * fy);
+        });
+        const lastDef = flow.def.length ? flow.def[flow.def.length - 1] : COUPLE.def.top;
+        noteText(c, "coupleDef", { x: left, y: COUPLE.def.top * fy - defSize,
+            w: colW, h: (lastDef - COUPLE.def.top + COUPLE.def.leading) * fy,
+            size: defSize, font: c.font, align: "left",
+            multiline: true, leading: COUPLE.def.leading * fy });
+
+        /* ---- the closing line, which switches BACK to the serif ---- */
+        const clSize = coupleFitLine(c, state.coupleClosing,
+            COUPLE.closing.size * fy, colW, (s) => coupleSerif(s, 400));
+        const cy = flow.closing * fy;
+        const clW = c.measureText(state.coupleClosing).width;
+        c.fillText(state.coupleClosing, left, cy);
+        noteText(c, "coupleClosing", { x: left, y: cy - clSize,
+            w: Math.max(clW, clSize * 3), h: clSize * 1.3,
+            size: clSize, font: c.font, align: "left" });
+    }
+
+    /* SVG twin of paintCouple(). Reads coupleCells(), coupleWordFit(),
+       coupleDefLines(), coupleFlow() and coupleFitLine() -- the same five the
+       canvas reads -- so neither painter derives a position of its own. */
+    function coupleSVG(W, H, esc) {
+        const fy = H / COUPLE.page.h;
+        const ink = coupleTheme();
+        const grey = coupleGrey();
+        const measure = document.createElement("canvas").getContext("2d");
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + ink.page + '"/>';
+
+        const cells = coupleCells(W, H);
+        let defs = grey ? COUPLE_GREY_FILTER : "";
+        cells.forEach((r, i) => {
+            if (photos[coupleSlot(i)]) {
+                defs += '<clipPath id="tb-couple-' + i + '"><rect x="' + r.x + '" y="' +
+                    r.y + '" width="' + r.w + '" height="' + r.h + '"/></clipPath>';
+            }
+        });
+        if (defs) { out += "<defs>" + defs + "</defs>"; }
+
+        cells.forEach((r, i) => {
+            const slot = coupleSlot(i);
+            if (photos[slot]) {
+                /* Clip and filter on the same group. SVG renders the element,
+                   applies the filter, then the clip, so a zoomed photograph is
+                   greyed whole and then cut to the cell -- which for a
+                   per-pixel colour matrix is the same picture either way
+                   round, and is why this can be one group rather than two. */
+                out += '<g clip-path="url(#tb-couple-' + i + ')"' +
+                    (grey ? ' filter="url(#' + COUPLE_GREY_ID + ')"' : "") + ">" +
+                    photoImageSVG(photos[slot], state.views[slot], r.x, r.y, r.w, r.h) +
+                    "</g>";
+            } else {
+                out += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w +
+                    '" height="' + r.h + '" fill="' + ink.empty + '"/>';
+            }
+        });
+
+        const left = coupleTextLeft(W);
+        const colW = coupleTextWidth(W);
+        const bracket = coupleBracketText(state.coupleBracket);
+        const fit = coupleWordFit(measure, state.coupleWord, bracket, colW,
+            COUPLE.word.size * fy);
+        const wy = COUPLE.word.baseline * fy;
+        measure.font = coupleSerif(fit.size, 700);
+        const wordW = measure.measureText(state.coupleWord).width;
+        out += '<text x="' + left + '" y="' + wy + '"' +
+            coupleSvgFont("playfair", fit.size, 700) + ' fill="' + ink.ink + '">' +
+            esc(state.coupleWord) + "</text>";
+        if (bracket) {
+            out += '<text x="' + (left + wordW + fit.gap) + '" y="' + wy + '"' +
+                coupleSvgFont("inter", fit.bracket, 600) + ' fill="' + ink.ink +
+                '">' + esc("[" + bracket + "]") + "</text>";
+        }
+
+        const defSize = COUPLE.def.size * fy;
+        measure.font = coupleSans(defSize, 400);
+        const lines = coupleDefLines(measure, state.coupleDef, colW);
+        const flow = coupleFlow(lines.length);
+        lines.forEach((line, i) => {
+            out += '<text x="' + left + '" y="' + (flow.def[i] * fy) + '"' +
+                coupleSvgFont("inter", defSize, 400) + ' fill="' + ink.ink + '">' +
+                esc(line) + "</text>";
+        });
+
+        const clSize = coupleFitLine(measure, state.coupleClosing,
+            COUPLE.closing.size * fy, colW, (s) => coupleSerif(s, 400));
+        out += '<text x="' + left + '" y="' + (flow.closing * fy) + '"' +
+            coupleSvgFont("playfair", clSize, 400) + ' fill="' + ink.ink + '">' +
+            esc(state.coupleClosing) + "</text>";
+        return out;
+    }
+
     function noteText(c, key, box) {
         if (recordingRegions) {
             /* fillStyle is still the colour the words were just drawn in, so
@@ -5321,6 +5821,8 @@
             paintTribute(c, W, H, options);
         } else if (frame.layout === "love") {
             paintLove(c, W, H, options);
+        } else if (frame.layout === "couple") {
+            paintCouple(c, W, H, options);
         } else {
             const FRAME_W = frame.frame ? 60 * scale : 0;
             const MATTE_W = frame.frame ? 50 * scale : 0;
@@ -5722,7 +6224,11 @@
         message: { field: "p-message", clean: cleanBlock },
         title: { field: "p-title", clean: cleanLine },
         loveMessage: { field: "p-love-message", clean: cleanBlock },
-        loveTitle: { field: "p-love-title", clean: cleanLine }
+        loveTitle: { field: "p-love-title", clean: cleanLine },
+        coupleWord: { field: "p-couple-word", clean: cleanLine },
+        coupleBracket: { field: "p-couple-bracket", clean: cleanLine },
+        coupleDef: { field: "p-couple-def", clean: cleanBlock },
+        coupleClosing: { field: "p-couple-closing", clean: cleanLine }
     };
 
     function regionFor(key) {
@@ -6179,6 +6685,20 @@
             if (dx * dx + dy * dy <= 1) { return 0; }
             return -1;
         }
+        /* Forwards, because the nine cells do not overlap: there is exactly
+           one answer and no last-painted rule to respect. */
+        if (layout === "couple") {
+            const px = pt.x * W;
+            const py = pt.y * H;
+            const cells = coupleCells(W, H);
+            for (let i = 0; i < cells.length; i += 1) {
+                const r = cells[i];
+                if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) {
+                    return coupleSlot(i);
+                }
+            }
+            return -1;
+        }
         if (layout === "birthday") {
             const px = pt.x * W;
             const py = pt.y * H;
@@ -6260,6 +6780,13 @@
                 if (loveSlot(k) === i) { return loveInner(k, W, H); }
             }
             return loveInner(0, W, H);
+        }
+        if (layout === "couple") {
+            const cells = coupleCells(W, H);
+            for (let k = 0; k < cells.length; k += 1) {
+                if (coupleSlot(k) === i) { return cells[k]; }
+            }
+            return cells[0];
         }
         if (layout === "anniversary") {
             if (i === CODE_SLOT) { return annivCodeRect(W, H); }
@@ -6622,7 +7149,8 @@
            for no reason anybody chose. */
         const upLayout = layoutOf(state.frame);
         if (upLayout === "anniversary" || upLayout === "birthday" ||
-                upLayout === "tribute" || upLayout === "love") {
+                upLayout === "tribute" || upLayout === "love" ||
+                upLayout === "couple") {
             const slots = slotsFor(upLayout)
                 .filter((i) => i !== CODE_SLOT);
             const from = Math.max(0, slots.indexOf(primarySlot()));
@@ -6825,6 +7353,40 @@
         });
     });
 
+    const coupleThemeSelect = byId("p-couple-theme");
+    if (coupleThemeSelect) {
+        coupleThemeSelect.addEventListener("change", () => {
+            beginChange();
+            state.coupleTheme = COUPLE_THEMES[coupleThemeSelect.value]
+                ? coupleThemeSelect.value : DEFAULT_COUPLE_THEME;
+            commit();
+            render();
+        });
+    }
+
+    const coupleGreyBox = byId("p-couple-grey");
+    if (coupleGreyBox) {
+        coupleGreyBox.addEventListener("change", () => {
+            beginChange();
+            state.coupleGrey = !!coupleGreyBox.checked;
+            commit();
+            render();
+        });
+    }
+
+    [["p-couple-word", "coupleWord", cleanLine],
+     ["p-couple-bracket", "coupleBracket", cleanLine],
+     ["p-couple-def", "coupleDef", cleanBlock],
+     ["p-couple-closing", "coupleClosing", cleanLine]].forEach((entry) => {
+        const el = byId(entry[0]);
+        if (!el) { return; }
+        el.addEventListener("input", () => {
+            beginChange();
+            state[entry[1]] = entry[2](el.value);
+            commit("couple-" + entry[1]);
+        });
+    });
+
     const hbdThemeSelect = byId("p-hbd-theme");
     if (hbdThemeSelect) {
         hbdThemeSelect.addEventListener("change", () => {
@@ -6980,6 +7542,13 @@
             for (let i = 0; i < LOVE_BOXES.length; i += 1) { out.push(loveSlot(i)); }
             return out;
         }
+        if (layout === "couple") {
+            const out = [];
+            for (let i = 0; i < COUPLE.grid.cols * COUPLE.grid.rows; i += 1) {
+                out.push(coupleSlot(i));
+            }
+            return out;
+        }
         if (layout === "split") { return [0, 1]; }
         return [0];
     }
@@ -7008,6 +7577,9 @@
         }
         if (lay === "love") {
             return i === 0 ? "Portrait circle" : "Photo " + (i - LOVE_FIRST + 1);
+        }
+        if (lay === "couple") {
+            return i === 0 ? "Photo 1" : "Photo " + (i - COUPLE_FIRST + 2);
         }
         return "Card " + (i + 1);
     }
@@ -7545,6 +8117,10 @@
         const loveFields = byId("p-love-fields");
         if (loveFields) { loveFields.hidden = !love; }
 
+        const couple = style.layout === "couple";
+        const coupleFields = byId("p-couple-fields");
+        if (coupleFields) { coupleFields.hidden = !couple; }
+
         /* Two posters print a pair of names, and the rest of the anniversary
            poster's block belongs to it alone. */
         const namesFields = byId("p-names-fields");
@@ -7581,10 +8157,10 @@
            gated on the search screen alone, above. */
         const batchFields = byId("p-batch-fields");
         if (batchFields) {
-            batchFields.hidden = !grid && !anniv && !hbd && !trib && !love;
+            batchFields.hidden = !grid && !anniv && !hbd && !trib && !love && !couple;
         }
         if (photoFields) {
-            photoFields.hidden = grid || anniv || hbd || trib || love;
+            photoFields.hidden = grid || anniv || hbd || trib || love || couple;
         }
 
         [["p-name-a", "nameA"], ["p-name-b", "nameB"],
@@ -7624,6 +8200,16 @@
         if (tt) { tt.value = state.tribTheme; }
         const lt = byId("p-love-theme");
         if (lt) { lt.value = state.loveTheme; }
+        const ct = byId("p-couple-theme");
+        if (ct) { ct.value = state.coupleTheme; }
+        const cg = byId("p-couple-grey");
+        if (cg) { cg.checked = coupleGrey(); }
+        [["p-couple-word", "coupleWord"], ["p-couple-bracket", "coupleBracket"],
+         ["p-couple-def", "coupleDef"], ["p-couple-closing", "coupleClosing"]]
+            .forEach((pair) => {
+                const el = byId(pair[0]);
+                if (el && el.value !== state[pair[1]]) { el.value = state[pair[1]]; }
+            });
         [["p-love-message", "loveMessage"], ["p-love-title", "loveTitle"]]
             .forEach((pair) => {
                 const el = byId(pair[0]);
@@ -8375,6 +8961,8 @@
             body += tributeSVG(W, H, esc);
         } else if (frame.layout === "love") {
             body += loveSVG(W, H, esc);
+        } else if (frame.layout === "couple") {
+            body += coupleSVG(W, H, esc);
         } else {
             if (frame.frame) {
                 body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
@@ -8759,6 +9347,15 @@
                 o.value = k;
                 o.textContent = LOVE_THEMES[k].label;
                 loveTheme2.appendChild(o);
+            });
+        }
+        const coupleTheme2 = byId("p-couple-theme");
+        if (coupleTheme2 && !coupleTheme2.options.length) {
+            Object.keys(COUPLE_THEMES).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = COUPLE_THEMES[k].label;
+                coupleTheme2.appendChild(o);
             });
         }
         const hbdTheme2 = byId("p-hbd-theme");
