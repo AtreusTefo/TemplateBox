@@ -33,6 +33,289 @@
 
 window.TB_RESUME_TEMPLATES = [
     {
+        /* Traced from a supplied design, measured off the artwork rather than
+           eyeballed: a two-column CV with a charcoal masthead, a circular
+           portrait straddling it, and blush heading bands across both columns.
+           Built September 15, 2026.
+
+           IT SHIPS DESIGN-LED, NOT ATS-UNQUALIFIED, and that is deliberate.
+           The site's documented position grants the unqualified claim to a
+           sheet that is single column, carries no photograph, and has
+           deterministic extraction order. This one is two-column AND
+           photo-led -- the portrait is its centrepiece -- so it fails two of
+           the three by construction, and removing either would be designing a
+           different sheet rather than building this one. grey-rail set that
+           precedent. What it DOES keep is the third: the engine emits its own
+           content stream, so the sidebar extracts whole and then the main
+           column extracts whole, never interleaved across the gutter.
+
+           Measurements: the supplied raster is 736x1041 and its aspect is
+           0.7070 against A4's 0.7067, so it is an uncropped page converting at
+           595/736 with nothing to correct. Sizes are derived from measured
+           WIDTHS through jsPDF's Helvetica metrics; where a string is
+           letter-spaced the size comes from its cap height and the tracking
+           from the width it has left over. See
+           docs/implementation/PEACH_PORTRAIT_CV_TEMPLATE.md. */
+        id: "peach-portrait",
+        title: "Peach Portrait CV",
+        catalog: true,
+
+        /* The artwork's own charcoal. Every role that is not the accent is a
+           fixed colour here, because this design is a two-tone scheme rather
+           than an accented one -- the swatch row moves the masthead and
+           nothing else, which is honest about what it controls. */
+        defaultAccent: "#4A4A4A",
+
+        page: { width: 595, height: 842 },
+
+        layout: {
+            kind: "two-column",
+            /* The divider measures x=254.2, so the sidebar is 253.8 of 595 =
+               0.4266. Sidebar text runs 12.9 to 248.2 and main text 269.2 to
+               582.1, which are the insets below.
+
+               `bottom` is a reservation boundary, not the last baseline. */
+            sidebar: {
+                side: "left",
+                width: 0.4266,
+                left: 13, right: 7,
+                firstBaseline: 245.1,
+                bottom: 815
+            },
+            main: {
+                left: 15.4, right: 12.9,
+                firstBaseline: 144,
+                bottom: 815
+            }
+        },
+
+        palette: {
+            paper:    "#F9EEEA",   /* the whole sheet, both columns alike */
+            charcoal: "#322E2F",   /* the masthead band                   */
+            band:     "#F3D8C5",   /* every heading band                  */
+            tan:      "#C79B80",   /* the name, on the charcoal           */
+            ink:      "#2B2B2B",
+            divider:  "#69605B",
+            onDark:   "#FFFFFF"
+        },
+
+        /* The sheet is not white: it is a pale pink, and both columns are the
+           same pale pink. There is no tinted sidebar in this design, which is
+           easy to mis-see -- what separates the columns is one hairline rule.
+           Sampling the two columns returns the identical value. */
+        background: "paper",
+
+        type: {
+            /* 23pt with 2.55 of tracking. The cap height puts the size at
+               about 23; the string measures 218.3pt where 23pt of Helvetica
+               Bold is 182.6, and the 35.7 left over spread across 14 gaps is
+               the tracking. Deriving the size from the width alone would have
+               given 27.5 and glyphs half again too heavy. */
+            bannerName: { family: "sans", weight: "bold", size: 23,
+                          tracking: 2.55, color: "tan" },
+            bannerRole: { family: "sans", weight: "normal", size: 11.5,
+                          tracking: 3.18, color: "onDark" },
+
+            /* Band labels. The main column's are a point larger than the
+               sidebar's in the artwork -- 9.71pt of cap against 8.90 -- so
+               they are two roles rather than one. */
+            heading:     { family: "sans", weight: "normal", size: 12.5,
+                           tracking: 2.2, color: "ink", uppercase: true,
+                           /* The artwork measures 30 above a band and 27.5
+                              below it. Both are opened up here, and the entry
+                              gaps with them, because the MAIN column had 117pt
+                              of slack left even with the densest content the
+                              reference itself carries, and a shorter CV read
+                              as a tight block with a band of empty paper under
+                              it.
+
+                              Opened MODERATELY: 34 and 29 against the measured
+                              30 and 27.5. A first pass at 40 and 33 bought more
+                              air and cost far too much fidelity -- it pushed
+                              the Professional Experience band 44.8pt below
+                              where the artwork puts it, where this sits 12pt
+                              off. Most of the readability came from the
+                              LEADING below rather than from these gaps, which
+                              is why the gaps are nearly the measurement and
+                              the leading is not. The sidebar gets none of it;
+                              see its own note. */
+                           gapBefore: 34, gapAfter: 29,
+                           box: { color: "band", full: true, padX: 16.2,
+                                  above: 19.4, below: 10.5 } },
+            /* Deliberately NOT opened up the way the main column is. With the
+               reference's own three referees the sidebar finishes at y=813.4
+               against an 815 boundary -- 1.6pt of slack -- and the sidebar
+               cannot paginate: the engine reports its overflow rather than
+               moving it to a second page. Loosening it would silently clip a
+               third referee off the foot of somebody's CV. */
+            sideHeading: { family: "sans", weight: "normal", size: 11.5,
+                           tracking: 2.5, color: "ink", uppercase: true,
+                           gapBefore: 34, gapAfter: 26.7,
+                           box: { color: "band", full: true, padX: 25.9,
+                                  above: 21.9, below: 8.9 } },
+
+            /* The lead paragraph is markedly larger than anything under it:
+               15pt against 12, which is the artwork's own hierarchy. */
+            lead:        { family: "sans", weight: "normal", size: 15,
+                           lineHeight: 18.6, color: "ink" },
+
+            body:        { family: "sans", weight: "normal", size: 12,
+                           lineHeight: 15.3, color: "ink" },
+            tagline:     { family: "sans", weight: "normal", size: 12,
+                           lineHeight: 15.3, color: "ink", align: "center" },
+
+            /* Bold, where the artwork sets the company name heavier than the
+               role under it. */
+            entryHead:   { family: "sans", weight: "bold", size: 12,
+                           lineHeight: 18, color: "ink" },
+            entrySub:    { family: "sans", weight: "normal", size: 12,
+                           lineHeight: 18, color: "ink" },
+            /* itemGap above lineHeight: a bullet that wraps stays one block
+               while the space BETWEEN bullets opens, which is the difference
+               between a list that reads and a paragraph with dots in it. */
+            bullet:      { family: "sans", weight: "normal", size: 12,
+                           lineHeight: 16.5, color: "ink",
+                           marker: "\u2022", indent: 11, itemGap: 21 },
+            sideContact: { family: "sans", weight: "normal", size: 12,
+                           lineHeight: 16.2, color: "ink", rowGap: 8 }
+        },
+
+        blocks: [
+            /* ---------------- masthead, drawn in the main column ---------- */
+            /* Bleeds the whole page width even though it belongs to the main
+               column, because the artwork runs it edge to edge behind the
+               portrait. It advances no cursor: both columns set their own
+               firstBaseline below it, so a template that dropped the banner
+               would keep every other measurement. */
+            { column: "main", kind: "banner", fill: "charcoal",
+              bleed: "page", top: 12.1, height: 108.4,
+              lines: [
+                  { field: "name",  type: "bannerName", baseline: 55,
+                    dx: 11.3, uppercase: true, fallback: "Your Name" },
+                  { field: "title", type: "bannerRole", baseline: 88.2,
+                    dx: 12.1, uppercase: true }
+              ] },
+
+            /* The one hairline that separates the columns. Absolute, and it
+               starts below the masthead and stops short of the foot exactly
+               where the artwork's does. */
+            { column: "main", kind: "vrule", x: 254.2, y1: 150.4, y2: 810.5,
+              color: "divider", width: 0.8 },
+
+            /* ---------------- sidebar ------------------------------------ */
+            /* Centre (131, 123) with a 102 radius, so it spans y 21 to 225
+               and overlaps the masthead that ends at 119.7. `cx` is relative
+               to the column box, `cy` absolute.
+
+               The first pass had r=120 and cy=139.5, which reached y=259.5 --
+               PAST the tagline's baseline at 245.1, so the sidebar's first
+               line was being drawn over the photograph. It came from measuring
+               the circle by its white pixels, which also matched the sheet's
+               own pale paper below it; the honest measurement is the white
+               ring's apex against the charcoal band (y=19.4) and the widest
+               chord (204.5 across), which fix the centre and radius between
+               them. The circle now clears the tagline by 20pt. */
+            { column: "sidebar", kind: "photo", shape: "circle",
+              cx: 131, cy: 123, r: 102,
+              ring: { color: "paper", width: 7 } },
+
+            { column: "sidebar", kind: "text", field: "tagline",
+              type: "tagline" },
+
+            { column: "sidebar", kind: "section", label: "Contact",
+              headingType: "sideHeading",
+              body: { kind: "contact", type: "sideContact",
+                      iconSize: 12, textOffset: 38.7,
+                      glyph: "ink", knockout: "paper",
+                      rows: [
+                          { icon: "phone",    fields: ["phone"] },
+                          { icon: "envelope", fields: ["email"] },
+                          { icon: "pin",      fields: ["address", "city"],
+                            separator: ", " }
+                      ] } },
+
+            /* labelWidth "auto" runs the colon straight after each label, as
+               the artwork does -- these are not a column of aligned colons. */
+            { column: "sidebar", kind: "section", label: "Personal Information",
+              headingType: "sideHeading",
+              body: { kind: "fields", type: "body", labelType: "body",
+                      labelWidth: "auto", separator: ": ", rowGap: -0.3,
+                      rows: [
+                          { label: "Date of Birth",  field: "dateOfBirth" },
+                          { label: "Place of Birth", field: "placeOfBirth" },
+                          { label: "Marital Status", field: "maritalStatus" },
+                          { label: "Nationality",    field: "nationality" },
+                          { label: "Height",         field: "height" },
+                          { label: "Weight",         field: "weight" },
+                          { label: "Religion",       field: "religion" }
+                      ] } },
+
+            /* Every line is "Label: Value" built from a literal run and a
+               field, which is what keeps an empty one from leaving a stray
+               label behind -- buildRuns drops the pair together. */
+            { column: "sidebar", kind: "section", label: "Character Reference",
+              headingType: "sideHeading",
+              body: { kind: "entries", source: "references",
+                      head: { runs: [
+                          { literal: "Name: ", type: "body" },
+                          { field: "name",     type: "body" }
+                      ]},
+                      sub: [
+                          { runs: [{ literal: "Company: ", type: "body" },
+                                   { field: "company",     type: "body" }],
+                            gapBefore: 15.3 },
+                          { runs: [{ literal: "Profession: ", type: "body" },
+                                   { field: "title",          type: "body" }],
+                            gapBefore: 15.3 },
+                          { runs: [{ literal: "Address: ", type: "body" },
+                                   { field: "refAddress",   type: "body" }],
+                            gapBefore: 15.3 },
+                          { runs: [{ literal: "Contact Number: ", type: "body" },
+                                   { field: "phone",              type: "body" }],
+                            gapBefore: 15.3 }
+                      ],
+                      entryGap: 24 } },
+
+            /* ---------------- main column -------------------------------- */
+            /* The lead paragraph carries no heading: the artwork opens the
+               column with it, straight under the masthead. Justified, which
+               the engine does by per-line TRACKING rather than word spacing,
+               because tracking is the one measure both painters honour
+               identically. */
+            { column: "main", kind: "text", field: "summary", type: "lead",
+              justify: true, gapAfter: 10 },
+
+            { column: "main", kind: "section", label: "Educational Attainment",
+              body: { kind: "entries", source: "education",
+                      head: { runs: [{ field: "degree", type: "entryHead" }] },
+                      sub: [
+                          { runs: [{ field: "school", type: "entrySub" }],
+                            gapBefore: 16.2 },
+                          { runs: [{ literal: "School Year(s): ", type: "entrySub" },
+                                   { field: "dates",              type: "entrySub" }],
+                            gapBefore: 13 }
+                      ],
+                      entryGap: 30 } },
+
+            { column: "main", kind: "section", label: "Professional Experience",
+              body: { kind: "entries", source: "experience",
+                      head: { runs: [{ field: "company", type: "entryHead" }] },
+                      sub: [
+                          { runs: [{ field: "role",  type: "entrySub" }],
+                            gapBefore: 17 },
+                          { runs: [{ field: "dates", type: "entrySub" }],
+                            gapBefore: 18.6 },
+                          { runs: [{ literal: "Work Responsibilities",
+                                     type: "entrySub", keep: true }],
+                            gapBefore: 14.5 }
+                      ],
+                      bullets: { field: "description", split: "\n",
+                                 gapBefore: 19 },
+                      entryGap: 31 } }
+        ]
+    },
+
+    {
         /* Traced from a supplied design: the Indian biodata resume, where a
            filled heading box, a labelled details block and a ruled marks table
            are the whole visual grammar. Built September 15, 2026.

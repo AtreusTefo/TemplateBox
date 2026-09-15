@@ -271,9 +271,44 @@
                             <label for="f-father-name">Father's Name</label>
                             <input type="text" id="f-father-name" data-bind="fatherName" maxlength="60">
                         </div>
-                        <div class="field" data-templates="boxed-biodata">
+                        <div class="field" data-templates="boxed-biodata peach-portrait">
                             <label for="f-dob">Date of Birth</label>
                             <input type="text" id="f-dob" data-bind="dateOfBirth" maxlength="40" placeholder="12 January 2004">
+                        </div>
+                        <!-- The line under the portrait. Its own field rather
+                             than a second use of the summary, which this design
+                             already spends on the objective beside it. -->
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-tagline">Tagline</label>
+                            <input type="text" id="f-tagline" data-bind="tagline" maxlength="120" placeholder="A fast learner who adapts quickly to change.">
+                        </div>
+                        <!-- The personal-information block. Conventional on a
+                             CV in much of Asia and unusual elsewhere, which is
+                             why they are gated to the one template that draws
+                             them rather than offered to everybody. -->
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-place-birth">Place of Birth</label>
+                            <input type="text" id="f-place-birth" data-bind="placeOfBirth" maxlength="60">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-marital">Marital Status</label>
+                            <input type="text" id="f-marital" data-bind="maritalStatus" maxlength="30">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-nationality">Nationality</label>
+                            <input type="text" id="f-nationality" data-bind="nationality" maxlength="40">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-height">Height</label>
+                            <input type="text" id="f-height" data-bind="height" maxlength="20" placeholder="5'3 ft">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-weight">Weight</label>
+                            <input type="text" id="f-weight" data-bind="weight" maxlength="20" placeholder="55 kg">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-religion">Religion</label>
+                            <input type="text" id="f-religion" data-bind="religion" maxlength="40">
                         </div>
                         <div class="field">
                             <label for="f-email">Email</label>
@@ -601,6 +636,12 @@
             <div class="field">
                 <label>Company</label>
                 <input type="text" data-entry-field="company" maxlength="60" placeholder="Northwind Logistics">
+            </div>
+            <!-- Only the portrait CV prints a referee's address; every other
+                 template sets name, title, company and one contact line. -->
+            <div class="field" data-templates="peach-portrait">
+                <label>Address</label>
+                <input type="text" data-entry-field="refAddress" maxlength="90">
             </div>
             <div class="field">
                 <label>Email</label>

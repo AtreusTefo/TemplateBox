@@ -1935,6 +1935,73 @@ body.is-nav-hidden .site-header:focus-within {
     color: var(--color-muted);
 }
 
+/* Peach Portrait CV miniature. A charcoal banner, a round portrait and blush
+   bands across two columns -- the three things that identify the design at
+   card size. Everything else is the shared .mk- set. */
+
+.mock-doc.portrait {
+    background-color: #F9EEEA;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.portrait .mk-banner {
+    background-color: #322E2F;
+    padding: 0.1875rem 0.25rem 0.1875rem 45%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.0625rem;
+}
+
+.mock-doc.portrait .mk-banner-name {
+    font-size: 0.4375rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #C79B80;
+    text-transform: uppercase;
+}
+
+.mock-doc.portrait .mk-banner-role {
+    font-size: 0.25rem;
+    letter-spacing: 0.12em;
+    color: #FFFFFF;
+    text-transform: uppercase;
+}
+
+.mock-doc.portrait .mk-cols {
+    display: grid;
+    grid-template-columns: 43% 57%;
+    gap: 0.1875rem;
+    padding: 0.125rem 0.25rem 0.25rem;
+}
+
+/* The one hairline that separates the columns in the template itself. */
+.mock-doc.portrait .mk-main {
+    border-left: 1px solid #C9BDB7;
+    padding-left: 0.1875rem;
+}
+
+/* Pulled up so it straddles the banner, as the portrait does on the sheet. */
+.mock-doc.portrait .mk-round {
+    width: 62%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: #D8C3B4;
+    border: 2px solid #F9EEEA;
+    margin: -2.25rem auto 0.1875rem;
+}
+
+.mock-doc.portrait .mk-band {
+    background-color: #F3D8C5;
+    font-size: 0.25rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.0625rem 0.125rem;
+    margin: 0.1875rem 0 0.0625rem;
+    color: #2B2B2B;
+}
+
 /* Boxed Headings Biodata CV miniature. A centred banner, section labels
    knocked out of a filled chip with the rule carrying on from it, and a ruled
    marks table. The chip needs the label in a <span> so the flex row can size
@@ -5694,6 +5761,24 @@ legend {
     margin: 4rem auto;
 }
 
+/* The side column has outrun the page. Sits on the mat ABOVE the sheet rather
+   than on it: it is a note about the document, not part of it, and the same
+   reasoning keeps the page labels off the display list. It is rebuilt with
+   every repaint, so it clears itself the moment the column fits again.
+
+   Warn colours rather than the brand's, because this one is telling the
+   visitor something is being lost. */
+.sheet-warning {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid var(--color-warn);
+    border-radius: 2px;
+    background-color: var(--color-card);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
 /* An engine-drawn preview is a STACK OF PAGES, not one long sheet.
 
    The first version of this rule made the container carry the paper: it kept
@@ -8919,6 +9004,15 @@ main:has(.mockup-layout) .editor-head {
        -- but "usually" is not a guarantee, and an input box printed across a
        resume is not a defect anyone would think to test for. */
     .rt-inline-editor {
+        display: none;
+    }
+
+    /* The side-column overflow note. It sits on the mat above the sheet and
+       says the document is losing lines -- a remark to the person editing,
+       never part of what they are printing. The jsPDF export cannot carry it
+       (that file is painted from the display list, which this was
+       deliberately kept out of), but a browser print takes the DOM. */
+    .sheet-warning {
         display: none;
     }
 

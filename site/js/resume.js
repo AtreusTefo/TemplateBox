@@ -81,12 +81,19 @@
             phoneAlt: "",
             fatherName: "",
             dateOfBirth: "",
-            declaration: ""
+            declaration: "",
+            tagline: "",
+            placeOfBirth: "",
+            maritalStatus: "",
+            nationality: "",
+            height: "",
+            weight: "",
+            religion: ""
         },
         experience: [{ role: "", company: "", place: "", dates: "", description: "" }],
         education: [{ degree: "", school: "", place: "", dates: "", score: "" }],
         projects: [{ name: "", role: "", dates: "", description: "" }],
-        references: [{ name: "", title: "", company: "", email: "", phone: "" }]
+        references: [{ name: "", title: "", company: "", email: "", phone: "", refAddress: "" }]
     };
 
     /* First-run sample content.
@@ -143,6 +150,15 @@
                other field does: a template that opens with three empty
                rows in its own signature block shows the visitor nothing
                about what it is. */
+            /* Drawn by the portrait CV alone. Conventional on a CV in much
+               of Asia, which is the market that design comes from. */
+            tagline: "A dependable fast learner who adapts quickly to change.",
+            placeOfBirth: "Enugu, Nigeria",
+            maritalStatus: "Married",
+            nationality: "Nigerian",
+            height: "5'7 ft",
+            weight: "63 kg",
+            religion: "Christian",
             fatherName: "Chukwuemeka Nwosu",
             dateOfBirth: "4 March 1987",
             declaration: "I hereby declare that the information given above is true to the best of my knowledge and belief."
@@ -196,7 +212,7 @@
            second referee -- which used to carry the other half of it -- is
            gone. */
         references: [
-            { name: "Marcus Ellery", title: "VP Supply Chain", company: "Northwind Logistics", email: "m.ellery@example.com", phone: "" }
+            { name: "Marcus Ellery", title: "VP Supply Chain", company: "Northwind Logistics", email: "m.ellery@example.com", phone: "+1 (555) 014-2200", refAddress: "1400 North Lake Shore Drive, Chicago" }
         ]
     };
 
@@ -739,7 +755,7 @@
             projects: collectEntries(projectsList,
                 ["name", "role", "dates", "description"]),
             references: collectEntries(referencesList,
-                ["name", "title", "company", "email", "phone"])
+                ["name", "title", "company", "email", "phone", "refAddress"])
         };
         form.querySelectorAll("[data-bind]").forEach((input) => {
             state.fields[input.getAttribute("data-bind")] = TB.sanitize(input.value);
@@ -1349,9 +1365,45 @@
             }
             return false;
         }
-        window.TBResume.renderPreview(tpl, state, sheet);
+        const ctx = window.TBResume.renderPreview(tpl, state, sheet);
         labelPages();
+        warnSideOverflow(ctx);
         return true;
+    }
+
+    /* The side column does not paginate.
+
+       That is deliberate in the engine -- a rail carrying contact details and
+       skills that split across two pages reads as a rendering fault rather
+       than a longer document -- and it was harmless while every two-column
+       template put only a handful of lines there. The Peach Portrait CV puts a
+       contact block, seven personal-information rows and a list of referees in
+       it, so a visitor can now fill it past the foot of the sheet, and what
+       runs over is simply not drawn.
+
+       The engine has always measured this and set ctx.overflow. Nothing ever
+       read it: a third referee vanished with no message anywhere, in the
+       preview and in the exported PDF alike. This is the thing reading it.
+
+       Editor chrome, added after the paint like the page labels above, so it
+       cannot reach the display list and therefore cannot reach the download.
+       renderPreview() calls replaceChildren() first, so it is rebuilt every
+       keystroke and disappears the moment the visitor shortens the column. */
+    function warnSideOverflow(ctx) {
+        const over = ctx && ctx.overflow;
+        if (!over || !over.sidebar) {
+            return;
+        }
+        const note = document.createElement("p");
+        note.className = "sheet-warning";
+        note.setAttribute("role", "status");
+        /* Two messages, because the two cases are genuinely different. Past
+           the column's boundary the last lines are crowding the foot of the
+           page; past the paper they are not on it at all. */
+        note.textContent = over.sidebarOffPage
+            ? "The side column has run off the bottom of the page. Anything below the edge will not be printed or exported — shorten an entry, or remove one."
+            : "The side column has reached the bottom of the page. Add any more and it will start to fall off the sheet.";
+        sheet.insertBefore(note, sheet.firstChild);
     }
 
     /* "Page 1 of 2" under each page, so a CV that has run over says so instead

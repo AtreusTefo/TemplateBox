@@ -3367,9 +3367,17 @@ async function resumeTemplateChecks(page) {
             accent: '#1F4E79',
             fields: fields,
             experience: rows('experience-list', ['role', 'company', 'place', 'dates', 'description']),
-            education: rows('education-list', ['degree', 'school', 'place', 'dates']),
+            education: rows('education-list', ['degree', 'school', 'place', 'dates', 'score']),
             projects: rows('projects-list', ['name', 'role', 'dates', 'description']),
-            references: rows('references-list', ['name', 'title', 'company', 'email', 'phone'])
+            /* refAddress and score were missing until September 15, 2026, and
+               a key missing here is not a cosmetic omission: this block exists
+               to read the editor's REAL sample, and every field it forgets
+               makes the document shorter than the one a visitor actually has.
+               The overflow check below is the one that suffers -- it was
+               asserting that no column overruns, against content lighter than
+               the form produces. Add a key here whenever the form gains one. */
+            references: rows('references-list',
+                ['name', 'title', 'company', 'email', 'phone', 'refAddress'])
         };
         const empty = { accent: '#1A1A1A', fields: {},
                         experience: [], education: [], projects: [], references: [] };
@@ -3392,7 +3400,7 @@ async function resumeTemplateChecks(page) {
                        is the defect colorOf's indirection was added to fix,
                        and it paints as nothing rather than erroring. */
                     const unresolved = ops.filter((o) => {
-                        if (o.op === 'image') { return false; }
+                        if (o.op === 'image' || o.op === 'imageCircle') { return false; }
                         /* A stroke joined fill and color as a colour-bearing
                            key when the rect op learned a keyline on September
                            14, 2026. (No back-ticks in here: this whole block
@@ -3443,7 +3451,14 @@ async function resumeTemplateChecks(page) {
                        rather than trusted: the drawn box must be the ratio
                        js/resume.js crops every upload to, or a face is
                        stretched and neither painter can tell. */
-                    const images = ops.filter((o) => o.op === 'image');
+                    /* imageCircle counts as an image. It was added on
+                       September 15, 2026 for a circular portrait, and while
+                       this read 'image' alone every photo invariant below
+                       silently did not apply to the template that draws one --
+                       including the anti-stretch rule, which is the whole
+                       reason this block exists. */
+                    const images = ops.filter((o) =>
+                        o.op === 'image' || o.op === 'imageCircle');
                     const stretched = images.filter((o) =>
                         Math.abs((o.w / o.h) - ratio) > 0.001).length;
 
@@ -3550,6 +3565,175 @@ async function resumeTemplateChecks(page) {
         check(`${t.id}: exports a PDF whose text is still text`,
             t.pdfBytes > 0 && t.pdfTextOps > 20,
             t.pdfError || `${t.pdfBytes} bytes, ${t.pdfTextOps} text-positioning operators`);
+    });
+}
+
+/* ==========================================================================
+   9b. An overrun side column is SAID, not merely measured.
+
+   Section 9 asserts that no template overruns its own side column with the
+   editor's sample in it. That is the right check for the DESIGNS, and it says
+   nothing about the visitor, who can put a fourth referee in a column that
+   held three.
+
+   The side column does not paginate, deliberately. So when it overruns, the
+   lines past the foot are not drawn -- not in the preview, not in the
+   exported PDF. The engine has always measured exactly this and set
+   ctx.overflow.sidebar. Until September 15, 2026 nothing read it: a referee
+   typed into the Peach Portrait CV vanished with no message anywhere, and
+   both the preview and the download were quietly short.
+
+   That is why this is its own section rather than another assertion inside 9.
+   Section 9 runs layout() in a detached div and reads the return value; this
+   one has to drive the real form and look at the real page, because the
+   defect was never in the measurement -- it was in the wiring between the
+   measurement and the screen, which only the live editor has.
+
+   THE NON-VACUITY GUARD IS THE POINT. Every per-template assertion below is
+   conditional on having actually pushed that template past its boundary, so
+   without the global check that at least one was, a change that made overflow
+   unreachable would turn this whole section into a silence that reads as a
+   pass.
+   ========================================================================== */
+async function sidebarOverflowNoticeChecks(page) {
+    section("9b. The editor reports an overrun side column");
+
+    await page.navigate(`http://localhost:${PORT}/resume.html`, 1440);
+
+    const r = await page.evaluate(`(async () => {
+        const settle = () => new Promise(r => setTimeout(r, 260));
+        for (let i = 0; i < 100; i += 1) {
+            if (window.jspdf && window.jspdf.jsPDF) { break; }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        if (!window.jspdf || !window.jspdf.jsPDF) { return { error: 'jsPDF never loaded' }; }
+        if (!window.TBResume || !window.TB_RESUME_TEMPLATES) { return { error: 'the engine or the registry did not load' }; }
+
+        const notes = () => document.querySelectorAll('.sheet-warning').length;
+        const refRows = () => [...document.querySelectorAll('#references-list [data-entry]')];
+        const add = document.getElementById('add-reference');
+        if (!add) { return { error: 'the references list has no Add control' }; }
+
+        /* The state the EDITOR persisted, not one assembled here, so the
+           overflow this asks the engine about is the overflow the visitor's
+           own sheet has. */
+        const state = () => JSON.parse(localStorage.getItem('tb_resume_v1') || 'null');
+        const overflows = (tpl) => {
+            const st = state();
+            return Boolean(st && window.TBResume.layout(tpl, st).overflow.sidebar);
+        };
+
+        const rows = [];
+        const sidebars = window.TB_RESUME_TEMPLATES.filter(
+            (t) => t.layout && t.layout.sidebar);
+
+        for (const tpl of sidebars) {
+            const pick = document.querySelector('.template-pick[data-template="' + tpl.id + '"]');
+            if (!pick) { continue; }
+            pick.click();
+            await settle();
+
+            const row = { id: tpl.id, noteAtSample: notes(), added: 0 };
+            row.sampleOverflows = overflows(tpl);
+
+            /* Add referees one at a time until the ENGINE says the column has
+               overrun, then look at the page. Capped, so a template with a
+               deep side column ends the loop rather than the suite.
+
+               WHOLE referees, not bare names, and the cap has margin. Filling
+               only the name took 7 of 8 additions to overrun Peach Portrait,
+               which is one short entry away from never reaching the boundary
+               at all -- and every assertion under this loop is conditional on
+               reaching it, so a cap that is nearly tight is a section that
+               nearly stops testing anything. A referee with every field set is
+               also what the template actually draws: it emits a line per
+               populated field and drops the pairs that are empty. */
+            let over = row.sampleOverflows;
+            while (!over && row.added < 12) {
+                add.click();
+                const list = refRows();
+                const last = list.length ? list[list.length - 1] : null;
+                if (!last) { break; }
+                const filled = [['name', 'Overflow Probe Referee'],
+                                ['title', 'Principal Records Officer'],
+                                ['company', 'Probe Manpower Services'],
+                                ['refAddress', '14 Probe Street, Malolos, Bulacan'],
+                                ['email', 'probe@example.com'],
+                                ['phone', '(044) 791 2233']]
+                    .filter(([k, v]) => {
+                        const el = last.querySelector('[data-entry-field="' + k + '"]');
+                        if (!el) { return false; }
+                        el.value = v;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        return true;
+                    }).length;
+                if (!filled) { break; }
+                row.added += 1;
+                await settle();
+                over = overflows(tpl);
+            }
+            row.engineSaysOverflow = over;
+            row.noteWhenOver = notes();
+            row.noteText = (document.querySelector('.sheet-warning') || {}).textContent || '';
+
+            /* Take it back off again. A notice that does not clear is its own
+               defect: the visitor shortens the column, the warning stays, and
+               they are told they are losing lines that are on the page. */
+            for (let i = 0; i < row.added; i += 1) {
+                const list = refRows();
+                if (!list.length) { break; }
+                const btn = list[list.length - 1].querySelector('.entry-remove');
+                if (!btn) { break; }
+                btn.click();
+            }
+            await settle();
+            row.noteAfterUndo = notes();
+            row.refsAfterUndo = refRows().length;
+            rows.push(row);
+        }
+        return { rows: rows, sidebars: sidebars.length,
+                 templates: window.TB_RESUME_TEMPLATES.length };
+    })()`);
+
+    if (r.error) {
+        check("resume.html loads the engine for the overrun check", false, r.error);
+        return;
+    }
+
+    check(`a two-column template is registered to exercise ` +
+          `(${r.sidebars} of ${r.templates})`,
+        r.sidebars > 0,
+        "no template declares a side column, so nothing below was exercised");
+
+    check("at least one side column was actually driven past its boundary",
+        r.rows.some((t) => t.engineSaysOverflow),
+        "no template could be overrun in 8 referees, so every per-template " +
+        "assertion below is vacuous -- either the columns grew or the form " +
+        "stopped feeding them");
+
+    r.rows.forEach((t) => {
+        check(`${t.id}: the sample sheet carries no overrun notice`,
+            t.noteAtSample === 0 && !t.sampleOverflows,
+            `notice=${t.noteAtSample}, engine overflow=${t.sampleOverflows} -- ` +
+            "a notice on the untouched sample means either the sample no " +
+            "longer fits or the notice is stuck on");
+
+        if (!t.engineSaysOverflow) { return; }
+
+        check(`${t.id}: an overrun side column says so (${t.added} referees added)`,
+            t.noteWhenOver === 1,
+            `${t.noteWhenOver} notices while ctx.overflow.sidebar was true -- ` +
+            "the engine measured the overrun and the editor drew nothing, " +
+            "which is the silent-loss defect this section closes");
+
+        check(`${t.id}: the notice tells the visitor which column`,
+            /side column/i.test(t.noteText),
+            `the notice read: ${t.noteText}`);
+
+        check(`${t.id}: the notice clears once the column fits again`,
+            t.noteAfterUndo === 0,
+            `${t.noteAfterUndo} notices left with ${t.refsAfterUndo} referees, ` +
+            "so a visitor who fixed the overrun is still being warned about it");
     });
 }
 
@@ -4985,6 +5169,7 @@ async function main() {
                     await adminPersistenceChecks(page);
                     await exportNameChecks(page);
                     await resumeTemplateChecks(page);
+                    await sidebarOverflowNoticeChecks(page);
                     await posterExportChecks(page);
                     await mockupTemplateChecks(page);
                     await ruledInvoiceChecks(page);

@@ -143,7 +143,21 @@ window.TBResume = (() => {
         const out = [];
         (spec.runs || []).forEach((run) => {
             if (run.literal !== undefined) {
-                if (out.length) out.push({ text: run.literal, type: run.type, pending: true });
+                /* Pushed whether or not anything precedes it, so a literal can
+                   LEAD a line -- "Name: Marcus Ellery" -- and not only sit
+                   between two fields as a separator. It is pending either way,
+                   so a label whose field turns out empty is dropped with it
+                   and never strands a bare "Name:" on the sheet. The guard
+                   that used to require out.length made a leading label
+                   impossible to express at all.
+
+                   `keep` opts out of pending, for a literal that is a line in
+                   its OWN right rather than a label for something -- the
+                   "Work Responsibilities" caption this design sets above each
+                   entry's bullets. Without it such a line can never render,
+                   because nothing follows to clear the flag. */
+                out.push({ text: run.literal, type: run.type,
+                           pending: !run.keep });
                 return;
             }
             const text = readField(source, run.field);
@@ -291,8 +305,28 @@ window.TBResume = (() => {
             measureDoc.setFont(FAMILY[t.family].pdf, t.weight);
             measureDoc.setFontSize(t.size);
         };
-        ctx.measure = (text, t) => { setFont(t); return measureDoc.getTextWidth(text); };
-        ctx.wrap = (text, t, w) => { setFont(t); return measureDoc.splitTextToSize(text, w); };
+        /* `tracking` is letter-spacing, and it has to be added HERE as well as
+           painted, or every measurement downstream is short: a heading box
+           sized to a tracked label would cut the label off, and a tracked line
+           would wrap early. SVG's letter-spacing and PDF's Tc both add their
+           space after every glyph including the last, so the two painters
+           agree with each other; the visible INK extent is one gap fewer,
+           which is what a box or a wrap wants. */
+        const track = (text, t) =>
+            (t.tracking ? t.tracking * Math.max(0, String(text).length - 1) : 0);
+        ctx.measure = (text, t) => {
+            setFont(t);
+            return measureDoc.getTextWidth(text) + track(text, t);
+        };
+        ctx.wrap = (text, t, w) => {
+            setFont(t);
+            /* Wrap to a width reduced by the tracking a full line would add,
+               rather than post-checking each line: splitTextToSize knows
+               nothing about letter-spacing. */
+            const perChar = t.tracking || 0;
+            const guess = perChar ? Math.max(20, w - perChar * (w / Math.max(1, t.size * 0.5))) : w;
+            return measureDoc.splitTextToSize(text, guess);
+        };
 
         paintRail(ctx, 0);
 
@@ -310,9 +344,22 @@ window.TBResume = (() => {
             layoutBlock(ctx, block, key, cursor, started, pageOf);
         });
 
+        /* HOW FAR over, not only whether: the editor turns this into a
+           warning, and "your side column runs 84pt past the page" is a
+           different message from "it runs 4pt past it". The main column
+           paginates, so its flag is informational; the sidebar does not, so
+           its flag is the one that means content will be lost. */
         ctx.overflow = {
             main: cursor.main > cols.main.bottom,
-            sidebar: Boolean(cols.sidebar) && cursor.sidebar > cols.sidebar.bottom
+            mainBy: Math.max(0, cursor.main - cols.main.bottom),
+            sidebar: Boolean(cols.sidebar) && cursor.sidebar > cols.sidebar.bottom,
+            sidebarBy: cols.sidebar
+                ? Math.max(0, cursor.sidebar - cols.sidebar.bottom) : 0,
+            /* Past the paper itself, rather than past the column's own
+               reservation boundary. Anything here is not merely tight, it is
+               not on the sheet at all. */
+            sidebarOffPage: Boolean(cols.sidebar) &&
+                cursor.sidebar > ctx.template.page.height
         };
         return ctx;
     }
@@ -321,6 +368,13 @@ window.TBResume = (() => {
         const L = ctx.template.layout;
         const c = ctx.cols.sidebar;
         if (!c) return;
+        /* A sidebar that declares no background paints NOTHING. It used to
+           paint `colorOf(undefined)`, which falls through that function's last
+           line to #000000 -- so a two-column template whose columns are the
+           same colour got a solid black rail. Every two-column template until
+           now declared a tint, so the path was never taken and the default was
+           never wrong out loud. */
+        if (!L.sidebar.background) return;
         ctx.ops.push({
             op: "rect", page: page,
             x: c.boxX, y: 0, w: c.boxW, h: ctx.template.page.height,
@@ -437,13 +491,18 @@ window.TBResume = (() => {
        -- the two are separate now because they are separate problems: `multi`
        is "this value is bigger than the run you clicked", `inline: false` is
        "this run is not the whole of any one value". */
-    function text(ctx, page, x, y, str, t, widthForAlign, edit) {
+    function text(ctx, page, x, y, str, t, widthForAlign, edit, trackingOverride) {
         const op = {
             op: "text", page: page, x: x, y: y, text: str,
             family: t.family, size: t.size, weight: t.weight,
             color: colorOf(t.color, ctx.template, ctx.state),
             align: t.align || "left", boxWidth: widthForAlign
         };
+        /* An override is how a justified line carries its own spacing: the
+           role's tracking is a design constant, the override is computed per
+           line to make it fill the measure. */
+        const tr = trackingOverride === undefined ? t.tracking : trackingOverride;
+        if (tr) op.tracking = tr;
         if (edit) op.edit = edit;
         ctx.ops.push(op);
     }
@@ -557,8 +616,17 @@ window.TBResume = (() => {
             wrapped.forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
                 ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
+                /* Same per-line tracking the paragraph body uses, and for the
+                   same reason: it is the one spacing both painters honour
+                   identically. */
+                let tr;
+                if (block.justify && i < wrapped.length - 1) {
+                    const extra = (col.width - ctx.measure(line, t))
+                        / Math.max(1, String(line).length - 1);
+                    if (extra > 0 && extra < t.size * 0.35) tr = (t.tracking || 0) + extra;
+                }
                 text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], line, t,
-                     undefined, textEdit);
+                     undefined, textEdit, tr);
             });
             cursor[key] += block.gapAfter || 0;
             started[key] = true;
@@ -662,7 +730,14 @@ window.TBResume = (() => {
             const rows = block.left || [];
 
             cursor[key] += block.gapBefore || 0;
-            ensureRoom(ctx, key, cursor, pageOf, rowGap * rows.length + lh);
+            /* rows.length - 1, because the first row sits ON the cursor and
+               only the ones after it cost a rowGap. Reserving for the full
+               count over-reserved by a whole row, which broke the page 1.3pt
+               short of fitting a block that had 89pt of room under it. The
+               1.2 covers the signature caption, which hangs 0.6 of a line
+               below the last row. */
+            ensureRoom(ctx, key, cursor, pageOf,
+                       rowGap * Math.max(0, rows.length - 1) + lh * 1.2);
             const page = pageOf[key];
             const top = cursor[key];
 
@@ -678,18 +753,67 @@ window.TBResume = (() => {
             });
 
             if (block.right) {
-                const y = top + rowGap * Math.max(0, rows.length - 1);
+                /* The signature rule is NOT level with the last labelled row.
+                   The reference sets it BETWEEN the two, 8.9pt under the first
+                   row's baseline, and insets it from the right margin rather
+                   than running it to the edge -- so both are parameters here
+                   rather than derived from the rows. */
                 const w = block.rightWidth || 130;
+                const inset = block.rightInset || 0;
+                const ry = top + (block.rightOffset === undefined
+                    ? rowGap * Math.max(0, rows.length - 1) - lh * 0.4
+                    : block.rightOffset);
+                const rx = col.x + col.width - inset;
                 ctx.ops.push({ op: "line", page: page,
-                    x1: col.x + col.width - w, y1: y - lh * 0.4,
-                    x2: col.x + col.width, y2: y - lh * 0.4,
+                    x1: rx - w, y1: ry, x2: rx, y2: ry,
                     color: ruleColor, width: ruleW });
-                text(ctx, page, col.x + col.width, y + lh * 0.6, block.right.label,
+                text(ctx, page, rx, ry + (block.rightGap === undefined ? lh : block.rightGap),
+                     block.right.label,
                      Object.assign({}, t, { align: "right", weight: "bold" }));
             }
 
             cursor[key] = top + rowGap * Math.max(0, rows.length - 1) + lh;
             started[key] = true;
+            return;
+        }
+
+        /* A masthead band: one filled rectangle with text set inside it, at
+           absolute page coordinates, bleeding wherever it is told to. It does
+           NOT advance the cursor -- the column's own firstBaseline is set
+           below it, exactly as the photo block leaves the cursor alone -- so a
+           template that drops the banner keeps the rest of its layout. */
+        if (block.kind === "banner") {
+            const bx = block.bleed === "page" ? 0 : col.boxX;
+            const bw = block.bleed === "page" ? ctx.template.page.width : col.boxW;
+            ctx.ops.push({
+                op: "rect", page: page, x: bx, y: block.top || 0,
+                w: bw, h: block.height || 0,
+                fill: colorOf(block.fill, ctx.template, ctx.state)
+            });
+            (block.lines || []).forEach((line) => {
+                const t = T[line.type];
+                const value = line.literal
+                    || readField(ctx.state.fields, line.field)
+                    || line.fallback || "";
+                if (!value) return;
+                text(ctx, page, col.x + (line.dx || 0), line.baseline,
+                     line.uppercase ? value.toUpperCase() : value, t,
+                     undefined, fieldEdit(line.field));
+            });
+            started[key] = true;
+            return;
+        }
+
+        /* A vertical rule: the divider between two columns. Absolute, and it
+           advances nothing, because it is furniture spanning content rather
+           than a step in the flow. */
+        if (block.kind === "vrule") {
+            ctx.ops.push({
+                op: "line", page: page,
+                x1: block.x, y1: block.y1, x2: block.x, y2: block.y2,
+                color: colorOf(block.color, ctx.template, ctx.state),
+                width: block.width || 0.8
+            });
             return;
         }
 
@@ -709,6 +833,21 @@ window.TBResume = (() => {
                    cover the visitor's own contact details. It marks the top-left
                    corner and the width instead. If another template ever gains
                    a photo block, check this height against what follows it. */
+                if (block.shape === "circle") {
+                    /* A ring where the portrait will go, and nothing else.
+                       Same discipline as the rectangular slot: preview only,
+                       never advancing the cursor, so a sheet with no
+                       photograph lays out exactly as it always did. */
+                    const r = block.r || (block.width || col.width) / 2;
+                    ctx.ops.push({
+                        op: "photoSlot", page: page, round: true,
+                        x: col.boxX + (block.cx === undefined ? col.boxW / 2 : block.cx) - r,
+                        y: (block.cy || 0) - r, w: r * 2, h: r * 2,
+                        color: colorOf("accent", ctx.template, ctx.state),
+                        label: "Add a photo"
+                    });
+                    return;
+                }
                 ctx.ops.push({
                     op: "photoSlot", page: page,
                     x: col.x, y: block.top || 0,
@@ -724,6 +863,53 @@ window.TBResume = (() => {
                     color: colorOf("accent", ctx.template, ctx.state),
                     label: "Add a photo"
                 });
+                return;
+            }
+            /* A circular crop. The stored bitmap is 4:5 and PHOTO_RATIO is
+               fixed site-wide so no painter can ever stretch a face, so the
+               circle is cut OUT of a correctly-proportioned image rather than
+               the image being squashed into a square: the photo is drawn at
+               2r wide, its natural 2.5r tall, centred on the circle, and
+               clipped. What the circle shows is the middle band of the frame,
+               which is where the editor's own framing controls put a face. */
+            if (block.shape === "circle") {
+                const r = block.r || (block.width || col.width) / 2;
+                const cx = col.boxX + (block.cx === undefined ? col.boxW / 2 : block.cx);
+                const cy = block.cy || 0;
+                const iw = r * 2;
+                const ih = iw / PHOTO_RATIO;
+                /* The bitmap is 4:5 and the circle is round, so the image is
+                   always TALLER than the circle it fills -- 255pt against a
+                   204pt circle here. Centring it on the circle therefore puts
+                   its top above the sheet whenever the circle sits near it,
+                   which is exactly where a portrait goes: this drew from
+                   y=-4.5 until the suite caught it.
+
+                   Clamped into the band that still covers the circle
+                   (`cy + r - ih` to `cy - r`) intersected with the page, so
+                   the crop slides down rather than hanging off. Nothing about
+                   what the circle SHOWS changes unless the image had nowhere
+                   to slide, and the aspect is untouched either way. */
+                const pageH = ctx.template.page.height;
+                const pageW = ctx.template.page.width;
+                const fit = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+                if (block.ring) {
+                    ctx.ops.push({
+                        op: "circle", page: page, cx: cx, cy: cy,
+                        r: r + (block.ring.width || 4) / 2,
+                        fill: colorOf(block.ring.color, ctx.template, ctx.state)
+                    });
+                }
+                ctx.ops.push({
+                    op: "imageCircle", page: page, url: url,
+                    cx: cx, cy: cy, r: r,
+                    x: fit(cx - iw / 2, Math.max(cx + r - iw, 0),
+                           Math.min(cx - r, pageW - iw)),
+                    y: fit(cy - ih / 2, Math.max(cy + r - ih, 0),
+                           Math.min(cy - r, pageH - ih)),
+                    w: iw, h: ih
+                });
+                started[key] = true;
                 return;
             }
             const w = block.width || col.width;
@@ -777,7 +963,15 @@ window.TBResume = (() => {
         if (block.kind === "section") {
             if (!sectionHasContent(block.body, ctx.state)) return;
             const t = T[block.headingType || "heading"];
-            if (started[key]) cursor[key] += t.gapBefore || 0;
+            /* A block may set its own gap ABOVE the heading, mirroring the
+               gapAfter override below it. The first section of a sheet often
+               needs a different one from the rest -- it follows a masthead
+               rather than a body -- and without this the choice is one value
+               that is too large at the top or too small everywhere after. */
+            if (started[key]) {
+                cursor[key] += (block.gapBefore === undefined
+                    ? (t.gapBefore || 0) : block.gapBefore);
+            }
 
             const label = t.uppercase ? block.label.toUpperCase() : block.label;
 
@@ -825,14 +1019,22 @@ window.TBResume = (() => {
                 const padX = t.box.padX === undefined ? 7 : t.box.padX;
                 const above = t.box.above === undefined ? t.size : t.box.above;
                 const below = t.box.below === undefined ? t.size * 0.35 : t.box.below;
-                const w = ctx.measure(label, t) + padX * 2;
+                /* `full` spans the column's BOX rather than its text measure,
+                   and bleeds to the page edge where the box does. A band is
+                   page furniture, so it follows the column it belongs to
+                   rather than the margin the text keeps inside it. */
+                const bx = t.box.full ? col.boxX : col.x;
+                const w = t.box.full
+                    ? col.boxW
+                    : ctx.measure(label, t) + padX * 2;
                 ctx.ops.push({
-                    op: "rect", page: pageOf[key], x: col.x,
+                    op: "rect", page: pageOf[key], x: bx,
                     y: cursor[key] - above, w: w, h: above + below,
                     fill: colorOf(t.box.color, ctx.template, ctx.state)
                 });
-                boxRight = col.x + w;
-                text(ctx, pageOf[key], col.x + padX, cursor[key], label, t);
+                boxRight = bx + w;
+                text(ctx, pageOf[key], (t.box.full ? bx : col.x) + padX,
+                     cursor[key], label, t);
             } else {
                 text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], label, t);
             }
@@ -927,7 +1129,7 @@ window.TBResume = (() => {
             return t ? (t.lineHeight || t.size) : 14;
         }
         if (body.kind === "contact") {
-            const t = T.sidebarContact;
+            const t = T[body.type || "sidebarContact"];
             return t ? (t.lineHeight || t.size) : 14;
         }
         if (body.kind === "meters") {
@@ -959,10 +1161,21 @@ window.TBResume = (() => {
         const labelType = T[body.labelType || body.type || "body"];
         const lh = t.lineHeight || t.size;
         const sep = body.separator === undefined ? " : " : body.separator;
-        const labelWidth = body.labelWidth || 110;
+        /* "auto" sets the separator immediately after the label instead of
+           on a fixed column, which is the difference between a form-style
+           block whose colons line up and a prose-style one that reads
+           "Date of Birth: 9 February". Both appear on real CVs and the
+           reference for this template uses the second. */
+        const autoWidth = body.labelWidth === "auto";
+        const labelWidth = autoWidth ? 0 : (body.labelWidth || 110);
+        /* The reference aligns these labels with the heading chip's TEXT
+           rather than with the chip's left edge, which is the margin. One
+           inset carries the whole block over, colons included. */
+        const indent = body.indent || 0;
+        const labelX = col.x + indent;
         const sepWidth = ctx.measure(sep, labelType);
-        const valueX = col.x + labelWidth + sepWidth;
-        const valueWidth = col.width - labelWidth - sepWidth;
+        const valueX = labelX + labelWidth + sepWidth;
+        const valueWidth = col.width - indent - labelWidth - sepWidth;
 
         /* `valueWidth` caps the measure a value wraps to, which is how the
            address stays clear of a photograph sitting to its right without the
@@ -982,7 +1195,12 @@ window.TBResume = (() => {
             if (emitted) cursor[key] += body.rowGap === undefined ? 0 : body.rowGap;
             emitted += 1;
 
-            const lines = ctx.wrap(value, t, measure);
+            const lw = autoWidth ? ctx.measure(row.label, labelType) : labelWidth;
+            const vx = labelX + lw + sepWidth;
+            const lines = ctx.wrap(value, t, autoWidth
+                ? Math.min(body.valueWidth || (col.width - indent - lw - sepWidth),
+                           col.width - indent - lw - sepWidth)
+                : measure);
             ensureRoom(ctx, key, cursor, pageOf, lh * lines.length);
             const page = pageOf[key];
             /* A joined row is several fields in one run, so no overlay can
@@ -992,11 +1210,11 @@ window.TBResume = (() => {
                 ? fieldEdit(row.fields[0], { inline: false })
                 : fieldEdit(row.field, lines.length > 1 ? { multi: true } : null);
 
-            text(ctx, page, col.x, cursor[key], row.label, labelType);
-            text(ctx, page, col.x + labelWidth, cursor[key], sep, labelType);
+            text(ctx, page, labelX, cursor[key], row.label, labelType);
+            text(ctx, page, labelX + lw, cursor[key], sep, labelType);
             lines.forEach((line, i) => {
                 if (i) cursor[key] += lh;
-                text(ctx, page, valueX, cursor[key], line, t, undefined, edit);
+                text(ctx, page, vx, cursor[key], line, t, undefined, edit);
             });
             cursor[key] += lh;
         });
@@ -1143,10 +1361,29 @@ window.TBResume = (() => {
                to cover all of them; it is NOT a hand-off, because the field
                behind it is a textarea holding exactly this value. */
             const edit = fieldEdit(body.field, { multi: true });
-            ctx.wrap(value, t, col.width).forEach((line, i) => {
+            const lines = ctx.wrap(value, t, col.width);
+            lines.forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
                 ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
-                text(ctx, pageOf[key], col.x, cursor[key], line, t, undefined, edit);
+                /* Justification as per-line TRACKING rather than word spacing.
+                   Word spacing would need each painter to distribute it the
+                   same way and they do not: SVG stretches inter-glyph space
+                   and jsPDF stretches word space, so the two would disagree
+                   about where a line ends. Tracking is one number both already
+                   honour exactly, so the line fills the measure identically in
+                   preview and export. The LAST line is never justified, which
+                   is what makes a paragraph a paragraph. */
+                let tr;
+                if (body.justify && i < lines.length - 1) {
+                    const natural = ctx.measure(line, t);
+                    const gaps = Math.max(1, String(line).length - 1);
+                    const extra = (col.width - natural) / gaps;
+                    if (extra > 0 && extra < t.size * 0.35) {
+                        tr = (t.tracking || 0) + extra;
+                    }
+                }
+                text(ctx, pageOf[key], col.x, cursor[key], line, t, undefined,
+                     edit, tr);
             });
             return;
         }
@@ -1494,7 +1731,14 @@ window.TBResume = (() => {
     function layoutContact(ctx, block, key, cursor, pageOf) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
-        const t = T.sidebarContact;
+        /* The block names its own role, like every other body does. It was
+           hard-wired to `sidebarContact`, which silently required every
+           template with contact rows to use that one name -- a template that
+           called the role anything else got `undefined` and threw inside the
+           measurer, several frames from the descriptor that caused it.
+           Defaults to the old name, so the templates that use it are
+           untouched. */
+        const t = T[block.type || "sidebarContact"];
         const r = (block.iconSize || 15) / 2;
         /* `disc` is optional: omit it and the glyphs sit straight on the
            column's background at full size. `knockout` is then what fills the
@@ -1733,7 +1977,10 @@ window.TBResume = (() => {
         const bg = document.createElementNS(SVG_NS, "rect");
         bg.setAttribute("width", String(tpl.page.width));
         bg.setAttribute("height", String(tpl.page.height));
-        bg.setAttribute("fill", "#FFFFFF");
+        /* A template may tint the whole sheet. Defaults to white, so every
+           template that says nothing is unchanged. */
+        bg.setAttribute("fill", tpl.background
+            ? colorOf(tpl.background, tpl, ctx.state) : "#FFFFFF");
         svg.appendChild(bg);
 
         ctx.ops.filter((o) => (o.page || 0) === page).forEach((o) => {
@@ -1765,6 +2012,27 @@ window.TBResume = (() => {
             n = document.createElementNS(SVG_NS, "circle");
             n.setAttribute("cx", o.cx); n.setAttribute("cy", o.cy);
             n.setAttribute("r", o.r); n.setAttribute("fill", o.fill);
+        } else if (o.op === "imageCircle") {
+            /* A <clipPath> per photograph, with an id unique to the page and
+               the op, because two sheets in one preview would otherwise share
+               one id and the second would clip to the first's circle. */
+            const gid = "rt-clip-" + o.page + "-" + Math.round(o.cx) + "-" + Math.round(o.cy);
+            n = document.createElementNS(SVG_NS, "g");
+            const clip = document.createElementNS(SVG_NS, "clipPath");
+            clip.setAttribute("id", gid);
+            const cc = document.createElementNS(SVG_NS, "circle");
+            cc.setAttribute("cx", o.cx); cc.setAttribute("cy", o.cy);
+            cc.setAttribute("r", o.r);
+            clip.appendChild(cc);
+            n.appendChild(clip);
+            const img = document.createElementNS(SVG_NS, "image");
+            img.setAttributeNS("http://www.w3.org/1999/xlink", "href", o.url);
+            img.setAttribute("href", o.url);
+            img.setAttribute("x", o.x); img.setAttribute("y", o.y);
+            img.setAttribute("width", o.w); img.setAttribute("height", o.h);
+            img.setAttribute("clip-path", "url(#" + gid + ")");
+            img.setAttribute("preserveAspectRatio", "xMidYMid slice");
+            n.appendChild(img);
         } else if (o.op === "poly") {
             n = document.createElementNS(SVG_NS, "polygon");
             n.setAttribute("points", o.points.map((p) => p[0] + "," + p[1]).join(" "));
@@ -1805,10 +2073,18 @@ window.TBResume = (() => {
             n.setAttribute("class", "rt-photo-slot");
             n.setAttribute("data-photo-slot", "1");
 
-            const box = document.createElementNS(SVG_NS, "rect");
-            box.setAttribute("x", o.x); box.setAttribute("y", o.y);
-            box.setAttribute("width", o.w); box.setAttribute("height", o.h);
-            box.setAttribute("rx", "4");
+            const box = o.round
+                ? document.createElementNS(SVG_NS, "circle")
+                : document.createElementNS(SVG_NS, "rect");
+            if (o.round) {
+                box.setAttribute("cx", o.x + o.w / 2);
+                box.setAttribute("cy", o.y + o.h / 2);
+                box.setAttribute("r", o.w / 2);
+            } else {
+                box.setAttribute("x", o.x); box.setAttribute("y", o.y);
+                box.setAttribute("width", o.w); box.setAttribute("height", o.h);
+                box.setAttribute("rx", "4");
+            }
             /* No fill: the panel behind this is the template's, and tinting it
                would be a second colour decision on top of the accent. */
             box.setAttribute("fill", "none");
@@ -1836,6 +2112,7 @@ window.TBResume = (() => {
             n.setAttribute("font-size", o.size);
             n.setAttribute("font-weight", o.weight === "bold" ? "700" : "400");
             n.setAttribute("fill", o.color);
+            if (o.tracking) n.setAttribute("letter-spacing", o.tracking);
             /* The same x the PDF anchors: jsPDF's align option and SVG's
                text-anchor place a centred or right-aligned string identically
                about the coordinate, so no second measurement is needed here
@@ -1875,8 +2152,18 @@ window.TBResume = (() => {
        ---------------------------------------------------------------------- */
     function paintPdf(ctx) {
         const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+        const tpl = ctx.template;
         for (let page = 0; page < ctx.pages; page += 1) {
             if (page) doc.addPage();
+            /* The sheet's own tint, under everything, on every page. A PDF
+               page has no background of its own -- it is whatever the reader
+               paints behind it -- so a tinted design has to fill it or it
+               prints white with tinted bands floating on it. */
+            if (tpl.background) {
+                const c = hexToRgb(colorOf(tpl.background, tpl, ctx.state));
+                doc.setFillColor(c[0], c[1], c[2]);
+                doc.rect(0, 0, tpl.page.width, tpl.page.height, "F");
+            }
             ctx.ops.filter((o) => (o.page || 0) === page).forEach((o) => pdfOp(doc, o));
         }
         return doc;
@@ -1935,6 +2222,20 @@ window.TBResume = (() => {
                          o.x, o.y, o.w, o.h);
             return;
         }
+        /* The circular crop. Clipping is bracketed by save/restore of the
+           graphics state, because a clip left open would silently cut every
+           later op on the page down to this circle. `discardPath` drops the
+           circle itself so the clip shape is never also painted. */
+        if (o.op === "imageCircle") {
+            doc.saveGraphicsState();
+            doc.circle(o.cx, o.cy, o.r, null);
+            doc.clip();
+            doc.discardPath();
+            doc.addImage(o.url, /^data:image\/png/.test(o.url) ? "PNG" : "JPEG",
+                         o.x, o.y, o.w, o.h);
+            doc.restoreGraphicsState();
+            return;
+        }
         if (o.op === "line") {
             const c = hexToRgb(o.color);
             doc.setDrawColor(c[0], c[1], c[2]);
@@ -1946,8 +2247,13 @@ window.TBResume = (() => {
         doc.setFont(FAMILY[o.family].pdf, o.weight);
         doc.setFontSize(o.size);
         doc.setTextColor(c[0], c[1], c[2]);
-        doc.text(o.text, o.x, o.y, o.align && o.align !== "left"
-            ? { align: o.align } : undefined);
+        /* charSpace as a per-call OPTION, never doc.setCharSpace: that sets
+           it on the document and every later string inherits it, so one
+           tracked heading would letter-space the whole sheet. */
+        const opts = {};
+        if (o.align && o.align !== "left") opts.align = o.align;
+        if (o.tracking) opts.charSpace = o.tracking;
+        doc.text(o.text, o.x, o.y, Object.keys(opts).length ? opts : undefined);
     }
 
     /* ---------------------------------------------------------------------- */
