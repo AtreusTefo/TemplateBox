@@ -33,6 +33,217 @@
 
 window.TB_RESUME_TEMPLATES = [
     {
+        /* Traced from a supplied design: the Indian biodata resume, where a
+           filled heading box, a labelled details block and a ruled marks table
+           are the whole visual grammar. Built September 15, 2026.
+
+           IT IS ATS-COMPLIANT BY CONSTRUCTION, which is the reason several
+           things below are not what the reference draws. See
+           docs/implementation/BOXED_BIODATA_RESUME_TEMPLATE.md for the
+           extracted-text proof; the short version is that this engine emits
+           its own PDF content stream, so reading order is a decision rather
+           than a renderer's guess, and a design this decorative can still
+           parse as clean linear text. Three specifics worth knowing before
+           editing anything here:
+
+           - The education TABLE emits row-major. A table drawn column by
+             column extracts as four unrelated lists and every qualification
+             loses its board, its year and its mark. Row-major it extracts as
+             records. `layoutTable` guarantees it; do not reorder it.
+           - The heading boxes are a filled rect with ordinary text over it.
+             They read as graphics and extract as text, which is why the most
+             decorative thing on the sheet costs a parser nothing.
+           - The photograph is OPT-IN and empty by default, and an unfilled
+             slot never reaches the PDF at all -- paintPdf drops `photoSlot`.
+             The reference shows one because this format conventionally
+             carries one; US and UK screening does not want it. */
+        id: "boxed-biodata",
+        title: "Boxed Headings Biodata CV",
+        catalog: true,
+
+        /* The navy the reference is drawn in, and already a swatch on the
+           editor's row -- which is the invariant: applyAccent matches the hex
+           exactly, so a defaultAccent that is not on the row opens the editor
+           with nothing selected. */
+        defaultAccent: "#1F4E79",
+
+        page: { width: 595, height: 842 },
+
+        layout: {
+            kind: "single-column",
+            /* 34pt side margins. The reference's own are nearer 29, which is
+               10mm and inside the clip range of several consumer printers;
+               34 is 12mm and keeps the proportion the design reads at. The
+               measurements here are PROPORTIONAL to the supplied image rather
+               than taken off it to the point -- it is a raster at roughly
+               736px wide, so a claim of point precision would be false.
+
+               `bottom` is a reservation boundary, not the last baseline. */
+            main: {
+                left: 34, right: 34,
+                firstBaseline: 58,
+                bottom: 802
+            }
+        },
+
+        palette: {
+            ink:         "#1A1A1A",
+            headBg:      "accent",    /* the filled heading boxes and rules */
+            headingInk:  "#FFFFFF",   /* knocked out of them               */
+            rule:        "accent",
+            /* A pale tint of the navy for the table's header band. Fixed
+               rather than derived: it has to stay legible under black header
+               text whatever accent the visitor picks, and a tint computed
+               from a gold or burgundy accent would not. */
+            tableHeadBg: "#DCE4F0"
+        },
+
+        type: {
+            /* The banner word. Not a field: this design puts RESUME across the
+               head of the sheet and the visitor's name in the details block
+               below, which is the format's own convention. */
+            displayName: { family: "sans", weight: "bold", size: 25,
+                           lineHeight: 29, color: "accent", align: "center" },
+
+            heading:     { family: "sans", weight: "bold", size: 9.5,
+                           color: "headingInk", uppercase: true,
+                           gapBefore: 25, gapAfter: 17,
+                           box: { color: "headBg", padX: 7, above: 9, below: 4.5 },
+                           /* fromBox runs the rule on from the box's right
+                              edge, so the two read as one horizontal feature
+                              rather than a box with a line near it. */
+                           rule: { color: "rule", width: 1, offset: 4.5, fromBox: 0 } },
+
+            body:        { family: "sans", weight: "normal", size: 10,
+                           lineHeight: 14, color: "ink" },
+            fieldLabel:  { family: "sans", weight: "bold", size: 10,
+                           lineHeight: 14, color: "ink" },
+
+            tableHead:   { family: "sans", weight: "bold", size: 9,
+                           lineHeight: 12, color: "ink" },
+            tableCell:   { family: "sans", weight: "normal", size: 9,
+                           lineHeight: 12, color: "ink" },
+
+            bullet:      { family: "sans", weight: "normal", size: 10,
+                           lineHeight: 14, color: "ink",
+                           marker: "\u2022", indent: 9, itemGap: 14 }
+        },
+
+        blocks: [
+            { column: "main", kind: "display", type: "displayName",
+              fallback: "RESUME", uppercase: true, gapAfter: 11 },
+
+            { column: "main", kind: "rule", color: "rule", width: 1.2,
+              gapAfter: 23 },
+
+            { column: "main", kind: "section", label: "Personal Details",
+              body: { kind: "fields", type: "body", labelType: "fieldLabel",
+                      labelWidth: 100, valueWidth: 262, rowGap: 5,
+                      rows: [
+                          { label: "Name",          field: "name" },
+                          { label: "Father's Name", field: "fatherName" },
+                          { label: "Date of Birth", field: "dateOfBirth" },
+                          { label: "Mobile No.",    field: "phone" },
+                          { label: "Email ID",      field: "email" },
+                          /* Three fields joined, because the reference sets a
+                             full postal address across two lines and the form
+                             already collects it in three parts. */
+                          { label: "Address",
+                            fields: ["address", "city", "postcode"],
+                            separator: ", " }
+                      ] } },
+
+            /* AFTER the details, not before them, and that ordering is load
+               bearing. A photo block reserves its own height by pushing the
+               cursor to `Math.max(cursor, top + h)`, so placed ahead of the
+               section it drove the PERSONAL DETAILS heading down to y=271 the
+               moment a photograph was uploaded -- invisible while the sample
+               carried none, which is exactly how it shipped that way for an
+               hour. Placed here the reservation lands where it belongs: it
+               pushes OBJECTIVE clear of the photograph when the details are
+               shorter than the frame, and does nothing when they are longer.
+
+               `inset.left` of 423 puts its right edge on the 527pt measure's
+               right margin. `top` is absolute and can be, because everything
+               above it is fixed height -- a one-line banner, a rule and a
+               heading -- so the frame lands beside the first detail row at
+               y=138.5 whatever the visitor types.
+
+               4:5 is not negotiable: PHOTO_RATIO is fixed site-wide precisely
+               so that neither painter can ever rescale one axis against the
+               other and stretch a face. The reference's frame is nearer 2:3;
+               this is the closest honest fit to it. */
+            { column: "main", kind: "photo",
+              inset: { left: 423 }, top: 130, width: 104,
+              border: { color: "ink", width: 1.2 } },
+
+            /* "Career Objective" on the reference. Titled Objective because
+               that is the word a parser's section dictionary carries. */
+            { column: "main", kind: "section", label: "Objective",
+              body: { kind: "paragraph", field: "summary" } },
+
+            { column: "main", kind: "section", label: "Education",
+              body: { kind: "table", source: "education",
+                      headerType: "tableHead", cellType: "tableCell",
+                      headerFill: "tableHeadBg",
+                      border: { color: "ink", width: 0.8 },
+                      padX: 7, padY: 5.5,
+                      /* Widths are FRACTIONS of the measure, so the table
+                         tracks the text column instead of carrying absolute
+                         numbers that would break on a narrower page. */
+                      columns: [
+                          { label: "Qualification",      field: "degree", width: 0.30 },
+                          { label: "Board / University", field: "school", width: 0.30 },
+                          { label: "Year of Passing",    field: "dates",  width: 0.20,
+                            align: "center" },
+                          { label: "Percentage",         field: "score",  width: 0.20,
+                            align: "center" }
+                      ] } },
+
+            { column: "main", kind: "section", label: "Skills",
+              body: { kind: "list", field: "skills", split: ",",
+                      columns: { count: 2, split: 0.5, gutter: 18 } } },
+
+            /* Ordinary entries, not the reference's single "Fresher" line. A
+               fresher types Fresher into the job title and gets exactly that
+               line, because an entry draws whatever parts of it are filled;
+               anyone with real roles gets a real history. One shape serves
+               both, which a free-text note would not. */
+            { column: "main", kind: "section", label: "Work Experience",
+              gapAfter: 13,
+              body: { kind: "entries", source: "experience",
+                      head: { runs: [
+                          { field: "role",    type: "fieldLabel" },
+                          { literal: ", ",    type: "body" },
+                          { field: "company", type: "body" }
+                      ]},
+                      sub: [
+                          { runs: [{ field: "dates", type: "body" }], gapBefore: 13 }
+                      ],
+                      bullets: { field: "description", split: "\n",
+                                 gapBefore: 14 },
+                      entryGap: 18 } },
+
+            /* Three columns, as the reference sets them. Each bullet is a
+               self-contained item, so column order cannot scramble a record
+               the way it would in a table. */
+            { column: "main", kind: "section", label: "Languages",
+              body: { kind: "list", field: "languages", split: "\n",
+                      entryList: "language",
+                      columns: { count: 3, gutter: 14 } } },
+
+            { column: "main", kind: "section", label: "Declaration",
+              body: { kind: "paragraph", field: "declaration" } },
+
+            { column: "main", kind: "signoff", type: "body", gapBefore: 26,
+              labelWidth: 42, ruleWidth: 104, rowGap: 24, rightWidth: 128,
+              left: [{ label: "Date" }, { label: "Place" }],
+              right: { label: "Signature" },
+              rule: { color: "ink", width: 0.8 } }
+        ]
+    },
+
+    {
         /* The editor's original layout, migrated onto this engine from the
            hand-written preview and jsPDF writer that used to live in
            js/resume.js. Those two agreed about content and about nothing else

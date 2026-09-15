@@ -263,6 +263,18 @@
                             <label for="f-title">Professional Title</label>
                             <input type="text" id="f-title" data-bind="title" maxlength="60">
                         </div>
+                        <!-- The biodata format's own two. Gated, because no
+                             other template has anywhere to put them -- and
+                             still collected while hidden, so switching away
+                             and back does not lose them. -->
+                        <div class="field" data-templates="boxed-biodata">
+                            <label for="f-father-name">Father's Name</label>
+                            <input type="text" id="f-father-name" data-bind="fatherName" maxlength="60">
+                        </div>
+                        <div class="field" data-templates="boxed-biodata">
+                            <label for="f-dob">Date of Birth</label>
+                            <input type="text" id="f-dob" data-bind="dateOfBirth" maxlength="40" placeholder="12 January 2004">
+                        </div>
                         <div class="field">
                             <label for="f-email">Email</label>
                             <input type="email" id="f-email" data-bind="email" maxlength="100">
@@ -282,15 +294,21 @@
                              `location` and `phone`. Hidden for those, and
                              still collected, like every other conditional
                              field here. -->
-                        <div class="field" data-templates="grey-rail">
+                        <!-- boxed-biodata joins these three into its Address
+                             row, so it draws them as surely as grey-rail's
+                             sidebar does. A gate that lists only one of the
+                             two would render a field the form gives no way to
+                             fill, which is the fault this file has shipped
+                             twice already. -->
+                        <div class="field" data-templates="grey-rail boxed-biodata">
                             <label for="f-address">Street Address</label>
                             <input type="text" id="f-address" data-bind="address" maxlength="80">
                         </div>
-                        <div class="field" data-templates="grey-rail">
+                        <div class="field" data-templates="grey-rail boxed-biodata">
                             <label for="f-city">City</label>
                             <input type="text" id="f-city" data-bind="city" maxlength="60">
                         </div>
-                        <div class="field" data-templates="grey-rail">
+                        <div class="field" data-templates="grey-rail boxed-biodata">
                             <label for="f-postcode">Postcode</label>
                             <input type="text" id="f-postcode" data-bind="postcode" maxlength="20">
                         </div>
@@ -366,6 +384,20 @@
                             <textarea id="f-accomplishments" data-bind="accomplishments" maxlength="600" rows="4"></textarea>
                         </div>
                     </fieldset>
+                    <!-- The signed statement an Indian biodata closes on. No
+                         other template draws it, and it sits here rather than
+                         after References because on the sheet it comes last
+                         but one, above the date and signature blanks -- which
+                         are drawn furniture, not fields: they exist to be
+                         written on after printing. -->
+                    <fieldset data-templates="boxed-biodata">
+                        <legend>Declaration</legend>
+                        <div class="field">
+                            <label for="f-declaration">Declaration</label>
+                            <textarea id="f-declaration" data-bind="declaration" maxlength="300" rows="3"></textarea>
+                        </div>
+                    </fieldset>
+
                     <!-- Last, because a reference is the last thing a reader
                          reaches and every template draws it there. A row is
                          five fields and any of them may be left out: the
@@ -514,6 +546,13 @@
             <div class="field">
                 <label>Dates</label>
                 <input type="text" data-entry-field="dates" maxlength="40" placeholder="2018 - 2022">
+            </div>
+            <!-- The marks column of the biodata sheet's education table. Free
+                 text rather than a number: a percentage, a CGPA and a grade
+                 letter are all valid answers and only one of them is numeric. -->
+            <div class="field" data-templates="boxed-biodata">
+                <label>Percentage or Grade</label>
+                <input type="text" data-entry-field="score" maxlength="20" placeholder="72%">
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
         </div>

@@ -186,6 +186,19 @@ window.TBResume = (() => {
         if (body.kind === "list" || body.kind === "meters") {
             return splitList((state.fields || {})[body.field], body.split).length > 0;
         }
+        /* A row counts when any cell in it carries text. The header alone is
+           furniture, so a table whose source is empty draws no heading -- the
+           same rule every other body follows. */
+        if (body.kind === "table") {
+            const rows = state[body.source] || [];
+            return rows.some((row) => (body.columns || [])
+                .some((c) => String(row[c.field] || "").trim()));
+        }
+        if (body.kind === "fields") {
+            return (body.rows || []).some((r) => Boolean(
+                r.fields ? joinFields(r, state.fields)
+                         : readField(state.fields, r.field)));
+        }
         if (body.kind === "entries") {
             const rows = state[body.source] || [];
             return rows.some((row) => entryHasContent(body, row));
@@ -631,6 +644,55 @@ window.TBResume = (() => {
            a mismatch would stretch a face -- and it would do so silently,
            since neither painter can tell a distorted photograph from an
            intended one. One number in, no distortion possible. */
+        /* The hand-completed foot of a printed sheet: labelled blanks on the
+           left, a signature rule on the right. Deliberately NOT fields -- the
+           rules are there to be written on after printing, so there is nothing
+           to collect and nothing a parser should find. The labels are real
+           text and cost a parser nothing; the rules are lines and are
+           invisible to one. */
+        if (block.kind === "signoff") {
+            const t = T[block.type || "body"];
+            const lh = t.lineHeight || t.size;
+            const rowGap = block.rowGap === undefined ? lh + 8 : block.rowGap;
+            const sep = block.separator === undefined ? " : " : block.separator;
+            const ruleWidth = block.ruleWidth || 110;
+            const spec = block.rule || {};
+            const ruleColor = colorOf(spec.color || "ink", ctx.template, ctx.state);
+            const ruleW = spec.width || 0.8;
+            const rows = block.left || [];
+
+            cursor[key] += block.gapBefore || 0;
+            ensureRoom(ctx, key, cursor, pageOf, rowGap * rows.length + lh);
+            const page = pageOf[key];
+            const top = cursor[key];
+
+            rows.forEach((row, i) => {
+                const y = top + rowGap * i;
+                text(ctx, page, col.x, y, row.label, t);
+                const lx = col.x + (block.labelWidth || 46);
+                text(ctx, page, lx, y, sep, t);
+                const rx = lx + ctx.measure(sep, t);
+                ctx.ops.push({ op: "line", page: page,
+                    x1: rx, y1: y + 2, x2: rx + ruleWidth, y2: y + 2,
+                    color: ruleColor, width: ruleW });
+            });
+
+            if (block.right) {
+                const y = top + rowGap * Math.max(0, rows.length - 1);
+                const w = block.rightWidth || 130;
+                ctx.ops.push({ op: "line", page: page,
+                    x1: col.x + col.width - w, y1: y - lh * 0.4,
+                    x2: col.x + col.width, y2: y - lh * 0.4,
+                    color: ruleColor, width: ruleW });
+                text(ctx, page, col.x + col.width, y + lh * 0.6, block.right.label,
+                     Object.assign({}, t, { align: "right", weight: "bold" }));
+            }
+
+            cursor[key] = top + rowGap * Math.max(0, rows.length - 1) + lh;
+            started[key] = true;
+            return;
+        }
+
         if (block.kind === "photo") {
             const url = photoUrl(ctx.state);
             if (!url) {
@@ -749,11 +811,48 @@ window.TBResume = (() => {
             cursor[key] += emitRulesBefore(ctx, pageOf[key], col,
                 rulesBefore(t), cursor[key]);
 
-            text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], label, t);
+            /* A label knocked out of a filled box, and the rule picking up
+               where the box ends. Optional, and absent everywhere else, so the
+               five templates that predate it are untouched.
+
+               The box is drawn BEFORE the label and the label keeps its own
+               colour role, so what reaches the PDF is an ordinary filled
+               rectangle with ordinary text over it. It reads as a graphic and
+               extracts as text, which is why a design this decorative costs
+               nothing at parse time. */
+            let boxRight = 0;
+            if (t.box) {
+                const padX = t.box.padX === undefined ? 7 : t.box.padX;
+                const above = t.box.above === undefined ? t.size : t.box.above;
+                const below = t.box.below === undefined ? t.size * 0.35 : t.box.below;
+                const w = ctx.measure(label, t) + padX * 2;
+                ctx.ops.push({
+                    op: "rect", page: pageOf[key], x: col.x,
+                    y: cursor[key] - above, w: w, h: above + below,
+                    fill: colorOf(t.box.color, ctx.template, ctx.state)
+                });
+                boxRight = col.x + w;
+                text(ctx, pageOf[key], col.x + padX, cursor[key], label, t);
+            } else {
+                text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], label, t);
+            }
 
             if (t.rule) {
                 const ry = cursor[key] + (t.rule.offset || 2);
-                emitRule(ctx, pageOf[key], col, t.rule, ry);
+                /* `fromBox` runs the rule from the box's right edge instead of
+                   the column's left, which is what makes the box and the rule
+                   read as one horizontal feature rather than two. */
+                if (t.box && t.rule.fromBox !== undefined) {
+                    const rx = boxRight + t.rule.fromBox;
+                    ctx.ops.push({
+                        op: "line", page: pageOf[key], x1: rx, y1: ry,
+                        x2: col.x + col.width, y2: ry,
+                        color: colorOf(t.rule.color, ctx.template, ctx.state),
+                        width: t.rule.width || 1
+                    });
+                } else {
+                    emitRule(ctx, pageOf[key], col, t.rule, ry);
+                }
                 cursor[key] = ry;
             }
             /* A block may tighten its own heading-to-body gap: entry lists
@@ -815,6 +914,18 @@ window.TBResume = (() => {
     function bodyFirstLine(body, T) {
         if (!body) return 0;
         if (body.kind === "entries") return 40;
+        /* Header band plus one data row: a table whose heading fits but whose
+           header lands alone at the foot of a page is the same defect as an
+           orphaned heading, one level down. */
+        if (body.kind === "table") {
+            const t = T[body.cellType || "body"];
+            const lh = t ? (t.lineHeight || t.size) : 14;
+            return (lh + (body.padY === undefined ? 5 : body.padY) * 2) * 2;
+        }
+        if (body.kind === "fields") {
+            const t = T[body.type || "body"];
+            return t ? (t.lineHeight || t.size) : 14;
+        }
         if (body.kind === "contact") {
             const t = T.sidebarContact;
             return t ? (t.lineHeight || t.size) : 14;
@@ -827,9 +938,202 @@ window.TBResume = (() => {
         return t ? (t.lineHeight || t.size) : 14;
     }
 
+    /* ----------------------------------------------------------------------
+       Label-and-value rows: "Date of Birth : 12 January 2004".
+
+       The colons align on a fixed column, which is the whole look of a biodata
+       sheet, and the value wraps into whatever is left. Three runs per row --
+       label, separator, value -- emitted in that order, so the PDF's content
+       stream reads the way the line reads. A parser that took the labels as
+       one column and the values as another would return six labels followed by
+       six unrelated values; emission order is the only thing preventing that,
+       and it is free here because the engine decides its own draw order.
+
+       A row whose field is empty draws nothing at all rather than a label over
+       a blank, so a sheet that skips the father's name simply closes up.
+       ---------------------------------------------------------------------- */
+    function layoutFields(ctx, body, key, cursor, pageOf) {
+        const col = ctx.cols[key];
+        const T = ctx.template.type;
+        const t = T[body.type || "body"];
+        const labelType = T[body.labelType || body.type || "body"];
+        const lh = t.lineHeight || t.size;
+        const sep = body.separator === undefined ? " : " : body.separator;
+        const labelWidth = body.labelWidth || 110;
+        const sepWidth = ctx.measure(sep, labelType);
+        const valueX = col.x + labelWidth + sepWidth;
+        const valueWidth = col.width - labelWidth - sepWidth;
+
+        /* `valueWidth` caps the measure a value wraps to, which is how the
+           address stays clear of a photograph sitting to its right without the
+           whole block -- heading, box and rule included -- being inset away
+           from the margin. */
+        const measure = Math.min(body.valueWidth || valueWidth, valueWidth);
+
+        let emitted = 0;
+        (body.rows || []).forEach((row) => {
+            /* A row may name one field or join several. The address is three
+               fields on this sheet, and joinFields drops an empty one along
+               with the separator that would dangle after it. */
+            const value = row.fields
+                ? joinFields(row, ctx.state.fields)
+                : readField(ctx.state.fields, row.field);
+            if (!value) return;
+            if (emitted) cursor[key] += body.rowGap === undefined ? 0 : body.rowGap;
+            emitted += 1;
+
+            const lines = ctx.wrap(value, t, measure);
+            ensureRoom(ctx, key, cursor, pageOf, lh * lines.length);
+            const page = pageOf[key];
+            /* A joined row is several fields in one run, so no overlay can
+               stand in for it and it hands off to the form -- the answer every
+               joined line in this engine gives. */
+            const edit = row.fields
+                ? fieldEdit(row.fields[0], { inline: false })
+                : fieldEdit(row.field, lines.length > 1 ? { multi: true } : null);
+
+            text(ctx, page, col.x, cursor[key], row.label, labelType);
+            text(ctx, page, col.x + labelWidth, cursor[key], sep, labelType);
+            lines.forEach((line, i) => {
+                if (i) cursor[key] += lh;
+                text(ctx, page, valueX, cursor[key], line, t, undefined, edit);
+            });
+            cursor[key] += lh;
+        });
+        /* The loop leaves the cursor one line PAST the last baseline, because
+           each row advances after drawing. Step back onto it, which is the
+           convention every other body here follows. */
+        if (emitted) cursor[key] -= lh;
+    }
+
+    /* ----------------------------------------------------------------------
+       A ruled table.
+
+       Emitted ROW-MAJOR, and that is the point rather than an implementation
+       detail. An applicant tracking system reads the PDF's text stream in the
+       order the text was drawn; a table drawn column by column extracts as
+       four unrelated lists and every qualification loses its board, its year
+       and its mark. Drawn row by row it extracts as records. The engine owns
+       its own draw order, so this is a guarantee rather than a hope -- which a
+       table in a word processor cannot offer.
+
+       Borders are lines, invisible to a text extractor, so they cost nothing
+       at parse time. The risk in a table is reading order alone.
+
+       A row is never split across a page: each reserves its own full height
+       before drawing. The header does not repeat on the second page, which is
+       a real limitation and an acceptable one for a document whose tables run
+       to a handful of rows.
+       ---------------------------------------------------------------------- */
+    function layoutTable(ctx, body, key, cursor, pageOf) {
+        const col = ctx.cols[key];
+        const T = ctx.template.type;
+        const cells = T[body.cellType || "body"];
+        const heads = T[body.headerType || body.cellType || "body"];
+        const lh = cells.lineHeight || cells.size;
+        const padX = body.padX === undefined ? 6 : body.padX;
+        const padY = body.padY === undefined ? 5 : body.padY;
+        const cols = body.columns || [];
+        const border = body.border || {};
+        const borderColor = colorOf(border.color || "ink", ctx.template, ctx.state);
+        const borderWidth = border.width || 0.8;
+
+        /* Fractions of the column, so the table tracks the text measure rather
+           than carrying absolute widths that would break on a narrower page. */
+        let total = 0;
+        cols.forEach((c) => { total += c.width || 0; });
+        const widths = cols.map((c) => col.width * ((c.width || 0) / (total || 1)));
+        const xs = [];
+        let x = col.x;
+        widths.forEach((w) => { xs.push(x); x += w; });
+
+        const rows = (ctx.state[body.source] || [])
+            .filter((row) => cols.some((c) => String(row[c.field] || "").trim()));
+
+        /* One band: the cells wrapped, and the height the tallest of them
+           needs. Measured before anything is drawn, because the row's borders
+           have to know how deep the row is. */
+        const band = (values, type) => {
+            const wrapped = values.map((v, i) =>
+                ctx.wrap(String(v || ""), type, Math.max(4, widths[i] - padX * 2)));
+            let deepest = 1;
+            wrapped.forEach((w) => { deepest = Math.max(deepest, w.length); });
+            return { wrapped: wrapped, height: deepest * lh + padY * 2 };
+        };
+
+        const drawBand = (b, type, fill, editFor) => {
+            ensureRoom(ctx, key, cursor, pageOf, b.height);
+            const page = pageOf[key];
+            const top = cursor[key];
+
+            if (fill) {
+                ctx.ops.push({ op: "rect", page: page, x: col.x, y: top,
+                               w: col.width, h: b.height,
+                               fill: colorOf(fill, ctx.template, ctx.state) });
+            }
+
+            /* Cells first, left to right, then the rules. Text before lines so
+               the content stream reads as the table reads. */
+            b.wrapped.forEach((lines, i) => {
+                const align = cols[i].align || "left";
+                const cx = align === "center" ? xs[i] + widths[i] / 2
+                         : align === "right" ? xs[i] + widths[i] - padX
+                         : xs[i] + padX;
+                lines.forEach((line, j) => {
+                    text(ctx, page, cx, top + padY + lh * (j + 1) - lh * 0.25, line,
+                         Object.assign({}, type, { align: align }),
+                         undefined, editFor ? editFor(i) : undefined);
+                });
+            });
+
+            const bottom = top + b.height;
+            const hline = (y) => ctx.ops.push({ op: "line", page: page,
+                x1: col.x, y1: y, x2: col.x + col.width, y2: y,
+                color: borderColor, width: borderWidth });
+            hline(top);
+            hline(bottom);
+            xs.concat([col.x + col.width]).forEach((vx) => {
+                ctx.ops.push({ op: "line", page: page, x1: vx, y1: top,
+                               x2: vx, y2: bottom, color: borderColor,
+                               width: borderWidth });
+            });
+            cursor[key] = bottom;
+        };
+
+        /* The cursor arrives on a BASELINE; a table is a box, so it starts one
+           line-height above it. Without this the header sits a line lower than
+           every other body's first line and the section looks mis-set. */
+        cursor[key] -= lh * 0.75;
+
+        if (body.header !== false) {
+            drawBand(band(cols.map((c) => c.label || ""), heads), heads,
+                     body.headerFill);
+        }
+        rows.forEach((row, ri) => {
+            drawBand(band(cols.map((c) => row[c.field]), cells), cells, null,
+                /* Provenance per cell: the form keeps these as rows, so a
+                   click lands in the right control rather than nowhere. */
+                (ci) => entryEdit({ list: body.source, index: ri }, cols[ci].field));
+        });
+
+        /* Leave the cursor on a baseline again, so whatever follows spaces
+           itself from the table exactly as it would from a paragraph. */
+        cursor[key] += lh * 0.75;
+    }
+
     function layoutBody(ctx, body, key, cursor, pageOf) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
+
+        if (body.kind === "fields") {
+            layoutFields(ctx, body, key, cursor, pageOf);
+            return;
+        }
+
+        if (body.kind === "table") {
+            layoutTable(ctx, body, key, cursor, pageOf);
+            return;
+        }
 
         if (body.kind === "paragraph") {
             const t = T[body.type || "body"];

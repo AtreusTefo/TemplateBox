@@ -94,6 +94,8 @@ A 1.6pt measurement difference decides one line break, and everything below shif
 
 Two-column layouts carry parsing risk, and that matters because ATS-safety is an explicit claim on the resume tools. Two mitigations are real here: there is no photograph, and because the engine controls `doc.text()` call order, extraction order is deterministic rather than interleaved. Ship this template as design-led, with the single-column templates retaining the unqualified ATS claim.
 
+Tables joined the question on September 15, 2026, when the Boxed Headings Biodata CV shipped with a ruled marks table. The same mitigation carries it: a table drawn column by column extracts as unrelated lists and every row loses its record, so `layoutTable` emits ROW-MAJOR and each row extracts contiguously. Cell borders are vector lines and invisible to a text extractor, and a heading knocked out of a filled box is ordinary text over a rect, so neither costs anything at parse time. The risk in a table is reading order alone, and this engine owns its own draw order. That template keeps the unqualified claim; its photograph is opt-in and an unfilled slot never reaches the PDF. See `BOXED_BIODATA_RESUME_TEMPLATE.md` for the extracted-text dump.
+
 ## Adding a Template
 
 Copy an entry in `site/js/resume-templates.js`, change the data, and add a catalog card in `index.html` with `data-target="resume" data-doc="<id>"`. No engine changes. This is the same data-only-registry pattern as `site/js/mockup-templates.js`.

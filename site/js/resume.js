@@ -78,10 +78,13 @@
             address: "",
             city: "",
             postcode: "",
-            phoneAlt: ""
+            phoneAlt: "",
+            fatherName: "",
+            dateOfBirth: "",
+            declaration: ""
         },
         experience: [{ role: "", company: "", place: "", dates: "", description: "" }],
-        education: [{ degree: "", school: "", place: "", dates: "" }],
+        education: [{ degree: "", school: "", place: "", dates: "", score: "" }],
         projects: [{ name: "", role: "", dates: "", description: "" }],
         references: [{ name: "", title: "", company: "", email: "", phone: "" }]
     };
@@ -134,7 +137,15 @@
             address: "1400 North Lake Shore Drive",
             city: "Chicago, IL",
             postcode: "60610",
-            phoneAlt: "+1 (555) 220-7741"
+            phoneAlt: "+1 (555) 220-7741",
+            /* Drawn by the biodata sheet alone, and hidden everywhere
+               else. They carry sample text for the same reason every
+               other field does: a template that opens with three empty
+               rows in its own signature block shows the visitor nothing
+               about what it is. */
+            fatherName: "Chukwuemeka Nwosu",
+            dateOfBirth: "4 March 1987",
+            declaration: "I hereby declare that the information given above is true to the best of my knowledge and belief."
         },
         /* Descriptions are one achievement per LINE. Ruled Serif splits them
            into bullets on the newline; Classic reflows them as prose, which
@@ -156,8 +167,8 @@
             }
         ],
         education: [
-            { degree: "MBA, Operations Management", school: "Kellogg School of Management", place: "Evanston, IL", dates: "2012 - 2014" },
-            { degree: "BSc Industrial Engineering", school: "University of Lagos", place: "Lagos", dates: "2005 - 2009" }
+            { degree: "MBA, Operations Management", school: "Kellogg School of Management", place: "Evanston, IL", dates: "2012 - 2014", score: "3.8 GPA" },
+            { degree: "BSc Industrial Engineering", school: "University of Lagos", place: "Lagos", dates: "2005 - 2009", score: "First Class" }
         ],
         /* One project, not three. The sample exists to show what the preview
            does with a section, and every extra row is a row the visitor has to
@@ -721,7 +732,7 @@
             experience: collectEntries(experienceList,
                 ["role", "company", "place", "dates", "description"]),
             education: collectEntries(educationList,
-                ["degree", "school", "place", "dates"]),
+                ["degree", "school", "place", "dates", "score"]),
             /* The field NAMES here are the contract with the descriptors: a
                block reads `row.name`, so a rename in one place without the
                other silently empties the section rather than erroring. */
