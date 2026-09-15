@@ -1,4 +1,4 @@
-# The Boxed Headings Biodata CV, and Three Engine Additions It Needed
+# The Boxed Headings Biodata CV, Measured Off Its Own Artwork
 
 Date: September 15, 2026
 Status: Complete
@@ -18,9 +18,15 @@ is a decision rather than a renderer's guess. A table that would scramble a
 parser when produced by a word processor extracts here as clean records. The
 proof is an extracted-text dump, reproduced in full below, not an assertion.
 
-Three engine additions were required, each an optional key that leaves the five
+Six engine additions were required, each an optional key that leaves the five
 pre-existing templates producing **byte-identical display lists** — measured,
 not asserted; see Verification.
+
+Every geometric number in the descriptor is **measured off the supplied raster
+programmatically**, not eyeballed. The first pass was proportional and wrong by
+enough to see: the banner was 25pt where it is really 40. Rendered with the
+reference's own content, the template now lands within a **mean 2.98pt** of the
+reference's own landmarks.
 
 ## Why the design is ATS-safe
 
@@ -150,6 +156,26 @@ The heading no longer moves, and OBJECTIVE clears the frame's bottom edge at
 painter can rescale one axis against the other and stretch a face. The
 reference's frame is nearer 2:3; 104 x 130 is the closest honest fit.
 
+### Two more, added when the measurements went in
+
+**`block.gapBefore`** overrides a heading's own gap above it, mirroring the
+`block.gapAfter` that already existed. The first section of a sheet follows a
+masthead where the rest follow a body, and the reference draws exactly that
+difference — 25.9pt under the banner against 33 to 36 elsewhere. One shared
+value left the top 5pt low and the foot 29pt high once seven sections had
+accumulated the error.
+
+**The sign-off's right-hand group is positioned rather than derived.** The
+reference puts its signature rule *between* the two labelled rows, not level
+with the last one, and insets it 12pt from the margin instead of running it to
+the edge — so `rightOffset`, `rightInset` and `rightGap` are parameters.
+
+Fixing that also caught a reservation bug: the block reserved
+`rowGap * rows.length` where it draws `rowGap * (rows.length - 1)`, because the
+first row sits on the cursor and only the rows after it cost a gap. It
+over-reserved by a whole row and broke the page **1.3pt short of fitting** a
+block that had 89pt of clear space beneath it.
+
 ### And one block: `signoff`
 
 The hand-completed foot of a printed sheet — labelled blanks on the left, a
@@ -160,25 +186,98 @@ invisible to an extractor.
 
 ## Measurements
 
-The supplied file is a raster roughly 736px wide, so every number here is
-**proportional to it rather than taken off it to the point**. A claim of point
-precision would be false. One deliberate change: side margins are 34pt (12mm)
-where the reference's are nearer 29pt (10mm), which is inside the clip range of
-several consumer printers; the proportion the design reads at is preserved.
+The first pass at this template was built to **proportions eyeballed off the
+image**, and it was wrong by enough to matter: the banner was set at 25pt where
+it is really 40, and the section chips at 9.5pt where they are really 11.3. The
+numbers below are **measured off the supplied raster programmatically**, and
+the difference is visible at a glance.
 
-| Element | Value |
-| --- | --- |
-| Page | 595 x 842 (A4) |
-| Text column | 34pt margins, 527pt measure |
-| Banner | sans bold 25pt, centred, accent |
-| Section heading | sans bold 9.5pt, white on an accent box, 7pt side padding |
-| Body | sans 10pt / 14pt |
-| Table header / cell | sans bold 9pt / sans 9pt, 12pt leading |
+### Method
+
+The supplied file is 736 x 1040. Its aspect is 0.7077 against A4's 0.7067, so
+it is an uncropped page and its pixels convert at 595/736 with nothing to
+correct for. Landmarks were found by scanning pixels: navy runs give the banner
+and the heading chips with their text knocked out of them, full-width dark runs
+give the rules and the table grid, and ink runs in a column give text baselines.
+
+**Type sizes come from measured WIDTHS through jsPDF's own Helvetica metrics,
+never from cap heights.** A scan's antialiasing adds about a pixel either side
+of a capital, which inflates a cap-height estimate by roughly two points — that
+is exactly how the first pass produced 10pt for a chip that measures 11.3
+across seven independent samples. Width has no such error: `Father's Name` is
+6.82 em of Helvetica Bold and spans 82.5pt, which fixes the size at 12.1
+without any judgement.
+
+The reference is **not set in Helvetica** — its face is narrower per em. Since
+this engine only has jsPDF's built-ins, each size here is the Helvetica size
+that reproduces the reference's measured line *widths*, because width is what
+decides where lines break.
+
+### What was measured
+
+| Element | Reference | Used |
+| --- | --- | --- |
+| Page | 736 x 1040 raster, A4 aspect | 595 x 842 |
+| Rules | x 25.9 to 565.9 | 27pt margins, 541pt measure |
+| Banner | "RESUME" 170.6pt wide, baseline 57.5 | sans bold 40pt, baseline 57.5 |
+| Heading chip | 19.4pt deep, label 13.0 below the top and 5.7 above the bottom, 7.3 side padding | box above 13, below 5.7, padX 7.3 |
+| Chip label | 10.73 to 11.49pt across seven chips, mean 11.26 | sans bold 11.3 |
+| Body | two long lines give 12.68 and 12.78 | sans 12.5 |
+| Bold labels | two labels give 11.66 and 12.10 | sans bold 12.5 |
+| Leading | address second line 18.6 under its first | 18.6 |
+| Detail rows | 23.5pt apart | leading 18.6 + rowGap 4.9 |
+| Label column | labels at x 33.1, colons at 151.5, values at 160.1 | indent 6.1, labelWidth 118.4 |
+| Table | rules 23.5pt apart | leading 14 + padY 4.75 |
+| Photo frame | x 432.5-542.0, y 99.2-251.8 | inset 405.5, top 99, width 110 |
+| Sign-off | Date blank 84.1 wide, signature rule 89.8 wide inset 12 from the margin | 84, 90, inset 12 |
 | Default accent | `#1F4E79` — already a swatch, which is the invariant |
+
+Two numbers are deliberately **not** the measurement. The reference's margins
+are 25.9 left and 29.1 right; that 3.2pt asymmetry is scan skew rather than
+design, so it is split into a symmetric 27, which lands the rules within 1.2pt.
+And 4:5 is forced on the photo frame by `PHOTO_RATIO`, where the reference's is
+nearer 0.72 — the frame matches the reference's width and top-left corner and
+falls 16pt short at the bottom, which is the closest an unstretchable face can
+come.
+
+### How close it lands
+
+Laid out with the reference's **own** content, against the reference's own
+landmarks:
+
+| Landmark | Rendered | Reference | Delta |
+| --- | --- | --- | --- |
+| Banner baseline | 57.5 | 57.5 | 0.0 |
+| First chip top | 70.5 | 70.4 | +0.1 |
+| First detail row | 117.5 | 117.4 | +0.1 |
+| Objective chip | 275.6 | 279.3 | -3.7 |
+| Education chip | 355.9 | 357.9 | -2.0 |
+| Skills chip | 476.0 | 468.8 | +7.2 |
+| Work chip | 574.9 | 570.8 | +4.1 |
+| Languages chip | 628.6 | 632.3 | -3.7 |
+| Declaration chip | 690.3 | 693.0 | -2.7 |
+| Date label | 782.0 | 778.0 | +4.0 |
+| Place label | 805.0 | 800.9 | +4.1 |
+| Signature caption | 807.9 | 803.9 | +4.0 |
+| Signature rule | 790.9 | 786.9 | +4.0 |
+
+**Mean absolute delta 2.98pt, worst 7.2pt**, over one page of A4. The residual
+is the part that cannot be fitted with one `gapBefore`: the reference's gaps
+above a heading run from 33 to 36 depending on whether a paragraph, a table or
+a bullet list precedes it, because each leaves a different amount of descender
+under its last baseline. Fitting each separately would be fitting content, not
+design.
 
 ## Verification
 
-**Preview and PDF agree**: 1 page each, sample content, 13,235 bytes.
+**Preview and PDF agree**: 1 page each.
+
+**The reference's own content fits one page**, which is the check that
+separates a metric problem from a content one. The shared editor sample does
+not — it is a mid-career CV with two jobs and four bullets, where the reference
+is a fresher's sheet whose entire work history is the word "Fresher". At the
+reference's true type size that sample is a two-page document, exactly as it is
+on Ruled Serif. The metrics are not the thing to change for it.
 
 **The five pre-existing templates are untouched.** Their display lists were
 captured under the extended engine, the engine and registry were then reverted

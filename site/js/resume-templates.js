@@ -71,18 +71,25 @@ window.TB_RESUME_TEMPLATES = [
 
         layout: {
             kind: "single-column",
-            /* 34pt side margins. The reference's own are nearer 29, which is
-               10mm and inside the clip range of several consumer printers;
-               34 is 12mm and keeps the proportion the design reads at. The
-               measurements here are PROPORTIONAL to the supplied image rather
-               than taken off it to the point -- it is a raster at roughly
-               736px wide, so a claim of point precision would be false.
+            /* MEASURED off the supplied 736x1040 raster, whose aspect is A4
+               to within a thousandth, so its pixels convert at 595/736 with no
+               crop to correct for. Every number in this descriptor came out of
+               that scan rather than off a proportional eyeball; the few places
+               a measurement was overridden say so and why.
 
-               `bottom` is a reservation boundary, not the last baseline. */
+               The reference's rules run x=25.9 to x=565.9, so its margins are
+               25.9 left and 29.1 right. That 3.2pt asymmetry is scan skew, not
+               design -- nobody sets a page that way -- so it is split into a
+               symmetric 27, which puts the rules within 1.2pt of the scan.
+
+               `bottom` is a reservation boundary, not the last baseline. The
+               reference's own last mark is the signature caption at 803.9,
+               so 830 is the boundary that lets the sign-off block fit rather
+               than the depth anything actually reaches. */
             main: {
-                left: 34, right: 34,
-                firstBaseline: 58,
-                bottom: 802
+                left: 27, right: 27,
+                firstBaseline: 57.5,
+                bottom: 830
             }
         },
 
@@ -102,43 +109,99 @@ window.TB_RESUME_TEMPLATES = [
             /* The banner word. Not a field: this design puts RESUME across the
                head of the sheet and the visitor's name in the details block
                below, which is the format's own convention. */
-            displayName: { family: "sans", weight: "bold", size: 25,
-                           lineHeight: 29, color: "accent", align: "center" },
+            /* 40pt, from the measured width: "RESUME" spans 170.6pt in the
+               scan, and those six caps are 4.278 em of Helvetica Bold, which
+               puts the size at 39.9. The cap height agrees once the scan's
+               antialiasing is allowed for. */
+            displayName: { family: "sans", weight: "bold", size: 40,
+                           lineHeight: 44, color: "accent", align: "center" },
 
-            heading:     { family: "sans", weight: "bold", size: 9.5,
+            /* The chip measures 19.4pt deep with its label's baseline 13.0pt
+               below its top edge and 5.7pt above its bottom -- and the rule
+               sits exactly ON that bottom edge, which is why the offset and
+               `below` are the same number. Seven chips measured through
+               jsPDF's Helvetica metrics put the label between 10.73 and
+               11.49pt, mean 11.26, so 11.3; the left inset measures 7.3 on
+               every one of them.
+
+               gapBefore is 35 for every section but the first, which sets 26
+               of its own. That is not over-fitting: the first heading follows
+               a MASTHEAD and the rest follow a body, and the reference draws
+               exactly that difference -- 25.9pt under the banner against 33 to
+               36 everywhere else. One shared value left the top 5pt low and
+               the foot 29pt high once seven sections had accumulated it. The
+               remaining spread between 33 and 36 IS content-dependent, since a
+               paragraph, a table and a bullet list leave different descender
+               space under their last baseline, and fitting each separately
+               would be false precision. */
+            heading:     { family: "sans", weight: "bold", size: 11.3,
                            color: "headingInk", uppercase: true,
-                           gapBefore: 25, gapAfter: 17,
-                           box: { color: "headBg", padX: 7, above: 9, below: 4.5 },
+                           gapBefore: 35, gapAfter: 21,
+                           box: { color: "headBg", padX: 7.3, above: 13, below: 5.7 },
                            /* fromBox runs the rule on from the box's right
                               edge, so the two read as one horizontal feature
                               rather than a box with a line near it. */
-                           rule: { color: "rule", width: 1, offset: 4.5, fromBox: 0 } },
+                           rule: { color: "rule", width: 1, offset: 5.7, fromBox: 0 } },
 
-            body:        { family: "sans", weight: "normal", size: 10,
+            /* Sizes are derived from MEASURED WIDTHS through jsPDF's own
+               Helvetica metrics, never from cap heights -- a scan's
+               antialiasing adds a pixel either side of a cap and throws that
+               estimate by two points, which is how an earlier pass here got
+               10pt for a chip that is really 11.3.
+
+               The reference is not set in Helvetica; its face is narrower per
+               em. Matching the WIDTH is what matters, because width decides
+               where lines break, so every size is the Helvetica size that
+               reproduces the reference's measured line widths. Two long lines
+               put the body at 12.68 and 12.78, two labels put the bold at
+               11.66 and 12.10; 12.5 sits inside both bands and keeps a label
+               and its value visually equal.
+
+               18.6pt leading is measured directly: the address's second line
+               sits 18.6 under its first and rows sit 23.5 apart, so the 4.9
+               difference is the gap BETWEEN rows rather than leading. */
+            body:        { family: "sans", weight: "normal", size: 12.5,
+                           lineHeight: 18.6, color: "ink" },
+            fieldLabel:  { family: "sans", weight: "bold", size: 12.5,
+                           lineHeight: 18.6, color: "ink" },
+
+            /* The table's rules sit 23.5pt apart, header row included. That
+               depth is the leading plus twice the cell padding below. */
+            tableHead:   { family: "sans", weight: "bold", size: 11,
                            lineHeight: 14, color: "ink" },
-            fieldLabel:  { family: "sans", weight: "bold", size: 10,
+            tableCell:   { family: "sans", weight: "normal", size: 11,
                            lineHeight: 14, color: "ink" },
 
-            tableHead:   { family: "sans", weight: "bold", size: 9,
-                           lineHeight: 12, color: "ink" },
-            tableCell:   { family: "sans", weight: "normal", size: 9,
-                           lineHeight: 12, color: "ink" },
-
-            bullet:      { family: "sans", weight: "normal", size: 10,
-                           lineHeight: 14, color: "ink",
-                           marker: "\u2022", indent: 9, itemGap: 14 }
+            bullet:      { family: "sans", weight: "normal", size: 12.5,
+                           lineHeight: 18.6, color: "ink",
+                           marker: "\u2022", indent: 10, itemGap: 18.6 }
         },
 
         blocks: [
+            /* No rule block under the banner. There appears to be one in the
+               artwork and there is not: the scan's first full-width rule is at
+               y=88.2, which is the PERSONAL DETAILS chip's own bottom edge.
+               Drawing a second one here put a line on the page the reference
+               does not have. */
             { column: "main", kind: "display", type: "displayName",
-              fallback: "RESUME", uppercase: true, gapAfter: 11 },
+              fallback: "RESUME", uppercase: true },
 
-            { column: "main", kind: "rule", color: "rule", width: 1.2,
-              gapAfter: 23 },
-
+            /* 26, not the 35 every other section takes: this one follows the
+               banner rather than a body. */
+            /* gapAfter 28.3, where a paragraph section takes the heading's
+               own 21.1: the reference sets its first detail row 28.3pt under
+               the rule and its objective's first line 21.1pt under one. That
+               is a property of the BODY, not the heading, which is why it
+               belongs on the block. */
             { column: "main", kind: "section", label: "Personal Details",
+              gapBefore: 26, gapAfter: 28.3,
+              /* Measured: labels start at x=33.1 against a 27pt margin, the
+                 colons align at x=151.5 and the values at x=160.1. The
+                 valueWidth stops the address short of the photo frame's left
+                 edge at 432.5 rather than letting it run under the frame. */
               body: { kind: "fields", type: "body", labelType: "fieldLabel",
-                      labelWidth: 100, valueWidth: 262, rowGap: 5,
+                      indent: 6.1, labelWidth: 118.4, valueWidth: 262,
+                      rowGap: 4.9,
                       rows: [
                           { label: "Name",          field: "name" },
                           { label: "Father's Name", field: "fatherName" },
@@ -174,7 +237,7 @@ window.TB_RESUME_TEMPLATES = [
                other and stretch a face. The reference's frame is nearer 2:3;
                this is the closest honest fit to it. */
             { column: "main", kind: "photo",
-              inset: { left: 423 }, top: 130, width: 104,
+              inset: { left: 405.5 }, top: 99, width: 110,
               border: { color: "ink", width: 1.2 } },
 
             /* "Career Objective" on the reference. Titled Objective because
@@ -182,12 +245,19 @@ window.TB_RESUME_TEMPLATES = [
             { column: "main", kind: "section", label: "Objective",
               body: { kind: "paragraph", field: "summary" } },
 
+            /* The table sits 8.9pt under its rule where prose sits 21.1pt
+               under one, which is a property of the body rather than of the
+               heading -- the same reason entry lists carry their own gapAfter
+               on the other templates. */
             { column: "main", kind: "section", label: "Education",
+              gapAfter: 8.9,
               body: { kind: "table", source: "education",
                       headerType: "tableHead", cellType: "tableCell",
                       headerFill: "tableHeadBg",
                       border: { color: "ink", width: 0.8 },
-                      padX: 7, padY: 5.5,
+                      /* 14pt of leading plus 4.75 above and below is the
+                         23.5pt the scan's table rules are apart. */
+                      padX: 7, padY: 4.75,
                       /* Widths are FRACTIONS of the measure, so the table
                          tracks the text column instead of carrying absolute
                          numbers that would break on a narrower page. */
@@ -235,8 +305,14 @@ window.TB_RESUME_TEMPLATES = [
             { column: "main", kind: "section", label: "Declaration",
               body: { kind: "paragraph", field: "declaration" } },
 
-            { column: "main", kind: "signoff", type: "body", gapBefore: 26,
-              labelWidth: 42, ruleWidth: 104, rowGap: 24, rightWidth: 128,
+            /* Measured off the scan's foot: the Date label runs 33.1 to 75.2,
+               its blank rule 80.8 to 164.9 (84.1 wide), and the signature rule
+               464.0 to 553.8 (89.8 wide) with its caption under it. The 52pt
+               gap above it is measured too: the declaration's own line sits at
+               726.2 and the Date label at 778.0. */
+            { column: "main", kind: "signoff", type: "body", gapBefore: 52,
+              labelWidth: 42, ruleWidth: 84, rowGap: 23,
+              rightWidth: 90, rightInset: 12, rightOffset: 8.9, rightGap: 17,
               left: [{ label: "Date" }, { label: "Place" }],
               right: { label: "Signature" },
               rule: { color: "ink", width: 0.8 } }
