@@ -139,7 +139,7 @@ window.TB_RESUME_TEMPLATES = [
                               is why the gaps are nearly the measurement and
                               the leading is not. The sidebar gets none of it;
                               see its own note. */
-                           gapBefore: 34, gapAfter: 29,
+                           gapBefore: 40, gapAfter: 33,
                            box: { color: "band", full: true, padX: 16.2,
                                   above: 19.4, below: 10.5 } },
             /* Deliberately NOT opened up the way the main column is. With the
@@ -150,19 +150,19 @@ window.TB_RESUME_TEMPLATES = [
                third referee off the foot of somebody's CV. */
             sideHeading: { family: "sans", weight: "normal", size: 11.5,
                            tracking: 2.5, color: "ink", uppercase: true,
-                           gapBefore: 34, gapAfter: 26.7,
+                           gapBefore: 37, gapAfter: 28.5,
                            box: { color: "band", full: true, padX: 25.9,
                                   above: 21.9, below: 8.9 } },
 
             /* The lead paragraph is markedly larger than anything under it:
                15pt against 12, which is the artwork's own hierarchy. */
             lead:        { family: "sans", weight: "normal", size: 15,
-                           lineHeight: 18.6, color: "ink" },
+                           lineHeight: 21.5, color: "ink" },
 
             body:        { family: "sans", weight: "normal", size: 12,
                            lineHeight: 15.3, color: "ink" },
             tagline:     { family: "sans", weight: "normal", size: 12,
-                           lineHeight: 15.3, color: "ink", align: "center" },
+                           lineHeight: 16.5, color: "ink", align: "center" },
 
             /* Bold, where the artwork sets the company name heavier than the
                role under it. */
@@ -174,10 +174,10 @@ window.TB_RESUME_TEMPLATES = [
                while the space BETWEEN bullets opens, which is the difference
                between a list that reads and a paragraph with dots in it. */
             bullet:      { family: "sans", weight: "normal", size: 12,
-                           lineHeight: 16.5, color: "ink",
-                           marker: "\u2022", indent: 11, itemGap: 21 },
+                           lineHeight: 18, color: "ink",
+                           marker: "\u2022", indent: 11, itemGap: 23 },
             sideContact: { family: "sans", weight: "normal", size: 12,
-                           lineHeight: 16.2, color: "ink", rowGap: 8 }
+                           lineHeight: 16.2, color: "ink", rowGap: 8.5 }
         },
 
         blocks: [
@@ -239,7 +239,7 @@ window.TB_RESUME_TEMPLATES = [
             { column: "sidebar", kind: "section", label: "Personal Information",
               headingType: "sideHeading",
               body: { kind: "fields", type: "body", labelType: "body",
-                      labelWidth: "auto", separator: ": ", rowGap: -0.3,
+                      labelWidth: "auto", separator: ": ", rowGap: 1.5,
                       rows: [
                           { label: "Date of Birth",  field: "dateOfBirth" },
                           { label: "Place of Birth", field: "placeOfBirth" },
@@ -283,35 +283,35 @@ window.TB_RESUME_TEMPLATES = [
                because tracking is the one measure both painters honour
                identically. */
             { column: "main", kind: "text", field: "summary", type: "lead",
-              justify: true, gapAfter: 10 },
+              justify: true, gapAfter: 14 },
 
             { column: "main", kind: "section", label: "Educational Attainment",
               body: { kind: "entries", source: "education",
                       head: { runs: [{ field: "degree", type: "entryHead" }] },
                       sub: [
                           { runs: [{ field: "school", type: "entrySub" }],
-                            gapBefore: 16.2 },
+                            gapBefore: 18 },
                           { runs: [{ literal: "School Year(s): ", type: "entrySub" },
                                    { field: "dates",              type: "entrySub" }],
-                            gapBefore: 13 }
+                            gapBefore: 16 }
                       ],
-                      entryGap: 30 } },
+                      entryGap: 34 } },
 
             { column: "main", kind: "section", label: "Professional Experience",
               body: { kind: "entries", source: "experience",
                       head: { runs: [{ field: "company", type: "entryHead" }] },
                       sub: [
                           { runs: [{ field: "role",  type: "entrySub" }],
-                            gapBefore: 17 },
+                            gapBefore: 19 },
                           { runs: [{ field: "dates", type: "entrySub" }],
-                            gapBefore: 18.6 },
+                            gapBefore: 20 },
                           { runs: [{ literal: "Work Responsibilities",
                                      type: "entrySub", keep: true }],
-                            gapBefore: 14.5 }
+                            gapBefore: 17 }
                       ],
                       bullets: { field: "description", split: "\n",
-                                 gapBefore: 19 },
-                      entryGap: 31 } }
+                                 gapBefore: 21 },
+                      entryGap: 36 } }
         ]
     },
 

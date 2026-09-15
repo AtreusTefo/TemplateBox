@@ -319,6 +319,111 @@ vacuously true. But it harvested referee rows by a fixed key list, and
 a document lighter than the form actually produces. Both keys are in the list
 now.
 
+## Loosened again, and the defect that was making it look cramped
+
+Reported a second time as still cramped, after the first loosening pass
+recorded above. Measuring the sheet found two separate things, and only one of
+them was spacing.
+
+### A composed line did not wrap, so it ran into the other column
+
+`layoutRuns` sets several runs on one baseline with the pen advancing between
+them, which is how a PDF draws mixed weights -- a single text call cannot
+change font mid-string. It did not wrap. A composed line wider than its column
+did not break, it simply kept going, and on a two-column sheet it kept going
+ACROSS THE GUTTER and drew over the main column.
+
+The referee block composes `"Address: "` with the visitor's own field, so an
+ordinary street address did exactly that: measured at **21.3pt past the
+sidebar's text measure and 13.9pt past the divider**, printed on top of the
+Professional Experience entries. Every anchor was still on the page, so
+nothing in the suite objected.
+
+Wrapping a run group is not the same problem as wrapping a paragraph, which is
+why `ctx.wrap` could not be reused: the first line starts at whatever x the
+preceding runs left the pen at, so how much fits depends on the runs before
+it, and each run may be a different size. The measure is consumed left to
+right, word by word, with the pen carrying over between runs. A word that does
+not fit even from the column's left edge is drawn overlong rather than broken,
+which is what the paragraph wrapper already does -- hyphenating an email
+address at an arbitrary point is worse than one wide line.
+
+It advances the cursor by one line height per break, and callers depend on
+that: they add the next line's `gapBefore` to wherever this left the cursor,
+so a wrapped value pushes what follows down instead of being drawn under it.
+
+**This was never peach-portrait's bug alone** -- it was in the engine, and any
+template composing a label with a field could hit it. The other six do not,
+because none of them puts a long free-text field into a composed line.
+
+### The spacing pass
+
+With wrapping fixed, the sheet was measured rather than eyeballed. The editor's
+sample left **151.1pt of the main column and 141.4pt of the sidebar unused**:
+the page was a third empty at the foot while the type inside it was set at
+1.24 to 1.275 of its size. That combination is what reads as cramped.
+
+| | before | after |
+| --- | --- | --- |
+| main column slack | 151.1pt | 77.5pt |
+| sidebar slack (sample) | 141.4pt | 114.0pt |
+| pages | 1 | 1 |
+
+The main column took most of it, because it has the room and it paginates:
+lead leading 18.6 to 21.5, bullet leading 16.5 to 18 and item gap 21 to 23,
+heading gaps 34/29 to 40/33, and every within-entry gap opened by 2 to 3pt.
+
+The sidebar took less, and the reason is a hard constraint rather than
+restraint.
+
+### Why the sidebar could not have as much
+
+The side column does not paginate, so its capacity is fixed: roughly 570pt
+between the portrait and the foot. Against that it carries a tagline, a
+contact block, seven personal-information rows and a referee list at five
+labelled lines each.
+
+Measured capacity, with the loosening above:
+
+| referees | sidebar slack |
+| --- | --- |
+| 1 (the shipped sample) | 114.0pt |
+| 2, long addresses | 13.5pt |
+| 3, long addresses | **-87.0pt** |
+
+**The reference artwork has three referees and this template cannot hold
+three.** That is not a regression introduced here -- it was already true, and
+before the wrap fix it was *concealed*, because the overrunning lines were
+being drawn outside the column instead of counted. Fixing the wrap is what
+turned a hidden 13.7pt overrun into an honest 59.6pt one at the old spacing.
+
+So the referee block was left at the artwork's own density -- its 15.3pt line
+gaps and 24pt entry gap are untouched -- and the air went to everything else:
+section separation, the personal-information rows, the contact rows and the
+tagline. Loosening the referee block as well was measured and rejected: at
+17.5pt gaps even **two** referees overflowed, which turns a Character
+Reference list into a single-referee block.
+
+Three referees now produce the side-column notice rather than silent loss,
+which is what that notice was built for.
+
+## The suite could not see text leaving its column
+
+Section 9 asked whether an anchor was on the paper. It never asked whether a
+line stayed inside the column it belongs to, and those are different
+questions: the address that ran across the gutter was comfortably on the page
+the whole time.
+
+The new check measures each text op's real width through the same Helvetica
+metrics the engine measures with, resolves which column the anchor sits in
+from `ctx.cols` -- **the engine's own boxes, not the descriptor**, because a
+sidebar can be on either side and inferring it gets `grey-rail` backwards --
+and fails on anything whose right edge passes its column.
+
+Proved by disabling the wrap and re-running: `peach-portrait` reports 1 line
+21.3pt outside its column, every other template reports 0. With the wrap
+restored, all seven report 0.
+
 ## Verification
 
 - **Preview and PDF agree**: 1 page each, with and without a photograph.
@@ -332,6 +437,8 @@ now.
   seven resume cards open their own template.
 - **The side column's overrun is reported**, and the check was proved by
   disabling the fix first: see the table above.
+- **No text is drawn outside its column** in any of the seven templates, and
+  that check was proved by disabling the wrap first.
 - Static checks: 148 passed, 0 failed.
 
 ## Files changed

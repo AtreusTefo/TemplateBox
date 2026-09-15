@@ -3336,6 +3336,19 @@ async function resumeTemplateChecks(page) {
 
         const HEX = /^#[0-9A-Fa-f]{6}$/;
 
+        /* A private jsPDF purely to MEASURE with. The engine measures through
+           the same Helvetica metrics, so a width taken here is the width the
+           painters will draw, not an approximation of it. */
+        const mdoc = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
+        const pdfFamily = (f) =>
+            f === 'serif' ? 'times' : (f === 'mono' ? 'courier' : 'helvetica');
+        const inkWidth = (o) => {
+            mdoc.setFont(pdfFamily(o.family), o.weight === 'bold' ? 'bold' : 'normal');
+            mdoc.setFontSize(o.size);
+            return mdoc.getTextWidth(o.text) +
+                (o.tracking ? o.tracking * Math.max(0, String(o.text).length - 1) : 0);
+        };
+
         /* A photograph, so a template that draws one is exercised with one
            rather than only in its empty state. Drawn on a canvas at the ratio
            the engine declares, which is also how js/resume.js produces one. */
@@ -3447,6 +3460,49 @@ async function resumeTemplateChecks(page) {
                         }
                     });
 
+                    /* Nothing may be drawn OUTSIDE the column it belongs to.
+                       This is a different question from the off-page check
+                       above, which asks only whether an anchor is on the
+                       paper: a line can sit well inside the page and still be
+                       drawn across the gutter into the next column, which is
+                       what a two-column sheet cannot survive.
+
+                       It needs a real width rather than an anchor, which is
+                       why it measures. Added September 15, 2026 after exactly
+                       that defect shipped: layoutRuns composed a label and a
+                       field onto one baseline and never wrapped, so the Peach
+                       Portrait CV drew a referee's street address 13.9pt into
+                       the main column, on top of whatever was already there.
+                       Every anchor was on the page throughout, so the check
+                       above saw nothing wrong.
+
+                       The column is the one whose box the anchor sits in --
+                       taken from ctx.cols, the engine's own boxes, rather than
+                       inferred from the descriptor, because a sidebar can be
+                       on either side and guessing gets grey-rail backwards. */
+                    let outsideColumn = 0;
+                    let worstOutside = 0;
+                    const boxes = Object.keys(ctx.cols || {})
+                        .map((k) => ctx.cols[k]);
+                    if (boxes.length) {
+                        ops.filter((o) => o.op === 'text').forEach((o) => {
+                            const w = inkWidth(o);
+                            const right = o.align === 'center' ? o.x + w / 2
+                                        : o.align === 'right' ? o.x
+                                        : o.x + w;
+                            let box = null;
+                            boxes.forEach((b) => {
+                                if (o.x >= b.x - 1 && (!box || b.x > box.x)) { box = b; }
+                            });
+                            if (!box) { return; }
+                            const past = right - (box.x + box.width);
+                            if (past > 0.5) {
+                                outsideColumn += 1;
+                                if (past > worstOutside) { worstOutside = past; }
+                            }
+                        });
+                    }
+
                     /* Photographs. The anti-stretch invariant, asserted
                        rather than trusted: the drawn box must be the ratio
                        js/resume.js crops every upload to, or a face is
@@ -3466,6 +3522,8 @@ async function resumeTemplateChecks(page) {
                              overflowMain: ctx.overflow.main,
                              overflowSidebar: ctx.overflow.sidebar,
                              unresolved: unresolved, offPage: offPage,
+                             outsideColumn: outsideColumn,
+                             worstOutside: Math.round(worstOutside * 10) / 10,
                              images: images.length, stretched: stretched };
                 } catch (e) {
                     return { ok: false, error: String((e && e.message) || e) };
@@ -3549,6 +3607,14 @@ async function resumeTemplateChecks(page) {
         check(`${t.id}: nothing is drawn off the page`,
             states.every(([, s]) => s.offPage === 0),
             states.map(([l, s]) => `${l}: ${s.offPage}`).join(", "));
+
+        check(`${t.id}: no text is drawn outside its own column`,
+            states.every(([, s]) => s.outsideColumn === 0),
+            states.map(([l, s]) =>
+                `${l}: ${s.outsideColumn} line(s), worst ${s.worstOutside}pt past the edge`
+            ).join(", ") +
+            " -- on a two-column sheet this is text drawn across the gutter " +
+            "over the other column");
 
         check(`${t.id}: no photograph is drawn at the wrong aspect`,
             states.every(([, s]) => s.stretched === 0),

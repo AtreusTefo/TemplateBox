@@ -1579,18 +1579,65 @@ window.TBResume = (() => {
         }
     }
 
-    /* One baseline, several fonts. Each run is measured and the pen advances,
-       which is how a PDF draws mixed weights -- a single text call cannot
-       change font mid-string. */
+    /* Several fonts sharing a baseline, WRAPPED to the column. Each run is
+       measured and the pen advances, which is how a PDF draws mixed weights --
+       a single text call cannot change font mid-string.
+
+       It used to be one baseline and no wrapping at all, and that was a real
+       defect rather than a simplification: a composed line wider than its
+       column did not wrap, it kept going. On a two-column sheet it kept going
+       ACROSS THE GUTTER and drew over the other column. Found September 15,
+       2026 on the Peach Portrait CV, whose referee block composes
+       "Address: " with a field -- a normal street address put 13.9pt of the
+       visitor's own text into the main column, on top of whatever was there.
+
+       Wrapping a RUN GROUP is not the same problem as wrapping a paragraph,
+       which is why ctx.wrap cannot be used here: the first line starts at
+       whatever x the preceding runs left the pen at, so how much fits on it
+       depends on the runs before it, and each run may be a different size.
+       The measure is therefore consumed left to right, word by word, with the
+       pen carrying over between runs.
+
+       It advances cursor[key] by one line height for every line it had to
+       break, and callers rely on that: they add the NEXT line's gapBefore to
+       wherever this left the cursor, so a wrapped value pushes what follows
+       down instead of being drawn under it. */
     function layoutRuns(ctx, runs, key, cursor, pageOf, entryRef) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
+        /* Half a point of tolerance, the same slack the off-page check uses:
+           a value that measures exactly to the edge is not an overflow. */
+        const right = col.x + col.width + 0.5;
         let x = col.x;
         runs.forEach((run) => {
             const t = T[run.type];
-            text(ctx, pageOf[key], x, cursor[key], run.text, t, undefined,
-                 entryEdit(entryRef, run.field));
-            x += ctx.measure(run.text, t);
+            const lh = t.lineHeight || t.size;
+            const edit = entryEdit(entryRef, run.field);
+            if (x + ctx.measure(run.text, t) <= right) {
+                text(ctx, pageOf[key], x, cursor[key], run.text, t, undefined, edit);
+                x += ctx.measure(run.text, t);
+                return;
+            }
+            const words = String(run.text).split(/\s+/).filter(Boolean);
+            let line = "";
+            words.forEach((word) => {
+                const probe = line ? line + " " + word : word;
+                if (x + ctx.measure(probe, t) <= right) { line = probe; return; }
+                /* An empty line here means the word does not fit even from the
+                   column's left edge. Drawing it overlong is deliberate and is
+                   what the paragraph wrapper does too: breaking inside a word
+                   would hyphenate an email address or a URL at an arbitrary
+                   point, which is worse than one line running wide. */
+                if (!line) { line = word; return; }
+                text(ctx, pageOf[key], x, cursor[key], line, t, undefined, edit);
+                cursor[key] += lh;
+                x = col.x;
+                line = word;
+            });
+            if (line) {
+                text(ctx, pageOf[key], x, cursor[key], line, t, undefined, edit);
+                x += ctx.measure(line, t);
+            }
         });
     }
 
