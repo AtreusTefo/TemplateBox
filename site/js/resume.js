@@ -189,73 +189,249 @@
         ]
     };
 
-    /* Renders the sample-content notice above the form. Clearing swaps the
-       whole editor back to a blank document in one action. */
-    function showSampleNotice() {
+    /* The notice above the form, which has TWO states rather than one.
+
+       It used to be one-way: the sample loaded, the notice offered "Start
+       blank", and pressing it removed both the content and the notice. There
+       was then no way back -- a visitor who wanted to see the preview working
+       again had to clear this browser's storage.
+
+       So the same element now says one of two things:
+
+         "sample"  the sample content is loaded, and the offer is to empty it
+         "blank"   the document is empty, and the offer is to put it back
+
+       One element that changes its wording rather than two that take turns: a
+       second notice appearing where the first one was reads as the page having
+       changed its mind.
+
+       The "blank" offer is shown ONLY while the document is genuinely empty,
+       which is what makes it safe without a confirm dialog. It cannot destroy
+       work, because it is not there once there is any work to destroy -- and
+       it comes back if the visitor empties the form again. */
+    const NOTICE_COPY = {
+        sample: {
+            text: "This is sample content so you can see how the live preview works. Type over it, or start from an empty resume.",
+            button: "Start blank"
+        },
+        blank: {
+            text: "Started from blank. Bring the sample content back at any time if you want to see the live preview working against a filled-in resume.",
+            button: "Bring the sample back"
+        }
+    };
+
+    /* Whether the editor is entitled to show the SAMPLE notice. Not derived
+       from the content, deliberately: the sample notice stays up while the
+       visitor types over the sample, which is the behaviour it has always had
+       and is the point at which it is still useful. */
+    let sampleShown = false;
+
+    /* Whether "Start blank" was pressed in THIS session.
+
+       The offer to bring the sample back was shown only while the document
+       was empty, on the argument that it could then destroy nothing. True,
+       and it hid the control at the exact moment somebody goes looking for
+       it: start blank, type your name, decide you wanted to see the sample
+       after all -- and it is gone, because one letter counted as work.
+
+       So it survives typing, for this session, and asks before overwriting
+       anything. What it does NOT do is follow a returning visitor around: a
+       reload with a real document in it shows no notice at all, because
+       somebody opening a finished resume is not looking for sample content. */
+    let blankedThisSession = false;
+
+    function renderNotice(mode) {
         const pane = form.parentElement;
-        if (!pane || document.getElementById("sample-notice")) {
+        if (!pane) { return; }
+        let notice = document.getElementById("sample-notice");
+
+        if (!mode) {
+            if (notice) { notice.remove(); }
             return;
         }
 
-        const notice = document.createElement("div");
-        notice.className = "sample-notice";
-        notice.id = "sample-notice";
-
-        const text = document.createElement("p");
-        text.textContent = "This is sample content so you can see how the live preview works. Type over it, or start from an empty resume.";
-
-        const clear = document.createElement("button");
-        clear.type = "button";
-        clear.className = "btn btn-secondary btn-small";
-        clear.textContent = "Start blank";
-        clear.addEventListener("click", () => {
-            form.querySelectorAll("[data-bind]").forEach((input) => {
-                input.value = "";
+        if (!notice) {
+            notice = document.createElement("div");
+            notice.className = "sample-notice";
+            notice.id = "sample-notice";
+            notice.appendChild(document.createElement("p"));
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-secondary btn-small";
+            /* Read at click time, not bound per mode: one listener on one
+               button that does whatever the notice currently offers. */
+            button.addEventListener("click", () => {
+                if (notice.getAttribute("data-mode") === "sample") { startBlank(); }
+                else { restoreSample(); }
             });
-            experienceList.textContent = "";
-            educationList.textContent = "";
-            addEntryRow(experienceList, tplExperience);
-            addEntryRow(educationList, tplEducation);
-            /* Languages are rows too, so clearing [data-bind] controls does
-               not reach them -- they have to be emptied by hand like the two
-               lists above, or the sample's three languages survive a blank
-               start. */
-            if (languageList && tplLanguage) {
-                languageList.textContent = "";
-                addEntryRow(languageList, tplLanguage);
-            }
-            /* Same story for projects and references: rows, not [data-bind]
-               controls, so the sweep above does not reach them and the
-               sample's entries would survive a blank start. */
-            [[projectsList, tplProject], [referencesList, tplReference]]
-                .forEach(([listEl, template]) => {
-                    if (!listEl || !template) return;
-                    listEl.textContent = "";
-                    addEntryRow(listEl, template);
-                });
-            /* And the photograph, for the third time the same reason: it is
-               not a [data-bind] control either, so the sweep above does not
-               reach it. Left out, "Start blank" produced an empty resume with
-               the visitor's face still on it -- and left the photograph in
-               storage, so it survived the reload too. Content, and a
-               photograph is content. */
-            setPhoto("");
-            /* Starting blank clears the CONTENT, not the design. The template
-               stays selected and its own accent comes back, so "Start blank"
-               on a template chosen from a catalog card does not silently
-               return the visitor to Classic charcoal. */
-            applyAccent(defaultAccentFor(currentTemplate));
-            notice.remove();
-            persistAndRender();
-            const first = form.querySelector("[data-bind]");
-            if (first) {
-                first.focus();
-            }
+            notice.appendChild(button);
+            pane.insertBefore(notice, pane.firstChild);
+        }
+
+        if (notice.getAttribute("data-mode") === mode) { return; }
+        notice.setAttribute("data-mode", mode);
+        notice.querySelector("p").textContent = NOTICE_COPY[mode].text;
+        notice.querySelector("button").textContent = NOTICE_COPY[mode].button;
+    }
+
+    /* Empty means the visitor has nothing to lose. The doc NAME is not
+       counted: "Start blank" never cleared it, so a document called something
+       and holding nothing is still empty in the only sense that matters here.
+
+       Entry rows are not filtered out when empty -- collectEntries keeps the
+       blank row every list opens with -- so the test has to look inside them
+       rather than at how many there are. */
+    function documentIsEmpty(state) {
+        const fields = state.fields || {};
+        if (Object.keys(fields).some((key) => fields[key])) { return false; }
+        if (state.photo) { return false; }
+        return ["experience", "education", "projects", "references"].every((list) =>
+            (state[list] || []).every((row) =>
+                Object.keys(row).every((key) => !row[key])));
+    }
+
+    /* Called after every change, from persistAndRender, so the offer tracks
+       the document rather than needing each call site to remember it. */
+    function syncNotice(state) {
+        if (documentIsEmpty(state)) {
+            sampleShown = false;
+            renderNotice("blank");
+            return;
+        }
+        if (sampleShown) {
+            renderNotice("sample");
+            return;
+        }
+        renderNotice(blankedThisSession ? "blank" : null);
+    }
+
+    function startBlank() {
+        form.querySelectorAll("[data-bind]").forEach((input) => {
+            input.value = "";
+        });
+        experienceList.textContent = "";
+        educationList.textContent = "";
+        addEntryRow(experienceList, tplExperience);
+        addEntryRow(educationList, tplEducation);
+        /* Languages are rows too, so clearing [data-bind] controls does
+           not reach them -- they have to be emptied by hand like the two
+           lists above, or the sample's three languages survive a blank
+           start. */
+        if (languageList && tplLanguage) {
+            languageList.textContent = "";
+            addEntryRow(languageList, tplLanguage);
+        }
+        /* Same story for projects and references: rows, not [data-bind]
+           controls, so the sweep above does not reach them and the
+           sample's entries would survive a blank start. */
+        [[projectsList, tplProject], [referencesList, tplReference]]
+            .forEach(([listEl, template]) => {
+                if (!listEl || !template) return;
+                listEl.textContent = "";
+                addEntryRow(listEl, template);
+            });
+        /* And the photograph, for the third time the same reason: it is
+           not a [data-bind] control either, so the sweep above does not
+           reach it. Left out, "Start blank" produced an empty resume with
+           the visitor's face still on it -- and left the photograph in
+           storage, so it survived the reload too. Content, and a
+           photograph is content.
+
+           This is the one part of a blank start that "Bring the sample
+           back" cannot undo: the photograph was the visitor's, not the
+           sample's, and nothing here keeps a copy of it. */
+        clearPhoto();
+        /* Starting blank clears the CONTENT, not the design. The template
+           stays selected and its own accent comes back, so "Start blank"
+           on a template chosen from a catalog card does not silently
+           return the visitor to Classic charcoal. */
+        applyAccent(defaultAccentFor(currentTemplate));
+        sampleShown = false;
+        blankedThisSession = true;
+        /* Which swaps the notice to its "blank" state by way of syncNotice,
+           rather than this function knowing what the notice should say. */
+        persistAndRender();
+        const first = form.querySelector("[data-bind]");
+        if (first) {
+            first.focus();
+        }
+    }
+
+    function restoreSample() {
+        /* Only when there is something to lose. An empty document needs no
+           confirmation and asking for one on every press would make the way
+           back feel dangerous when it is not. */
+        if (!documentIsEmpty(collectState()) &&
+                !window.confirm("Replace what is in this form with the sample content?")) {
+            return;
+        }
+        fillForm(SAMPLE_STATE);
+        /* The content comes back and the design does not, which is the same
+           rule "Start blank" follows in the other direction: the template the
+           visitor chose stays chosen, and the accent they are looking at is
+           not overwritten by the sample's own blue. */
+        sampleShown = true;
+        blankedThisSession = false;
+        persistAndRender();
+        const first = form.querySelector("[data-bind]");
+        if (first) {
+            first.focus();
+        }
+    }
+
+    /* Fills the form's CONTENT from a state object.
+
+       Extracted from init() when the sample gained a way back: restoring it is
+       the same operation as the first load, and a second copy of it would be a
+       second place for a newly added field to be forgotten.
+
+       Design -- the template and the accent -- is deliberately not here. Both
+       callers decide that for themselves, and they decide differently. */
+    function fillForm(state) {
+        if (docNameInput) {
+            docNameInput.value = TB.desanitize(state.docName || DEFAULT_DOC_NAME);
+        }
+
+        form.querySelectorAll("[data-bind]").forEach((input) => {
+            input.value = TB.desanitize(state.fields[input.getAttribute("data-bind")] || "");
         });
 
-        notice.appendChild(text);
-        notice.appendChild(clear);
-        pane.insertBefore(notice, pane.firstChild);
+        const experience = state.experience && state.experience.length
+            ? state.experience
+            : DEFAULT_STATE.experience;
+        const education = state.education && state.education.length
+            ? state.education
+            : DEFAULT_STATE.education;
+
+        /* Emptied first. hydrateList and addEntryRow both APPEND, which is
+           right on a first load into empty lists and would otherwise stack the
+           sample on top of whatever is already there when it is restored. */
+        experienceList.textContent = "";
+        educationList.textContent = "";
+        experience.forEach((entry) => addEntryRow(experienceList, tplExperience, entry));
+        education.forEach((entry) => addEntryRow(educationList, tplEducation, entry));
+
+        /* Projects and references hydrate the same way, and an empty one still
+           opens with a blank row so the section is visibly there to fill in --
+           the rule the two lists above and the languages below both follow. */
+        if (projectsList) { projectsList.textContent = ""; }
+        if (referencesList) { referencesList.textContent = ""; }
+        hydrateList(projectsList, tplProject, state.projects, DEFAULT_STATE.projects);
+        hydrateList(referencesList, tplReference, state.references,
+                    DEFAULT_STATE.references);
+
+        /* Languages hydrate from the saved string rather than from a bound
+           control, and an empty one still opens with a blank row so the
+           section is visibly there to fill in, matching the two lists above. */
+        if (languageList && tplLanguage) {
+            languageList.textContent = "";
+            const languages = parseLanguages(state.fields.languages);
+            if (languages.length) {
+                languages.forEach((row) => addEntryRow(languageList, tplLanguage, row));
+            } else {
+                addEntryRow(languageList, tplLanguage);
+            }
+        }
     }
 
     const form = document.getElementById("resume-form");
@@ -282,6 +458,11 @@
     const photoPreview = document.getElementById("photo-preview");
     const photoThumb = document.getElementById("photo-thumb");
     const photoRemove = document.getElementById("photo-remove");
+    const photoFrameBox = document.getElementById("photo-frame");
+    const photoReset = document.getElementById("photo-reset");
+    const zoomInput = document.getElementById("f-photo-zoom");
+    const xInput = document.getElementById("f-photo-x");
+    const yInput = document.getElementById("f-photo-y");
 
     /* ----------------------------------------------------------------------
        Template selection.
@@ -337,10 +518,33 @@
        Marked-up nodes with no data-templates attribute are shown by every
        template; only listed ones are conditional. */
     function syncTemplateFields(root) {
-        (root || document).querySelectorAll("[data-templates]").forEach((node) => {
+        const scope = root || document;
+        scope.querySelectorAll("[data-templates]").forEach((node) => {
             node.hidden = node.getAttribute("data-templates")
                 .split(/\s+/).indexOf(currentTemplate) === -1;
         });
+        /* `data-needs` asks the DESCRIPTOR rather than naming templates.
+
+           The photo field was gated with data-templates="photo-rail", a list
+           of one written when there was one. The Labelled Sections CV then
+           arrived drawing a photograph, and the field stayed hidden on it --
+           a frame on the sheet with no control to fill it. A list of which
+           templates draw a photo is a second copy of something the registry
+           already knows, and it went stale the first time it could. */
+        scope.querySelectorAll("[data-needs]").forEach((node) => {
+            node.hidden = !templateNeeds(node.getAttribute("data-needs"));
+        });
+    }
+
+    /* Does the current template draw the thing this field feeds? Only
+       "photo" is asked today; the shape takes another the day one is added. */
+    function templateNeeds(what) {
+        const chosen = engineTemplate(currentTemplate);
+        if (!chosen) { return false; }
+        if (what === "photo") {
+            return (chosen.blocks || []).some((b) => b.kind === "photo");
+        }
+        return true;
     }
 
     function buildTemplateRow() {
@@ -549,6 +753,10 @@
         delete record.photo;
         TB.storageSet(STORAGE_KEY, record);
         TB.markSaved();
+        /* Before the render rather than after: the notice sits above the form,
+           not in the sheet, and doing it here means no call site has to
+           remember that emptying the document changes what is on offer. */
+        syncNotice(state);
         renderPreview(state);
     }
 
@@ -583,7 +791,23 @@
        indistinguishable from 0.95 at 480px, which is 3-4x larger. */
     const PHOTO_QUALITY = 0.82;
 
+    /* Three values, and they are not interchangeable:
+
+         photoMaster   the whole photograph, downscaled, as stored
+         photoView     how the frame sits on it
+         currentPhoto  the frame itself, which is what the sheet draws
+
+       The third is DERIVED from the first two and is never the source of
+       truth. It used to be the only one that existed, which is why framing
+       could not be offered: there was nothing left to re-frame against. */
+    let photoMaster = "";
+    let photoView = { zoom: 1, x: 0, y: 0 };
     let currentPhoto = "";
+
+    /* The decoded master, kept for the session so moving a slider does not
+       decode a data URI on every input event. Null until one is loaded, and
+       null is what disables the framing controls. */
+    let masterImg = null;
 
     /* The ratio the engine draws, never a second copy of the number. Falls
        back only if the engine failed to load, in which case nothing will be
@@ -613,7 +837,70 @@
         return c;
     }
 
-    /* Cover-crop to the target ratio, then downscale in halving steps.
+    /* The largest edge kept of the WHOLE photograph, and the quality it is
+       kept at.
+
+       This is new, and it is what makes framing possible. The editor used to
+       keep only the finished 4:5 crop, so there was nothing left to re-frame
+       against: moving the picture would have meant cropping a crop, losing a
+       little more each time. The uncropped master is kept instead and the
+       frame is cut from it on every change, so the three sliders are lossless
+       against the upload however often they are moved.
+
+       900 and 0.78 put a typical portrait at 90-140KB against the 480px
+       crop's 30-60. That is the cost, it is paid once per document, and it
+       buys a control that would otherwise have to lie about what it does. */
+    const PHOTO_MASTER_EDGE = 900;
+    const PHOTO_MASTER_QUALITY = 0.78;
+
+    /* Framing, in the vocabulary js/poster.js already uses for exactly this:
+       a zoom of 1 or more, and x and y as units of the slack in [-1, 1] so
+       0 is centred and the ends are flush. Named the same way on purpose --
+       a visitor who has framed a photograph on a poster has met this idea.
+
+       Not shared with that file. The two editors are separate pages loading
+       different scripts, and moving eight lines of arithmetic into js/app.js
+       would mean touching the poster's photo handling inside a change to the
+       resume's. Worth doing; not worth doing here. */
+    function defaultView() {
+        return { zoom: 1, x: 0, y: 0 };
+    }
+
+    function clampUnit(n) {
+        return Math.min(1, Math.max(-1, Number(n) || 0));
+    }
+
+    /* The source rectangle a frame of `ratio` takes out of `img`. */
+    function photoFrame(img, ratio, view) {
+        const v = view || defaultView();
+        const sw0 = img.naturalWidth || img.width;
+        const sh0 = img.naturalHeight || img.height;
+        const zoom = Math.max(1, Number(v.zoom) || 1);
+
+        /* The biggest box of the target ratio that fits, then divided by the
+           zoom: zooming IN takes a smaller piece of the source. */
+        let cw = sw0;
+        let ch = Math.round(sw0 / ratio);
+        if (ch > sh0) {
+            ch = sh0;
+            cw = Math.round(sh0 * ratio);
+        }
+        cw = Math.max(1, Math.round(cw / zoom));
+        ch = Math.max(1, Math.round(ch / zoom));
+
+        const slackX = (sw0 - cw) / 2;
+        const slackY = (sh0 - ch) / 2;
+        return {
+            sx: Math.round(slackX + clampUnit(v.x) * slackX),
+            sy: Math.round(slackY + clampUnit(v.y) * slackY),
+            sw: cw, sh: ch,
+            /* Whether either slider has anywhere to go, which is what decides
+               if they are offered as live controls or as disabled ones. */
+            slackX: slackX, slackY: slackY
+        };
+    }
+
+    /* Downscale in halving steps.
 
        The halving matters. Every browser's one-shot drawImage undersamples
        heavily on a large reduction -- a 4000px phone photograph drawn
@@ -621,49 +908,51 @@
        reads as aliasing on hair and on the edge of a collar. Halving
        repeatedly averages the pixels being discarded. Same technique, and the
        same reason, as scaleTo() in js/admin-image.js. */
-    function cropToRatio(img) {
-        const ratio = photoRatio();
+    function halveTo(canvas, targetW, targetH) {
+        let current = canvas;
+        while (current.width > targetW * 2) {
+            const next = canvasOf(Math.max(targetW, Math.round(current.width / 2)),
+                                  Math.max(targetH, Math.round(current.height / 2)));
+            next.getContext("2d").drawImage(current, 0, 0, next.width, next.height);
+            current = next;
+        }
+        const out = canvasOf(targetW, targetH);
+        out.getContext("2d").drawImage(current, 0, 0, targetW, targetH);
+        return out;
+    }
+
+    /* The whole photograph, downscaled, uncropped. What gets stored. */
+    function toMaster(img) {
         const sw = img.naturalWidth || img.width;
         const sh = img.naturalHeight || img.height;
-        if (!sw || !sh) {
-            return "";
-        }
+        if (!sw || !sh) { return ""; }
+        const scale = Math.min(1, PHOTO_MASTER_EDGE / Math.max(sw, sh));
+        const targetW = Math.max(1, Math.round(sw * scale));
+        const targetH = Math.max(1, Math.round(sh * scale));
+        const first = canvasOf(sw, sh);
+        first.getContext("2d").drawImage(img, 0, 0);
+        return halveTo(first, targetW, targetH)
+            .toDataURL("image/jpeg", PHOTO_MASTER_QUALITY);
+    }
 
-        /* The largest box of the target ratio that fits inside the source,
-           centred. Centred rather than offered as a choice: a crop handle is
-           a second editor, and every portrait photograph a visitor uploads to
-           a CV already has the face near the middle. */
-        let cw = sw;
-        let ch = Math.round(sw / ratio);
-        if (ch > sh) {
-            ch = sh;
-            cw = Math.round(sh * ratio);
-        }
-        const sx = Math.round((sw - cw) / 2);
-        const sy = Math.round((sh - ch) / 2);
+    /* The frame, cut from the master, at the size the sheet draws.
 
-        const targetW = Math.min(PHOTO_W, cw);
+       JPEG, always: the engine's guard accepts PNG too, but a photograph has
+       no transparency to protect and a PNG of one is roughly ten times the
+       size -- straight out of the localStorage budget. */
+    function toFrame(img, view) {
+        const ratio = photoRatio();
+        const f = photoFrame(img, ratio, view);
+        if (!f.sw || !f.sh) { return ""; }
+        const targetW = Math.min(PHOTO_W, f.sw);
         const targetH = Math.max(1, Math.round(targetW / ratio));
 
         /* First pass takes the crop out at its own size; the halving loop
            then works on a plain canvas, so the source rectangle is applied
            once and cannot compound. */
-        let canvas = canvasOf(cw, ch);
-        canvas.getContext("2d").drawImage(img, sx, sy, cw, ch, 0, 0, cw, ch);
-
-        while (canvas.width > targetW * 2) {
-            const next = canvasOf(Math.max(targetW, Math.round(canvas.width / 2)),
-                                  Math.max(targetH, Math.round(canvas.height / 2)));
-            next.getContext("2d").drawImage(canvas, 0, 0, next.width, next.height);
-            canvas = next;
-        }
-
-        const out = canvasOf(targetW, targetH);
-        out.getContext("2d").drawImage(canvas, 0, 0, targetW, targetH);
-        /* JPEG, always: the engine's guard accepts PNG too, but a photograph
-           has no transparency to protect and a PNG of one is roughly ten
-           times the size -- straight out of the localStorage budget. */
-        return out.toDataURL("image/jpeg", PHOTO_QUALITY);
+        const cut = canvasOf(f.sw, f.sh);
+        cut.getContext("2d").drawImage(img, f.sx, f.sy, f.sw, f.sh, 0, 0, f.sw, f.sh);
+        return halveTo(cut, targetW, targetH).toDataURL("image/jpeg", PHOTO_QUALITY);
     }
 
     /* The form's own copy of the photograph, and the Remove button that goes
@@ -689,6 +978,26 @@
         if (photoPreview) {
             photoPreview.hidden = !currentPhoto;
         }
+        if (photoFrameBox) {
+            photoFrameBox.hidden = !currentPhoto;
+        }
+        if (!masterImg) { return; }
+
+        /* The sliders are written back from the view rather than left where
+           the visitor dragged them, so Reset and a fresh upload both move
+           them, and a reload restores the position the sheet is showing. */
+        if (zoomInput) { zoomInput.value = String(Math.round(photoView.zoom * 100)); }
+        if (xInput) { xInput.value = String(Math.round(photoView.x * 100)); }
+        if (yInput) { yInput.value = String(Math.round(photoView.y * 100)); }
+
+        /* At zoom 1 one axis has no slack at all -- the frame already spans
+           the whole of it -- so its slider would move and change nothing.
+           Disabled rather than hidden: a control that vanishes and returns as
+           the zoom passes 1 is worse than one that is visibly not available
+           yet. */
+        const f = photoFrame(masterImg, photoRatio(), photoView);
+        if (xInput) { xInput.disabled = f.slackX < 1; }
+        if (yInput) { yInput.disabled = f.slackY < 1; }
     }
 
     /* Writes the photograph and CHECKS that the write happened.
@@ -697,13 +1006,38 @@
        so the value is read back. Silence would be the worst outcome here:
        the sheet would show the photograph, the visitor would close the tab,
        and it would be gone with no explanation. */
+    /* What goes under PHOTO_KEY: the master AND its framing, because a frame
+       without the picture it was cut from is meaningless and the two must not
+       be able to get out of step.
+
+       An older document holds a bare STRING there -- the finished crop, from
+       before framing existed. It is read as a master with a neutral view,
+       which reproduces exactly what that document showed, because the stored
+       crop is already at the frame's ratio. Zooming into it then works and
+       costs a little sharpness, which is the honest outcome for a picture
+       whose original this editor never kept. */
+    function readStoredPhoto() {
+        const raw = TB.storageGet(PHOTO_KEY);
+        if (typeof raw === "string") {
+            return { src: raw, zoom: 1, x: 0, y: 0 };
+        }
+        if (raw && typeof raw === "object" && typeof raw.src === "string") {
+            return { src: raw.src, zoom: Math.max(1, Number(raw.zoom) || 1),
+                x: clampUnit(raw.x), y: clampUnit(raw.y) };
+        }
+        return { src: "", zoom: 1, x: 0, y: 0 };
+    }
+
     function storePhoto() {
-        if (!currentPhoto) {
+        if (!photoMaster) {
             TB.storageSet(PHOTO_KEY, "");
             return true;
         }
-        TB.storageSet(PHOTO_KEY, currentPhoto);
-        if (TB.storageGet(PHOTO_KEY) === currentPhoto) {
+        const record = { src: photoMaster, zoom: photoView.zoom,
+            x: photoView.x, y: photoView.y };
+        TB.storageSet(PHOTO_KEY, record);
+        const back = TB.storageGet(PHOTO_KEY);
+        if (back && back.src === photoMaster) {
             return true;
         }
         /* setItem threw, so the PREVIOUS photograph is still under this key
@@ -716,8 +1050,12 @@
         return false;
     }
 
-    function setPhoto(url) {
-        currentPhoto = url || "";
+    /* Re-cuts the frame, saves, and redraws. The one path every change to
+       the photograph goes through -- upload, replace, a slider, Reset and
+       Remove -- so none of them can save without redrawing or redraw without
+       saving. */
+    function applyPhoto() {
+        currentPhoto = (masterImg && photoMaster) ? toFrame(masterImg, photoView) : "";
         syncPhotoControls();
         /* Any successful set clears a stale message. The upload handler
            clears it too, on the way in, but this is the path "Start blank"
@@ -732,6 +1070,38 @@
                 "for next time. Try a smaller image.";
         }
         persistAndRender();
+    }
+
+    /* Takes a master and a framing, decodes, then applies. Used by the
+       upload, by a restore from storage, and by Remove with an empty src. */
+    function loadPhoto(src, view, done) {
+        photoView = view ? { zoom: Math.max(1, Number(view.zoom) || 1),
+            x: clampUnit(view.x), y: clampUnit(view.y) } : defaultView();
+        if (!src) {
+            photoMaster = "";
+            masterImg = null;
+            applyPhoto();
+            if (done) { done(true); }
+            return;
+        }
+        const img = new Image();
+        img.addEventListener("load", () => {
+            photoMaster = src;
+            masterImg = img;
+            applyPhoto();
+            if (done) { done(true); }
+        });
+        img.addEventListener("error", () => {
+            photoMaster = "";
+            masterImg = null;
+            applyPhoto();
+            if (done) { done(false); }
+        });
+        img.src = src;
+    }
+
+    function clearPhoto() {
+        loadPhoto("", defaultView());
     }
 
     function bindPhotoUpload() {
@@ -762,8 +1132,8 @@
             reader.addEventListener("load", () => {
                 const img = new Image();
                 img.addEventListener("load", () => {
-                    const prepared = cropToRatio(img);
-                    if (!prepared) {
+                    const master = toMaster(img);
+                    if (!master) {
                         if (photoError) {
                             photoError.textContent = "That image could not be read. Please try a different file.";
                         }
@@ -773,7 +1143,12 @@
                     /* Cleared so re-picking the same file still fires change,
                         which is how a visitor retries after an error. */
                     photoInput.value = "";
-                    setPhoto(prepared);
+                    /* A fresh upload starts centred and unzoomed, deliberately:
+                       carrying the previous photograph's framing onto a new one
+                       frames a face nobody has looked at yet. Replacing IS this
+                       path -- there is no separate Replace control, because
+                       choosing another file is the same gesture. */
+                    loadPhoto(master, defaultView());
                 });
                 img.addEventListener("error", () => {
                     if (photoError) {
@@ -794,11 +1169,34 @@
 
         if (photoRemove) {
             photoRemove.addEventListener("click", () => {
-                if (photoError) {
-                    photoError.textContent = "";
-                }
-                photoInput.value = "";
-                setPhoto("");
+                clearPhoto();
+                if (photoInput) { photoInput.focus(); }
+            });
+        }
+
+        /* The three framing sliders. All of them recut from the master, so
+           dragging one back and forth is lossless however long it goes on.
+
+           `input` rather than `change`, because a framing control that only
+           updates when the mouse is released is a control you cannot aim. */
+        [[zoomInput, "zoom", 100], [xInput, "x", 100], [yInput, "y", 100]]
+            .forEach(([control, key, divisor]) => {
+                if (!control) { return; }
+                control.addEventListener("input", () => {
+                    if (!masterImg) { return; }
+                    const value = Number(control.value) / divisor;
+                    photoView[key] = key === "zoom"
+                        ? Math.max(1, value)
+                        : clampUnit(value);
+                    applyPhoto();
+                });
+            });
+
+        if (photoReset) {
+            photoReset.addEventListener("click", () => {
+                if (!masterImg) { return; }
+                photoView = defaultView();
+                applyPhoto();
             });
         }
     }
@@ -1459,14 +1857,6 @@
 
         applyAccent(state.accent);
 
-        if (docNameInput) {
-            docNameInput.value = TB.desanitize(state.docName || DEFAULT_DOC_NAME);
-        }
-
-        form.querySelectorAll("[data-bind]").forEach((input) => {
-            input.value = TB.desanitize(state.fields[input.getAttribute("data-bind")] || "");
-        });
-
         /* A catalog card's data-doc names the template, handed over through
            localStorage by bindLaunchControls() in js/app.js. It beats the
            saved choice on purpose: arriving on the Ruled Serif card IS the
@@ -1480,34 +1870,7 @@
             preset || (hasSaved && state.template) || TB.storageGet(TEMPLATE_KEY) || CLASSIC_ID,
             Boolean(preset));
 
-        const experience = state.experience && state.experience.length
-            ? state.experience
-            : DEFAULT_STATE.experience;
-        const education = state.education && state.education.length
-            ? state.education
-            : DEFAULT_STATE.education;
-
-        experience.forEach((entry) => addEntryRow(experienceList, tplExperience, entry));
-        education.forEach((entry) => addEntryRow(educationList, tplEducation, entry));
-
-        /* Projects and references hydrate the same way, and an empty one still
-           opens with a blank row so the section is visibly there to fill in --
-           the rule the two lists above and the languages below both follow. */
-        hydrateList(projectsList, tplProject, state.projects, DEFAULT_STATE.projects);
-        hydrateList(referencesList, tplReference, state.references,
-                    DEFAULT_STATE.references);
-
-        /* Languages hydrate from the saved string rather than from a bound
-           control, and an empty one still opens with a blank row so the
-           section is visibly there to fill in, matching the two lists above. */
-        if (languageList && tplLanguage) {
-            const languages = parseLanguages(state.fields.languages);
-            if (languages.length) {
-                languages.forEach((row) => addEntryRow(languageList, tplLanguage, row));
-            } else {
-                addEntryRow(languageList, tplLanguage);
-            }
-        }
+        fillForm(state);
 
         /* Real-time binding: one delegated listener covers every current and
            future input inside the form, including cloned entry rows.
@@ -1560,19 +1923,38 @@
            uploading writes the document record too, so a photograph with no
            record is an orphan by definition. It is cleared rather than left,
            or it would be waiting again on the next load. */
-        const savedPhoto = TB.storageGet(PHOTO_KEY);
-        currentPhoto = (hasSaved && validPhoto(savedPhoto)) ? savedPhoto : "";
-        if (!currentPhoto && savedPhoto) {
+        const savedPhoto = readStoredPhoto();
+        const keepPhoto = hasSaved && validPhoto(savedPhoto.src);
+        if (!keepPhoto && savedPhoto.src) {
             TB.storageSet(PHOTO_KEY, "");
         }
-        syncPhotoControls();
         bindPhotoUpload();
+        if (keepPhoto) {
+            /* ASYNCHRONOUS, and everything below runs without waiting for it.
 
-        if (!hasSaved) {
-            showSampleNotice();
+               Decoding the master is what makes the framing sliders live, and
+               it cannot be done synchronously. The first render therefore
+               happens with no photograph and a second one follows when the
+               decode lands -- which is the same shape the page already had,
+               since an <img> never painted on the first frame either. What
+               matters is that nothing in between can save: loadPhoto only
+               reaches applyPhoto once it has a decoded image or has given up,
+               and giving up writes an empty key rather than the old one. */
+            loadPhoto(savedPhoto.src, savedPhoto);
+        } else {
+            syncPhotoControls();
         }
 
-        renderPreview(collectState());
+        /* The opening notice. A first visit gets the sample and the offer to
+           empty it; a returning visitor whose saved document is empty gets the
+           offer to fill it, which is what somebody who pressed "Start blank"
+           and then reloaded is looking at. Anyone with work in progress gets
+           neither. */
+        sampleShown = !hasSaved;
+        const opening = collectState();
+        syncNotice(opening);
+
+        renderPreview(opening);
     }
 
     init();

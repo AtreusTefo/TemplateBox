@@ -4369,6 +4369,181 @@ async function oneCalendarPoster(page, L) {
     });
 }
 
+/* ==========================================================================
+   14. Template Studio: a refused publish writes nothing.
+
+   The studio edits JavaScript SOURCE. Everywhere else in this suite a defect
+   is a wrong number on a page; here a defect is a corrupted registry, and the
+   thing standing between the two is one function -- verifyRegistry -- that
+   has to refuse a patch it cannot prove.
+
+   So what is asserted is the REFUSAL, not the success. A splice that works is
+   pleasant; a splice that quietly damages a neighbouring entry and gets
+   written is the failure mode this whole design exists to prevent, and a
+   check that only ever exercises the happy path would not see it.
+
+   Everything here is in-memory. The studio hands back patched SOURCE and the
+   caller decides whether to write it, so this section can exercise the whole
+   mechanism against the real registries without touching a file.
+
+   Runs in the browser because the verification uses DOMParser and compiles
+   the patched file, neither of which exists in the static section.
+   ========================================================================== */
+async function templateStudioChecks(page) {
+    section("14. Template Studio: a refused publish writes nothing");
+
+    await page.navigate(`http://localhost:${PORT}/admin.html`, 1440);
+
+    const r = await page.evaluate(`(async () => {
+        for (let i = 0; i < 150; i += 1) {
+            if (window.TBStudio) break;
+            await new Promise((res) => setTimeout(res, 100));
+        }
+        if (!window.TBStudio) { return { error: "js/admin-studio.js did not load" }; }
+        const S = window.TBStudio;
+        /* Everything below reports its own failure rather than throwing into
+           the void: an evaluate that throws comes back undefined, and "no
+           result" is the least useful thing a check can say. */
+        try {
+        const reg = await S.loadRegistries();
+        const RC = S.RESUME_CFG;
+        const DC = S.DOCS_CFG;
+        const ids = reg.resumes.map((t) => t.id);
+        const docIds = Object.keys(reg.docs);
+        const out = { ids: ids, docIds: docIds, drift: reg.drift };
+
+        /* A round trip. Re-writing an entry with its own value must leave the
+           registry meaning exactly what it meant -- the comments inside it do
+           not survive and the MEANING must. */
+        const same = reg.resumes[0];
+        const rt = S.planRegistryEdit(reg.resumeSrc, RC, same, same.id, "save", ids);
+        out.roundTrip = S.deepEqual(
+            S.evaluateRegistry(rt.source, "window.TB_RESUME_TEMPLATES = [", "[", "]"),
+            reg.resumes);
+
+        /* Creating one must add exactly that one and move nothing else. */
+        const made = { id: "suite-probe", title: "Suite Probe", catalog: false,
+            page: { width: 595, height: 842 },
+            layout: { kind: "single-column",
+                main: { left: 48, right: 48, firstBaseline: 74, bottom: 800 } },
+            palette: { ink: "#1A1A1A" },
+            type: { body: { family: "sans", weight: "normal", size: 10,
+                lineHeight: 14, color: "ink" } },
+            blocks: [{ column: "main", kind: "text", type: "body", field: "summary" }] };
+        const created = S.planRegistryEdit(reg.resumeSrc, RC, made, made.id, "save", ids);
+        const afterCreate = S.evaluateRegistry(created.source,
+            "window.TB_RESUME_TEMPLATES = [", "[", "]");
+        out.create = afterCreate.length === reg.resumes.length + 1 &&
+            S.deepEqual(afterCreate.slice(0, -1), reg.resumes) &&
+            S.deepEqual(afterCreate[afterCreate.length - 1], made);
+
+        /* And removing one must remove exactly that one. */
+        const gone = S.planRegistryEdit(reg.resumeSrc, RC, null, ids[ids.length - 1],
+            "delete", ids);
+        out.remove = S.deepEqual(
+            S.evaluateRegistry(gone.source, "window.TB_RESUME_TEMPLATES = [", "[", "]"),
+            reg.resumes.slice(0, -1));
+
+        /* The document registry is a different shape and the same rules. */
+        const dmade = { layout: reg.layouts[0], heading: "SUITE PROBE",
+            file: "suite-probe", labels: { issuerLegend: "Issued By" } };
+        const dplan = S.planRegistryEdit(reg.docsSrc, DC, dmade, "suite-probe", "save", docIds);
+        const afterDoc = S.evaluateRegistry(dplan.source, "const DOC_TYPES = {", "{", "}");
+        out.docCreate = Object.keys(afterDoc).length === docIds.length + 1 &&
+            docIds.every((k) => S.deepEqual(afterDoc[k], reg.docs[k])) &&
+            S.deepEqual(afterDoc["suite-probe"], dmade);
+
+        /* THE REFUSALS. Each of these is a patch that must never reach disk. */
+        const refuse = (after, expected) => S.verifyRegistry(reg.resumeSrc, after, RC, expected);
+        const target = reg.resumes[reg.resumes.length - 1];
+        const expected = { id: target.id, value: target, count: reg.resumes.length,
+            action: "save" };
+
+        /* A neighbour quietly altered. */
+        out.collateral = refuse(
+            reg.resumeSrc.replace("title: " + JSON.stringify(reg.resumes[0].title),
+                "title: " + JSON.stringify("Tampered")), expected);
+
+        /* A patch that does not compile. */
+        out.syntax = refuse(
+            reg.resumeSrc.replace("window.TB_RESUME_TEMPLATES = [",
+                "window.TB_RESUME_TEMPLATES = [ {{{ "), expected);
+
+        /* A count that is not what the edit was for. */
+        out.count = refuse(reg.resumeSrc, Object.assign({}, expected,
+            { count: reg.resumes.length + 1 }));
+
+        /* An entry that did not come back as it was written. */
+        out.notWritten = refuse(reg.resumeSrc, Object.assign({}, expected,
+            { value: Object.assign({}, target, { title: "Something Else" }) }));
+
+        /* A file gutted. */
+        out.truncated = refuse(reg.resumeSrc.slice(0, 400), expected);
+
+        /* Validation catches what the engine cannot draw and the form cannot
+           fill, BEFORE any of the above is reached. */
+        out.validation = S.validateResume({
+            id: "Not An Id", title: "",
+            page: { width: 595, height: 842 },
+            layout: { kind: "single-column",
+                main: { left: 0, right: 0, firstBaseline: 10, bottom: 800 } },
+            palette: { ink: "#1A1A1A" },
+            type: { body: { family: "Helvetica", size: 10, color: "#FF0000" } },
+            blocks: [{ column: "main", kind: "text", type: "body", field: "nickname" },
+                { column: "main", kind: "photo", width: 100, height: 200 }]
+        }, reg.resumes).length;
+
+        /* A document layout that is not one of the five renderers. */
+        out.docLayout = S.validateDoc({ layout: "invented", heading: "X", file: "x",
+            labels: { a: "b" } }, "x", docIds).length;
+
+        return out;
+        } catch (err) {
+            return { error: String((err && err.stack) || err) };
+        }
+    })()`);
+
+    if (!r || r.error) {
+        check("14a. the studio answered", false, r && r.error ? r.error : "no result");
+        return;
+    }
+
+    check("14a. the studio reads both registries",
+        r.ids.length > 0 && r.docIds.length > 0,
+        r.ids.length + " resume templates, " + r.docIds.length + " document types");
+
+    /* The five layout names are duplicated in js/admin-studio.js so a select
+       cannot offer a sixth. This is what stops that copy going stale. */
+    check("14b. the studio's layout list matches js/docs.js",
+        r.drift.length === 0, "drift: " + r.drift.join(", "));
+
+    check("14c. re-writing an entry preserves the registry's meaning", r.roundTrip,
+        "a round trip through the serialiser changed what the registry means");
+    check("14d. creating an entry moves nothing else", r.create,
+        "the other entries did not come back unchanged");
+    check("14e. removing an entry removes only that one", r.remove,
+        "the remaining entries did not come back unchanged");
+    check("14f. the document registry round-trips too", r.docCreate,
+        "adding a document type disturbed the others");
+
+    /* The half that matters. Each of these is a patch that must be refused,
+       and the message is checked to be non-empty rather than exact: what is
+       asserted is the refusal, not its wording. */
+    [["14g", "collateral", "a patch that alters a neighbouring entry"],
+     ["14h", "syntax", "a patch that does not compile"],
+     ["14i", "count", "a patch with the wrong entry count"],
+     ["14j", "notWritten", "a patch whose entry is not what was authored"],
+     ["14k", "truncated", "a patch that gutted the file"]].forEach(([n, key, what]) => {
+        check(n + ". refuses " + what, Boolean(r[key]),
+            "this was ACCEPTED, and would have been written to disk");
+    });
+
+    check("14l. validation rejects what the engine cannot draw",
+        r.validation >= 5, "only " + r.validation + " problems reported, expected at least 5");
+    check("14m. a document layout outside the five is rejected",
+        r.docLayout > 0, "an invented layout name was accepted");
+}
+
 async function ruledInvoiceChecks(page) {
     section("12. Ruled invoice: the sheet, the arithmetic and the logo");
 
@@ -4814,6 +4989,7 @@ async function main() {
                     await mockupTemplateChecks(page);
                     await ruledInvoiceChecks(page);
                     await anniversaryCalendarChecks(page);
+                    await templateStudioChecks(page);
                 } finally {
                     page.close();
                 }

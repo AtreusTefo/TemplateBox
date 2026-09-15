@@ -207,18 +207,44 @@
                              photograph is cropped and re-encoded by
                              js/resume.js and kept under its own localStorage
                              key, so the form sweep neither collects nor
-                             restores it. Gated to the one template that draws
-                             it; like every other gated field it keeps its
-                             value while hidden, so switching away and back
-                             does not lose the upload. -->
-                        <div class="field" data-templates="photo-rail">
+                             restores it.
+
+                             data-needs="photo" rather than a data-templates
+                             LIST. Which templates draw a photograph is a fact
+                             about the registry, and a hand-maintained list of
+                             them goes stale the moment one is added -- it
+                             already had, so the Labelled Sections CV drew a
+                             photo frame with no way to fill it. Like every
+                             other gated field it keeps its value while
+                             hidden, so switching away and back does not lose
+                             the upload. -->
+                        <div class="field" data-needs="photo">
                             <label for="f-photo">Profile Photo</label>
                             <input type="file" id="f-photo" accept="image/*">
-                            <p class="upload-hint">JPG, PNG or WebP. Centre-cropped to a 4:5 portrait. It stays on this device: nothing is uploaded, here or at export.</p>
+                            <p class="upload-hint">JPG, PNG or WebP. Choose another at any time to replace it. It stays on this device: nothing is uploaded, here or at export.</p>
                             <p class="form-error" id="f-photo-error" role="alert"></p>
                             <div class="photo-chip" id="photo-preview" hidden>
                                 <img id="photo-thumb" alt="Your profile photo as it will appear on the sheet">
                                 <button type="button" class="entry-remove" id="photo-remove">Remove Photo</button>
+                            </div>
+                            <!-- Framing. The whole photograph is kept and the
+                                 frame is cut from it on every change, so these
+                                 three are lossless against the upload rather
+                                 than a crop of a crop. -->
+                            <div class="photo-frame-controls" id="photo-frame" hidden>
+                                <div class="field">
+                                    <label for="f-photo-zoom">Size</label>
+                                    <input type="range" id="f-photo-zoom" min="100" max="300" step="1" value="100">
+                                </div>
+                                <div class="field">
+                                    <label for="f-photo-x">Move across</label>
+                                    <input type="range" id="f-photo-x" min="-100" max="100" step="1" value="0">
+                                </div>
+                                <div class="field">
+                                    <label for="f-photo-y">Move up and down</label>
+                                    <input type="range" id="f-photo-y" min="-100" max="100" step="1" value="0">
+                                </div>
+                                <p class="upload-hint">At the smallest size the whole width of the frame is filled and there is nothing to move; zoom in and the two sliders have somewhere to go. <button type="button" class="btn btn-secondary btn-small" id="photo-reset">Reset framing</button></p>
                             </div>
                         </div>
                         <!-- data-templates lists the templates that DRAW a

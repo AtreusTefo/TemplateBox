@@ -639,6 +639,10 @@
         const state = collectState();
         TB.storageSet(STORAGE_KEY, state);
         TB.markSaved();
+        /* The notice sits above the form rather than in the sheet, and doing
+           it here means no call site has to remember that emptying the
+           document changes what is on offer. */
+        syncSampleBar(state);
         applyDocType(state);
         renderPreview(state);
     }
@@ -2812,6 +2816,13 @@
            reach it. Clearing every field and leaving the logo standing is the
            defect this line exists to prevent. */
         setLogo("", 0);
+        /* Clear Form empties the document exactly as "Start blank" does, so it
+           earns the same way back -- including after the visitor has started
+           typing again. setLogo calls persistAndRender, which is what puts the
+           notice up. */
+        sampleShown = false;
+        blankedThisSession = true;
+        persistAndRender();
     });
 
     /* ----------------------------------------------------------------------
@@ -2862,46 +2873,172 @@
         { date: "3 Aug", description: "Delivery", qty: "1", price: "35.00" }
     ];
 
-    /* Renders the sample-content notice above the form, with a one-click
-       route to a genuinely empty document. */
-    function showSampleNotice() {
+    /* The notice above the form, which has TWO states rather than one.
+
+       It used to be one-way: the sample loaded, the notice offered "Start
+       blank", and pressing it removed both the content and the notice. There
+       was then no way back -- a visitor who wanted to see the preview working
+       again had to clear this browser's storage.
+
+       The same control, the same wording and the same rules as the resume
+       editor's, deliberately: these are two editors of one product and a
+       visitor should not have to learn the affordance twice. Not SHARED code,
+       because the two hold entirely different documents -- what "empty" means
+       and what "the sample" is are different in each -- and the notice is four
+       small functions over those two answers. */
+    const SAMPLE_COPY = {
+        sample: {
+            text: "This is sample content so you can see how the live preview works. Type over it, or start from an empty document.",
+            button: "Start blank"
+        },
+        blank: {
+            text: "Started from blank. Bring the sample content back at any time if you want to see the live preview working against a filled-in document.",
+            button: "Bring the sample back"
+        }
+    };
+
+    /* Whether the editor is entitled to show the SAMPLE notice. Not derived
+       from the content: it stays up while the visitor types over the sample,
+       which is the point at which it is still useful. */
+    let sampleShown = false;
+
+    /* Whether the document was emptied in THIS session, by "Start blank" or by
+       Clear Form.
+
+       The offer to bring the sample back was shown only while the document was
+       empty, which hides the control at the exact moment somebody goes looking
+       for it: start blank, type one field, decide you wanted the sample after
+       all. It survives typing now, for this session, and asks before
+       overwriting anything -- and it does NOT follow a returning visitor,
+       because somebody opening a finished receipt is not looking for sample
+       content. */
+    let blankedThisSession = false;
+
+    /* renderSampleBar, NOT renderNotice.
+
+       This file already has a renderNotice: it is the layout renderer for the
+       employee warning notice, in RENDERERS. Declaring a second one shadowed
+       it -- the later declaration wins -- so the warning notice's SHEET was
+       being drawn by this function, called with the state object. The symptom
+       was a sample bar with `data-mode="[object Object]"` and an empty button,
+       four hundred lines from the cause, on one document type out of seven.
+
+       Same class of mistake as a tile whose bullets were called `dot` in a
+       stylesheet that already had one. A generic name in a big shared file is
+       a collision waiting to happen. */
+    function renderSampleBar(mode) {
         const pane = form.parentElement;
-        if (!pane || document.getElementById("sample-notice")) {
+        if (!pane) { return; }
+        let notice = document.getElementById("sample-notice");
+
+        if (!mode) {
+            if (notice) { notice.remove(); }
             return;
         }
 
-        const notice = document.createElement("div");
-        notice.className = "sample-notice";
-        notice.id = "sample-notice";
-
-        const text = document.createElement("p");
-        text.textContent = "This is sample content so you can see how the live preview works. Type over it, or start from an empty document.";
-
-        const clear = document.createElement("button");
-        clear.type = "button";
-        clear.className = "btn btn-secondary btn-small";
-        clear.textContent = "Start blank";
-        clear.addEventListener("click", () => {
-            form.querySelectorAll("[data-bind]").forEach((input) => {
-                if (input.tagName === "SELECT") {
-                    return;
-                }
-                input.value = "";
+        if (!notice) {
+            notice = document.createElement("div");
+            notice.className = "sample-notice";
+            notice.id = "sample-notice";
+            notice.appendChild(document.createElement("p"));
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-secondary btn-small";
+            /* Read at click time, not bound per mode: one listener on one
+               button that does whatever the notice currently offers. */
+            button.addEventListener("click", () => {
+                if (notice.getAttribute("data-mode") === "sample") { startBlank(); }
+                else { restoreSample(); }
             });
-            itemList.replaceChildren();
-            addItemRow();
-            notice.remove();
-            /* Same reason as Clear Form above: not a [data-bind] control. */
-            setLogo("", 0);
-            const first = form.querySelector("[data-bind]:not(select)");
-            if (first) {
-                first.focus();
-            }
-        });
+            notice.appendChild(button);
+            pane.insertBefore(notice, pane.firstChild);
+        }
 
-        notice.appendChild(text);
-        notice.appendChild(clear);
-        pane.insertBefore(notice, pane.firstChild);
+        if (notice.getAttribute("data-mode") === mode) { return; }
+        notice.setAttribute("data-mode", mode);
+        notice.querySelector("p").textContent = SAMPLE_COPY[mode].text;
+        notice.querySelector("button").textContent = SAMPLE_COPY[mode].button;
+    }
+
+    /* Empty means the visitor has nothing to lose.
+
+       The document NAME, the accent, the type and the blank-form toggle are
+       not counted: none of them is content, and "Start blank" never cleared
+       them. Line items have to be looked INSIDE -- collectItems keeps the
+       blank row the list opens with -- so counting rows would find one and
+       conclude the document was full. */
+    function documentIsEmpty(state) {
+        const fields = state.fields || {};
+        if (Object.keys(fields).some((key) => fields[key])) { return false; }
+        if (state.logo) { return false; }
+        if ((state.items || []).some((row) =>
+                Object.keys(row).some((key) => row[key]))) { return false; }
+        return [state.methods, state.violations].every((set) =>
+            Object.keys(set || {}).every((key) => !set[key]));
+    }
+
+    /* Called after every change, from persistAndRender, so the offer tracks
+       the document rather than needing each call site to remember it. */
+    function syncSampleBar(state) {
+        if (documentIsEmpty(state)) {
+            sampleShown = false;
+            renderSampleBar("blank");
+            return;
+        }
+        if (sampleShown) {
+            renderSampleBar("sample");
+            return;
+        }
+        renderSampleBar(blankedThisSession ? "blank" : null);
+    }
+
+    function startBlank() {
+        form.querySelectorAll("[data-bind]").forEach((input) => {
+            if (input.tagName === "SELECT") {
+                return;
+            }
+            input.value = "";
+        });
+        /* The checkboxes, which the sweep above does not reach either: they
+           are [data-check], not [data-bind]. Left out, "Start blank" on a
+           warning notice emptied every field and left its violation boxes
+           ticked -- the same defect the logo line below was written for, on
+           a control nobody had thought about. Clear Form has always cleared
+           them; this did not. */
+        form.querySelectorAll("[data-check]").forEach((box) => {
+            box.checked = false;
+        });
+        itemList.replaceChildren();
+        addItemRow();
+        /* Same reason as Clear Form: not a [data-bind] control. */
+        setLogo("", 0);
+        sampleShown = false;
+        blankedThisSession = true;
+        /* Which swaps the notice to its "blank" state by way of syncSampleBar,
+           rather than this function knowing what the notice should say. */
+        persistAndRender();
+        const first = form.querySelector("[data-bind]:not(select)");
+        if (first) {
+            first.focus();
+        }
+    }
+
+    function restoreSample() {
+        /* Only when there is something to lose. An empty document needs no
+           confirmation, and asking on every press would make the way back
+           feel dangerous when it is not. */
+        if (!documentIsEmpty(collectState()) &&
+                !window.confirm("Replace what is in this form with the sample content?")) {
+            return;
+        }
+        applySampleContent();
+        sampleShown = true;
+        blankedThisSession = false;
+        persistAndRender();
+        const first = form.querySelector("[data-bind]:not(select)");
+        if (first) {
+            first.focus();
+        }
     }
 
     /* Sample values that differ by document type, overlaid on SAMPLE_FIELDS.
@@ -3007,8 +3144,15 @@
         } else {
             applyAccent(DEFAULT_ACCENT);
             applySampleContent();
-            showSampleNotice();
         }
+
+        /* The opening notice. A first visit gets the sample and the offer to
+           empty it; a returning visitor whose saved document is empty gets the
+           offer to fill it, which is what somebody who pressed "Start blank"
+           or Clear Form and then reloaded is looking at. Anyone with work in
+           progress gets neither. */
+        sampleShown = !state;
+        syncSampleBar(collectState());
 
         /* Real-time binding: one delegated listener covers every current and
            future input inside the form, including cloned line-item rows. */

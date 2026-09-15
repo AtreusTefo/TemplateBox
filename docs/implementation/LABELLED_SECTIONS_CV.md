@@ -143,6 +143,58 @@ being conservative and it is the right kind of conservative -- a CV whose last
 line sits 6mm from the edge is one many printers clip. 816 puts it at 9mm and
 still fits the content volume the reference itself carries on one page.
 
+## The separator is two strokes, and reading it took two passes
+
+Reported as: the lines that separate the sections do not match the reference,
+and the square around the photograph should stay when one is uploaded.
+
+The first build drew one 1pt rule across the full width. That is what a
+thumbnail says, and it is wrong twice over.
+
+**A row of pixels and a column of pixels disagree, and the column is right.**
+Scanning one row of the reference at each separator finds a single long dark
+run, which reads as one rule. A column through the same band reads
+`144, 0, 148, 218, 71, 222` -- dark, light, dark. Two strokes with a gap, not
+one thick one.
+
+Measured at 736px for a 595pt page:
+
+| | Extent | Weight | Position |
+| --- | --- | --- | --- |
+| Short rule | x 26.8 to 169 | solid, 1pt | 2.4pt above the long one |
+| Long rule | x 26.8 to 568.4 | lighter, 0.7pt | on the band's own line |
+
+The short one stops at **169**, which is exactly where the body column begins.
+It is the gutter's own rule, not a heavier start to the long one.
+
+The reference's long rule is also tilted about 3px across its width, which is
+why a single row scan finds it at four different x ranges at four different y.
+That is a defect of whatever produced the reference and is not reproduced.
+
+### `ruleBefore` became a set
+
+`type.heading.ruleBefore` may now be one spec or an array of them, drawn on the
+same line, each with an optional `dy`. A separator is sometimes one horizontal
+feature made of two strokes rather than two features, and expressing it as two
+entries keeps it one thing in the descriptor -- which is what it is on the page.
+
+`gapAfter` is taken from the last, so a set behaves exactly as the single spec
+it generalises and none of the four other templates changed. The studio's
+validator walks every member rather than the first, so a bad colour role in the
+second stroke is still caught.
+
+## The photograph's keyline was there and could not be seen
+
+It was drawn, after the image, with the right colour -- confirmed in the op
+list and in the rendered SVG. It was 1pt, and the reference draws 2px at 736px
+for a 595pt page, which is **1.6pt**.
+
+The difference matters more than it sounds. The preview scales the sheet to fit
+a pane, so a 1pt keyline lands on half a device pixel with a photograph behind
+half of it. It exists in the export and is invisible where the visitor is
+looking, and a keyline that only exists at full size is one they have no reason
+to trust. It is 1.6pt now, and visible in both.
+
 ## The editor's first-run sample lost two skills to this template
 
 `SAMPLE_STATE` in `js/resume.js` is shared by every template and carries a

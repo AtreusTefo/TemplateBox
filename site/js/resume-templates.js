@@ -1031,11 +1031,34 @@ window.TB_RESUME_TEMPLATES = [
                            color: "accent", uppercase: true,
                            gapBefore: 16,
                            gutter: { width: 127, lineHeight: 18 },
-                           ruleBefore: { color: "accent", width: 1,
-                                         gapAfter: 22,
-                                         /* 26.8 to 568.4, from a column that
-                                            runs 42 to 553. */
-                                         bleedLeft: 15.2, length: 1.0293 } },
+                           /* TWO strokes, not one, and it took two passes to
+                              read them correctly.
+
+                              Above the label gutter the reference shows a
+                              SHORT rule with white below it and a second line
+                              under that; to the right of the gutter there is a
+                              single hairline. Measured at 736px for a 595pt
+                              page: the short one is solid black, one pixel,
+                              and stops at x 169 -- exactly where the body
+                              column begins. The long one is a pixel that never
+                              reaches full black, and it sits 3px below the
+                              short one at the left edge.
+
+                              Read first as ONE heavy rule over the gutter,
+                              which is what a single row of pixels says if you
+                              only sample one. A column through the band says
+                              otherwise: dark, light, dark. Two strokes with a
+                              gap, not one thick one.
+
+                              Both `length` values come from a column that runs
+                              42 to 553: 26.8 to 169 for the short rule, 26.8
+                              to 568.4 for the long one. */
+                           ruleBefore: [
+                               { color: "accent", width: 1, dy: -2.4,
+                                 bleedLeft: 15.2, length: 0.2702 },
+                               { color: "accent", width: 0.7, gapAfter: 22,
+                                 bleedLeft: 15.2, length: 1.0293 }
+                           ] },
 
             body:        { family: "sans", weight: "normal", size: 11,
                            lineHeight: 22, color: "ink" },
@@ -1111,7 +1134,12 @@ window.TB_RESUME_TEMPLATES = [
                name's own x, and the height that 4/5 then forces (137.5) still
                clears the first rule. */
             { column: "main", kind: "photo", top: 48, width: 110,
-              border: { color: "ink", width: 1 } },
+              /* 1.6, because that is what the reference draws: a 2px frame at
+                 736px for a 595pt page. At 1 it is there in the export and
+                 all but invisible in the preview, where the sheet is scaled
+                 to fit a pane -- a keyline that only exists at full size is a
+                 keyline the visitor has no way to trust. */
+              border: { color: "ink", width: 1.6 } },
 
             { column: "main", kind: "section", label: "Objective",
               body: { kind: "paragraph", field: "summary" } },

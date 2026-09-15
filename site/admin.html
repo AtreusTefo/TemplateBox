@@ -67,7 +67,112 @@
                 <h2>Publish</h2>
                 <p class="admin-sync" data-admin-sync></p>
             </div>
-            <!-- One folder grant covers both panels; connecting here or in
+            <!-- Template Studio. Authors the two registries that describe
+             templates rather than draw them. Every write goes through
+             js/admin-studio.js, which proves a patched file before it
+             reaches disk and writes nothing if the proof fails. -->
+        <section class="admin-panel" aria-label="Template studio" data-studio>
+            <div class="admin-panel-head">
+                <h2>Template Studio</h2>
+                <p class="admin-sync" data-studio-pages></p>
+            </div>
+
+            <p class="admin-status" data-studio-fs-state></p>
+            <p class="admin-status" data-studio-drift hidden></p>
+            <div class="admin-actions">
+                <button class="btn" type="button" data-studio-connect hidden>Connect Project Folder</button>
+                <button class="btn" type="button" data-studio-new>New</button>
+                <button class="btn btn-secondary" type="button" data-studio-duplicate>Duplicate</button>
+                <button class="btn" type="button" data-studio-publish disabled>Publish</button>
+                <button class="btn btn-secondary" type="button" data-studio-copy>Copy Entry</button>
+                <button class="btn btn-secondary" type="button" data-studio-card>Copy Card Markup</button>
+                <button class="btn btn-secondary" type="button" data-studio-delete>Remove</button>
+            </div>
+            <p class="admin-status" data-studio-status aria-live="polite"></p>
+
+            <details class="admin-help">
+                <summary>What this can and cannot author</summary>
+                <p><strong>Resume and CV templates are fully authorable.</strong> <span class="mono">js/resume-templates.js</span> is a registry of descriptors rendered by a generic engine, so a template here is data: you can create one from nothing, preview it against the real engine at the real page size, and publish it.</p>
+                <p><strong>Receipts and invoices are authorable as variants, not as layouts.</strong> <span class="mono">DOC_TYPES</span> in <span class="mono">js/docs.js</span> looks like the same kind of registry and is not: its <span class="mono">layout</span> names one of five hand-written renderer functions. You can create a document type that uses one of those five with its own heading and its own field labels, and edit any existing one. A genuinely new layout is a JavaScript function and has to be written as one.</p>
+                <p>That is why the layout control is a fixed list rather than a text field, and why there is no live sheet for a document type: those renderers draw into the documents editor's own page.</p>
+            </details>
+
+            <details class="admin-help">
+                <summary>What Publish changes, and what it will not touch</summary>
+                <p>Publishing a resume template writes up to three files: the entry in <span class="mono">js/resume-templates.js</span>, a catalog card in <span class="mono">index.html</span> with the empty-search count corrected, and a line in the catalog list in <span class="mono">js/admin.js</span>. A document type writes one: the entry in <span class="mono">js/docs.js</span>.</p>
+                <p>Each edit is a byte-level splice of ONE entry, not a rewrite of the file. Every other byte stays identical, so <span class="mono">git diff</span> shows only what you changed.</p>
+                <p>What a splice does not preserve is the prose INSIDE the entry it replaces. These registries are heavily commented, and re-serialising an entry keeps its meaning and loses its comments. The panel measures that and tells you the byte count when you open one; comments on entries you are not touching are untouched.</p>
+                <p>Before anything is written the patched file is proved: it must compile, the registry's own literal is evaluated on its own, the entry count must be what was expected, every entry this edit was not about must come back deep-equal to what it was, and the entry you authored must come back exactly as written. If any check fails, nothing is written and the message says which one.</p>
+                <p>The registry is written before the catalog card, deliberately. A descriptor nothing links to is inert; a card whose <span class="mono">data-doc</span> names a template that does not exist is a broken entry point.</p>
+                <p>Editing a template that already has a catalog card leaves the card alone. The tile inside a card is design somebody drew by hand, and replacing it with a generated default would throw that away.</p>
+                <p>Removing a template removes its registry entry only. Its catalog card, its admin line and the count are left for you, because deleting markup you may have hand-edited is not a thing this panel should do on its own.</p>
+            </details>
+
+            <details class="admin-help">
+                <summary>Without a connected folder</summary>
+                <p>Everything except Publish works. The registries are read from the served site, so the list, the editor, the validation and the preview are all live on any browser.</p>
+                <p><strong>Copy Entry</strong> puts the entry on the clipboard, formatted the way the registry is written, to paste in by hand. <strong>Copy Card Markup</strong> does the same for the catalog card and tells you what the count should become.</p>
+                <p>The File System Access API is Chromium only. On Firefox and Safari this is the whole workflow, not a degraded one.</p>
+            </details>
+
+            <div class="field">
+                <label for="f-studio-kind">Authoring</label>
+                <select id="f-studio-kind" data-studio-kind>
+                    <option value="resume">Resume and CV templates</option>
+                    <option value="doc">Receipt and invoice types</option>
+                </select>
+            </div>
+
+            <div class="studio-grid">
+                <div class="studio-side">
+                    <h3 class="studio-h">In the registry</h3>
+                    <div class="studio-list" data-studio-list></div>
+                </div>
+
+                <div class="studio-main">
+                    <div data-studio-resume>
+                        <div class="field">
+                            <label for="f-studio-editor">Descriptor</label>
+                            <textarea id="f-studio-editor" data-studio-editor spellcheck="false" rows="24"></textarea>
+                            <p class="upload-hint">The descriptor as the registry holds it: JavaScript, not JSON, so unquoted keys and trailing commas are fine. It is evaluated in its own scope and never in this page's. The preview redraws as you type.</p>
+                        </div>
+                        <div class="studio-problems" data-studio-problems hidden></div>
+                        <h3 class="studio-h">Preview</h3>
+                        <div class="studio-preview" data-studio-preview></div>
+                    </div>
+
+                    <div data-studio-doc hidden>
+                        <div class="field">
+                            <label for="f-studio-doc-id">Type id</label>
+                            <input type="text" id="f-studio-doc-id" data-studio-doc-id maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Lower-case letters, digits and hyphens. This is what a catalog card's <span class="mono">data-doc</span> names.</p>
+                        </div>
+                        <div class="field">
+                            <label for="f-studio-doc-layout">Layout</label>
+                            <select id="f-studio-doc-layout" data-studio-doc-layout></select>
+                            <p class="upload-hint">One of the renderers that exist in <span class="mono">js/docs.js</span>. This list is read from that file; it is not a list this panel can extend.</p>
+                        </div>
+                        <div class="field">
+                            <label for="f-studio-doc-heading">Heading</label>
+                            <input type="text" id="f-studio-doc-heading" data-studio-doc-heading maxlength="60" autocomplete="off">
+                            <p class="upload-hint">Printed across the top of the sheet.</p>
+                        </div>
+                        <div class="field">
+                            <label for="f-studio-doc-file">Download name</label>
+                            <input type="text" id="f-studio-doc-file" data-studio-doc-file maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Names the exported file.</p>
+                        </div>
+                        <div class="field">
+                            <label for="f-studio-doc-labels">Labels</label>
+                            <textarea id="f-studio-doc-labels" data-studio-doc-labels rows="10" spellcheck="false"></textarea>
+                            <p class="upload-hint">One per line, as <span class="mono">key: label</span>. These are what the form calls each field. The keys that matter are the ones this layout reads; choosing a layout fills in the keys a type already using it carries.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- One folder grant covers both panels; connecting here or in
                  Catalog Thumbnails connects the other too. Chromium only, so
                  the four export buttons below stay for Firefox and Safari and
                  remain the whole workflow with nothing connected. -->
@@ -428,5 +533,15 @@
     <script src="js/admin-image.js"></script>
     <script src="js/admin-fs.js"></script>
     <script src="js/admin.js"></script>
+    <!-- The Template Studio. jsPDF is what the resume engine measures text
+         with, so the live preview needs it exactly as resume.html does; the
+         engine and the registry follow it, and the panel's own two files
+         come last. All of these are admin-only. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="js/resume-templates.js"></script>
+    <script src="js/resume-engine.js"></script>
+    <script src="js/admin-studio.js"></script>
+    <script src="js/admin-studio-ui.js"></script>
 </body>
 </html>

@@ -379,6 +379,26 @@ window.TBResume = (() => {
         });
     }
 
+    /* `ruleBefore` may be ONE spec or several drawn on the same line.
+
+       A separator is sometimes one horizontal feature made of two strokes
+       rather than two features: the Labelled Sections CV draws a heavy rule
+       across its label gutter and a hairline across the full width, at the
+       same y. Expressing that as two `ruleBefore` entries keeps it one thing
+       in the descriptor, which is what it is on the page.
+
+       `gapAfter` is taken from the LAST, so a set behaves exactly as the
+       single spec it generalises and no existing template changes. */
+    function rulesBefore(t) {
+        if (!t.ruleBefore) { return []; }
+        return Array.isArray(t.ruleBefore) ? t.ruleBefore : [t.ruleBefore];
+    }
+
+    function emitRulesBefore(ctx, page, col, specs, y) {
+        specs.forEach((spec) => emitRule(ctx, page, col, spec, y + (spec.dy || 0)));
+        return specs.length ? (specs[specs.length - 1].gapAfter || 0) : 0;
+    }
+
     /* `edit` is PROVENANCE: which form control produced this run, so the
        preview can be clicked into. It is carried on the display list and read
        only by paintSvg, which writes it onto the <text> node; paintPdf reads
@@ -726,10 +746,8 @@ window.TBResume = (() => {
             ensureRoom(ctx, key, cursor, pageOf,
                        (t.ruleBefore ? 72 : 40) + bodyFirstLine(block.body, T));
 
-            if (t.ruleBefore) {
-                emitRule(ctx, pageOf[key], col, t.ruleBefore, cursor[key]);
-                cursor[key] += t.ruleBefore.gapAfter || 0;
-            }
+            cursor[key] += emitRulesBefore(ctx, pageOf[key], col,
+                rulesBefore(t), cursor[key]);
 
             text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], label, t);
 
@@ -768,14 +786,12 @@ window.TBResume = (() => {
         const lh = t.gutter.lineHeight || t.lineHeight || t.size;
         const lines = ctx.wrap(label, t, t.gutter.width);
 
+        const before = rulesBefore(t);
         ensureRoom(ctx, key, cursor, pageOf,
-                   (t.ruleBefore ? (t.ruleBefore.gapAfter || 0) : 0) +
+                   (before.length ? (before[before.length - 1].gapAfter || 0) : 0) +
                    Math.max(lines.length * lh, bodyFirstLine(block.body, T)));
 
-        if (t.ruleBefore) {
-            emitRule(ctx, pageOf[key], col, t.ruleBefore, cursor[key]);
-            cursor[key] += t.ruleBefore.gapAfter || 0;
-        }
+        cursor[key] += emitRulesBefore(ctx, pageOf[key], col, before, cursor[key]);
 
         const top = cursor[key];
         const page = pageOf[key];

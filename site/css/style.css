@@ -5422,6 +5422,60 @@ legend {
    so cover has nothing to crop, and it only matters if that ever stops being
    true. Reusing .entry-remove for the button rather than a photo-only variant:
    it is the same control doing the same job as the one on every entry row. */
+/* The photograph's framing controls, under the thumbnail chip.
+
+   Grouped in a box of their own rather than left as three loose fields: they
+   are one operation on one thing, and a visitor who has just uploaded a
+   photograph should see at a glance which controls belong to it.
+
+   Hidden entirely when there is no photograph -- a disabled size slider over
+   an empty frame is furniture. */
+.photo-frame-controls {
+    margin-top: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+}
+
+.photo-frame-controls[hidden] {
+    display: none;
+}
+
+.photo-frame-controls .field {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.photo-frame-controls label {
+    margin: 0;
+    font-size: 0.8125rem;
+}
+
+.photo-frame-controls input[type="range"] {
+    width: 100%;
+    /* The form's own input rule gives every control a border, a background
+       and vertical padding, which on a range track paints a box around the
+       thumb. Ranges want the browser's own widget. */
+    padding: 0;
+    border: 0;
+    background: none;
+    accent-color: var(--color-text);
+}
+
+/* Disabled means this axis has no slack at the current size, not that the
+   control is broken, so it dims rather than disappearing. */
+.photo-frame-controls input[type="range"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.photo-frame-controls .upload-hint {
+    margin-bottom: 0;
+}
+
 .photo-chip {
     display: flex;
     align-items: center;
