@@ -1939,30 +1939,30 @@
        own shape and the music block's rhythm is the design. */
     const TUNE = {
         page: { w: 595.28, h: 841.89 },
-        greeting: { baseline: 110, size: 46, maxW: 0.66 },
-        collage: { x: 47.64, y: 163, w: 500, h: 387 },
+        greeting: { baseline: 57, size: 42, maxW: 0.50 },
+        collage: { x: 72.64, y: 98.4, w: 450, h: 341.8 },
         /* The white margin inside each card. The tiles read as loose prints
            laid down, and the border is most of why. */
-        tile: { border: 5 },
+        tile: { border: 3 },
         /* `blur` is the CANVAS value. SVG takes a Gaussian deviation, which is
            about half of it -- the two are not the same number and writing the
            same one into both is how a shadow ends up twice as soft in the
            export as in the preview. tuneSVG() halves it, once, at the filter. */
-        shadow: { dx: 1.6, dy: 2.6, blur: 4.4, alpha: 0.24 },
-        music: { left: 149.64, w: 296 },
+        shadow: { dx: 1.44, dy: 2.35, blur: 3.96, alpha: 0.24 },
+        music: { left: 136.09, w: 323.1 },
         /* 4:1, which is the player's own proportion and kept for the player's
            own reason: the box crops what is dropped into it and a code cropped
            out of proportion does not scan. The reference's visible logo and
            bars are nearer 6:1 because that is the ink without the file's white
            padding, and the padding is what makes the file 4:1. */
-        code: { y: 588, w: 266, h: 66.5 },
-        title: { baseline: 709, size: 24 },
-        titleHeart: { w: 20, inset: 9, lift: 0.35 },
-        bar: { y: 726.5, width: 5, knob: 6.5, dim: 0.74 },
-        time: { baseline: 744, size: 12 },
+        code: { y: 538.4, w: 292.1, h: 73 },
+        title: { baseline: 655.5, size: 38 },
+        titleHeart: { w: 27.5, inset: 10.3, lift: 0.35 },
+        bar: { y: 700, width: 2.75, knob: 4.8, dim: 0.74 },
+        time: { baseline: 727.7, size: 19 },
         /* The transport row. `at` is each glyph's centre as a fraction of the
            music column, and `disc` is the play button's radius. */
-        row: { cy: 775, disc: 20 }
+        row: { cy: 787.3, disc: 20.6 }
     };
 
     /* The fourteen tiles, in the collage box's own coordinates -- x from 0 to
@@ -1977,6 +1977,11 @@
        The tiles ABUT rather than standing apart. Laid with a gap they read as
        fourteen separate pictures on a wall; touching, with the white borders
        meeting, they read as a stack of prints, which is what the reference is.
+       That is also why the border is 3 and not more: two abutting borders are
+       the whole gap between one photograph and the next, and the reference's
+       measures 11 pixels across an 835-pixel collage -- 1.3 per cent, which is
+       6 points here and therefore 3 a side. At 4.5 the collage read as a grid
+       of separated tiles rather than a stack.
        That decision is also why the shadow is drawn the way paintTune() draws
        it -- see the comment there.
 
@@ -1986,20 +1991,20 @@
        flanking tiles end with the centre's lower tile at 329 -- and those
        shared edges are what makes the heart read rather than a pile. */
     const TUNE_TILES = [
-        { x: 61, y: 0, w: 129, h: 127 },
-        { x: 310, y: 0, w: 129, h: 127 },
-        { x: 0, y: 63, w: 61, h: 64 },
-        { x: 439, y: 63, w: 61, h: 64 },
-        { x: 190, y: 70, w: 120, h: 129 },
-        { x: 0, y: 127, w: 61, h: 70 },
-        { x: 61, y: 127, w: 129, h: 138 },
-        { x: 310, y: 127, w: 129, h: 138 },
-        { x: 439, y: 127, w: 61, h: 70 },
-        { x: 190, y: 199, w: 120, h: 130 },
-        { x: 129, y: 269, w: 61, h: 60 },
-        { x: 310, y: 269, w: 61, h: 60 },
-        { x: 190, y: 329, w: 60, h: 58 },
-        { x: 250, y: 329, w: 60, h: 58 }
+        { x: 56, y: 0, w: 112.5, h: 114.2 },
+        { x: 281.5, y: 0, w: 112.5, h: 114.2 },
+        { x: 0, y: 58.1, w: 56, h: 56.1 },
+        { x: 394, y: 58.1, w: 56, h: 56.1 },
+        { x: 168.5, y: 58.5, w: 113, h: 113.1 },
+        { x: 0, y: 114.2, w: 56, h: 57.1 },
+        { x: 56, y: 114.2, w: 112.5, h: 113.4 },
+        { x: 281.5, y: 114.2, w: 112.5, h: 113.4 },
+        { x: 394, y: 114.2, w: 56, h: 57.1 },
+        { x: 168.5, y: 171.6, w: 113, h: 113.8 },
+        { x: 112.5, y: 227.6, w: 56, h: 57.8 },
+        { x: 281.5, y: 227.6, w: 56, h: 57.8 },
+        { x: 168.5, y: 285.4, w: 56.5, h: 56.4 },
+        { x: 225, y: 285.4, w: 56.5, h: 56.4 }
     ];
 
     /* The scattered hearts beside the greeting, anchored to the TEXT rather
@@ -2008,12 +2013,13 @@
        shorter word instead of being run into by it. `open` is the outlined
        pair the reference sets among the filled ones. */
     const TUNE_HEARTS = [
-        { side: -1, dx: 16, dy: -34, w: 15 },
-        { side: -1, dx: 34, dy: -13, w: 10 },
-        { side: -1, dx: 8, dy: -4, w: 8, open: true },
-        { side: 1, dx: 13, dy: -36, w: 12 },
-        { side: 1, dx: 30, dy: -15, w: 16 },
-        { side: 1, dx: 9, dy: -3, w: 9, open: true }
+        { side: -1, dx: 14.9, dy: -35.5, w: 10.5 },
+        { side: -1, dx: 4.2, dy: -37.5, w: 8.4 },
+        { side: -1, dx: -6.1, dy: -30.4, w: 10.5 },
+        { side: -1, dx: 21.2, dy: -23.1, w: 6.3 },
+        { side: 1, dx: -7.3, dy: -25.9, w: 7.1 },
+        { side: 1, dx: -0.2, dy: -17.4, w: 10.5 },
+        { side: 1, dx: 11.8, dy: -12.8, w: 5.9 }
     ];
 
     /* The music block, reused from the "Now Playing" poster.
@@ -2041,11 +2047,11 @@
     const TUNE_HEART_BOX = { x: 470, y: 506, w: 40, h: 37 };
 
     const TUNE_ROW = [
-        { key: "shuffle", at: 0.042, w: 20 },
-        { key: "prev", at: 0.268, w: 16 },
-        { key: "play", at: 0.5, w: 40 },
-        { key: "next", at: 0.732, w: 16 },
-        { key: "repeat", at: 0.958, w: 20 }
+        { key: "shuffle", at: 0.0426, w: 20.6 },
+        { key: "prev", at: 0.266, w: 16.5 },
+        { key: "play", at: 0.5, w: 41.2 },
+        { key: "next", at: 0.728, w: 17.2 },
+        { key: "repeat", at: 0.951, w: 24.1 }
     ];
 
     function tuneParts(key) {
@@ -7496,6 +7502,12 @@
             id = i === CODE_SLOT ? "p-image-code" : "p-image";
         } else if (layout === "anniversary") {
             id = i === CODE_SLOT ? "p-image-code" : "p-image-grid";
+        } else if (layout === "tune") {
+            /* Without this the song poster fell through to "p-image", the
+               single Photo Upload -- which this layout HIDES, and clicking a
+               hidden input does nothing. So a click on the scan code, or on
+               any empty tile, silently did nothing at all. */
+            id = i === CODE_SLOT ? "p-image-code" : "p-image-grid";
         } else if (layout === "browser") {
             id = i === AVATAR_SLOT ? "p-image-avatar" : "p-image-grid";
         } else if (layout === "split" && i === 1) {
@@ -7756,6 +7768,12 @@
             }
             readImage(file, (img) => {
                 assign(img);
+                /* Cleared on SUCCESS as well as on failure. A file input only
+                   fires `change` when the selection changes, so picking the
+                   same file twice -- which is exactly what "replace it with
+                   the one I just fixed" looks like -- did nothing at all the
+                   second time. */
+                input.value = "";
                 render();
             }, (message) => {
                 error.textContent = message;
@@ -8331,6 +8349,20 @@
        storage reason above -- so a commit here would push an entry that
        restores the framing of a photograph undo cannot bring back. An undo that
        visibly does nothing is worse than one that is not offered. */
+    /* The scan code can be taken off again. Uploading a different file
+       replaces it, and this is the other half -- there was no way back to an
+       empty code box short of clearing the browser's storage. Shared by the
+       three layouts that carry a code, because #p-code-fields is. */
+    const codeClear = byId("p-code-clear");
+    if (codeClear) {
+        codeClear.addEventListener("click", () => {
+            fillSlot(CODE_SLOT, null);
+            const input = byId("p-image-code");
+            if (input) { input.value = ""; }
+            render();
+        });
+    }
+
     const cardClear = byId("p-card-clear");
     if (cardClear) {
         cardClear.addEventListener("click", () => {
@@ -8584,6 +8616,8 @@
 
         const clear = byId("p-card-clear");
         if (clear) { clear.disabled = !grid || !photos[slot]; }
+        const codeBtn = byId("p-code-clear");
+        if (codeBtn) { codeBtn.disabled = !photos[CODE_SLOT]; }
     }
 
     /* ----------------------------------------------------------------------

@@ -5161,14 +5161,14 @@ async function songPosterChecks(page) {
            the card beside it and stripes the collage; a filter on an SVG group
            shadows the composite and cannot. So a seam that is darker on the
            canvas than in the export is the two painters having parted. */
-        const seamX = (47.64 + 190) / 595.28;
-        const seamY = (163 + 100) / 841.89;
+        const seamX = (72.64 + 168.5) / 595.28;
+        const seamY = (98.4 + 90) / 841.89;
         out.seam = { canvas: at(a, seamX, seamY), svg: at(b, seamX, seamY) };
         out.seamGap = gap(out.seam.canvas, out.seam.svg);
 
         /* And the shadow itself, just below the lowest tiles, where nothing but
            shadow can be. */
-        const shX = 0.504, shY = 553 / 841.89;
+        const shX = 0.504, shY = 444 / 841.89;
         out.shadow = { canvas: at(a, shX, shY), svg: at(b, shX, shY) };
         out.shadowGap = gap(out.shadow.canvas, out.shadow.svg);
         out.shadowIsDarker = at(a, shX, shY)[0] < at(a, 0.04, shY)[0] - 3;
@@ -5177,8 +5177,8 @@ async function songPosterChecks(page) {
            row's band, grouped into runs: five glyphs, at this layout's own
            centres and not the player's. */
         const runs = (data) => {
-            const y0 = Math.round(H * (762 / 841.89));
-            const y1 = Math.round(H * (789 / 841.89));
+            const y0 = Math.round(H * (770 / 841.89));
+            const y1 = Math.round(H * (805 / 841.89));
             const found = [];
             let cur = null;
             for (let x = 0; x < W; x += 1) {
@@ -5199,8 +5199,8 @@ async function songPosterChecks(page) {
         out.rowSvg = runs(b).map((f) => ({
             centre: toPt((f[0] + f[1]) / 2), w: toPt(f[1] - f[0] + 1) }));
         /* Where the design says they go: 149.64 plus these fractions of 296. */
-        out.rowWant = [0.042, 0.268, 0.5, 0.732, 0.958]
-            .map((k) => Math.round((149.64 + 296 * k) * 10) / 10);
+        out.rowWant = [0.0426, 0.266, 0.5, 0.728, 0.951]
+            .map((k) => Math.round((136.09 + 323.1 * k) * 10) / 10);
         /* And where the PLAYER puts its own row, for contrast: its group spans
            92 to 508 of a 597.45-point page, which is nowhere near these. */
         out.playerRow = [92, 508];
@@ -5269,7 +5269,7 @@ async function songPosterChecks(page) {
     check("16i. the shuffle is drawn whole, all three of its paths",
         r.rowCanvas.length === 5 && r.rowCanvas[0].w >= 16,
         "leftmost glyph is " + (r.rowCanvas[0] || {}).w +
-        " points wide, expected about 20 -- one path alone is nearer 8");
+        " points wide, expected about 21 -- one path alone is nearer 9");
     check("16j. the export puts the row in the same place",
         r.rowSvg.length === 5 && r.rowCanvas.length === 5 &&
         r.rowSvg.every((g, i) => Math.abs(g.centre - r.rowCanvas[i].centre) <= 2),

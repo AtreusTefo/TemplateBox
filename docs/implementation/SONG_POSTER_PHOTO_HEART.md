@@ -27,33 +27,65 @@ their own image into -- `CODE_SLOT`, the existing `#p-code-fields` upload --
 exactly as the music poster and the anniversary poster already do. No logo
 path was added, no code is generated, and no label names a service.
 
-## 2. Derived, not traced
+## 2. Measured, because the perspective was undone
 
-Second reference in this family that is a photograph of a framed print rather
-than an artwork file, so the method is the ninth layout's and is not repeated
-here: `ANNIVERSARY_DEFINITION_POSTER.md` sections 2 and 3 record which kinds of
-number survive a perspective transform.
+**This section replaces what it first said.** The layout was built the ninth
+poster's way -- derive proportions, do not trace a skewed photograph -- and
+then, asked to match the reference more closely, the perspective was removed
+instead and the design was measured properly. The numbers at `TUNE` are
+measurements now, not estimates, and the first build's were wrong in ways no
+amount of careful eyeballing was going to catch.
 
-What was read off this one, all of it a ratio or a symmetry:
+### Undoing the projection
 
-| Thing | Reading |
-| --- | --- |
-| The music block | 49.7 per cent of the print's width, centred -- its centre measured 385 against the print's 384 |
-| The collage | 1.34 times as wide as it is tall |
-| Its symmetry | The far-right column's measured edges are the far-left's reflected about the centre to within a pixel. That is what confirmed the mirror rather than assuming it. |
-| The bands | Greeting 3.0 to 14.1 per cent of the print's height, collage 17.5 to 62.5, music 68.2 to 93.9 |
+The frame's four edges were found by sampling each side at many positions and
+fitting a line through the inliers, which needed two corrections worth keeping:
 
-Everything else is derived, and written out at `TUNE`.
+- **The bottom edge is a bright ridge, not a dark dip.** The light falls from
+  above, so the top inner bevel shades and the bottom one catches. A detector
+  looking for darkness found two sides out of four; one looking for the
+  steepest GRADIENT found all four.
+- **The left rail is behind a hand**, so it is sampled only above it.
 
-### The slack, again
+The four corners then give the camera's focal length and the print's true
+aspect through the standard closed form for a rectangle under perspective, and
+the homography follows. Focal 2456, and the check that it worked is that the
+round mark on the scan code comes back ROUND -- an anisotropic error would have
+made it an ellipse.
 
-The print is 0.845 wide-to-tall against A4's 0.707, so its proportions carried
-across leave about 138 points over. The ninth layout spent its slack on the
-head margin because its composition was two blocks; this one has three, so the
-slack is spread across the four gaps -- head 48, greeting to collage 44,
-collage to music 48, foot 56 -- and no block was stretched. The collage's
-height is fixed by the heart's own shape and the music block's rhythm is the
-design; stretching either would have been inventing.
+### What the rectified print then said, and what it changed
+
+| Thing | First build | Rectified | Effect |
+| --- | --- | --- | --- |
+| Collage, as a fraction of the page width | 84 per cent | about 76 | the collage was too big, then over-corrected to 65 before settling |
+| Music block, as a fraction of the collage | 0.59 | 0.718 | the music block was too narrow for its collage |
+| Gap, collage to music block | 0.10 collage-heights | 0.48 | far too tight; the blocks were crowding each other |
+| Title cap height, against the music column | 5.9 per cent | 8.5 | the track title was too small |
+| The greeting's hearts | invented offsets | seven hearts at measured places | they floated; they hug the words now |
+| The tile border | 4.5 points | 3 | the collage read as a grid rather than a stack |
+| The collage's own rows | close | within half a per cent | the lobes, the cleft and the point all sit where the reference puts them |
+
+The collage's own proportions survived unchanged, which is the one piece of
+luck in this: 1.284 wide-to-tall against the rectified 1.284.
+
+### What still cannot be matched, and why
+
+- **The print is not A4.** Rectified it is about 0.64 wide-to-tall against A4's
+  0.707, so the reference's own vertical rhythm does not fit the page at any
+  size that fills it. Scaled to fit the height exactly, the collage comes out
+  at 65 per cent of the page width and the poster looks lost in its margins;
+  scaled by width it overflows. The gaps are compressed instead -- the greeting
+  to the collage, and the collage to the music block -- because a gap is the
+  most forgiving thing on a page to lose a few points of, where a block is not.
+- **The script face is not the reference's.** Petit Formal Script is what this
+  editor has; the reference's face has taller capitals for the same width. The
+  greeting is matched on WIDTH, which is what sets its weight on the page, and
+  the hearts are then placed in units of the greeting's own cap height so they
+  hug the words whatever face draws them.
+- **The reference's tiles overlap and are slightly rotated**, the way prints
+  laid on a table are. These abut squarely. Overlapping cards cannot be drawn
+  as the single silhouette the shadow depends on (section 5), so this is a
+  deliberate simplification and not an oversight.
 
 ### One number that is not the reference's
 
@@ -64,8 +96,9 @@ not scan. The 6:1 is the ink without the file's white padding, and the padding
 is what makes the file 4:1. Verified by uploading a 640x160 code and confirming
 the round mark and every bar survive.
 
-That one decision cost 22.5 points of height, which is why the music block
-starts at 588 rather than where the reference's ratio alone would put it.
+That decision costs height -- a 4:1 box is taller than the 5:1 the ink needs --
+which is part of why the gaps above and below the music block are tighter here
+than in the reference.
 
 ## 3. The music block is the music poster's
 
@@ -107,15 +140,16 @@ is wrong. Each glyph as a fraction of its own row's width:
 
 | Glyph | Here | In the player |
 | --- | --- | --- |
-| shuffle | 6.8% | 8.2% |
-| previous | 5.5% | 6.7% |
-| play disc | 13.7% | 17.3% |
-| next | 5.5% | 6.7% |
-| repeat | 6.8% | 8.7% |
+| shuffle | 6.4% | 8.2% |
+| previous | 5.1% | 6.7% |
+| play disc | 12.8% | 17.3% |
+| next | 5.3% | 6.7% |
+| repeat | 7.5% | 8.7% |
 
-Consistently about 0.8: this design's glyphs are smaller within their row with
-correspondingly wider gaps. So they are placed one at a time, at `TUNE_ROW`'s
-five fractions of the music column.
+Between 0.75 and 0.86 of the player's, and the repeat glyph is the one that
+does not follow the others -- which is the argument for placing them one at a
+time, at `TUNE_ROW`'s five measured fractions of the music column, rather than
+scaling the group by any single factor.
 
 ### What the reference arranges that the player already had
 
@@ -168,7 +202,15 @@ music poster lost nothing in the split.
 ### The bordered tile, and its shadow
 
 Each tile is a card in the theme's `card` colour with the photograph inset by
-a 5-point border. The tiles ABUT rather than standing apart: laid with a gap
+a 3-point border.
+
+**Three, not four and a half**, and the number is measured rather than chosen:
+the tiles abut, so two borders are the entire gap between one photograph and
+the next, and the reference's gap measures 11 pixels across an 835-pixel
+collage. That is 1.3 per cent, which is 6 points on this collage and therefore
+3 a side. At 4.5 the collage read as a grid of separated tiles where the
+reference reads as a stack of prints -- the same shape of error as getting the
+tile positions right and the gutters wrong. The tiles ABUT rather than standing apart: laid with a gap
 they read as fourteen pictures on a wall, and touching they read as a stack of
 prints, which is what the reference is.
 
@@ -206,10 +248,16 @@ layout spells it out.
 
 ### The hearts hang off the greeting, not off the page
 
-`TUNE_HEARTS` gives each heart a side and an offset measured outwards from the
-greeting's own measured extent, so they travel with a longer or shorter word
-instead of being run into by it. Two of the six are outlined rather than
-filled, which the reference does.
+`TUNE_HEARTS` gives each of the seven a side and an offset measured outwards
+from the greeting's own extent, so they travel with a longer or shorter word
+instead of being run into by it.
+
+Their positions and sizes are the reference's, taken off the rectified print
+and expressed in units of the greeting's cap height rather than in points.
+That matters because the two faces disagree: the reference's script has taller
+capitals for the same width, so hearts placed at its absolute offsets floated
+above this one's words. In cap units they sit where they sit in the reference,
+straddling the capitals' tops, whatever face draws the greeting.
 
 ## 6. A defect this build surfaced in four existing posters
 
@@ -242,6 +290,39 @@ separate change because the greeting cannot render as designed without it.
 Check 16b guards it, and guards it by MEASURING -- the greeting's width in the
 script against its width in the fallback, because `check()` answers about the
 font set and not about what the canvas would draw.
+
+## 6b. Three faults reported after the first build
+
+All three were real, and two of them were the same fault.
+
+**Clicking the scan code on the preview did nothing.** `openUploadFor()` maps a
+slot to the file input that fills it, and it had no branch for this layout, so
+it fell through to `p-image` -- the single Photo Upload, which this layout
+HIDES. Clicking a hidden input does nothing at all. The same fall-through broke
+a click on any empty TILE, which was not reported but was equally broken: both
+now route to `p-image-code` and `p-image-grid` respectively.
+
+That is worth naming as a class. `openUploadFor()` is a per-layout lookup with
+a default, and the default is another layout's control rather than nothing --
+so a layout that forgets to register fails silently instead of loudly.
+
+**There was no way to remove the scan code.** `#p-code-fields` had an upload
+and nothing else, and the only route back to an empty code box was clearing the
+browser's storage. It has a Remove button now, disabled when there is nothing
+to remove, and it serves all three layouts that carry a code because
+`#p-code-fields` is shared.
+
+**Replacing an image with the SAME file silently did nothing.**
+`bindPhotoInput()` cleared `input.value` on failure but not on success, and a
+file input only fires `change` when the selection changes -- so re-picking the
+file you have just corrected and re-exported did nothing the second time. It is
+cleared on success too now. This one was not specific to this layout: it
+affected every upload in the editor.
+
+Driven rather than asserted: a click on the code opens `p-image-code`, a click
+on an empty tile opens `p-image-grid`, the code box goes from the empty tone to
+ink on upload, back to the empty tone on Remove, and to ink again when the same
+file is picked a second time.
 
 ## 7. Slots
 

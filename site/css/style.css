@@ -10269,10 +10269,10 @@ main:has(.mockup-layout) .editor-head {
    and the bar is what the eye reads as a line of writing. */
 .mock-doc.poster.tune .mk-sp-greet {
     position: absolute;
-    left: 31%;
-    width: 38%;
-    top: 11.3%;
-    height: 2.4%;
+    left: 28.7%;
+    width: 42.7%;
+    top: 4.75%;
+    height: 2%;
     background-color: #1A1A1A;
     border-radius: 1px;
 }
@@ -10283,10 +10283,10 @@ main:has(.mockup-layout) .editor-head {
    both places, so the tile cannot drift from the poster. */
 .mock-doc.poster.tune .mk-sp-heart {
     position: absolute;
-    left: 8%;
-    top: 19.36%;
-    width: 84%;
-    height: 45.97%;
+    left: 12.203%;
+    top: 11.688%;
+    width: 75.594%;
+    height: 40.598%;
 }
 
 .mock-doc.poster.tune .mk-sp-heart b {
@@ -10301,10 +10301,10 @@ main:has(.mockup-layout) .editor-head {
    this poster nothing else in the catalog has. */
 .mock-doc.poster.tune .mk-sp-code {
     position: absolute;
-    left: 27.66%;
-    top: 69.84%;
-    width: 44.69%;
-    height: 7.9%;
+    left: 25.46%;
+    top: 63.95%;
+    width: 49.07%;
+    height: 8.67%;
     display: flex;
     align-items: center;
     gap: 6%;
@@ -10340,18 +10340,18 @@ main:has(.mockup-layout) .editor-head {
 
 .mock-doc.poster.tune .mk-sp-title {
     position: absolute;
-    left: 25.14%;
+    left: 22.86%;
     width: 22%;
-    top: 82.2%;
-    height: 2.2%;
+    top: 74.66%;
+    height: 3.2%;
     background-color: #1A1A1A;
 }
 
 .mock-doc.poster.tune .mk-sp-bar {
     position: absolute;
-    left: 25.14%;
-    width: 49.73%;
-    top: 86.3%;
+    left: 22.86%;
+    width: 54.28%;
+    top: 83.15%;
     height: 1.5px;
     background-color: #C8C8C8;
 }
@@ -10370,9 +10370,9 @@ main:has(.mockup-layout) .editor-head {
 
 .mock-doc.poster.tune .mk-sp-row {
     position: absolute;
-    left: 25.14%;
-    width: 49.73%;
-    top: 90.5%;
+    left: 22.86%;
+    width: 54.28%;
+    top: 92.33%;
     height: 4%;
     display: flex;
     align-items: center;
