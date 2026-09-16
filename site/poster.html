@@ -439,15 +439,18 @@
                     <!-- The music player's own fields. Hidden for every
                          other style, the way the card and grid fields are:
                          a control that is visible but inert reads as broken. -->
-                    <div id="p-player-fields" hidden>
+                    <!-- The music block is drawn by TWO layouts: the music
+                         poster and the song poster. These are the controls
+                         both of them have, and they are a block of their own
+                         rather than a widened #p-player-fields -- which is one
+                         line and would put that block's Screen Mode, artist
+                         line and album-specific code position on a poster that
+                         has none of them. Widening #p-grid-fields for the
+                         collages did exactly that once. -->
+                    <div id="p-music-fields" hidden>
                         <div class="field">
                             <label for="p-song">Song Title</label>
                             <input type="text" id="p-song" maxlength="40" autocomplete="off">
-                        </div>
-
-                        <div class="field">
-                            <label for="p-artist">Artist Name</label>
-                            <input type="text" id="p-artist" maxlength="40" autocomplete="off">
                         </div>
 
                         <div class="field field-row">
@@ -462,17 +465,6 @@
                         </div>
                         <p class="upload-hint">The dot on the progress bar follows these two. Anything that is not a time leaves it where the artwork put it.</p>
                         <p class="upload-hint">Every line on this poster can also be typed on the preview itself: double-click it there.</p>
-
-                        <div class="field">
-                            <label for="p-player-theme">Screen Mode</label>
-                            <select id="p-player-theme"></select>
-                        </div>
-
-                        <div class="field">
-                            <label for="p-code-pos">Scan Code Position</label>
-                            <select id="p-code-pos"></select>
-                            <p class="upload-hint">Below the buttons is where the artwork puts it. Above the song title makes room by drawing the album a little smaller, so the picture keeps its shape rather than being squashed.</p>
-                        </div>
 
                         <!-- The same control the mockup editor uses for a
                              product colour, from the same factory in
@@ -536,6 +528,29 @@
 
                             <p class="upload-hint">Only the heart changes. It keeps your colour when you switch between the dark and light screen.</p>
                         </div>
+                    </div>
+
+                    <!-- The music poster's own: an artist line, its colourway,
+                         where its scan code sits, and its two caption lines.
+                         None of these belong to the song poster -- it prints no
+                         artist, has its own colourway, and puts the code where
+                         its design puts it. -->
+                    <div id="p-player-fields" hidden>
+                        <div class="field">
+                            <label for="p-artist">Artist Name</label>
+                            <input type="text" id="p-artist" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field">
+                            <label for="p-player-theme">Screen Mode</label>
+                            <select id="p-player-theme"></select>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-code-pos">Scan Code Position</label>
+                            <select id="p-code-pos"></select>
+                            <p class="upload-hint">Below the buttons is where the artwork puts it. Above the song title makes room by drawing the album a little smaller, so the picture keeps its shape rather than being squashed.</p>
+                        </div>
 
                         <div class="field">
                             <label for="p-caption-head">Caption Heading</label>
@@ -547,6 +562,22 @@
                             <input type="text" id="p-caption-body" maxlength="80" autocomplete="off">
                             <p class="upload-hint">Two lines under the buttons, for a lyric or a note. Leave them empty and nothing is drawn. If the scan code is also below the buttons it tucks in underneath, smaller, so the two never overlap.</p>
                         </div>
+                    </div>
+
+                    <div id="p-tune-fields" hidden>
+                        <div class="field">
+                            <label for="p-tune-greeting">Greeting</label>
+                            <input type="text" id="p-tune-greeting" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">One line in the script face, centred at the top, with the small hearts hanging off either end of it. They travel with the words rather than sitting at fixed places, so a longer greeting does not run into them.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-tune-theme">Screen Mode</label>
+                            <select id="p-tune-theme"></select>
+                            <p class="upload-hint">The same poster on paper or on a dark ground. The photo tiles keep their white borders on both, because a print laid on a dark surface still has one.</p>
+                        </div>
+
+                        <p class="upload-hint">This poster prints the track length only. Time played is still half of what puts the dot on the bar.</p>
                     </div>
 
                     <!-- The anniversary poster: two names, the line beneath the

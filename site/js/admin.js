@@ -1470,6 +1470,7 @@ body + '\n' +
         { id: "tribute", title: "Birthday Tribute, Photo Wall", category: "canvas", doc: "tribute" },
         { id: "love", title: "Love Story Calendar, Photo Cascade", category: "canvas", doc: "love" },
         { id: "couple", title: "Anniversary Definition, Nine Photos", category: "canvas", doc: "couple" },
+        { id: "tune", title: "Song Poster, Photo Heart", category: "canvas", doc: "tune" },
         {
             id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
             folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"

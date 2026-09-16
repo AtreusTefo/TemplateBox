@@ -5029,6 +5029,264 @@ async function definitionPosterChecks(page) {
         r.colourWorstDelta <= 2, "worst channel difference " + r.colourWorstDelta);
 }
 
+async function songPosterChecks(page) {
+    section("16. Song poster: the reused music block, and the split that feeds it");
+
+    /* The tenth layout REUSES the music poster's block rather than drawing its
+       own, and the two ways that goes wrong are both silent.
+
+       PLAYER_ART's paths are in the player's PAGE coordinates, so a group
+       placed with drawArt() lands where the PLAYER put it. This layout places
+       each glyph by its own box instead, and if anyone ever "simplifies" that
+       back the transport row moves to another poster's position -- which still
+       renders, still exports, and is wrong. So the row is measured from the
+       PIXELS rather than trusted from the code, in both painters.
+
+       And the controls behind that block are SHARED, which is what made the
+       split necessary. Widening #p-player-fields would have been one line and
+       would have put a dead Screen Mode on this poster -- the exact defect this
+       file already shipped once by widening #p-grid-fields. What is asserted
+       here is both halves: that this poster can reach what it needs, and that
+       it cannot reach what belongs to the other one.
+
+       The third thing is the script face, which no poster in this editor had
+       ever actually loaded -- see 16b. */
+    await page.navigate(`http://localhost:${PORT}/poster.html`, 1440);
+
+    const r = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+        try {
+        if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+        await wait(900);
+
+        const out = {};
+
+        /* THE SCRIPT FACE. check() alone is not enough -- it answers about the
+           font set, not about what the canvas would draw -- so the greeting is
+           measured in the script and again in the fallback the stack names
+           next. Equal widths mean the webfont is not in use whatever check()
+           says. */
+        out.scriptCheck = document.fonts.check('16px "Petit Formal Script"');
+        const mc = document.createElement('canvas').getContext('2d');
+        mc.font = '40px "Petit Formal Script"';
+        out.scriptWidth = Math.round(mc.measureText('Happy Birthday').width * 100) / 100;
+        mc.font = '40px "Playfair Display"';
+        out.fallbackWidth = Math.round(mc.measureText('Happy Birthday').width * 100) / 100;
+
+        const sel = document.getElementById('p-frame');
+        if (!sel) { return { error: 'no frame select on poster.html' }; }
+        sel.value = 'tune';
+        if (sel.value !== 'tune') { return { error: 'no tune option in the frame select' }; }
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(800);
+
+        /* Reachable means VISIBLE THROUGH ITS ANCESTORS, not merely present:
+           a control inside a hidden block is in the DOM and unusable, which is
+           the whole shape of the defect being guarded against. */
+        const reach = (id) => {
+            let el = document.getElementById(id);
+            if (!el) { return null; }
+            while (el && el !== document.body) {
+                if (el.hidden) { return false; }
+                el = el.parentElement;
+            }
+            return Boolean(el);
+        };
+        const SHARED = ['p-song', 'p-elapsed', 'p-total', 'p-heart-trigger', 'p-image-code'];
+        const PLAYER_ONLY = ['p-artist', 'p-player-theme', 'p-code-pos', 'p-caption-head'];
+        out.tuneShared = SHARED.map(reach);
+        out.tunePlayerOnly = PLAYER_ONLY.map(reach);
+        out.tuneOwn = [reach('p-tune-greeting'), reach('p-tune-theme')];
+        out.tuneBatch = reach('p-image-grid');
+        out.tuneSinglePhoto = reach('p-image');
+
+        /* Flat fills, so a tile's own contents cannot be mistaken for the two
+           painters disagreeing. */
+        const files = [];
+        for (let i = 0; i < 14; i += 1) {
+            const cv = document.createElement('canvas');
+            cv.width = 400; cv.height = 400;
+            const g = cv.getContext('2d');
+            g.fillStyle = 'hsl(' + (i * 26) + ', 70%, 58%)';
+            g.fillRect(0, 0, 400, 400);
+            const b = await new Promise((res) => cv.toBlob(res, 'image/png'));
+            files.push(new File([b], 't' + i + '.png', { type: 'image/png' }));
+        }
+        const grid = document.getElementById('p-image-grid');
+        if (!grid) { return { error: 'no batch photo input' }; }
+        const dt = new DataTransfer();
+        files.forEach((f) => dt.items.add(f));
+        grid.files = dt.files;
+        grid.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(3200);
+
+        let blob = null;
+        const realCreate = URL.createObjectURL;
+        const realClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function () {};
+        URL.createObjectURL = function (b) {
+            if (b && b.type && b.type.indexOf('svg') >= 0) { blob = b; }
+            return realCreate.call(URL, b);
+        };
+        const type = document.getElementById('dl-type');
+        type.value = 'svg';
+        type.dispatchEvent(new Event('change', { bubbles: true }));
+        document.getElementById('dl-go').click();
+        await wait(1400);
+        URL.createObjectURL = realCreate;
+        HTMLAnchorElement.prototype.click = realClick;
+        if (!blob) { return { error: 'the SVG export produced nothing' }; }
+        const svgText = await blob.text();
+
+        const canvas = document.getElementById('poster-canvas');
+        const W = canvas.width, H = canvas.height;
+        const img = new Image();
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+        const sv = document.createElement('canvas');
+        sv.width = W; sv.height = H;
+        sv.getContext('2d').drawImage(img, 0, 0, W, H);
+        const a = canvas.getContext('2d').getImageData(0, 0, W, H).data;
+        const b = sv.getContext('2d').getImageData(0, 0, W, H).data;
+
+        const at = (data, fx, fy) => {
+            const i = (Math.round(H * fy) * W + Math.round(W * fx)) * 4;
+            return [data[i], data[i + 1], data[i + 2]];
+        };
+        const gap = (p, q) => Math.max(Math.abs(p[0] - q[0]), Math.abs(p[1] - q[1]),
+            Math.abs(p[2] - q[2]));
+
+        /* THE SEAM. Two cards abut at collage x 190, and both are card-coloured
+           there. Filling the tiles one at a time drops each card's shadow onto
+           the card beside it and stripes the collage; a filter on an SVG group
+           shadows the composite and cannot. So a seam that is darker on the
+           canvas than in the export is the two painters having parted. */
+        const seamX = (47.64 + 190) / 595.28;
+        const seamY = (163 + 100) / 841.89;
+        out.seam = { canvas: at(a, seamX, seamY), svg: at(b, seamX, seamY) };
+        out.seamGap = gap(out.seam.canvas, out.seam.svg);
+
+        /* And the shadow itself, just below the lowest tiles, where nothing but
+           shadow can be. */
+        const shX = 0.504, shY = 553 / 841.89;
+        out.shadow = { canvas: at(a, shX, shY), svg: at(b, shX, shY) };
+        out.shadowGap = gap(out.shadow.canvas, out.shadow.svg);
+        out.shadowIsDarker = at(a, shX, shY)[0] < at(a, 0.04, shY)[0] - 3;
+
+        /* THE TRANSPORT ROW, from the pixels. Columns carrying ink across the
+           row's band, grouped into runs: five glyphs, at this layout's own
+           centres and not the player's. */
+        const runs = (data) => {
+            const y0 = Math.round(H * (762 / 841.89));
+            const y1 = Math.round(H * (789 / 841.89));
+            const found = [];
+            let cur = null;
+            for (let x = 0; x < W; x += 1) {
+                let hit = 0;
+                for (let y = y0; y <= y1; y += 1) {
+                    const i = (y * W + x) * 4;
+                    if (data[i] < 140) { hit += 1; }
+                }
+                if (hit) { if (!cur) { cur = [x, x]; } else { cur[1] = x; } }
+                else if (cur) { found.push(cur); cur = null; }
+            }
+            if (cur) { found.push(cur); }
+            return found.filter((f) => f[1] - f[0] >= 2);
+        };
+        const toPt = (v) => Math.round(v * 595.28 / W * 10) / 10;
+        out.rowCanvas = runs(a).map((f) => ({
+            centre: toPt((f[0] + f[1]) / 2), w: toPt(f[1] - f[0] + 1) }));
+        out.rowSvg = runs(b).map((f) => ({
+            centre: toPt((f[0] + f[1]) / 2), w: toPt(f[1] - f[0] + 1) }));
+        /* Where the design says they go: 149.64 plus these fractions of 296. */
+        out.rowWant = [0.042, 0.268, 0.5, 0.732, 0.958]
+            .map((k) => Math.round((149.64 + 296 * k) * 10) / 10);
+        /* And where the PLAYER puts its own row, for contrast: its group spans
+           92 to 508 of a 597.45-point page, which is nowhere near these. */
+        out.playerRow = [92, 508];
+
+        /* Back to the music poster: the split must not have cost it anything. */
+        sel.value = 'player';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(700);
+        out.playerShared = SHARED.map(reach);
+        out.playerOwn = PLAYER_ONLY.map(reach);
+        out.playerTuneBlock = reach('p-tune-greeting');
+        return out;
+        } catch (err) {
+            return { error: String((err && err.stack) || err) };
+        }
+    })()`);
+
+    if (!r || r.error) {
+        check("16a. the song poster answered", false,
+            r && r.error ? r.error : "no result");
+        return;
+    }
+
+    check("16a. the song poster renders and exports", Array.isArray(r.rowCanvas),
+        "no transport row came back");
+
+    /* The script face had NEVER loaded before this layout was built: nothing
+       on any page uses it in the DOM, so it was never pending, so
+       document.fonts.ready resolved without it and five layouts drew their
+       script text in the fallback. */
+    check("16b. the script face is loaded, not merely declared",
+        r.scriptCheck && r.scriptWidth !== r.fallbackWidth,
+        "check: " + r.scriptCheck + ", script " + r.scriptWidth +
+        " against fallback " + r.fallbackWidth +
+        " -- a false check means the face was never requested; equal widths " +
+        "mean it arrived and the canvas is drawing in the fallback anyway");
+
+    check("16c. the song poster reaches every shared music control",
+        r.tuneShared.every(Boolean), "reachable: " + JSON.stringify(r.tuneShared));
+    check("16d. and reaches NONE of the music poster's own",
+        r.tunePlayerOnly.every((v) => v === false),
+        "reachable: " + JSON.stringify(r.tunePlayerOnly) +
+        " -- a control that does nothing is the defect the split exists to prevent");
+    check("16e. it shows its own two controls and the batch upload",
+        r.tuneOwn.every(Boolean) && r.tuneBatch === true && r.tuneSinglePhoto === false,
+        "own " + JSON.stringify(r.tuneOwn) + ", batch " + r.tuneBatch +
+        ", single " + r.tuneSinglePhoto);
+    check("16f. the split cost the music poster nothing",
+        r.playerShared.every(Boolean) && r.playerOwn.every(Boolean) &&
+        r.playerTuneBlock === false,
+        "shared " + JSON.stringify(r.playerShared) + ", own " +
+        JSON.stringify(r.playerOwn) + ", song poster's block " + r.playerTuneBlock);
+
+    /* Five glyphs, at this poster's centres. Two failures are caught here: a
+       group placed by drawArt() lands at the player's own coordinates, and a
+       shuffle drawn from one path instead of three comes out narrow. */
+    const centres = (list) => list.map((g) => g.centre);
+    check("16g. the transport row has five glyphs on the canvas",
+        r.rowCanvas.length === 5, "found " + r.rowCanvas.length + ": " +
+        JSON.stringify(r.rowCanvas));
+    check("16h. they land where THIS design puts them, not the player's",
+        r.rowCanvas.length === 5 &&
+        r.rowCanvas.every((g, i) => Math.abs(g.centre - r.rowWant[i]) <= 4),
+        "drawn " + JSON.stringify(centres(r.rowCanvas)) + ", wanted " +
+        JSON.stringify(r.rowWant));
+    check("16i. the shuffle is drawn whole, all three of its paths",
+        r.rowCanvas.length === 5 && r.rowCanvas[0].w >= 16,
+        "leftmost glyph is " + (r.rowCanvas[0] || {}).w +
+        " points wide, expected about 20 -- one path alone is nearer 8");
+    check("16j. the export puts the row in the same place",
+        r.rowSvg.length === 5 && r.rowCanvas.length === 5 &&
+        r.rowSvg.every((g, i) => Math.abs(g.centre - r.rowCanvas[i].centre) <= 2),
+        "export " + JSON.stringify(centres(r.rowSvg)) + " against canvas " +
+        JSON.stringify(centres(r.rowCanvas)));
+
+    check("16k. the tiles cast one shadow and not fourteen",
+        r.seamGap <= 4, "a seam between two abutting cards reads " +
+        JSON.stringify(r.seam.canvas) + " on the canvas and " +
+        JSON.stringify(r.seam.svg) + " in the export");
+    check("16l. the collage is shadowed at all, and the same in both",
+        r.shadowIsDarker && r.shadowGap <= 4,
+        "darker than the page: " + r.shadowIsDarker + ", canvas " +
+        JSON.stringify(r.shadow.canvas) + " against export " +
+        JSON.stringify(r.shadow.svg));
+}
+
 async function ruledInvoiceChecks(page) {
     section("12. Ruled invoice: the sheet, the arithmetic and the logo");
 
@@ -5477,6 +5735,7 @@ async function main() {
                     await anniversaryCalendarChecks(page);
                     await templateStudioChecks(page);
                     await definitionPosterChecks(page);
+                    await songPosterChecks(page);
                 } finally {
                     page.close();
                 }

@@ -206,6 +206,17 @@
         couple: {
             frame: null, trim: null, label: "Anniversary Definition, Nine Photos",
             layout: "couple"
+        },
+        /* The tenth layout, and the first to REUSE another one's block rather
+           than only its helpers: a script greeting over a heart of fourteen
+           bordered photo tiles, over the music poster's own scan code, title,
+           bar and transport row. What is reused is PLAYER_ART and the state
+           behind it; none of PLAYER's geometry is, because that page is a
+           phone screen and this is a band across the lower third. See
+           paintTune(). */
+        tune: {
+            frame: null, trim: null, label: "Song Poster, Photo Heart",
+            layout: "tune"
         }
     };
 
@@ -1895,6 +1906,281 @@
         return size;
     }
 
+
+    /* ----------------------------------------------------------------------
+       The tenth layout: a script greeting over a heart of bordered photo
+       tiles over a music block.
+
+       Derived, not traced. The reference is the second photograph of a framed
+       print this editor has been built from rather than an artwork file, so
+       the method is the ninth layout's and is written out in full at COUPLE
+       and in docs/implementation/ANNIVERSARY_DEFINITION_POSTER.md. The short
+       version: a length read off a print held at an angle is a length times an
+       unknown projective transform, and what survives is ratios, symmetries,
+       and two things sharing an edge.
+
+       What was read off the reference, all of it a ratio:
+
+       - The music block is 49.7 per cent of the print's width and centred on
+         it -- its centre measured 385 against the print's 384.
+       - The collage is 1.34 times as wide as it is tall, and mirror-symmetric:
+         the far-right column's measured edges are the far-left's reflected
+         about the centre to within a pixel, which is what confirmed the
+         symmetry rather than assuming it.
+       - The bands down the page, as fractions of the print's height: greeting
+         3.0 to 14.1 per cent, collage 17.5 to 62.5, and the music block from
+         68.2 to 93.9.
+
+       And the slack, which is the same problem the ninth layout had. The print
+       is 0.845 wide-to-tall against A4's 0.707, so its proportions carried
+       across leave about 138 points over. They are spent on the four gaps --
+       head 48, greeting to collage 44, collage to music 48, foot 56 -- rather
+       than on any block, because the collage's height is fixed by the heart's
+       own shape and the music block's rhythm is the design. */
+    const TUNE = {
+        page: { w: 595.28, h: 841.89 },
+        greeting: { baseline: 110, size: 46, maxW: 0.66 },
+        collage: { x: 47.64, y: 163, w: 500, h: 387 },
+        /* The white margin inside each card. The tiles read as loose prints
+           laid down, and the border is most of why. */
+        tile: { border: 5 },
+        /* `blur` is the CANVAS value. SVG takes a Gaussian deviation, which is
+           about half of it -- the two are not the same number and writing the
+           same one into both is how a shadow ends up twice as soft in the
+           export as in the preview. tuneSVG() halves it, once, at the filter. */
+        shadow: { dx: 1.6, dy: 2.6, blur: 4.4, alpha: 0.24 },
+        music: { left: 149.64, w: 296 },
+        /* 4:1, which is the player's own proportion and kept for the player's
+           own reason: the box crops what is dropped into it and a code cropped
+           out of proportion does not scan. The reference's visible logo and
+           bars are nearer 6:1 because that is the ink without the file's white
+           padding, and the padding is what makes the file 4:1. */
+        code: { y: 588, w: 266, h: 66.5 },
+        title: { baseline: 709, size: 24 },
+        titleHeart: { w: 20, inset: 9, lift: 0.35 },
+        bar: { y: 726.5, width: 5, knob: 6.5, dim: 0.74 },
+        time: { baseline: 744, size: 12 },
+        /* The transport row. `at` is each glyph's centre as a fraction of the
+           music column, and `disc` is the play button's radius. */
+        row: { cy: 775, disc: 20 }
+    };
+
+    /* The fourteen tiles, in the collage box's own coordinates -- x from 0 to
+       500, y from 0 to 379.
+
+       Five columns of two at the top, then one tile either side below the
+       centre, then two at the point: the two large columns are the heart's
+       lobes and stand highest, the centre sits lower between them, and the
+       small outer columns lower still. Exactly mirror-symmetric about x 250,
+       because the reference is and because a heart that is not is a blot.
+
+       The tiles ABUT rather than standing apart. Laid with a gap they read as
+       fourteen separate pictures on a wall; touching, with the white borders
+       meeting, they read as a stack of prints, which is what the reference is.
+       That decision is also why the shadow is drawn the way paintTune() draws
+       it -- see the comment there.
+
+       Listed in (y, x) order, which is the order a batch upload fills them and
+       the order somebody's eye takes them in. Several tiles deliberately SHARE
+       an edge -- the outer and large columns end together at 127, and the
+       flanking tiles end with the centre's lower tile at 329 -- and those
+       shared edges are what makes the heart read rather than a pile. */
+    const TUNE_TILES = [
+        { x: 61, y: 0, w: 129, h: 127 },
+        { x: 310, y: 0, w: 129, h: 127 },
+        { x: 0, y: 63, w: 61, h: 64 },
+        { x: 439, y: 63, w: 61, h: 64 },
+        { x: 190, y: 70, w: 120, h: 129 },
+        { x: 0, y: 127, w: 61, h: 70 },
+        { x: 61, y: 127, w: 129, h: 138 },
+        { x: 310, y: 127, w: 129, h: 138 },
+        { x: 439, y: 127, w: 61, h: 70 },
+        { x: 190, y: 199, w: 120, h: 130 },
+        { x: 129, y: 269, w: 61, h: 60 },
+        { x: 310, y: 269, w: 61, h: 60 },
+        { x: 190, y: 329, w: 60, h: 58 },
+        { x: 250, y: 329, w: 60, h: 58 }
+    ];
+
+    /* The scattered hearts beside the greeting, anchored to the TEXT rather
+       than to the page: `side` is which end of the greeting they hang off and
+       `dx` is measured outwards from that end, so they travel with a longer or
+       shorter word instead of being run into by it. `open` is the outlined
+       pair the reference sets among the filled ones. */
+    const TUNE_HEARTS = [
+        { side: -1, dx: 16, dy: -34, w: 15 },
+        { side: -1, dx: 34, dy: -13, w: 10 },
+        { side: -1, dx: 8, dy: -4, w: 8, open: true },
+        { side: 1, dx: 13, dy: -36, w: 12 },
+        { side: 1, dx: 30, dy: -15, w: 16 },
+        { side: 1, dx: 9, dy: -3, w: 9, open: true }
+    ];
+
+    /* The music block, reused from the "Now Playing" poster.
+
+       PLAYER_ART's viewBox is the player's whole PAGE, so every glyph's path
+       carries its absolute position on that page and drawArt() can only put a
+       group back where the player had it. These are each glyph's OWN box in
+       those coordinates, measured by rasterising the paths at the player's
+       page size and bounding the ink rather than retyped, which is what lets
+       tuneGlyph() put one anywhere at any size.
+
+       Two things here are easy to get wrong. The transport group is SIX paths
+       and FIVE glyphs -- the first three are the shuffle -- so a loop over the
+       parts draws four things. And the row is not the player's row at another
+       size: measured against their own row widths, this design's glyphs come
+       out at about 0.8 of the player's relative size with correspondingly
+       wider gaps, so they are placed one at a time and not as one group. */
+    const TUNE_GLYPHS = {
+        shuffle: { parts: [0, 1, 2], box: { x: 92, y: 655, w: 34, h: 25 } },
+        prev: { parts: [3], box: { x: 183, y: 653, w: 28, h: 30 } },
+        next: { parts: [4], box: { x: 388, y: 654, w: 28, h: 30 } },
+        repeat: { parts: [5], box: { x: 472, y: 654, w: 36, h: 33 } }
+    };
+    const TUNE_PLAY_BOX = { x: 289, y: 651, w: 26, h: 30 };
+    const TUNE_HEART_BOX = { x: 470, y: 506, w: 40, h: 37 };
+
+    const TUNE_ROW = [
+        { key: "shuffle", at: 0.042, w: 20 },
+        { key: "prev", at: 0.268, w: 16 },
+        { key: "play", at: 0.5, w: 40 },
+        { key: "next", at: 0.732, w: 16 },
+        { key: "repeat", at: 0.958, w: 20 }
+    ];
+
+    function tuneParts(key) {
+        return TUNE_GLYPHS[key].parts.map((i) => PLAYER_ART.transport.parts[i]);
+    }
+
+    /* Two colourways, the pair every layout here offers. The cards stay near
+       white on BOTH: a photographic print laid on a dark ground still has a
+       white border, and flipping the card to the page colour would turn the
+       whole collage into a silhouette. What flips is the ground and the ink. */
+    const TUNE_THEMES = {
+        day: {
+            label: "Light",
+            page: "#FFFFFF",
+            ink: "#1A1A1A",
+            card: "#FFFFFF",
+            empty: "#DCDCDC",
+            pink: "#F2A0BC",
+            shadow: 0.24
+        },
+        night: {
+            label: "Dark",
+            page: "#17171A",
+            ink: "#F2F0EC",
+            card: "#F4F2EE",
+            empty: "#3A3A3F",
+            pink: "#F07AA6",
+            shadow: 0.55
+        }
+    };
+
+    const DEFAULT_TUNE_THEME = "day";
+    const DEFAULT_TUNE_GREETING = "Happy Birthday";
+
+    function tuneTheme() {
+        return TUNE_THEMES[state.tuneTheme] || TUNE_THEMES[DEFAULT_TUNE_THEME];
+    }
+
+    /* The heart on the title row is the one colour the visitor sets outright,
+       and it is the SAME setting the music poster uses -- one heart colour for
+       one visitor, not one per layout. Read directly rather than through
+       playerTheme(), which would drag the player's colourway along with it. */
+    function tuneHeartColour() {
+        return cleanColour(state.heartColour) || DEFAULT_HEART_COLOUR;
+    }
+
+    function tuneRects(W, H) {
+        const fx = W / TUNE.page.w;
+        const fy = H / TUNE.page.h;
+        const C = TUNE.collage;
+        return TUNE_TILES.map((t) => ({
+            x: (C.x + t.x) * fx, y: (C.y + t.y) * fy,
+            w: t.w * fx, h: t.h * fy
+        }));
+    }
+
+    /* The photograph's own rectangle: the card less its white border. One
+       function, so the painter, the hit test and the SVG cannot disagree about
+       where a picture goes. */
+    function tuneInner(i, W, H) {
+        const fx = W / TUNE.page.w;
+        const fy = H / TUNE.page.h;
+        const r = tuneRects(W, H)[i];
+        const bx = TUNE.tile.border * fx;
+        const by = TUNE.tile.border * fy;
+        return { x: r.x + bx, y: r.y + by, w: r.w - bx * 2, h: r.h - by * 2 };
+    }
+
+    /* Tile index (0..13) to photo slot. Tile 0 is the left lobe's crown and IS
+       slot 0, so a photograph set on the card, the player or any of the other
+       collages arrives where the eye starts. */
+    function tuneSlot(i) {
+        return i === 0 ? 0 : TUNE_FIRST + i - 1;
+    }
+
+    function tuneMusic(W) {
+        const fx = W / TUNE.page.w;
+        return { left: TUNE.music.left * fx, w: TUNE.music.w * fx,
+            right: (TUNE.music.left + TUNE.music.w) * fx };
+    }
+
+    function tuneCodeRect(W, H) {
+        const fx = W / TUNE.page.w;
+        const fy = H / TUNE.page.h;
+        const m = tuneMusic(W);
+        const w = TUNE.code.w * fx;
+        return { x: m.left + (m.w - w) / 2, y: TUNE.code.y * fy,
+            w: w, h: TUNE.code.h * fy };
+    }
+
+    /* One PLAYER_ART glyph placed into this poster's own row: its source box
+       mapped onto a centre and a width. Scaled uniformly -- the page is
+       1:sqrt(2) like the player's, so one factor is exact rather than an
+       approximation between fx and fy. */
+    function tuneGlyph(c, parts, src, cx, cy, w, colour) {
+        const k = w / src.w;
+        c.save();
+        c.translate(cx - w / 2, cy - (src.h * k) / 2);
+        c.scale(k, k);
+        c.translate(-src.x, -src.y);
+        c.fillStyle = colour;
+        parts.forEach((p) => {
+            /* evenodd where the source says so: the repeat glyph fills as a
+               solid blob under the nonzero default, which is the trap
+               PLAYER_ART already carries a comment about. */
+            if (p.rule) { c.fill(p.path, p.rule); } else { c.fill(p.path); }
+        });
+        c.restore();
+    }
+
+    function tuneGlyphSVG(parts, src, cx, cy, w, colour) {
+        const k = w / src.w;
+        return '<g transform="translate(' + (cx - w / 2) + " " +
+            (cy - (src.h * k) / 2) + ") scale(" + k + ") translate(" +
+            (-src.x) + " " + (-src.y) + ')" fill="' + colour + '">' +
+            parts.map((p) => '<path d="' + p.d + '"' +
+                (p.rule ? ' fill-rule="' + p.rule + '"' : "") + "/>").join("") +
+            "</g>";
+    }
+
+    /* Where each glyph in the transport row lands, in drawn pixels. Shared,
+       because five centres computed twice is five chances for the two painters
+       to disagree about one row. */
+    function tuneRowAt(W, H) {
+        const fx = W / TUNE.page.w;
+        const fy = H / TUNE.page.h;
+        const m = tuneMusic(W);
+        return TUNE_ROW.map((g) => ({
+            key: g.key,
+            cx: m.left + m.w * g.at,
+            cy: TUNE.row.cy * fy,
+            w: g.w * fx
+        }));
+    }
+
     const ANNIV_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
     const ANNIV_MONTHS = ["January", "February", "March", "April", "May",
         "June", "July", "August", "September", "October", "November",
@@ -2075,7 +2361,20 @@
        every one of these comments gives: a slot is a place in ONE design. */
     const COUPLE_EXTRA = 8;
     const COUPLE_FIRST = LOVE_FIRST + LOVE_EXTRA;
-    const SLOT_COUNT = COUPLE_FIRST + COUPLE_EXTRA;
+
+    /* The song poster's fourteen tiles, appended by the same rule a sixth
+       time: tile 0 is slot 0 so a photograph carries across, and the other
+       thirteen take fresh indices rather than sharing the anniversary heart's
+       eighteen. The two are both hearts and they are not the same heart --
+       sharing the slots would mean a visitor who arranged one found fourteen
+       of those photographs redistributed through a different arrangement.
+
+       Its scan code is CODE_SLOT, which the player and the anniversary poster
+       already use, because it is the same kind of thing in the same sense that
+       a photograph in a box is. */
+    const TUNE_EXTRA = 13;
+    const TUNE_FIRST = COUPLE_FIRST + COUPLE_EXTRA;
+    const SLOT_COUNT = TUNE_FIRST + TUNE_EXTRA;
 
     /* Collage box index (0..17) to photo slot. */
     function annivSlot(i) {
@@ -2538,6 +2837,8 @@
            through coupleGrey() rather than testing the key: `undefined` from
            a record saved before this existed has to mean ON. */
         coupleGrey: true,
+        tuneTheme: DEFAULT_TUNE_THEME,
+        tuneGreeting: DEFAULT_TUNE_GREETING,
         coupleWord: DEFAULT_COUPLE_WORD,
         coupleBracket: DEFAULT_COUPLE_BRACKET,
         coupleDef: DEFAULT_COUPLE_DEF,
@@ -2593,6 +2894,7 @@
             tribTheme: state.tribTheme,
             loveTheme: state.loveTheme,
             loveMessage: state.loveMessage, loveTitle: state.loveTitle,
+            tuneTheme: state.tuneTheme, tuneGreeting: state.tuneGreeting,
             coupleTheme: state.coupleTheme, coupleGrey: state.coupleGrey,
             coupleWord: state.coupleWord, coupleBracket: state.coupleBracket,
             coupleDef: state.coupleDef, coupleClosing: state.coupleClosing,
@@ -2635,6 +2937,9 @@
             ? parsed.loveTheme : DEFAULT_LOVE_THEME;
         state.loveMessage = cleanBlock(parsed.loveMessage);
         state.loveTitle = cleanLine(parsed.loveTitle);
+        state.tuneTheme = TUNE_THEMES[parsed.tuneTheme]
+            ? parsed.tuneTheme : DEFAULT_TUNE_THEME;
+        state.tuneGreeting = cleanLine(parsed.tuneGreeting);
         state.coupleTheme = COUPLE_THEMES[parsed.coupleTheme]
             ? parsed.coupleTheme : DEFAULT_COUPLE_THEME;
         state.coupleGrey = parsed.coupleGrey !== false;
@@ -2754,6 +3059,8 @@
             loveTheme: state.loveTheme,
             loveMessage: TB.sanitize(state.loveMessage),
             loveTitle: TB.sanitize(state.loveTitle),
+            tuneTheme: state.tuneTheme,
+            tuneGreeting: TB.sanitize(state.tuneGreeting),
             coupleTheme: state.coupleTheme,
             coupleGrey: state.coupleGrey,
             coupleWord: TB.sanitize(state.coupleWord),
@@ -2840,6 +3147,11 @@
             ? DEFAULT_LOVE_MESSAGE : cleanBlock(TB.desanitize(String(saved.loveMessage)));
         state.loveTitle = saved.loveTitle === undefined
             ? DEFAULT_LOVE_TITLE : cleanLine(TB.desanitize(String(saved.loveTitle)));
+        state.tuneTheme = TUNE_THEMES[saved.tuneTheme]
+            ? saved.tuneTheme : DEFAULT_TUNE_THEME;
+        state.tuneGreeting = saved.tuneGreeting === undefined
+            ? DEFAULT_TUNE_GREETING
+            : cleanLine(TB.desanitize(String(saved.tuneGreeting)));
         state.coupleTheme = COUPLE_THEMES[saved.coupleTheme]
             ? saved.coupleTheme : DEFAULT_COUPLE_THEME;
         state.coupleGrey = saved.coupleGrey !== false;
@@ -5784,6 +6096,322 @@
         return out;
     }
 
+    function paintTune(c, W, H, options) {
+        const fx = W / TUNE.page.w;
+        const fy = H / TUNE.page.h;
+        const ink = tuneTheme();
+        const m = tuneMusic(W);
+
+        if (!options.transparent) {
+            c.fillStyle = ink.page;
+            c.fillRect(0, 0, W, H);
+        }
+
+        c.textBaseline = "alphabetic";
+
+        /* ---- the greeting, and the hearts that hang off its two ends ---- */
+        const gSize = hbdFit(c, state.tuneGreeting, TUNE.greeting.size * fy,
+            TUNE.greeting.maxW * W);
+        const gW = c.measureText(state.tuneGreeting).width;
+        const gx = W / 2 - gW / 2;
+        const gy = TUNE.greeting.baseline * fy;
+        c.fillStyle = ink.ink;
+        c.textAlign = "left";
+        c.fillText(state.tuneGreeting, gx, gy);
+        noteText(c, "tuneGreeting", { x: gx, y: gy - gSize,
+            w: Math.max(gW, gSize * 3), h: gSize * 1.4,
+            size: gSize, font: c.font, align: "left" });
+
+        TUNE_HEARTS.forEach((h) => {
+            const hw = h.w * fx;
+            const x = h.side < 0 ? gx - h.dx * fx - hw : gx + gW + h.dx * fx;
+            tuneDrawHeart(c, x, gy + h.dy * fy, hw, ink.pink, h.open, fx);
+        });
+
+        /* ---- the collage ----
+           All fourteen cards as ONE path and one fill, then the photographs in
+           a second pass with the shadow off.
+
+           One path rather than fourteen fills, and this is the whole reason:
+           the tiles ABUT, so filling them one at a time drops each card's
+           shadow onto the card beside it and stripes the collage. The SVG side
+           cannot do that -- a filter on a group shadows the group's composite,
+           so only the outer silhouette casts -- and the two painters would
+           have disagreed in a way that is obvious side by side and invisible
+           in either one alone. A single non-zero fill of all fourteen
+           rectangles IS that silhouette, so the canvas now does what the
+           filter does.
+
+           The cards also come before the photographs rather than tile by tile,
+           because a card drawn under its own picture would cast a shadow
+           inside its own border. */
+        const rects = tuneRects(W, H);
+        c.save();
+        c.shadowColor = "rgba(0, 0, 0, " + ink.shadow + ")";
+        c.shadowBlur = TUNE.shadow.blur * fx;
+        c.shadowOffsetX = TUNE.shadow.dx * fx;
+        c.shadowOffsetY = TUNE.shadow.dy * fy;
+        c.fillStyle = ink.card;
+        c.beginPath();
+        rects.forEach((r) => { c.rect(r.x, r.y, r.w, r.h); });
+        c.fill();
+        c.restore();
+
+        rects.forEach((r, i) => {
+            const box = tuneInner(i, W, H);
+            const slot = tuneSlot(i);
+            if (photos[slot]) {
+                c.save();
+                c.beginPath();
+                c.rect(box.x, box.y, box.w, box.h);
+                c.clip();
+                drawCoverImage(c, photos[slot], box.x, box.y, box.w, box.h,
+                    state.views[slot]);
+                c.restore();
+            } else {
+                c.fillStyle = ink.empty;
+                c.fillRect(box.x, box.y, box.w, box.h);
+            }
+        });
+
+        /* ---- the music block ----
+           Everything below is the "Now Playing" poster's, reused: its glyph
+           paths, its song and time fields, its heart colour and its scan-code
+           slot. None of its GEOMETRY is, because that page is a phone screen
+           with a 416-point album at the top and this one is a band across the
+           lower third at half the width. */
+        const code = tuneCodeRect(W, H);
+        if (photos[CODE_SLOT]) {
+            c.save();
+            c.beginPath();
+            c.rect(code.x, code.y, code.w, code.h);
+            c.clip();
+            drawCoverImage(c, photos[CODE_SLOT], code.x, code.y, code.w, code.h,
+                state.views[CODE_SLOT]);
+            c.restore();
+        } else {
+            c.fillStyle = ink.empty;
+            c.fillRect(code.x, code.y, code.w, code.h);
+        }
+
+        /* The title, and the heart at the column's other end. The title is
+           fitted against the width LEFT OVER after the heart, so a long track
+           is set smaller rather than running under it. */
+        const heartW = TUNE.titleHeart.w * fx;
+        const heartX = m.right - TUNE.titleHeart.inset * fx - heartW;
+        const tSize = fitLine(c, state.song, TUNE.title.size * fy,
+            heartX - m.left - 12 * fx, "700");
+        const ty = TUNE.title.baseline * fy;
+        c.font = "700 " + tSize + "px " + fontStack(SCREEN_FONT);
+        c.textAlign = "left";
+        c.fillStyle = ink.ink;
+        c.fillText(state.song, m.left, ty);
+        noteText(c, "song", { x: m.left, y: ty - tSize,
+            w: heartX - m.left - 12 * fx, h: tSize * 1.3,
+            size: tSize, font: c.font, align: "left" });
+        tuneGlyph(c, [PLAYER_ART.heart.parts[0]], TUNE_HEART_BOX,
+            heartX + heartW / 2, ty - TUNE.titleHeart.lift * tSize,
+            heartW, tuneHeartColour());
+
+        /* The bar. The played part in the ink and the rest dimmed, which is
+           the player's own `dim` rather than a second opinion about it. */
+        const played = playedFraction();
+        const by = TUNE.bar.y * fy;
+        const bw = TUNE.bar.width * fy;
+        c.save();
+        c.lineCap = "round";
+        c.lineWidth = bw;
+        c.globalAlpha = TUNE.bar.dim;
+        c.strokeStyle = ink.ink;
+        c.beginPath();
+        c.moveTo(m.left, by);
+        c.lineTo(m.right, by);
+        c.stroke();
+        c.globalAlpha = 1;
+        c.beginPath();
+        c.moveTo(m.left, by);
+        c.lineTo(m.left + m.w * played, by);
+        c.stroke();
+        c.restore();
+        c.fillStyle = ink.ink;
+        c.beginPath();
+        c.arc(m.left + m.w * played, by, TUNE.bar.knob * fx, 0, Math.PI * 2);
+        c.fill();
+
+        /* One time, at the right, which is what the reference prints. The
+           elapsed field is not dead for being unprinted -- it is half of what
+           puts the knob where it is, and the control says so. */
+        const timeSize = TUNE.time.size * fy;
+        c.font = "500 " + timeSize + "px " + fontStack(SCREEN_FONT);
+        c.textAlign = "right";
+        c.fillText(state.total, m.right, TUNE.time.baseline * fy);
+        c.textAlign = "left";
+
+        /* The transport row, glyph by glyph rather than as one group. */
+        tuneRowAt(W, H).forEach((g) => {
+            if (g.key === "play") {
+                const r = g.w / 2;
+                c.fillStyle = ink.ink;
+                c.beginPath();
+                c.arc(g.cx, g.cy, r, 0, Math.PI * 2);
+                c.fill();
+                /* The triangle is a HOLE in the disc, so it takes the page
+                   colour and not the ink -- the same thing PLAYER_ART.playIcon
+                   says about itself. */
+                tuneGlyph(c, PLAYER_ART.playIcon.parts, TUNE_PLAY_BOX,
+                    g.cx, g.cy, r * (TUNE_PLAY_BOX.w / PLAYER.play.r), ink.page);
+                return;
+            }
+            tuneGlyph(c, tuneParts(g.key), TUNE_GLYPHS[g.key].box,
+                g.cx, g.cy, g.w, ink.ink);
+        });
+    }
+
+    /* A heart at a size, filled or outlined. loveHeart() already draws the
+       filled case in both painters; this is a two-line wrapper so the greeting
+       does not have to know that an outlined one needs its stroke width
+       divided by its own scale. */
+    function tuneDrawHeart(c, x, y, w, colour, open, fx) {
+        loveHeart(c, x, y, w, colour, !!open, open ? 1.1 * fx : 0);
+    }
+
+    /* SVG twin of paintTune(). Reads tuneRects(), tuneInner(), tuneCodeRect(),
+       tuneRowAt() and tuneGlyphSVG() -- the same five the canvas reads -- so
+       neither painter derives a position of its own. */
+    function tuneSVG(W, H, esc) {
+        const fx = W / TUNE.page.w;
+        const fy = H / TUNE.page.h;
+        const ink = tuneTheme();
+        const m = tuneMusic(W);
+        const measure = document.createElement("canvas").getContext("2d");
+        let out = '<rect width="' + W + '" height="' + H + '" fill="' + ink.page + '"/>';
+
+        /* The shadow. stdDeviation is HALF the canvas blur: canvas spreads a
+           shadow over roughly twice the Gaussian deviation, so the same number
+           in both puts a shadow in the export at twice the softness of the one
+           in the preview. color-interpolation-filters is spelled out for the
+           reason the ninth layout's greyscale spells it out -- an SVG filter
+           works in linearRGB unless told otherwise. */
+        const S = TUNE.shadow;
+        out += '<defs><filter id="tb-tune-shadow" color-interpolation-filters="sRGB">' +
+            '<feDropShadow dx="' + (S.dx * fx) + '" dy="' + (S.dy * fy) +
+            '" stdDeviation="' + (S.blur * fx / 2) + '" flood-color="#000000" ' +
+            'flood-opacity="' + ink.shadow + '"/></filter></defs>';
+
+        measure.font = hbdFont(TUNE.greeting.size * fy);
+        const gSize = hbdFit(measure, state.tuneGreeting, TUNE.greeting.size * fy,
+            TUNE.greeting.maxW * W);
+        const gW = measure.measureText(state.tuneGreeting).width;
+        const gx = W / 2 - gW / 2;
+        const gy = TUNE.greeting.baseline * fy;
+        out += '<text x="' + gx + '" y="' + gy + '" font-family="' +
+            SCRIPT_SVG_FACE + '" font-weight="400" font-size="' + hbdPx(gSize) +
+            '" fill="' + ink.ink + '">' + esc(state.tuneGreeting) + "</text>";
+        TUNE_HEARTS.forEach((h) => {
+            const hw = h.w * fx;
+            const x = h.side < 0 ? gx - h.dx * fx - hw : gx + gW + h.dx * fx;
+            out += loveHeartSVG(x, gy + h.dy * fy, hw, ink.pink, !!h.open,
+                h.open ? 1.1 * fx : 0);
+        });
+
+        /* ONE path of fourteen rectangles, not fourteen rects in a group.
+
+           A group of abutting rects is not the same shape as their union: each
+           rect antialiases at the shared edge, so the composite's alpha dips
+           along every seam and the drop shadow draws a faint line down each
+           one. Measured, the seam came back 245 in the export against a clean
+           255 on the canvas -- ten levels, invisible alone and obvious against
+           the preview. A single non-zero path has no internal edges to
+           antialias and is exactly what the canvas fills. */
+        const rects = tuneRects(W, H);
+        const silhouette = rects.map((r) => "M" + r.x + " " + r.y + "h" + r.w +
+            "v" + r.h + "h" + (-r.w) + "Z").join("");
+        out += '<path d="' + silhouette + '" fill="' + ink.card +
+            '" filter="url(#tb-tune-shadow)"/>';
+
+        let clips = "";
+        rects.forEach((r, i) => {
+            if (!photos[tuneSlot(i)]) { return; }
+            const box = tuneInner(i, W, H);
+            clips += '<clipPath id="tb-tune-' + i + '"><rect x="' + box.x + '" y="' +
+                box.y + '" width="' + box.w + '" height="' + box.h + '"/></clipPath>';
+        });
+        const code = tuneCodeRect(W, H);
+        if (photos[CODE_SLOT]) {
+            clips += '<clipPath id="tb-tune-code"><rect x="' + code.x + '" y="' +
+                code.y + '" width="' + code.w + '" height="' + code.h +
+                '"/></clipPath>';
+        }
+        if (clips) { out += "<defs>" + clips + "</defs>"; }
+
+        rects.forEach((r, i) => {
+            const box = tuneInner(i, W, H);
+            const slot = tuneSlot(i);
+            if (photos[slot]) {
+                out += '<g clip-path="url(#tb-tune-' + i + ')">' +
+                    photoImageSVG(photos[slot], state.views[slot], box.x, box.y,
+                        box.w, box.h) + "</g>";
+            } else {
+                out += '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.w +
+                    '" height="' + box.h + '" fill="' + ink.empty + '"/>';
+            }
+        });
+
+        if (photos[CODE_SLOT]) {
+            out += '<g clip-path="url(#tb-tune-code)">' +
+                photoImageSVG(photos[CODE_SLOT], state.views[CODE_SLOT], code.x,
+                    code.y, code.w, code.h) + "</g>";
+        } else {
+            out += '<rect x="' + code.x + '" y="' + code.y + '" width="' + code.w +
+                '" height="' + code.h + '" fill="' + ink.empty + '"/>';
+        }
+
+        const heartW = TUNE.titleHeart.w * fx;
+        const heartX = m.right - TUNE.titleHeart.inset * fx - heartW;
+        const tSize = fitLine(measure, state.song, TUNE.title.size * fy,
+            heartX - m.left - 12 * fx, "700");
+        const ty = TUNE.title.baseline * fy;
+        out += '<text x="' + m.left + '" y="' + ty + '" font-family="' +
+            esc(fontStack(SCREEN_FONT).replace(/"/g, "'")) +
+            '" font-weight="700" font-size="' + tSize + '" fill="' + ink.ink +
+            '">' + esc(state.song) + "</text>";
+        out += tuneGlyphSVG([PLAYER_ART.heart.parts[0]], TUNE_HEART_BOX,
+            heartX + heartW / 2, ty - TUNE.titleHeart.lift * tSize,
+            heartW, tuneHeartColour());
+
+        const played = playedFraction();
+        const by = TUNE.bar.y * fy;
+        const bw = TUNE.bar.width * fy;
+        const line = (x1, x2, alpha) => '<line x1="' + x1 + '" y1="' + by + '" x2="' +
+            x2 + '" y2="' + by + '" stroke="' + ink.ink + '" stroke-width="' + bw +
+            '" stroke-linecap="round"' +
+            (alpha < 1 ? ' stroke-opacity="' + alpha + '"' : "") + "/>";
+        out += line(m.left, m.right, TUNE.bar.dim);
+        out += line(m.left, m.left + m.w * played, 1);
+        out += '<circle cx="' + (m.left + m.w * played) + '" cy="' + by + '" r="' +
+            (TUNE.bar.knob * fx) + '" fill="' + ink.ink + '"/>';
+
+        out += '<text x="' + m.right + '" y="' + (TUNE.time.baseline * fy) +
+            '" text-anchor="end" font-family="' +
+            esc(fontStack(SCREEN_FONT).replace(/"/g, "'")) +
+            '" font-weight="500" font-size="' + (TUNE.time.size * fy) +
+            '" fill="' + ink.ink + '">' + esc(state.total) + "</text>";
+
+        tuneRowAt(W, H).forEach((g) => {
+            if (g.key === "play") {
+                const r = g.w / 2;
+                out += '<circle cx="' + g.cx + '" cy="' + g.cy + '" r="' + r +
+                    '" fill="' + ink.ink + '"/>';
+                out += tuneGlyphSVG(PLAYER_ART.playIcon.parts, TUNE_PLAY_BOX,
+                    g.cx, g.cy, r * (TUNE_PLAY_BOX.w / PLAYER.play.r), ink.page);
+                return;
+            }
+            out += tuneGlyphSVG(tuneParts(g.key), TUNE_GLYPHS[g.key].box,
+                g.cx, g.cy, g.w, ink.ink);
+        });
+        return out;
+    }
+
     function noteText(c, key, box) {
         if (recordingRegions) {
             /* fillStyle is still the colour the words were just drawn in, so
@@ -5823,6 +6451,8 @@
             paintLove(c, W, H, options);
         } else if (frame.layout === "couple") {
             paintCouple(c, W, H, options);
+        } else if (frame.layout === "tune") {
+            paintTune(c, W, H, options);
         } else {
             const FRAME_W = frame.frame ? 60 * scale : 0;
             const MATTE_W = frame.frame ? 50 * scale : 0;
@@ -6225,6 +6855,7 @@
         title: { field: "p-title", clean: cleanLine },
         loveMessage: { field: "p-love-message", clean: cleanBlock },
         loveTitle: { field: "p-love-title", clean: cleanLine },
+        tuneGreeting: { field: "p-tune-greeting", clean: cleanLine },
         coupleWord: { field: "p-couple-word", clean: cleanLine },
         coupleBracket: { field: "p-couple-bracket", clean: cleanLine },
         coupleDef: { field: "p-couple-def", clean: cleanBlock },
@@ -6685,6 +7316,24 @@
             if (dx * dx + dy * dy <= 1) { return 0; }
             return -1;
         }
+        /* The code first, because it is the one box here that is not a tile
+           and the tiles cannot reach it. */
+        if (layout === "tune") {
+            const px = pt.x * W;
+            const py = pt.y * H;
+            const inside = (r) => px >= r.x && px <= r.x + r.w &&
+                py >= r.y && py <= r.y + r.h;
+            if (inside(tuneCodeRect(W, H))) { return CODE_SLOT; }
+            /* Forwards: the fourteen cards do not overlap, so there is exactly
+               one answer and no last-painted rule to respect. The CARD is what
+               is hit rather than the photograph inside it, so a click on a
+               tile's white border still finds its tile. */
+            const cards = tuneRects(W, H);
+            for (let i = 0; i < cards.length; i += 1) {
+                if (inside(cards[i])) { return tuneSlot(i); }
+            }
+            return -1;
+        }
         /* Forwards, because the nine cells do not overlap: there is exactly
            one answer and no last-painted rule to respect. */
         if (layout === "couple") {
@@ -6787,6 +7436,17 @@
                 if (coupleSlot(k) === i) { return cells[k]; }
             }
             return cells[0];
+        }
+        if (layout === "tune") {
+            if (i === CODE_SLOT) { return tuneCodeRect(W, H); }
+            /* The INNER rectangle: that is where the photograph actually goes,
+               so it is what a drag measures against and what the selection ring
+               marks. The card is what a CLICK finds; the two differ by the
+               border and both answers are wanted. */
+            for (let k = 0; k < TUNE_TILES.length; k += 1) {
+                if (tuneSlot(k) === i) { return tuneInner(k, W, H); }
+            }
+            return tuneInner(0, W, H);
         }
         if (layout === "anniversary") {
             if (i === CODE_SLOT) { return annivCodeRect(W, H); }
@@ -7150,7 +7810,7 @@
         const upLayout = layoutOf(state.frame);
         if (upLayout === "anniversary" || upLayout === "birthday" ||
                 upLayout === "tribute" || upLayout === "love" ||
-                upLayout === "couple") {
+                upLayout === "couple" || upLayout === "tune") {
             const slots = slotsFor(upLayout)
                 .filter((i) => i !== CODE_SLOT);
             const from = Math.max(0, slots.indexOf(primarySlot()));
@@ -7353,6 +8013,26 @@
         });
     });
 
+    const tuneThemeSelect = byId("p-tune-theme");
+    if (tuneThemeSelect) {
+        tuneThemeSelect.addEventListener("change", () => {
+            beginChange();
+            state.tuneTheme = TUNE_THEMES[tuneThemeSelect.value]
+                ? tuneThemeSelect.value : DEFAULT_TUNE_THEME;
+            commit();
+            render();
+        });
+    }
+
+    const tuneGreetingInput = byId("p-tune-greeting");
+    if (tuneGreetingInput) {
+        tuneGreetingInput.addEventListener("input", () => {
+            beginChange();
+            state.tuneGreeting = cleanLine(tuneGreetingInput.value);
+            commit("tune-greeting");
+        });
+    }
+
     const coupleThemeSelect = byId("p-couple-theme");
     if (coupleThemeSelect) {
         coupleThemeSelect.addEventListener("change", () => {
@@ -7549,6 +8229,12 @@
             }
             return out;
         }
+        if (layout === "tune") {
+            const out = [];
+            for (let i = 0; i < TUNE_TILES.length; i += 1) { out.push(tuneSlot(i)); }
+            out.push(CODE_SLOT);
+            return out;
+        }
         if (layout === "split") { return [0, 1]; }
         return [0];
     }
@@ -7580,6 +8266,9 @@
         }
         if (lay === "couple") {
             return i === 0 ? "Photo 1" : "Photo " + (i - COUPLE_FIRST + 2);
+        }
+        if (lay === "tune") {
+            return i === 0 ? "Photo 1" : "Photo " + (i - TUNE_FIRST + 2);
         }
         return "Card " + (i + 1);
     }
@@ -8098,8 +8787,27 @@
         if (photoFields) { photoFields.hidden = grid; }
 
         const player = style.layout === "player";
+        const tune = style.layout === "tune";
+        /* The music block is drawn by TWO layouts now, so the controls behind
+           it are split rather than widened.
+
+           #p-music-fields holds what both draw -- the song, the two times, the
+           heart colour and where the scan code sits. #p-player-fields keeps
+           what only the player has: the artist line, which this poster does
+           not print, and Screen Mode, which is the PLAYER'S colourway.
+
+           Widening #p-player-fields instead would have been one line and would
+           have put a dead Screen Mode on this poster, which is the exact
+           defect this file already shipped once by widening #p-grid-fields for
+           the collages -- a visitor reached the first Screen Mode they saw and
+           it did nothing. */
+        const musicFields = byId("p-music-fields");
+        if (musicFields) { musicFields.hidden = !player && !tune; }
         const playerFields = byId("p-player-fields");
         if (playerFields) { playerFields.hidden = !player; }
+
+        const tuneFields = byId("p-tune-fields");
+        if (tuneFields) { tuneFields.hidden = !tune; }
 
         const anniv = style.layout === "anniversary";
         const annivFields = byId("p-anniv-fields");
@@ -8142,7 +8850,7 @@
         /* The scan code is shared: the music poster and this one both carry
            one, so its control belongs to neither block. */
         const codeFields = byId("p-code-fields");
-        if (codeFields) { codeFields.hidden = !player && !anniv; }
+        if (codeFields) { codeFields.hidden = !player && !anniv && !tune; }
         /* The collage takes a batch, so it uses the multi-file input rather
            than the single Photo Upload -- the same swap the search screen
            makes, for the same reason.
@@ -8157,10 +8865,11 @@
            gated on the search screen alone, above. */
         const batchFields = byId("p-batch-fields");
         if (batchFields) {
-            batchFields.hidden = !grid && !anniv && !hbd && !trib && !love && !couple;
+            batchFields.hidden = !grid && !anniv && !hbd && !trib && !love &&
+                !couple && !tune;
         }
         if (photoFields) {
-            photoFields.hidden = grid || anniv || hbd || trib || love || couple;
+            photoFields.hidden = grid || anniv || hbd || trib || love || couple || tune;
         }
 
         [["p-name-a", "nameA"], ["p-name-b", "nameB"],
@@ -8200,6 +8909,10 @@
         if (tt) { tt.value = state.tribTheme; }
         const lt = byId("p-love-theme");
         if (lt) { lt.value = state.loveTheme; }
+        const tt2 = byId("p-tune-theme");
+        if (tt2) { tt2.value = state.tuneTheme; }
+        const tg = byId("p-tune-greeting");
+        if (tg && tg.value !== state.tuneGreeting) { tg.value = state.tuneGreeting; }
         const ct = byId("p-couple-theme");
         if (ct) { ct.value = state.coupleTheme; }
         const cg = byId("p-couple-grey");
@@ -8963,6 +9676,8 @@
             body += loveSVG(W, H, esc);
         } else if (frame.layout === "couple") {
             body += coupleSVG(W, H, esc);
+        } else if (frame.layout === "tune") {
+            body += tuneSVG(W, H, esc);
         } else {
             if (frame.frame) {
                 body += '<rect width="' + W + '" height="' + H + '" fill="' + frame.frame + '"/>';
@@ -9349,6 +10064,15 @@
                 loveTheme2.appendChild(o);
             });
         }
+        const tuneTheme2 = byId("p-tune-theme");
+        if (tuneTheme2 && !tuneTheme2.options.length) {
+            Object.keys(TUNE_THEMES).forEach((k) => {
+                const o = document.createElement("option");
+                o.value = k;
+                o.textContent = TUNE_THEMES[k].label;
+                tuneTheme2.appendChild(o);
+            });
+        }
         const coupleTheme2 = byId("p-couple-theme");
         if (coupleTheme2 && !coupleTheme2.options.length) {
             Object.keys(COUPLE_THEMES).forEach((k) => {
@@ -9469,6 +10193,41 @@
     syncControls();
     updateHistoryButtons();
     render();
+
+    /* The script face has to be ASKED for, and until now nothing asked.
+
+       document.fonts.ready resolves when every PENDING font load has
+       finished, and a webfont that no DOM element uses is never pending -- so
+       it is never fetched and the canvas silently falls back. SCRIPT_FACE is
+       used by the canvas ALONE and by five layouts now, and not one of them
+       has ever rendered in it: the anniversary, birthday, tribute and love
+       posters have all been setting their script text in Playfair Display,
+       which is the fallback SCRIPT_FACE's own comment calls "not close" and
+       which was replaced for exactly that reason. The stand-in was chosen,
+       written up, and then never reached the page.
+
+       Found building the song poster, whose greeting is set in it. One
+       request, before the repaint below, and the four layouts that came first
+       get the face they were written for. The catch is deliberate: a font that
+       will not load must leave the poster drawing in the fallback, which is
+       what it did before, rather than rejecting into nothing. */
+    function loadScriptFace() {
+        if (!document.fonts || !document.fonts.load) { return; }
+        /* Repaint on success only. A face that will not load must leave the
+           poster drawing in the fallback, which is what it did before, rather
+           than rejecting into nothing or forcing a pointless second paint. */
+        document.fonts.load("40px " + SCRIPT_FACE.split(",")[0].trim())
+            .then(render, () => {});
+    }
+    /* On LOAD, not now. poster.html fetches the webfont stylesheet with
+       media="print" and flips it on its own onload, so at this point in the
+       script the @font-face rule may not exist yet and asking for the family
+       by name finds nothing to ask for. */
+    if (document.readyState === "complete") {
+        loadScriptFace();
+    } else {
+        window.addEventListener("load", loadScriptFace, { once: true });
+    }
 
     /* A second paint once the display fonts finish loading, so the caption
        renders in Playfair Display rather than the fallback serif. */
