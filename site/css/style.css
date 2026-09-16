@@ -952,7 +952,13 @@ button {
    panel cannot be clamped at all. */
 .nav-more-panel {
     position: absolute;
-    top: calc(100% + 0.75rem);
+    /* One token, used by BOTH `top` and `max-height` below. The panel hangs
+       this far under the header, so this is exactly the room it loses -- and
+       a gap changed in one place without the other would leave the height
+       silently wrong. The narrow rule sets it to 0px because it uses
+       top: 100%. */
+    --nav-more-gap: 0.75rem;
+    top: calc(100% + var(--nav-more-gap));
     right: var(--space-lg);
     z-index: 30;
     display: grid;
@@ -963,6 +969,54 @@ button {
     padding: var(--space-lg) var(--space-xl);
     width: 52rem;
     max-width: calc(100% - 2 * var(--space-lg));
+
+    /* ----------------------------------------------------------------------
+       The panel scrolls rather than running off the bottom of the screen.
+
+       Without this it simply overflowed: measured on about.html at 1440x900,
+       1121px of panel hanging from y=96 in a 900px viewport, its foot 317px
+       past the bottom edge. And it could not be scrolled to. `.site-header`
+       is sticky, the panel is absolute against it, so scrolling the PAGE
+       moves the document underneath a panel that stays exactly where it is --
+       measured: panel top unchanged at 96 after scrolling 600px.
+
+       What that stranded was `.nav-more-social`, which since the footer was
+       folded into this menu on August 13, 2026 is the ONLY route to the
+       social links anywhere on the site.
+
+       --header-h is the header's real rendered height, republished by
+       initHeaderHeight() in js/app.js through a ResizeObserver, so this
+       tracks the header growing a second row instead of assuming it cannot.
+       The 5.25rem fallback matches the other consumers of that property.
+
+       --anchor-h is set ONLY by body.has-site-anchor / body.has-ad-anchor, on
+       the same rules that reserve the page's bottom padding for a mounted
+       anchor, so the allowance cannot drift from the reservation -- it is the
+       same declaration. It falls back to 0px where no anchor is mounted.
+
+       SUBTRACTING THE ANCHOR IS THE ONLY REMEDY, NOT A PREFERENCE. The panel
+       cannot be lifted above the anchor by any z-index: `.site-header` is
+       `position: sticky; z-index: 20`, which makes it a stacking context, so
+       every z-index inside it is resolved against siblings within the header
+       and the whole header sits below the anchor's 30. Measured directly --
+       with the panel forced over a stand-in anchor, the anchor painted on top
+       at z-index 30, 40 AND 999.
+
+       Two declarations on purpose: dvh is what makes this correct while a
+       phone's URL bar is showing, and the vh line above it is the fallback
+       for anything that does not understand dvh. The rule this replaced used
+       a flat 75vh for exactly that slack; an exact vh-only calc would have
+       removed it and made the panel taller than the visible area.
+       ---------------------------------------------------------------------- */
+    max-height: calc(100vh - var(--header-h, 5.25rem) - var(--nav-more-gap)
+        - var(--space-lg) - var(--anchor-h, 0px));
+    max-height: calc(100dvh - var(--header-h, 5.25rem) - var(--nav-more-gap)
+        - var(--space-lg) - var(--anchor-h, 0px));
+    overflow-y: auto;
+    /* The panel is a scroller inside a page that also scrolls. Without this,
+       reaching the end of the panel hands the wheel to the document and the
+       page lurches behind an open menu. */
+    overscroll-behavior: contain;
 }
 
 .nav-more-panel[hidden] {
@@ -1002,6 +1056,115 @@ button {
 .nav-more-panel a:focus-visible {
     color: var(--color-brand-ink);
     text-decoration: underline;
+}
+
+/* Backup and restore in the editor bar, for the two editors that carry no
+   mega-menu panel (resume.html and docs.html). Built by js/app.js, which
+   mounts it ONLY where there is no panel, so no page shows both.
+
+   It sits beside the save cloud because that is where the page already talks
+   about persistence. Inline rather than a block, and the status message is
+   allowed to disappear entirely rather than reserving a line: the editor bar
+   is a single row that has to survive 320px, where .site-nav already wraps,
+   and a permanently reserved line would push the row taller on every editor
+   for a message that is shown for a few seconds a month. */
+.editor-backup {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+.editor-backup-row {
+    display: inline-flex;
+    gap: var(--space-xs);
+}
+.editor-backup .btn {
+    /* Matches the other editor-bar controls rather than the page's default
+       button size, which would make these the largest thing in the row. */
+    padding: 0.375rem 0.6875rem;
+    font-size: 0.8125rem;
+}
+.editor-backup-status {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    max-width: 16rem;
+}
+.editor-backup-status.is-warn {
+    color: var(--color-warn);
+}
+/* Below 48rem the editor bar is already tight. Measured at 320px: with both
+   buttons and the status line the bar wraps and grows from 46px to 96px,
+   taking 50px off a form that has little to spare. The status still reaches a
+   screen reader through role="status", and Restore is still one tap away on
+   the homepage -- which is where a visitor restoring onto a new phone arrives
+   anyway, since they have nothing to open an editor with yet. */
+/* Gone entirely on phones, not trimmed down.
+
+   Measured on resume.html at 320px, where .site-header is STICKY and so every
+   pixel it takes is taken for the whole session:
+
+     both buttons   186px header   (+101 over HEAD's 85)
+     one button     126px header   (+41)
+     none            85px header   (unchanged)
+
+   The editor bar already wraps at that width, so any button added lands on a
+   row of its own. Forty-one permanent pixels off a 720px phone is a poor
+   trade for a control used a few times a year, and it is the same trade that
+   was refused one step earlier when the pair became one -- refusing it once
+   and accepting it the second time would only mean stopping halfway.
+
+   Nothing is lost that is not one tap away: the homepage continuation strip
+   carries "Back up my work" and appears exactly when there is work to lose,
+   and the homepage is also where a visitor restoring onto a new phone arrives,
+   since they have nothing to open an editor with yet.
+
+   Hidden at the wrapper rather than per control, so a button added to this
+   row later inherits the decision instead of quietly reopening it. */
+@media (max-width: 48rem) {
+    .editor-backup {
+        display: none;
+    }
+}
+
+/* Backup and restore controls, appended to the panel by js/app.js.
+
+   Full width under the columns, for the same reason the social row is: two
+   buttons and a status line in a 9rem column would wrap to three lines each
+   and stretch the other five columns through the grid's own minmax.
+
+   It is the FIRST child of the panel, and that is a reachability fix rather
+   than emphasis: the panel is over 1200px tall at 1440x900 with no
+   max-height and no internal scroll, and the sticky header pins it, so
+   anything appended sits below the fold where no amount of scrolling reaches
+   it. See buildBackupControls() in js/app.js for the measurements. The rule
+   therefore divides DOWNWARD, unlike .nav-more-social which divides upward.
+
+   The controls themselves are built in JavaScript rather than shipped in
+   markup -- they are buttons, so there is nothing for a crawler to follow,
+   and the panel's real-anchors rule is about links. */
+.nav-more-tools {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-md);
+}
+.nav-more-tools-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+.nav-more-tools-status {
+    margin: var(--space-xs) 0 0;
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    /* Reserved whether or not there is a message, so the panel does not jump
+       by a line the first time one appears -- the panel is anchored to the
+       header and a height change moves nothing else, but the buttons under
+       the pointer would shift out from under it. */
+    min-height: 1.2em;
+}
+.nav-more-tools-status.is-warn {
+    color: var(--color-warn);
 }
 
 /* Social row, the one part of the old footer that was not a link column.
@@ -1059,6 +1222,11 @@ button {
            without hardcoding a header height. The header carries
            flex-wrap:wrap and grows a second row on narrow screens, so any
            fixed pixel offset would drift the moment it wrapped. */
+        /* No gap here: this variant sits flush under the header with
+           top: 100%, so it loses nothing to an offset. The base rule's
+           max-height reads this same token, which is why it does not need a
+           second formula of its own -- it used to carry a flat 75vh. */
+        --nav-more-gap: 0px;
         top: 100%;
         left: 0;
         right: 0;
@@ -1069,13 +1237,22 @@ button {
         padding: var(--space-lg);
         border-left: 0;
         border-right: 0;
-        /* Long enough to run past a short phone viewport, so it scrolls
-           internally rather than off the end of the document. */
-        max-height: 75vh;
         overflow-y: auto;
-        /* Above the fixed ad anchor (z-index 30), or the foot of the panel
-           would sit behind the banner on a phone. */
-        z-index: 40;
+
+        /* THE z-index: 40 THAT USED TO BE HERE WAS INERT, AND ITS COMMENT WAS
+           WRONG. It claimed to put the panel "above the fixed ad anchor
+           (z-index 30)". It cannot. `.site-header` is `position: sticky;
+           z-index: 20` and therefore a stacking context, so a z-index on a
+           descendant is resolved among the header's own children and the
+           whole header paints below the anchor regardless. Measured with the
+           panel forced over a stand-in anchor: the anchor won at 30, at 40
+           and at 999, at 1440px and at 375px alike.
+
+           The foot of the panel is kept off the anchor by subtracting
+           --anchor-h in the base rule's max-height instead, which is the only
+           thing that actually works. Removed rather than corrected in place,
+           because a declaration that does nothing while claiming to is worse
+           than no declaration: the next person reads it as handled. */
     }
 
     .nav-more-social {
@@ -4240,12 +4417,14 @@ body.is-nav-hidden .site-header:focus-within {
    has to move with it; `${tag}: anchor reservation matches the mounted unit`
    in tests/verify-layout.js fails if they ever disagree. */
 body.has-site-anchor {
-    padding-bottom: 4.75rem;
+    --anchor-h: 4.75rem;
+    padding-bottom: var(--anchor-h);
 }
 
 @media (min-width: 48.0625rem) {
     body.has-site-anchor {
-        padding-bottom: 7.25rem;
+        --anchor-h: 7.25rem;
+        padding-bottom: var(--anchor-h);
     }
 }
 
@@ -4276,7 +4455,8 @@ body.has-site-anchor {
     /* Reserve the space the fixed anchor occupies. Without this the last of
        the page sits underneath it and cannot be scrolled clear. */
     body.has-ad-anchor {
-        padding-bottom: 4.75rem;
+        --anchor-h: 4.75rem;
+        padding-bottom: var(--anchor-h);
     }
 
     /* The export action is itself sticky at bottom:0, so it would otherwise
@@ -4309,7 +4489,8 @@ body.has-site-anchor {
    has-site-anchor note above for why that matters. */
 @media (min-width: 48.0625rem) and (max-width: 74.9375rem) {
     body.has-ad-anchor {
-        padding-bottom: 7.25rem;
+        --anchor-h: 7.25rem;
+        padding-bottom: var(--anchor-h);
     }
 
     /* The lift matches the reservation exactly here, because in THIS part of

@@ -420,6 +420,34 @@ const TB = (() => {
         open.href = EDITOR_ROUTES[item.target];
         open.textContent = "Continue editing";
 
+        /* A second entry point to the same export the mega-menu offers, and
+           it earns its place by WHEN it appears rather than by what it does.
+           Nobody goes looking for a backup button; this one is in front of a
+           visitor who demonstrably has work to lose, at the moment they are
+           being shown it, and beside the control that throws it away.
+
+           The label says "my work" and not "this document" deliberately: the
+           strip describes only the single most recent record, but the export
+           carries all six keys, and a visitor who read it as "back up this
+           poster" would think the rest was not covered. */
+        const backup = document.createElement("button");
+        backup.className = "btn btn-secondary";
+        backup.type = "button";
+        backup.textContent = "Back up my work";
+        backup.addEventListener("click", () => {
+            const result = exportBackup();
+            /* The button reports on itself. A download is one of the few
+               actions the browser confirms on the page's behalf, so a status
+               line here would be a third thing saying the same thing; what it
+               cannot report is a refusal, which is the case this covers. */
+            backup.disabled = true;
+            backup.textContent = result.ok ? "Saved to downloads" : "Nothing to back up";
+            window.setTimeout(() => {
+                backup.disabled = false;
+                backup.textContent = "Back up my work";
+            }, 2500);
+        });
+
         const discard = document.createElement("button");
         discard.className = "btn btn-secondary";
         discard.type = "button";
@@ -434,17 +462,27 @@ const TB = (() => {
             if (!origin || (origin !== discard && !discard.contains(origin))) {
                 return;
             }
-            try {
-                window.localStorage.removeItem(EDITORS[item.target].storageKey);
-            } catch (err) {
-                /* Persistence unavailable: nothing to clear. */
-            }
+            /* Every key this editor owns, not just the one EDITORS names.
+               See discardKeysFor() for what that distinction did and, just as
+               importantly, what it did not do. */
+            discardKeysFor(item.target).forEach((key) => {
+                try {
+                    window.localStorage.removeItem(key);
+                } catch (err) {
+                    /* Persistence unavailable: nothing to clear. Caught per
+                       key rather than around the loop, so one key that cannot
+                       be removed does not abandon the rest -- a partial
+                       discard that stops at the document would leave exactly
+                       the photograph this fix exists to remove. */
+                }
+            });
             strip.remove();
             window.removeEventListener("click", onDiscard, true);
         };
         window.addEventListener("click", onDiscard, true);
 
         actions.appendChild(open);
+        actions.appendChild(backup);
         actions.appendChild(discard);
 
         strip.appendChild(copy);
@@ -1342,6 +1380,671 @@ const TB = (() => {
         setSaveText(el, "Saves automatically");
     }
 
+    /* ======================================================================
+       Backup and restore of saved work.
+
+       Every document on this site lives in localStorage and nowhere else.
+       There is no account and no server copy, so the browser clearing its
+       storage, a visitor switching device, or iOS keeping SEPARATE storage
+       for Safari and the installed app all mean the same thing: the work is
+       gone, with nothing to restore it from. This is the only thing that
+       fixes any of those, and the iOS split in particular has no other fix.
+
+       It lives in app.js rather than in a js/backup.js of its own for a
+       reason worth stating: a new file needs a <script> tag on 26 pages, and
+       a per-page script tag is precisely the drift surface this project keeps
+       being bitten by. Everything here needs sanitize(), storageGet/Set() and
+       describeSavedWork(), all of which are already in this closure.
+
+       Full write-up: docs/implementation/BACKUP_AND_RESTORE.md
+       ====================================================================== */
+
+    const BACKUP_FORMAT = "templatebox-backup";
+    const BACKUP_VERSION = 1;
+
+    /* EVERY KEY THAT HOLDS A VISITOR'S WORK, and the reason this list is not
+       derived from EDITORS above.
+
+       EDITORS names four storage keys, one per editor, and a backup built
+       from it would look complete and be wrong: the resume editor writes
+       THREE keys, not one. The photograph is under its own key because
+       storageSet swallows a quota failure by design, and a photograph in the
+       document record would take the whole document down with it (see
+       PHOTO_KEY in js/resume.js). The chosen template is separate because it
+       is the fallback for a visitor who has no document yet.
+
+       So a naive backup over EDITORS restores a resume with no photograph, in
+       the Classic layout, and says it succeeded. Nothing would have reported
+       that -- which is why tests/verify-layout.js reads the editors' own key
+       constants and fails if any of them is missing from this list.
+
+       Deliberately NOT here: tb_theme and tb_editor_preset are device
+       settings rather than work, and restoring a backup should not reach over
+       and change the theme someone is reading in; tb_probe is a storage
+       probe; the tb_admin_* keys belong to the private authoring tool and are
+       not a visitor's documents. */
+    /* `target` names the editor a key belongs to, matching the EDITORS keys
+       above. It is here so that "Start fresh" can clear everything an editor
+       owns instead of the one key EDITORS names -- see discardKeysFor() and
+       docs/error-fixes/START_FRESH_LEFT_THE_PHOTOGRAPH_BEHIND.md.
+
+       `preference` marks a key that survives being discarded. Only one does,
+       and the reason is written on the key itself: js/resume.js describes
+       TEMPLATE_KEY as "consulted only when there is no document yet". The
+       state immediately after Start fresh IS "no document yet", so clearing
+       it would make the key do nothing in the one situation it exists for,
+       and the visitor would silently lose a layout they chose. A blank
+       document in your chosen template is what "start fresh" means; being
+       returned to Classic is the app forgetting something. The PHOTOGRAPH is
+       not a preference -- it is personal content attached to the document --
+       and it goes. */
+    const BACKUP_KEYS = [
+        { key: "tb_resume_v1", label: "Resume", kind: "record", target: "resume" },
+        { key: "tb_resume_photo_v1", label: "Resume photograph", kind: "photo",
+            target: "resume" },
+        { key: "tb_resume_template", label: "Resume template", kind: "id",
+            target: "resume", preference: true },
+        { key: "tb_docs_v1", label: "Business document", kind: "record", target: "docs" },
+        { key: "tb_poster_v1", label: "Poster", kind: "record", target: "poster" },
+        { key: "tb_mockup_v1", label: "Product mockup", kind: "record", target: "mockup" }
+    ];
+
+    /* Everything "Start fresh" must remove for one editor.
+
+       Derived from BACKUP_KEYS rather than from EDITORS, because EDITORS maps
+       an editor to exactly ONE key and the resume editor writes three. The
+       handler used to read EDITORS[target].storageKey, so discarding a resume
+       cleared the document and left the photograph in storage.
+
+       BE ACCURATE ABOUT WHAT THAT DID AND DID NOT CAUSE. It did NOT put the
+       old photograph back on screen. js/resume.js already gates on exactly
+       this -- `keepPhoto = hasSaved && validPhoto(...)` -- and where a
+       photograph outlives its document it is not merely ignored but actively
+       cleared, with the reasoning written beside it: "somebody's face on a
+       document that is not theirs". That guard was there first, it works, and
+       it stays. This was investigated as a leak and is not one; see
+       docs/error-fixes/START_FRESH_DID_NOT_CLEAR_EVERY_KEY.md before filing
+       it again.
+
+       What was actually wrong is smaller and still worth fixing: the
+       photograph sat in storage from the moment the visitor asked for it to
+       go until the next time they happened to open resume.html -- which,
+       having just discarded their resume, they may never do. "Start fresh"
+       should delete what it says it deletes when it is asked, not leave it
+       for a later page load to tidy up, and on a shared device that is a real
+       difference. It also means no-leak correctness stops depending on one
+       gate in one editor continuing to exist.
+
+       One list for "every key this editor owns", used by both the thing that
+       copies them and the thing that deletes them, is what stops those two
+       disagreeing at all. An editor gaining a fourth key should not require
+       anyone to remember this call site. */
+    function discardKeysFor(target) {
+        return BACKUP_KEYS
+            .filter((entry) => entry.target === target && !entry.preference)
+            .map((entry) => entry.key);
+    }
+
+    /* ----------------------------------------------------------------------
+       The trust boundary.
+
+       A restore takes a file off the visitor's disk and writes it into the
+       exact place the editors read from, which SKIPS every check the editors
+       apply to typed input: collectState() sanitizes on the way in, and a
+       restored record never passes through it. So the file is untrusted, the
+       same way the stored invoice logo already is, and everything below is
+       about making a hand-edited or hostile file harmless rather than about
+       re-implementing each editor's schema.
+
+       The boundary this draws, stated plainly so it can be argued with:
+
+         - no string reaches storage in an unescaped form
+         - nothing that will be used as an image source reaches storage
+           unless it is a base64 raster, so a data:image/svg+xml carrying a
+           script cannot be restored
+         - nothing that will be used as a fill style or an SVG fill attribute
+           reaches storage unless it is a six-digit hex
+         - no object can pollute a prototype, recurse without bound, or grow
+           without bound
+
+       What it deliberately does NOT do is check that a resume record has the
+       fields a resume has. The editors already re-validate their own shapes
+       on read -- migrate() in poster.js, readStoredPhoto() in resume.js,
+       DEFAULT_STATE merges, bounded numbers -- and duplicating that here
+       would be a second copy of four schemas that would rot within a month.
+       A structurally valid file with nonsense in it produces an empty-looking
+       editor, not a broken one.
+       ---------------------------------------------------------------------- */
+
+    const CLEAN_MAX_DEPTH = 8;
+    const CLEAN_MAX_ARRAY = 500;
+    const CLEAN_MAX_KEYS = 200;
+    const CLEAN_MAX_TEXT = 100000;
+
+    /* 8MB. localStorage is about 5MB in every browser that matters, so a file
+       larger than this could not be restored even if every byte were valid,
+       and reading it would only be a way to be handed an arbitrary amount of
+       memory by a file picker. */
+    const BACKUP_MAX_BYTES = 8 * 1024 * 1024;
+
+    /* The same shape docs.js already enforces on the stored logo. png|jpeg
+       covers everything this site can legitimately produce: the invoice logo
+       is read from the visitor's device and re-encoded, and the resume
+       photograph is always canvas.toDataURL("image/jpeg") -- never the raw
+       upload -- so no valid photograph is lost to this. */
+    const IMAGE_URI = /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+=*$/;
+    const HEX_COLOUR = /^#[0-9A-Fa-f]{6}$/;
+    const SLUG_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+    /* A key that matches SAFE_KEY can still be __proto__, which assignment
+       treats as the prototype setter rather than as a property. JSON.parse
+       itself is safe -- it defines an own property -- but the copy this
+       walker makes is not, so the name has to be refused by name. */
+    const SAFE_KEY = /^[A-Za-z0-9_-]{1,64}$/;
+    const UNSAFE_KEYS = ["__proto__", "constructor", "prototype"];
+
+    /* Matched on the field NAME rather than on the value, deliberately. A
+       value that merely looks like a data URI is not the test that matters:
+       what matters is where the editors USE it, and these are the names they
+       read an image from (docs.js `logo`, resume.js's photo record `src`).
+
+       `photo` was here too, defensively, and the suite rejected it: resume.js
+       collects state.photo but persistAndRender deletes it from the copy it
+       writes, so that name is in no stored record and a guard for it guards
+       nothing. The limit of that check is worth knowing -- it catches a name
+       here that no editor persists, but it cannot catch an editor persisting
+       a NEW image field that nobody added here, because "this string will be
+       used as an image" is not visible in the source. Adding an image to a
+       stored record means adding its field name here by hand. */
+    const IMAGE_FIELDS = ["logo", "src"];
+
+    /* Likewise by name: these reach ctx.fillStyle and a fill="..." attribute
+       in an exported SVG. js/color-picker.js records why a COLOUR needed a
+       sanitiser at all, and the path that matters there is this one --
+       storage -- because it has no <input type="color"> in front of it to
+       coerce a hostile value to #000000 first. */
+    const COLOUR_FIELDS = ["accent", "bg", "customHex", "heartColour"];
+
+    function isImageField(name) {
+        return IMAGE_FIELDS.indexOf(name) !== -1;
+    }
+
+    function isColourField(name) {
+        return COLOUR_FIELDS.indexOf(name) !== -1;
+    }
+
+    /* Re-escapes rather than escaping. Values in storage are ALREADY
+       sanitized, so running sanitize() over one directly would double-escape
+       it -- an apostrophe saved as "&#39;" would come back as "&amp;#39;" and
+       the visitor would find their name spelled in entities. desanitize first
+       and the pair is idempotent for a well-formed value, while a raw "<"
+       from a hand-edited file still comes out escaped. Same ordering trap
+       fileSlug() documents above. */
+    function cleanText(value) {
+        if (typeof value !== "string") {
+            return "";
+        }
+        return sanitize(desanitize(value.slice(0, CLEAN_MAX_TEXT)));
+    }
+
+    function cleanImage(value) {
+        return typeof value === "string" && IMAGE_URI.test(value) ? value : "";
+    }
+
+    /* null is a legitimate value here and not a rejection: js/mockup.js uses
+       it for a transparent background. An unrecognised colour becomes null
+       too, which leaves the editor to apply its own default rather than
+       painting with something unvetted. */
+    function cleanColour(value) {
+        if (value === null || value === "") {
+            return value;
+        }
+        return typeof value === "string" && HEX_COLOUR.test(value) ? value : null;
+    }
+
+    function cleanId(value) {
+        return typeof value === "string" && SLUG_ID.test(value) ? value : "";
+    }
+
+    function cleanValue(value, name, depth) {
+        if (value === null) {
+            return null;
+        }
+        if (typeof value === "boolean") {
+            return value;
+        }
+        if (typeof value === "number") {
+            /* JSON has no NaN or Infinity, but a number that arrives as one
+               through any other route would reach arithmetic in four editors
+               and produce NaN co-ordinates rather than an error. */
+            return Number.isFinite(value) ? value : 0;
+        }
+        if (typeof value === "string") {
+            if (isImageField(name)) {
+                return cleanImage(value);
+            }
+            if (isColourField(name)) {
+                return cleanColour(value);
+            }
+            return cleanText(value);
+        }
+        if (depth >= CLEAN_MAX_DEPTH) {
+            return null;
+        }
+        if (Array.isArray(value)) {
+            return value.slice(0, CLEAN_MAX_ARRAY)
+                .map((item) => cleanValue(item, name, depth + 1));
+        }
+        if (typeof value === "object") {
+            const out = {};
+            Object.keys(value).slice(0, CLEAN_MAX_KEYS).forEach((key) => {
+                if (!SAFE_KEY.test(key) || UNSAFE_KEYS.indexOf(key) !== -1) {
+                    return;
+                }
+                out[key] = cleanValue(value[key], key, depth + 1);
+            });
+            return out;
+        }
+        /* Unreachable from JSON.parse, which produces nothing else. Kept so
+           the function is total for any caller. */
+        return null;
+    }
+
+    /* One stored key, cleaned according to what that key actually holds.
+       Returns undefined when there is nothing worth restoring, which is how
+       the caller tells "absent" from "present and empty". */
+    function cleanRecord(kind, value) {
+        if (kind === "id") {
+            const id = cleanId(value);
+            return id || undefined;
+        }
+        if (kind === "photo") {
+            /* Three legitimate shapes. A bare string is a document from
+               before framing existed -- readStoredPhoto() in js/resume.js
+               still reads one -- so refusing it here would quietly drop the
+               photograph of exactly the oldest documents. */
+            if (typeof value === "string") {
+                const src = cleanImage(value);
+                return src || undefined;
+            }
+            if (!value || typeof value !== "object") {
+                return undefined;
+            }
+            const src = cleanImage(value.src);
+            if (!src) {
+                return undefined;
+            }
+            return {
+                src: src,
+                zoom: Math.max(1, Number(value.zoom) || 1),
+                x: Number.isFinite(Number(value.x)) ? Number(value.x) : 0,
+                y: Number.isFinite(Number(value.y)) ? Number(value.y) : 0
+            };
+        }
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+            return undefined;
+        }
+        return cleanValue(value, "", 0);
+    }
+
+    /* ----------------------------------------------------------------------
+       Export
+       ---------------------------------------------------------------------- */
+
+    function collectBackup() {
+        const data = {};
+        let found = 0;
+
+        BACKUP_KEYS.forEach((entry) => {
+            const value = storageGet(entry.key);
+            /* storageGet returns null both for an absent key and for one
+               holding "null". Either way there is nothing to carry. */
+            if (value === null || value === undefined || value === "") {
+                return;
+            }
+            data[entry.key] = value;
+            found += 1;
+        });
+
+        if (!found) {
+            return null;
+        }
+
+        return {
+            format: BACKUP_FORMAT,
+            version: BACKUP_VERSION,
+            created: new Date().toISOString(),
+            data: data
+        };
+    }
+
+    function backupFileName() {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        return "templatebox-backup-" + now.getFullYear() + "-" +
+            pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + ".json";
+    }
+
+    function exportBackup() {
+        const payload = collectBackup();
+        if (!payload) {
+            return { ok: false,
+                message: "There is nothing saved on this device yet." };
+        }
+
+        try {
+            const blob = new Blob([JSON.stringify(payload, null, 2)],
+                { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = backupFileName();
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+        } catch (err) {
+            return { ok: false,
+                message: "That file could not be created. Try again." };
+        }
+
+        const count = Object.keys(payload.data).length;
+        return { ok: true,
+            message: "Saved " + count + " item" + (count === 1 ? "" : "s") +
+                " to your downloads. Keep the file somewhere you can find it." };
+    }
+
+    /* ----------------------------------------------------------------------
+       Import
+       ---------------------------------------------------------------------- */
+
+    function applyBackup(text) {
+        let parsed = null;
+        try {
+            parsed = JSON.parse(text);
+        } catch (err) {
+            return { ok: false,
+                message: "That file is not a TemplateBox backup." };
+        }
+
+        /* The format marker earns its place here: without it, any JSON file a
+           visitor happened to pick would be walked, produce zero recognised
+           keys, and report "nothing to restore" -- which reads as "my backup
+           was empty" rather than "that was the wrong file". */
+        if (!parsed || typeof parsed !== "object" ||
+                parsed.format !== BACKUP_FORMAT ||
+                !parsed.data || typeof parsed.data !== "object") {
+            return { ok: false,
+                message: "That file is not a TemplateBox backup." };
+        }
+
+        const cleaned = [];
+        BACKUP_KEYS.forEach((entry) => {
+            if (!Object.prototype.hasOwnProperty.call(parsed.data, entry.key)) {
+                return;
+            }
+            const value = cleanRecord(entry.kind, parsed.data[entry.key]);
+            if (value === undefined) {
+                return;
+            }
+            cleaned.push({ entry: entry, value: value });
+        });
+
+        if (!cleaned.length) {
+            return { ok: false,
+                message: "That backup holds nothing this version can restore." };
+        }
+
+        /* Everything is cleaned BEFORE anything is written. A file that is
+           half valid must not leave storage half replaced -- the visitor
+           would have lost the documents it overwrote and not gained the ones
+           it could not. */
+        let written = 0;
+        cleaned.forEach((item) => {
+            storageSet(item.entry.key, item.value);
+            written += 1;
+        });
+
+        return {
+            ok: true,
+            written: written,
+            labels: cleaned.map((item) => item.entry.label),
+            message: "Restored " + written + " item" + (written === 1 ? "" : "s") +
+                ". Reloading..."
+        };
+    }
+
+    function importBackupFile(file, done) {
+        if (!file) {
+            done({ ok: false, message: "No file chosen." });
+            return;
+        }
+        if (file.size > BACKUP_MAX_BYTES) {
+            done({ ok: false,
+                message: "That file is too large to be a backup." });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+            done(applyBackup(String(reader.result || "")));
+        });
+        reader.addEventListener("error", () => {
+            done({ ok: false, message: "That file could not be read." });
+        });
+        reader.readAsText(file);
+    }
+
+    /* ----------------------------------------------------------------------
+       Controls.
+
+       Built in JavaScript and appended to the mega-menu panel, rather than
+       shipped in the markup of 26 pages.
+
+       This looks like it contradicts the panel's own rule -- its links are
+       real anchors in the served markup, on purpose, so they stay crawlable
+       -- but that rule is about LINKS. These are buttons and a file input:
+       there is nothing for a crawler to follow, no destination to pass rank
+       to, and no value in a search engine seeing them. Shipping them in the
+       markup would buy nothing and would put the same block on 26 pages plus
+       admin.js's generated post head, which is the drift this project
+       already documents twice.
+
+       On every page rather than only the homepage, and that is the point of
+       putting them here: RESTORE MATTERS MOST WHERE THERE IS NOTHING SAVED.
+       A visitor opening the installed app on a new phone has an empty
+       continuation strip and no other route back to their own documents.
+       ---------------------------------------------------------------------- */
+
+    function buildBackupControls(host, compact) {
+        const wrap = document.createElement("div");
+        wrap.className = compact ? "editor-backup" : "nav-more-tools";
+
+        /* No heading in the editor bar. The bar is a row of controls beside
+           the save cloud, not a panel section, and a second-level heading
+           inside it would be both visually wrong and a stray <h2> in a
+           document that already has its own heading hierarchy. */
+        if (!compact) {
+            const heading = document.createElement("h2");
+            heading.textContent = "Your work";
+            wrap.appendChild(heading);
+        }
+
+        const row = document.createElement("div");
+        row.className = "nav-more-tools-row";
+
+        const save = document.createElement("button");
+        save.type = "button";
+        save.className = "btn btn-secondary";
+        /* Shorter in the editor bar, where the surrounding controls are
+           one or two words and the row has to survive 320px. The menu has
+           room for the sentence and needs it, because nothing around it
+           says what "Back up" would apply to. */
+        save.textContent = compact ? "Back up" : "Back up my work";
+
+        const restore = document.createElement("button");
+        restore.type = "button";
+        restore.className = "btn btn-secondary";
+        restore.textContent = compact ? "Restore" : "Restore a backup";
+        if (compact) {
+            /* Tagged for the stylesheet. The whole row is hidden below
+               48rem now rather than this button alone -- see the rule in
+               css/style.css for the three header measurements that
+               decided it -- but the class stays, because "which of these
+               is the secondary action" is a fact about the row and not
+               about the breakpoint that currently acts on it. */
+            restore.classList.add("editor-backup-restore");
+        }
+
+        /* Not hidden with CSS: a display:none input cannot be opened by a
+           programmatic click in every browser, and `hidden` plus an off-flow
+           position is the combination that works without the control ever
+           being reachable by tab. */
+        const picker = document.createElement("input");
+        picker.type = "file";
+        picker.accept = "application/json,.json";
+        picker.hidden = true;
+
+        const status = document.createElement("p");
+        status.className = compact ? "editor-backup-status" : "nav-more-tools-status";
+        status.setAttribute("role", "status");
+        status.setAttribute("aria-live", "polite");
+
+        const report = (result) => {
+            status.textContent = result.message;
+            status.classList.toggle("is-warn", !result.ok);
+        };
+
+        save.addEventListener("click", () => {
+            report(exportBackup());
+        });
+
+        restore.addEventListener("click", () => {
+            /* Cleared before opening, not after: a file input fires `change`
+               only when the SELECTION changes, so picking the same file twice
+               in a row would be silently ignored the second time. The same
+               defect was fixed in the poster editor's photo uploads on
+               September 14, 2026 -- worth not reintroducing here. */
+            picker.value = "";
+            picker.click();
+        });
+
+        picker.addEventListener("change", () => {
+            const file = picker.files && picker.files[0];
+            if (!file) {
+                return;
+            }
+
+            /* A restore overwrites without an undo, so it asks first -- but
+               only when there is something to lose. On the device this
+               feature exists for, a new phone with an empty store, there is
+               nothing to warn about and a confirm would be noise. */
+            const existing = describeSavedWork();
+            if (existing.length &&
+                    !window.confirm("Restoring replaces the work already saved " +
+                        "on this device. This cannot be undone. Continue?")) {
+                report({ ok: false, message: "Restore cancelled. Nothing changed." });
+                return;
+            }
+
+            status.textContent = "Reading...";
+            status.classList.remove("is-warn");
+
+            importBackupFile(file, (result) => {
+                report(result);
+                if (result.ok) {
+                    /* The editors read their keys once, at init. A reload is
+                       what makes a restore visible, and doing it here means no
+                       page has to know that its storage changed underneath it. */
+                    window.setTimeout(() => window.location.reload(), 600);
+                }
+            });
+        });
+
+        row.appendChild(save);
+        row.appendChild(restore);
+        wrap.appendChild(row);
+        wrap.appendChild(status);
+        wrap.appendChild(picker);
+
+        if (compact) {
+            /* Appended to the editor bar rather than inserted first: the save
+               cloud reads as the status of what is already there, and putting
+               a button in front of it would separate it from the document it
+               describes. The bar has no overflow problem to avoid. */
+            host.appendChild(wrap);
+            return;
+        }
+
+        /* FIRST in the panel, and this is a correctness fix rather than a
+           matter of emphasis.
+
+           Appended, these controls were measured at y=1105 in a 900px-tall
+           viewport and could not be reached at all: the panel is 1256px tall
+           at 1440x900 with no max-height and no internal scroll, and because
+           .site-header is sticky the panel is pinned -- scrolling the page
+           moves the document underneath it and leaves the panel's own foot
+           exactly where it was. A control nobody can reach is worse than no
+           control, because the menu claims to offer it.
+
+           That overflow is NOT introduced here: the social row was already
+           below the fold at the same size, and the panel measured 1145px
+           without this row. It is a pre-existing consequence of folding the
+           footer into the menu, it belongs to the panel rather than to this
+           feature, and it is filed separately. Putting this row at the top is
+           what keeps this feature out of the dead zone; it does not fix the
+           dead zone. */
+        panel.insertBefore(wrap, panel.firstChild);
+    }
+
+    /* A flag rather than a "has the row already been built" DOM lookup, and
+       the reason is a check rather than a preference. Section 1d of the suite
+       asserts that every hook this file LOOKS UP exists in the served markup,
+       which is what catches a hook renamed in HTML and not in JS. A class
+       this file creates itself has no markup to be found in, so looking for
+       it would have meant either shipping a dead class on 26 pages or
+       exempting the selector -- and an exemption list is how that check stops
+       being worth running. Nothing is looked up, so nothing is claimed.
+
+       Worth knowing if this comment is ever rewritten: that scan reads the
+       raw source, comments included, so spelling the lookup out here in full
+       fails the check on the strength of the comment alone. It did. */
+    let backupControlsBuilt = false;
+
+    function initBackupControls() {
+        if (backupControlsBuilt || !storageAvailable()) {
+            /* No persistence means there is nothing to back up and nowhere to
+               restore to. Offering either would be a control that cannot work. */
+            return;
+        }
+        backupControlsBuilt = true;
+
+        const panels = document.querySelectorAll("[data-nav-more-panel]");
+        if (panels.length) {
+            panels.forEach((panel) => {
+                buildBackupControls(panel);
+            });
+            return;
+        }
+
+        /* Fallback host, and it is not hypothetical: resume.html and docs.html
+           carry no mega-menu panel at all. That contradicts what this
+           project's own notes claim about every public page having one, it
+           predates this feature, and without a fallback the backup controls
+           would be missing from the resume editor -- the page whose documents
+           live longest and whose photograph is the thing most at risk.
+
+           .editor-actions is the right neighbour rather than merely an
+           available one: it holds the "Saves automatically" cloud, so it is
+           already where the page talks about persistence.
+
+           Only where there is no panel, so poster.html and mockup.html keep
+           the menu route and nobody gets the same control twice. */
+        document.querySelectorAll(".editor-actions").forEach((bar) => {
+            buildBackupControls(bar, true);
+        });
+    }
+
     /* ----------------------------------------------------------------------
        Installed-app support (Tier 0 PWA).
 
@@ -1479,6 +2182,10 @@ const TB = (() => {
             initFormNav,
             initHeaderToggles,
             initNavMore,
+            /* After initNavMore: it appends into the panel that initNavMore
+               wires, and the toggle must already be bound or the first open
+               would show a panel whose controls are not there yet. */
+            initBackupControls,
             initSearch,
             /* Before initScrollDirection: the hide transform reads --header-h,
                so it should be published before anything can hide the header. */

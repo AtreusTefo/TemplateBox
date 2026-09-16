@@ -779,6 +779,17 @@ function staticChecks() {
         stated ? `message says ${stated[1]}, index.html has ${cards.length} cards`
             : "no \"see all N\" count found in the catalog-empty message");
 
+    /* 1o. Backup and restore.
+
+           The defect this section exists for is not a crash. A backup that
+           silently omits a key restores a document that LOOKS restored -- the
+           resume comes back with no photograph, in the wrong template, and
+           says it succeeded. Nothing reports that, so it has to be checked
+           here.
+
+           Reference: docs/implementation/BACKUP_AND_RESTORE.md */
+    backupChecks();
+
     /* 1n. Installed-app surface (Tier 0 PWA).
 
            Everything here fails silently on the web and only shows up on a
@@ -787,6 +798,243 @@ function staticChecks() {
 
            Reference: docs/implementation/PWA_INSTALLABLE_APP.md */
     pwaChecks(pages);
+}
+
+function backupChecks() {
+    const appJsSrc = fs.readFileSync(path.join(SITE, "js", "app.js"), "utf8");
+
+    const listed = new Set(
+        [...appJsSrc.matchAll(/\{\s*key:\s*"(tb_[A-Za-z0-9_]+)",\s*label:/g)]
+            .map(([, key]) => key));
+
+    check("js/app.js declares a BACKUP_KEYS list",
+        listed.size > 0, "no { key: \"tb_...\", label: ... } entries found");
+    if (!listed.size) { return; }
+
+    /* THE CHECK THIS SECTION EXISTS FOR.
+
+       Every key an editor writes must be in that list. The list cannot be
+       derived from EDITORS -- the resume editor writes THREE keys and EDITORS
+       names one of them -- so the only thing that can keep the two in step is
+       reading the editors' own constants and insisting.
+
+       This is not hypothetical: tb_resume_photo_v1 and tb_resume_template are
+       exactly the keys a backup built from EDITORS would have dropped, and a
+       visitor would have discovered it on a new phone, holding the only copy
+       of a resume that came back blank. */
+    const EDITOR_FILES = ["resume.js", "docs.js", "poster.js", "mockup.js"];
+    const written = [];
+    EDITOR_FILES.forEach((file) => {
+        const src = fs.readFileSync(path.join(SITE, "js", file), "utf8");
+        [...src.matchAll(/const\s+[A-Z_]*KEY[A-Z_]*\s*=\s*"(tb_[A-Za-z0-9_]+)"/g)]
+            .forEach(([, key]) => written.push({ file: file, key: key }));
+    });
+
+    check(`every editor storage key is declared for backup (${written.length} found)`,
+        written.every((w) => listed.has(w.key)),
+        written.filter((w) => !listed.has(w.key))
+            .map((w) => `js/${w.file} writes ${w.key}, which BACKUP_KEYS does not carry`)
+            .join("\n      "));
+
+    /* And nothing in the list that no editor writes, which would be a key
+       renamed in an editor and left behind here -- a backup carrying a key
+       nothing reads, and silently not carrying its replacement. */
+    const writtenKeys = new Set(written.map((w) => w.key));
+    const orphaned = [...listed].filter((k) => !writtenKeys.has(k));
+    check("every backed-up key is one an editor actually writes",
+        orphaned.length === 0,
+        `in BACKUP_KEYS but written by no editor: ${orphaned.join(", ")}`);
+
+    /* --- "Start fresh" must clear everything an editor owns.
+
+           The handler read EDITORS[target].storageKey, and EDITORS maps an
+           editor to ONE key while the resume editor writes three, so
+           discarding a resume left the photograph in storage.
+
+           It did NOT put that photograph back on screen -- js/resume.js gates
+           on `hasSaved && validPhoto(...)` and actively clears a photograph
+           that outlives its document. That was checked by reproducing the old
+           behaviour in a browser, and no image appeared. The guard is older
+           than this check and is not what these assertions protect.
+
+           What they protect is smaller: that discarding deletes the data when
+           the visitor asks rather than leaving it until they next open an
+           editor they have just finished with, and that the copy path and the
+           delete path cannot come to disagree about which keys an editor owns.
+
+           Reference: docs/error-fixes/START_FRESH_DID_NOT_CLEAR_EVERY_KEY.md */
+    const editorTargets = new Set(
+        [...(appJsSrc.match(/const EDITORS = \{[\s\S]*?\n    \};/) || [""])[0]
+            .matchAll(/^\s{8}(\w+):\s*\{/gm)].map(([, t]) => t));
+
+    check(`js/app.js declares EDITORS targets (${editorTargets.size})`,
+        editorTargets.size > 0, "EDITORS block not found or empty");
+
+    const entries = [...appJsSrc.matchAll(
+        /\{\s*key:\s*"(tb_[A-Za-z0-9_]+)",[\s\S]{0,200}?target:\s*"(\w+)"(,\s*preference:\s*(true))?/g)]
+        .map(([, key, target, , pref]) => ({ key, target, preference: pref === "true" }));
+
+    check(`every backed-up key names the editor it belongs to (${entries.length} of ${listed.size})`,
+        entries.length === listed.size,
+        `${listed.size - entries.length} entr(ies) in BACKUP_KEYS carry no target field`);
+
+    const badTarget = entries.filter((e) => !editorTargets.has(e.target));
+    check("every backed-up key's target is a real editor",
+        badTarget.length === 0,
+        badTarget.map((e) => `${e.key} -> "${e.target}" is not in EDITORS`).join(", "));
+
+    /* An editor whose keys are ALL preferences would have a Start fresh that
+       silently does nothing at all -- a worse version of the original bug. */
+    const noDiscard = [...editorTargets].filter(
+        (t) => !entries.some((e) => e.target === t && !e.preference));
+    check("every editor has at least one key that Start fresh clears",
+        noDiscard.length === 0,
+        `discarding these clears nothing: ${noDiscard.join(", ")}`);
+
+    /* Only an id-shaped key may survive a discard. This is the rule that
+       stops the original bug being reintroduced as a decision: marking the
+       photograph or a document record as a preference would leave personal
+       content behind after the visitor asked for it to go. */
+    const keptContent = entries.filter((e) => {
+        if (!e.preference) { return false; }
+        const declared = appJsSrc.match(
+            new RegExp('key:\\s*"' + e.key + '"[\\s\\S]{0,200}?kind:\\s*"(\\w+)"'));
+        return !declared || declared[1] !== "id";
+    });
+    check("only a preference-shaped key survives Start fresh",
+        keptContent.length === 0,
+        `these hold content and must not be marked preference: ` +
+        keptContent.map((e) => e.key).join(", "));
+
+    /* And the handler must DERIVE the list rather than reach for the single
+       key EDITORS names, which is the exact line that caused this. */
+    const discardFn = (appJsSrc.match(
+        /function discardKeysFor[\s\S]*?\n    \}/) || [""])[0];
+    check("discardKeysFor derives its keys from BACKUP_KEYS",
+        /BACKUP_KEYS/.test(discardFn) && /preference/.test(discardFn),
+        "discardKeysFor must filter BACKUP_KEYS by target and skip preferences");
+
+    const onDiscard = (appJsSrc.match(
+        /const onDiscard = \(event\)[\s\S]*?\n        \};/) || [""])[0];
+    check("the Start fresh handler clears every key the editor owns",
+        /discardKeysFor\(/.test(onDiscard) &&
+        !/EDITORS\[[^\]]*\]\.storageKey/.test(onDiscard),
+        onDiscard.length
+            ? "the handler still reads EDITORS[...].storageKey, which names one key per editor"
+            : "the discard handler could not be located");
+
+    /* Device settings must stay OUT. Restoring a backup should not reach over
+       and change the theme someone is reading in, and tb_editor_preset is a
+       one-shot hand-off from the catalog that means nothing an hour later.
+       Written as a check rather than a comment because "add the theme too"
+       is an entirely reasonable-sounding thing for someone to do. */
+    const mustNotCarry = ["tb_theme", "tb_editor_preset", "tb_probe"];
+    const leaked = mustNotCarry.filter((k) => listed.has(k));
+    check("device settings are not carried in a backup",
+        leaked.length === 0,
+        `BACKUP_KEYS must not include: ${leaked.join(", ")}`);
+
+    /* The image guard is a SECOND copy of the shape docs.js enforces on the
+       stored logo. If docs.js ever accepts another raster type and this does
+       not, a restore drops every logo of that type and reports success; if
+       this accepts one docs.js does not, the guard is weaker than the editor
+       it is protecting. */
+    const docsSrc = fs.readFileSync(path.join(SITE, "js", "docs.js"), "utf8");
+    const docsUri = (docsSrc.match(/LOGO_URI\s*=\s*(\/.+\/)\s*;/) || [])[1];
+    const appUri = (appJsSrc.match(/IMAGE_URI\s*=\s*(\/.+\/)\s*;/) || [])[1];
+    check("the backup's image guard matches docs.js's stored-logo guard",
+        !!docsUri && docsUri === appUri,
+        `docs.js: ${docsUri || "not found"} | app.js: ${appUri || "not found"}`);
+
+    /* The image and colour guards are applied by FIELD NAME, so a typo is
+       silent in the worst way: the field falls through to plain text, an
+       unvetted value reaches ctx.fillStyle or an SVG fill attribute, and
+       everything still renders. Each name must be one an editor persists. */
+    const editorSrc = EDITOR_FILES
+        .map((f) => fs.readFileSync(path.join(SITE, "js", f), "utf8")).join("\n");
+    const nameList = (label) => {
+        const block = (appJsSrc.match(
+            new RegExp(label + "\\s*=\\s*\\[([^\\]]*)\\]")) || [])[1] || "";
+        return [...block.matchAll(/"([A-Za-z0-9_]+)"/g)].map(([, n]) => n);
+    };
+    ["IMAGE_FIELDS", "COLOUR_FIELDS"].forEach((label) => {
+        const names = nameList(label);
+        check(`${label} names at least one field (${names.length})`,
+            names.length > 0, "list not found or empty");
+        const unknown = names.filter(
+            (n) => !new RegExp("\\b" + n + ":").test(editorSrc));
+        check(`every ${label} entry is a field an editor persists`,
+            unknown.length === 0,
+            `not found as a property in any editor: ${unknown.join(", ")}`);
+    });
+
+    /* The format marker is what lets a wrong file be reported as a wrong file
+       rather than as an empty backup. Both halves have to agree or every
+       exported file is rejected by the importer that wrote it. */
+    const format = (appJsSrc.match(/BACKUP_FORMAT\s*=\s*"([^"]+)"/) || [])[1];
+    check("the backup format marker is declared once and non-empty",
+        !!format && (appJsSrc.match(/BACKUP_FORMAT\s*=/g) || []).length === 1,
+        `BACKUP_FORMAT=${format || "not found"}`);
+
+    /* Every page a visitor can reach has to be able to HOST the controls.
+
+       js/app.js mounts them into [data-nav-more-panel], and where a page has
+       none, into .editor-actions instead. That fallback is not hypothetical:
+       resume.html and docs.html carry no mega-menu panel at all, which
+       contradicts what this project's notes claim about every public page
+       having one, and without the fallback the backup controls would be
+       missing from the resume editor -- the page whose documents live longest.
+
+       A page with neither host offers no backup and says nothing about it. */
+    const hostless = [];
+    fs.readdirSync(SITE).filter((f) => f.endsWith(".html")).forEach((name) => {
+        /* admin.html is the private authoring tool, loading.html has no header
+           at all by design, and offline.html must reference nothing. */
+        if (["admin.html", "loading.html", "offline.html"].indexOf(name) !== -1) {
+            return;
+        }
+        const html = fs.readFileSync(path.join(SITE, name), "utf8");
+        if (!/data-nav-more-panel/.test(html) &&
+                !/class="editor-actions"/.test(html)) {
+            hostless.push(name);
+        }
+    });
+    check("every public page can host the backup controls",
+        hostless.length === 0,
+        `no [data-nav-more-panel] and no .editor-actions: ${hostless.join(", ")}`);
+
+    /* Prototype pollution. JSON.parse defines __proto__ as an own property,
+       but the walker COPIES into a fresh object, and there the same name is
+       the prototype setter. One line, and its absence is invisible. */
+    check("the import walker refuses prototype-poisoning key names",
+        /UNSAFE_KEYS\s*=\s*\[[^\]]*"__proto__"/.test(appJsSrc),
+        "UNSAFE_KEYS must list __proto__");
+
+    /* Cleaning has to finish before ANY write, or a half-valid file leaves
+       storage half replaced: the visitor loses what it overwrote and does not
+       gain what it could not restore.
+
+       Checked as "the gathering loop contains no write" rather than as
+       "the first write comes after the last clean". The position comparison
+       was the obvious form and it is useless: a storageSet added INSIDE the
+       gathering loop still sits after the cleanRecord call on the line above
+       it, so the ordering holds and the check passes while the property it
+       was written for is gone. Confirmed by breaking it exactly that way. */
+    const gather = (appJsSrc.match(
+        /const cleaned = \[\][\s\S]*?if \(!cleaned\.length\)/) || [""])[0];
+    check("applyBackup's gathering pass performs no writes",
+        gather.length > 0 && gather.indexOf("storageSet(") === -1,
+        gather.length
+            ? "a storageSet call sits inside the loop that cleans records"
+            : "the gathering pass could not be located -- applyBackup was restructured");
+
+    /* And the write pass has to exist, or the two halves of the check above
+       could both be satisfied by a function that never writes at all. */
+    const writePass = (appJsSrc.match(
+        /if \(!cleaned\.length\)[\s\S]*?return \{\s*ok: true/) || [""])[0];
+    check("applyBackup writes every cleaned record after the gathering pass",
+        writePass.indexOf("storageSet(") > -1,
+        "no storageSet call between the emptiness guard and the success return");
 }
 
 function pwaChecks(pages) {
@@ -1831,26 +2079,127 @@ async function layoutChecks(page) {
         ["homepage", "/", ".home-rail"],
         ["mockup editor", "/mockup.html", ".editor-rail"]
     ]) {
-        for (const width of [1920, 1440, 1366, 1200]) {
+        /* 1100 and 375 were added on September 16, 2026 with the panel's
+           height cap. They are the widths where a FIXED ANCHOR is mounted,
+           and without at least one of them the anchor-clearance check below
+           can never fail: the anchor's ceiling is 74.9375rem and every other
+           width here is above it. They are also the burger widths, which is
+           the harder case for the cap -- the header grows a second row when
+           the nav opens, so the panel's room has to be measured, not
+           assumed. */
+        for (const width of [1920, 1440, 1366, 1200, 1100, 375]) {
             await page.navigate(`http://localhost:${PORT}${urlPath}`, width);
-            const r = await page.evaluate(`(() => {
+            const r = await page.evaluate(`(async () => {
                 const toggle = document.querySelector('[data-nav-more-toggle]');
                 if (!toggle) return { skipped: true };
+
+                /* Below 74.9375rem the whole nav collapses behind the burger,
+                   so .nav-more is display:none and clicking the More toggle
+                   inside it yields a zero-sized panel and a run of false
+                   failures. Open the burger first.
+
+                   Checking .nav-more's own display rather than the width,
+                   because the width at which it collapses is a fact about the
+                   stylesheet and repeating it here is a second copy of it. */
+                const more = document.querySelector('[data-nav-more]');
+                if (more && getComputedStyle(more).display === 'none') {
+                    const burger = document.querySelector('[data-nav-toggle]');
+                    if (!burger) { return { skipped: true }; }
+                    burger.click();
+                }
+
+                /* WAIT FOR --header-h TO CATCH UP BEFORE MEASURING ANYTHING.
+
+                   Opening the burger grows the header by a whole row, and the
+                   panel's max-height is calculated from --header-h, which
+                   js/app.js republishes from a ResizeObserver -- asynchronously.
+                   Measure in the same tick as the click and the panel is
+                   positioned below the NEW header while sized against the OLD
+                   one, so it overflows by exactly the difference.
+
+                   That is not a hypothetical. The first run of these checks
+                   failed at 1100 and 375 with a panel 662px tall where
+                   900 - 85 - 12 - 24 - 116 = 663 -- the arithmetic of a 85px
+                   header, while the panel actually hung below a 302px one. The
+                   CSS was correct and the stopwatch was started too early, the
+                   same fault this section's scroll check documents further down.
+
+                   Polling until the published value matches the rendered height
+                   is deterministic regardless of how long the observer takes. */
+                const root = document.documentElement;
+                const hdr = document.querySelector('.site-header');
+                for (let i = 0; i < 60; i += 1) {
+                    await new Promise(r => requestAnimationFrame(r));
+                    const real = Math.ceil(hdr.getBoundingClientRect().height);
+                    const published = parseFloat(
+                        getComputedStyle(root).getPropertyValue('--header-h'));
+                    if (published === real) { break; }
+                }
+
                 toggle.click();
+                await new Promise(r => requestAnimationFrame(r));
                 const p = document.querySelector('[data-nav-more-panel]');
+                if (!p.getBoundingClientRect().height) { return { notOpen: true }; }
                 const b = p.getBoundingClientRect();
                 const rail = document.querySelector(${JSON.stringify(railSelector)});
                 const up = rail && getComputedStyle(rail).display !== 'none' && rail.querySelector('.ad-slot');
                 const mid = document.elementFromPoint(b.x + b.width / 2, b.y + 12);
+
+                /* The FOOT of the panel, which is what this section used to
+                   miss entirely: it asked whether the top was clickable and
+                   never whether the bottom could be reached at all. It could
+                   not. The panel measured 1121px hanging from y=96 in a 900px
+                   viewport with no max-height, and because .site-header is
+                   sticky and this is absolute against it, scrolling the page
+                   never brought the foot into view -- which stranded
+                   .nav-more-social, the only route to the social links since
+                   the footer was folded into this menu.
+
+                   Scrolling the panel to its end and hit-testing the last row
+                   is deliberately stronger than "does the box fit": a panel
+                   that fits by being clipped would pass a bounds check and
+                   still lose its last row. */
+                const last = p.lastElementChild;
+                p.scrollTop = p.scrollHeight;
+                const lr = last.getBoundingClientRect();
+                const lastHit = document.elementFromPoint(lr.left + 20, lr.top + 10);
+
+                /* An anchor is fixed to the foot of the window and CANNOT be
+                   painted under: the header is a stacking context at z-index
+                   20, below the anchor's 30, so no z-index on this panel can
+                   lift it (measured at 30, 40 and 999). The panel therefore
+                   has to stop above it. */
+                const anchor = document.querySelector('.site-anchor.is-filled, .editor-anchor.is-filled');
+                const aTop = anchor ? anchor.getBoundingClientRect().top : null;
+
                 return { hidden: p.hasAttribute('hidden'), left: +b.x.toFixed(1), right: +b.right.toFixed(1),
                          railLeft: up ? +rail.getBoundingClientRect().x.toFixed(1) : null,
-                         reachable: !!(mid && p.contains(mid)) };
+                         reachable: !!(mid && p.contains(mid)),
+                         bottom: +b.bottom.toFixed(1), innerHeight: window.innerHeight,
+                         anchorTop: aTop === null ? null : +aTop.toFixed(1),
+                         lastClass: last ? last.className : null,
+                         lastReachable: !!(lastHit && (last === lastHit || last.contains(lastHit))) };
             })()`);
             if (r.skipped) { continue; }
+            /* Distinct from `skipped`: the controls are present and the
+               panel still did not open, which is a real fault and must not
+               be quietly stepped over the way an absent menu is. */
+            check(`${label} mega-menu @${width}: the panel opens at all`,
+                !r.notOpen, "clicking the toggle produced a zero-height panel");
+            if (r.notOpen) { continue; }
             check(`${label} mega-menu @${width}: opens on screen, clear of the column, clickable`,
                 !r.hidden && r.left >= 0 && r.reachable &&
                 (r.railLeft === null || r.right <= r.railLeft + 0.5),
                 JSON.stringify(r));
+
+            check(`${label} mega-menu @${width}: its foot is on screen and reachable`,
+                r.bottom <= r.innerHeight + 0.5 && r.lastReachable,
+                `bottom ${r.bottom} vs viewport ${r.innerHeight}, ` +
+                `last row "${r.lastClass}" reachable=${r.lastReachable}`);
+
+            check(`${label} mega-menu @${width}: stops above a mounted anchor`,
+                r.anchorTop === null || r.bottom <= r.anchorTop + 0.5,
+                `panel bottom ${r.bottom} vs anchor top ${r.anchorTop}`);
         }
     }
 
