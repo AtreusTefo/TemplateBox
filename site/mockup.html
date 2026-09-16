@@ -13,12 +13,14 @@
     <meta property="og:title" content="Product Mockup Generator for Print-on-Demand | TemplateBox">
     <meta property="og:description" content="Pick a mockup template, drop in your artwork, and see edits live on t-shirts, hoodies, mugs, and packaging.">
     <meta property="og:url" content="https://templatebox.win/mockup.html">
-    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+    <meta property="og:image" content="https://templatebox.win/assets/og-mockup.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <!-- Twitter Card: without these every share renders as a bare link -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Product Mockup Generator for Print-on-Demand | TemplateBox">
     <meta name="twitter:description" content="Pick a mockup template, drop in your artwork, and see edits live on t-shirts, hoodies, mugs, and packaging.">
-    <meta name="twitter:image" content="https://templatebox.win/assets/logo.png">
+    <meta name="twitter:image" content="https://templatebox.win/assets/og-mockup.png">
 
     <script type="application/ld+json">
     {
@@ -66,6 +68,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Installed app (Tier 0 PWA). The manifest is what makes Chrome offer
+         "Install"; iOS ignores its icons array entirely and reads the
+         apple-touch-icon link below, so both are needed. js/app.js registers
+         sw.js on window load, deliberately after the ad scripts.
+         Reference: docs/implementation/PWA_INSTALLABLE_APP.md -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="assets/icon-180.png">
+    <meta name="apple-mobile-web-app-title" content="TemplateBox">
+    <!-- Both spellings on purpose: mobile-web-app-capable is the standard,
+         and the apple- prefixed original is still the only one iOS before 18
+         understands. Dropping it puts Safari chrome back over a home-screen
+         launch on those devices. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- Status bar and task-switcher tint; visible only once installed.
+         js/app.js rewrites both once it knows whether the visitor chose a
+         theme explicitly rather than inheriting the system one -- see
+         syncThemeColor() there. -->
+    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">
     <!-- Theme, applied before first paint so a returning visitor never sees a
          flash of the wrong one. Deliberately inline and synchronous: an
          external file would load after the first paint and the flash is
@@ -173,18 +195,29 @@
                         <h2>Apparel</h2>
                         <ul>
                             <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt on Model</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white-back">White T-Shirt on Model, Back</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie on Model</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie on Model, Back</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap on Model</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt">Classic T-Shirt</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie">Pullover Hoodie</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat on Model</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-cap-clay">White T-Shirt and Cap on Clay</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">White T-Shirt on a Hanger</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">White Hoodie on a Hanger</a></li>
                         </ul>
                     </div>
                     <div>
                         <h2>Print and Packaging</h2>
                         <ul>
                             <li><a href="mockup.html" data-target="mockup" data-doc="wood-a4">Leaning Wood Frame Poster</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-black-interior">Framed Poster in Interior</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Shopping Bag</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="mug">Ceramic Mug</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="box">Packaging Box</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Cards on Walnut</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="card-white-duotone">Business Cards on Duotone</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Stand</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="banner-rollup-angled">Roll-Up Banner, Angled</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-black-shelf">Framed Poster over a Shelf</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-wood-linen">Framed Print on Linen</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-held">Paper Shopping Bag in Hand</a></li>
                         </ul>
                     </div>
                     <div>
@@ -335,6 +368,18 @@
                              -- the visible buttons carry the accessible
                              names and call .click() on it. -->
                         <input type="file" id="m-design" class="file-trigger" accept="image/*">
+
+                        <!-- Surface switch. Empty and hidden in the served
+                             markup: js/mockup.js fills it only for a template
+                             that declares more than one printable surface,
+                             which today is the two-card business card mockup
+                             alone. Every other template never sees it.
+
+                             It moves the EDITING focus, not what renders --
+                             both cards always paint their own designs. It
+                             decides which surface a new upload lands on and
+                             which surface's layers the list below shows. -->
+                        <div class="zone-switch" id="m-zone-switch" data-mockup-zones role="group" aria-label="Choose which surface to edit" hidden></div>
 
                         <ul class="layer-list" id="m-layer-list" data-mockup-layers aria-labelledby="m-design-label"></ul>
 
@@ -595,8 +640,17 @@
                              CSS scales the visible element responsively.
                              aria-label is set from js/mockup.js to name the active
                              mockup: with the template picker gone, this is the
-                             only text that identifies which one is loaded. -->
-                        <canvas id="mockup-canvas" width="1000" height="1000" role="img" aria-label="Mockup preview"></canvas>
+                             only text that identifies which one is loaded.
+
+                             aria-busy starts TRUE and js/mockup.js clears it on
+                             the first paint. The canvas exists from the moment
+                             the parser reaches this line, but the script that
+                             fills it runs at the foot of the body, so without
+                             this there is a window where an empty canvas
+                             announces itself as ready. It is a short window and
+                             a permanent one if that script never loads at all,
+                             which is exactly the case where "busy" is true. -->
+                        <canvas id="mockup-canvas" width="1000" height="1000" role="img" aria-busy="true" aria-label="Mockup preview"></canvas>
 
                         <!-- Selection chrome (bounding box, corner handles,
                              rotate handle, layer name tag) is drawn HERE and
@@ -641,6 +695,7 @@
     <script src="js/app.js"></script>
     <!-- Photographic mockup template registry: must load before the editor
          logic so its products register at startup -->
+    <script src="js/color-picker.js"></script>
     <script src="js/mockup-templates.js"></script>
     <script src="js/mockup-displace.js"></script>
     <script src="js/mockup.js"></script>

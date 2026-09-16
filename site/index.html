@@ -15,13 +15,15 @@
     <meta property="og:title" content="Free Invoice, Receipt and Resume Maker | TemplateBox">
     <meta property="og:description" content="Editable rent receipts, invoices, business receipts, warning notices, resumes and posters. Free, local, no sign-up required.">
     <meta property="og:url" content="https://templatebox.win/">
-    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+    <meta property="og:image" content="https://templatebox.win/assets/og-cover.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
 
     <!-- Twitter Card: without these every share renders as a bare link -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Free Invoice, Receipt and Resume Maker | TemplateBox">
     <meta name="twitter:description" content="Editable rent receipts, invoices, resumes, posters and mockups. Free, local, no sign-up required.">
-    <meta name="twitter:image" content="https://templatebox.win/assets/logo.png">
+    <meta name="twitter:image" content="https://templatebox.win/assets/og-cover.png">
 
     <!-- Structured data: WebApplication schema per Google Search Central -->
     <script type="application/ld+json">
@@ -107,6 +109,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Installed app (Tier 0 PWA). The manifest is what makes Chrome offer
+         "Install"; iOS ignores its icons array entirely and reads the
+         apple-touch-icon link below, so both are needed. js/app.js registers
+         sw.js on window load, deliberately after the ad scripts.
+         Reference: docs/implementation/PWA_INSTALLABLE_APP.md -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="assets/icon-180.png">
+    <meta name="apple-mobile-web-app-title" content="TemplateBox">
+    <!-- Both spellings on purpose: mobile-web-app-capable is the standard,
+         and the apple- prefixed original is still the only one iOS before 18
+         understands. Dropping it puts Safari chrome back over a home-screen
+         launch on those devices. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- Status bar and task-switcher tint; visible only once installed.
+         js/app.js rewrites both once it knows whether the visitor chose a
+         theme explicitly rather than inheriting the system one -- see
+         syncThemeColor() there. -->
+    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">
     <!-- Theme, applied before first paint so a returning visitor never sees a
          flash of the wrong one. Deliberately inline and synchronous: an
          external file would load after the first paint and the flash is
@@ -190,7 +212,9 @@
                             <li><a href="cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
                             <li><a href="itemized-receipt-template.html">Itemized Business Receipt</a></li>
                             <li><a href="sales-receipt-template.html">Sales Receipt Form</a></li>
+                            <li><a href="trade-counter-receipt-template.html">Trade Counter Receipt</a></li>
                             <li><a href="free-invoice-template.html">Free Invoice Template</a></li>
+                            <li><a href="editable-invoice-template.html">Editable Invoice with Logo</a></li>
                             <li><a href="employee-warning-notice-template.html">Employee Warning Notice</a></li>
                         </ul>
                     </div>
@@ -200,6 +224,7 @@
                             <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
                             <li><a href="poster-maker.html">Poster Maker</a></li>
                             <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
+                            <li><a href="anniversary-calendar-poster.html">Anniversary Calendar Poster</a></li>
                         </ul>
                     </div>
                     <div>
@@ -212,13 +237,24 @@
                              it -- do not swap these for buttons. -->
                         <ul>
                             <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white-back">White T-Shirt Back Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="card-white-duotone">Duotone Business Card Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="banner-rollup-angled">Angled Roll-Up Banner Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie Back Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-cap-clay">T-Shirt and Cap Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-black-shelf">Framed Poster Wall Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-wood-linen">Linen Framed Print Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-held">Packaging Mockup</a></li>
                         </ul>
                     </div>
                     <div>
@@ -423,6 +459,87 @@
                 <article class="template-card" data-category="documents">
                     <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
+                            <div class="mock-doc invoiced">
+                                <div class="mk-inv-head">
+                                    <p class="mk-inv-title">Invoice</p>
+                                    <span class="mk-inv-mark"></span>
+                                </div>
+                                <div class="mk-row"><span class="mk-lbl">Date</span><span class="mk-val">14 Aug</span></div>
+                                <div class="mk-row"><span class="mk-lbl">No.</span><span class="mk-val">0148</span></div>
+                                <div class="mk-row"><span class="mk-lbl">Bill to</span><span class="mk-val">Larkfield Group</span></div>
+                                <div class="mk-grid">
+                                    <span class="mk-gh">Date</span><span class="mk-gh">Item</span><span class="mk-gh">Price</span><span class="mk-gh">Qty</span><span class="mk-gh">Total</span>
+                                    <span>1 Aug</span><span>Oak shelving</span><span>45.00</span><span>6</span><span>270.00</span>
+                                    <span>1 Aug</span><span>Brass fittings</span><span>42.00</span><span>2</span><span>84.00</span>
+                                    <span></span><span></span><span></span><span></span><span></span>
+                                    <span></span><span></span><span></span><span></span><span></span>
+                                </div>
+                                <div class="mk-fill"></div>
+                                <div class="mk-inv-foot"><span class="mk-inv-thanks">Thank you!</span><span class="mk-inv-box">Total  $389.00</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Receipts and Invoices</p>
+                        <h3 class="card-title"><a class="card-link" href="docs.html" data-target="docs" data-doc="logo-invoice">Editable Invoice with Logo</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc trade">
+                                <div class="mk-tr-card">
+                                    <div class="mk-tr-brand"><b></b><b></b><span></span><span></span><span></span></div>
+                                    <div class="mk-tr-refs"><span></span><span></span><span></span></div>
+                                </div>
+                                <div class="mk-tr-acct"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                                <div class="mk-tr-grid">
+                                    <div class="mk-tr-head"><span>Quantity</span><span>Descriptions</span><span></span><span>Amount</span><span></span></div>
+                                    <div class="mk-tr-body">
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                        <div class="mk-tr-row"></div>
+                                    </div>
+                                </div>
+                                <div class="mk-tr-totals">
+                                    <span class="mk-tr-tot"></span>
+                                    <span class="mk-tr-tot"></span>
+                                    <span class="mk-tr-tot is-final"></span>
+                                </div>
+                                <div class="mk-tr-terms"><i></i><span></span><span></span><span></span><span></span></div>
+                                <svg class="mk-tr-band" viewBox="0 0 600 60" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                                    <defs>
+                                        <linearGradient id="mk-tr-wash" x1="0" x2="1">
+                                            <stop offset="0" stop-color="#FFFFFF"></stop>
+                                            <stop offset="0.55" stop-color="#9A9A9A"></stop>
+                                            <stop offset="1" stop-color="#231F20"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M0,40 C150,22 340,12 600,6 L600,60 L0,60 Z" fill="url(#mk-tr-wash)"></path>
+                                    <path d="M240,60 C360,34 470,20 600,14 L600,60 Z" fill="#231F20"></path>
+                                    <path d="M0,34 C150,16 340,6 600,0 L600,9 C340,15 150,25 0,43 Z" fill="#B92025"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Receipts and Invoices</p>
+                        <h3 class="card-title"><a class="card-link" href="docs.html" data-target="docs" data-doc="trade-receipt">Trade Counter Receipt</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="documents">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
                             <div class="mock-doc">
                                 <p class="mk-title boxed">Employee Warning Notice</p>
                                 <div class="mk-row"><span class="mk-lbl">Employee</span><span class="mk-val">J. Whitmore</span></div>
@@ -443,56 +560,43 @@
                 </article>
 
                 <article class="template-card" data-category="resumes">
+                    <!-- Repointed at the grey-rail descriptor on August 30,
+                         2026. This card carried no data-doc and so launched
+                         the editor with no preset, meaning it rendered
+                         whichever template was last used -- three cards here
+                         promised three designs and delivered one, and after
+                         Ruled Serif shipped they delivered it inconsistently.
+                         The miniature is rebuilt to depict what the card now
+                         actually produces: a two-column sheet with a rail. -->
                     <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc">
-                                <p class="mk-name">Adaeze Nwosu</p>
-                                <p class="mk-role">Operations Director</p>
-                                <p class="mk-contact">adaeze.nwosu@mail.com | +1 555 0148 | Chicago, IL</p>
-                                <p class="mk-h">Summary</p>
-                                <p class="mk-p">Fifteen years leading supply chain and fulfilment teams across three continents.</p>
-                                <p class="mk-h">Experience</p>
-                                <p class="mk-t">Director of Operations, Northwind Logistics</p>
-                                <p class="mk-s">2019 - Present</p>
-                                <p class="mk-p">Cut fulfilment lead time 34% across nine regional depots.</p>
-                                <p class="mk-t">Head of Fulfilment, Cardinal Freight</p>
-                                <p class="mk-s">2014 - 2019</p>
-                                <div class="mk-fill"></div>
-                                <p class="mk-h">Education</p>
-                                <p class="mk-s">MBA, Kellogg School of Management</p>
+                            <div class="mock-doc railed accent-graphite">
+                                <div class="mk-main">
+                                    <p class="mk-name">Tomas<br>Lindqvist</p>
+                                    <p class="mk-h">Professional Summary</p>
+                                    <p class="mk-p">Designer focused on design systems and accessible interface patterns.</p>
+                                    <p class="mk-h">Work History</p>
+                                    <p class="mk-t">Senior Product Designer, 2021</p>
+                                    <p class="mk-s">Fjord Labs, Stockholm</p>
+                                    <div class="mk-fill"></div>
+                                    <p class="mk-h">Education</p>
+                                    <p class="mk-s">BA Design, Konstfack</p>
+                                </div>
+                                <div class="mk-rail">
+                                    <p class="mk-rail-line">Sveavagen 12, Stockholm</p>
+                                    <p class="mk-rail-line">+46 70 555 0192</p>
+                                    <p class="mk-rail-line">tomas.l@mail.com</p>
+                                    <p class="mk-rail-h">Skills</p>
+                                    <p class="mk-rail-line">Design systems</p>
+                                    <p class="mk-rail-line">Prototyping</p>
+                                    <p class="mk-rail-line">User research</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume">Executive Resume</a></h3>
-                    </div>
-                </article>
-
-                <article class="template-card" data-category="resumes">
-                    <div class="card-preview" aria-hidden="true">
-                        <div class="card-media">
-                            <div class="mock-doc accent-navy">
-                                <p class="mk-name">Tomas Lindqvist</p>
-                                <p class="mk-role">Product Designer</p>
-                                <p class="mk-contact">tomas.l@mail.com | +46 70 555 0192 | Stockholm</p>
-                                <p class="mk-h">Profile</p>
-                                <p class="mk-p">Designer focused on design systems and accessible interface patterns.</p>
-                                <p class="mk-h">Experience</p>
-                                <p class="mk-t">Senior Product Designer, Fjord Labs</p>
-                                <p class="mk-s">2021 - Present</p>
-                                <p class="mk-p">Owned the component library used by four product teams.</p>
-                                <p class="mk-t">Product Designer, Almen Studio</p>
-                                <p class="mk-s">2018 - 2021</p>
-                                <div class="mk-fill"></div>
-                                <p class="mk-h">Skills</p>
-                                <p class="mk-s">Design systems, prototyping, user research, WCAG</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-category">Resumes</p>
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume">Modern Professional CV</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="grey-rail">Modern Professional CV</a></h3>
                     </div>
                 </article>
 
@@ -518,7 +622,227 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Resumes</p>
-                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume">Minimalist ATS Resume</a></h3>
+                        <!-- data-doc is REQUIRED on every card, even one that
+                             launches the default template. Without it
+                             bindLaunchControls stores no preset and clears
+                             none, so the editor falls through to the last
+                             template the visitor used and this card opens
+                             whatever they happened to look at before it. The
+                             id names the CARD; the editor resolves an id it
+                             has no descriptor for to Classic, which is what
+                             this card relies on -- there is no
+                             `minimalist-ats-resume` descriptor and there does
+                             not need to be.
+
+                             It is the ONLY resume card resolving that way, as
+                             of September 8, 2026. "Executive Resume" resolved
+                             to Classic too, so the two were one document
+                             behind two names and two identical miniatures;
+                             that card is deleted rather than renamed, because
+                             the catalog promising a design the registry does
+                             not hold is the fault itself. -->
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="minimalist-ats-resume">Minimalist ATS Resume</a></h3>
+                    </div>
+                </article>
+
+                <!-- Its miniature needs the .ruled modifier because centred
+                     serif headings between two rules are the whole signature
+                     of the design. This once read "the first resume card
+                     carrying a data-doc", which stopped being true on August
+                     30, 2026 when the other cards were given one. -->
+                <article class="template-card" data-category="resumes">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc labelled">
+                                <div class="mk-lb-head">
+                                    <div class="mk-lb-photo"></div>
+                                    <div class="mk-lb-id">
+                                        <p class="mk-name">Alex Rivera Santos</p>
+                                        <p class="mk-contact">Riverside District, Northfield</p>
+                                        <p class="mk-contact">0400 555 018</p>
+                                    </div>
+                                </div>
+                                <div class="mk-lb-band">
+                                    <p class="mk-lb-label">Objective</p>
+                                    <div class="mk-lb-body"><span></span><span></span><span></span><span class="mk-li-short"></span></div>
+                                </div>
+                                <div class="mk-lb-band">
+                                    <p class="mk-lb-label">Experience</p>
+                                    <div class="mk-lb-body">
+                                        <p class="mk-lb-role"><b>Warehouse Assistant</b> <em>May - Jun</em></p>
+                                        <span class="mk-li"></span><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li mk-li-short"></span>
+                                    </div>
+                                </div>
+                                <div class="mk-lb-band">
+                                    <p class="mk-lb-label">Education</p>
+                                    <div class="mk-lb-body">
+                                        <p class="mk-lb-role">Northfield Senior High School</p>
+                                        <span></span>
+                                        <span class="mk-li-short"></span>
+                                    </div>
+                                </div>
+                                <div class="mk-lb-band">
+                                    <p class="mk-lb-label">Personal Attributes</p>
+                                    <div class="mk-lb-body"><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li mk-li-short"></span></div>
+                                </div>
+                                <div class="mk-lb-band">
+                                    <p class="mk-lb-label">Skills</p>
+                                    <div class="mk-lb-body"><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li"></span><span class="mk-li mk-li-short"></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Resumes</p>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="label-rail">Labelled Sections CV</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="resumes">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc ruled accent-green">
+                                <p class="mk-name">Calling Johnson</p>
+                                <p class="mk-contact">Gaborone, Botswana &#9670; +267 72654256 &#9670; callingjohnson@mail.com</p>
+                                <p class="mk-h">Professional Summary</p>
+                                <p class="mk-p">Strong foundation in computer science with hands-on experience in Java and SQL.</p>
+                                <p class="mk-h">Skills</p>
+                                <div class="mk-two">
+                                    <p class="mk-p">Problem-solving</p>
+                                    <p class="mk-p">Teamwork</p>
+                                    <p class="mk-p">Attention to detail</p>
+                                    <p class="mk-p">Flexible and adaptable</p>
+                                </div>
+                                <p class="mk-h">Experience</p>
+                                <p class="mk-t">GTA Auto Spares (Pty) Ltd</p>
+                                <p class="mk-s">Graphic Designer, Gaborone</p>
+                                <div class="mk-fill"></div>
+                                <p class="mk-h">Education</p>
+                                <p class="mk-s">BSc (Hons) Software Engineering</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Resumes</p>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="ruled-serif">Ruled Serif CV</a></h3>
+                    </div>
+                </article>
+
+                <!-- The only card whose editor asks for a photograph, so the
+                     miniature leads with one: a pale panel down the left with
+                     a portrait block at the top of it, which is the single
+                     thing that distinguishes this design from the two-column
+                     card above. .photo reuses every .mk- class the other
+                     resume miniatures use and adds only the panel side, the
+                     panel tint and the portrait block. -->
+                <article class="template-card" data-category="resumes">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc photo accent-navy">
+                                <div class="mk-panel">
+                                    <div class="mk-portrait"></div>
+                                    <p class="mk-panel-h">Contact</p>
+                                    <p class="mk-panel-line">eliza.reed@mail.com</p>
+                                    <p class="mk-panel-line">+1 415 555 0123</p>
+                                    <p class="mk-panel-h">Skills</p>
+                                    <p class="mk-panel-line">Python, PyTorch</p>
+                                    <p class="mk-panel-line">LLMs, NLP</p>
+                                    <p class="mk-panel-h">Education</p>
+                                    <p class="mk-panel-line">PhD Computer Science</p>
+                                </div>
+                                <div class="mk-main">
+                                    <p class="mk-name">Eliza Reed</p>
+                                    <p class="mk-role">Machine Learning Engineer</p>
+                                    <div class="mk-bar"></div>
+                                    <p class="mk-h">Professional Summary</p>
+                                    <p class="mk-p">Builds and ships large language model systems end to end.</p>
+                                    <p class="mk-h">Experience</p>
+                                    <p class="mk-t">Senior ML Engineer</p>
+                                    <p class="mk-s">Northwind AI, San Francisco</p>
+                                    <div class="mk-fill"></div>
+                                    <p class="mk-h">Certifications and Awards</p>
+                                    <p class="mk-s">Best Paper, NeurIPS 2022</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Resumes</p>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="photo-rail">Photo Profile CV</a></h3>
+                    </div>
+                </article>
+
+                <!-- The filled heading chip and the ruled marks table ARE the
+                     signature of this template, so the default miniature --
+                     left-aligned headings on an accent underline -- would
+                     depict a different document on its card. Only the banner,
+                     the chip and the grid are added; every other .mk- class is
+                     shared with the five resume miniatures beside it. -->
+                <article class="template-card" data-category="resumes">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc biodata accent-navy">
+                                <p class="mk-name">Resume</p>
+                                <p class="mk-h"><span>Personal Details</span></p>
+                                <p class="mk-s">Name : Aman Kaur</p>
+                                <p class="mk-s">Date of Birth : 12 January 2004</p>
+                                <p class="mk-h"><span>Objective</span></p>
+                                <p class="mk-p">To work in a reputed organization where I can learn new skills and contribute.</p>
+                                <p class="mk-h"><span>Education</span></p>
+                                <div class="mk-grid">
+                                    <span>Qualification</span><span>Board</span><span>Year</span><span>%</span>
+                                    <span>12th (Arts)</span><span>PSEB</span><span>2022</span><span>72%</span>
+                                    <span>10th</span><span>PSEB</span><span>2020</span><span>78%</span>
+                                </div>
+                                <div class="mk-fill"></div>
+                                <p class="mk-h"><span>Declaration</span></p>
+                                <p class="mk-p">I hereby declare that the above information is true.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Resumes</p>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="boxed-biodata">Boxed Headings Biodata CV</a></h3>
+                    </div>
+                </article>
+
+                <!-- The charcoal masthead, the circular portrait straddling it
+                     and the blush bands across both columns ARE this design,
+                     so the miniature draws all three. .portrait reuses the
+                     .mk- classes the other resume miniatures use and adds only
+                     the banner, the round photo and the band fill. -->
+                <article class="template-card" data-category="resumes">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc portrait">
+                                <div class="mk-banner"><span class="mk-banner-name">Abigail E. Diaz</span><span class="mk-banner-role">Applicant</span></div>
+                                <div class="mk-cols">
+                                    <div class="mk-side">
+                                        <div class="mk-round"></div>
+                                        <p class="mk-p">A fast learner who adapts quickly.</p>
+                                        <p class="mk-band">Contact</p>
+                                        <p class="mk-s">09918092848</p>
+                                        <p class="mk-s">abigail@mail.com</p>
+                                        <p class="mk-band">Personal Information</p>
+                                        <p class="mk-s">Nationality: Filipino</p>
+                                        <p class="mk-s">Religion: Roman Catholic</p>
+                                    </div>
+                                    <div class="mk-main">
+                                        <p class="mk-p">To be avail to enhance my skills and knowledge and help the company achieve their vision.</p>
+                                        <p class="mk-band">Educational Attainment</p>
+                                        <p class="mk-t">High School</p>
+                                        <p class="mk-s">Sta Maria Agro Industrial</p>
+                                        <p class="mk-band">Professional Experience</p>
+                                        <p class="mk-t">Retail Sales Associate</p>
+                                        <p class="mk-s">M&amp;H Fashion intl. co</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Resumes</p>
+                        <h3 class="card-title"><a class="card-link" href="resume.html" data-target="resume" data-doc="peach-portrait">Peach Portrait CV</a></h3>
                     </div>
                 </article>
 
@@ -535,7 +859,7 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Posters and Prints</p>
-                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster">Framed Photo Poster</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="framed-photo-poster">Framed Photo Poster</a></h3>
                     </div>
                 </article>
 
@@ -550,7 +874,7 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Posters and Prints</p>
-                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster">Matte Wood Canvas</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="matte-wood-canvas">Matte Wood Canvas</a></h3>
                     </div>
                 </article>
 
@@ -565,94 +889,536 @@
                     </div>
                     <div class="card-body">
                         <p class="card-category">Posters and Prints</p>
-                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster">Polished Gold Frame</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="polished-gold-frame">Polished Gold Frame</a></h3>
                     </div>
                 </article>
 
-                <article class="template-card" data-category="mockups">
+                <!-- The first poster card to carry a data-doc: the poster
+                     editor reads TB.takePreset() now, the same hand-off the
+                     document and mockup editors already use, so this opens
+                     with the card layout selected instead of the saved one. -->
+                <article class="template-card" data-category="canvas">
                     <div class="card-preview" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc mockup">
-                                <div class="mk-product">
-                                    <div class="mk-shape tee"><span class="mk-art">LOGO</span></div>
-                                </div>
-                                <div class="dot-row">
-                                    <span class="dot" style="background-color:#1A1A1A"></span>
-                                    <span class="dot" style="background-color:#FFFFFF"></span>
-                                    <span class="dot" style="background-color:#1F2A44"></span>
-                                </div>
+                            <div class="mock-doc poster" data-suit="hearts">
+                                <span class="mk-index mk-index-head">Q</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">K</span>
                             </div>
                         </div>
                     </div>
                     <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="hearts">Queen and King of Hearts</a></h3>
+                    </div>
+                </article>
+
+                <!-- Same layout, second suit. The hand-off carries the pairing
+                     as well as the style, so this card opens on a K and a Q --
+                     the order its own title advertises. -->
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="spades">
+                                <span class="mk-index mk-index-head">K</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">Q</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="spades">King and Queen of Spades</a></h3>
+                    </div>
+                </article>
+
+                <!-- The remaining two suits. Red leads with the queen and black
+                     with the king, which is what gives the four cards four
+                     titles rather than one title in four colours. -->
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="diamonds">
+                                <span class="mk-index mk-index-head">Q</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">K</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="diamonds">Queen and King of Diamonds</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="clubs">
+                                <span class="mk-index mk-index-head">K</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">Q</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="clubs">King and Queen of Clubs</a></h3>
+                    </div>
+                </article>
+
+                <!-- The split layout: two photographs, the lower one upside
+                     down. Its miniature carries data-layout as well as
+                     data-suit, because the plate is a diagonal split rather
+                     than the shared photo motif. -->
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="hearts" data-layout="split">
+                                <span class="mk-index mk-index-head">Q</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">K</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="split">Queen and King, Two Photos</a></h3>
+                    </div>
+                </article>
+
+                <!-- The split layout's other three suits. Same tile as the one
+                     above with a different pip, and a black plate on the two
+                     black suits -- see splitUpper() in js/poster.js, which the
+                     stylesheet mirrors. -->
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="spades" data-layout="split">
+                                <span class="mk-index mk-index-head">K</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">Q</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="split-spades">King and Queen of Spades, Two Photos</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="diamonds" data-layout="split">
+                                <span class="mk-index mk-index-head">Q</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">K</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="split-diamonds">Queen and King of Diamonds, Two Photos</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-suit="clubs" data-layout="split">
+                                <span class="mk-index mk-index-head">K</span>
+                                <div class="mk-plate"></div>
+                                <span class="mk-index mk-index-foot">Q</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="split-clubs">King and Queen of Clubs, Two Photos</a></h3>
+                    </div>
+                </article>
+
+                <!-- The search-screen layout: a phone results page with six
+                     photographs in it. The first poster tile that is not a
+                     playing card, so it carries data-layout alone -- there is
+                     no data-suit because there are no corner indices to put a
+                     pip under. -->
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-layout="browser">
+                                <p class="mk-wordmark">Google</p>
+                                <div class="mk-avatar"></div>
+                                <div class="mk-bar"></div>
+                                <div class="mk-rule"></div>
+                                <div class="mk-grid">
+                                    <div class="mk-col mk-col-left"><span></span><span></span><span></span></div>
+                                    <div class="mk-col mk-col-right"><span></span><span></span><span></span></div>
+                                </div>
+                                <p class="mk-hearts">&#9829;&#9829;&#9829;&#9829;</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="browser">Search Screen, Six Photos</a></h3>
+                    </div>
+                </article>
+
+                <!-- The music player. Carries data-layout alone like the search
+                     screen: no pip, so no data-suit. -->
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster" data-layout="player">
+                                <div class="mk-album"></div>
+                                <div class="mk-song"></div>
+                                <div class="mk-artist"></div>
+                                <p class="mk-heart">&#9829;</p>
+                                <div class="mk-bar"></div>
+                                <div class="mk-transport"><span></span><span></span><span></span><span></span><span></span></div>
+                                <div class="mk-code"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="player">Now Playing, Music Poster</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster anniv">
+                                <div class="mk-an-names"><span></span><i></i><span></span></div>
+                                <div class="mk-an-heart">
+                                    <b style="left:28.706%;top:23.357%;width:42.699%;height:60.182%"></b>
+                                    <b style="left:0.000%;top:13.718%;width:27.573%;height:27.711%"></b>
+                                    <b style="left:13.789%;top:0.000%;width:13.787%;height:12.853%"></b>
+                                    <b style="left:5.453%;top:4.572%;width:7.511%;height:8.281%"></b>
+                                    <b style="left:28.706%;top:8.866%;width:15.774%;height:12.845%"></b>
+                                    <b style="left:1.507%;top:42.458%;width:7.873%;height:9.457%"></b>
+                                    <b style="left:10.150%;top:42.458%;width:17.425%;height:20.930%"></b>
+                                    <b style="left:17.162%;top:64.397%;width:10.631%;height:12.768%"></b>
+                                    <b style="left:33.518%;top:84.489%;width:8.084%;height:9.470%"></b>
+                                    <b style="left:72.427%;top:13.718%;width:27.573%;height:27.711%"></b>
+                                    <b style="left:72.427%;top:0.000%;width:13.787%;height:12.853%"></b>
+                                    <b style="left:87.036%;top:4.572%;width:7.511%;height:8.281%"></b>
+                                    <b style="left:55.520%;top:8.866%;width:15.774%;height:12.845%"></b>
+                                    <b style="left:90.620%;top:42.458%;width:7.873%;height:9.457%"></b>
+                                    <b style="left:72.427%;top:42.458%;width:17.425%;height:20.930%"></b>
+                                    <b style="left:72.207%;top:64.397%;width:10.631%;height:12.768%"></b>
+                                    <b style="left:58.722%;top:84.489%;width:8.084%;height:9.470%"></b>
+                                    <b style="left:42.413%;top:84.489%;width:15.490%;height:15.511%"></b>
+                                </div>
+                                <div class="mk-an-code"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                                <p class="mk-an-month">NOVEMBER</p>
+                                <div class="mk-an-cal">
+                                    <div class="mk-an-head"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+                                    <div class="mk-an-rule"></div>
+                                    <div class="mk-an-grid"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                                </div>
+                                <div class="mk-an-tag"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="anniversary">Anniversary Calendar, Photo Heart</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster hbd">
+                                <div class="mk-hbd-boxes">
+                                    <b style="left:54.798%;top:19.404%;width:20.353%;height:11.697%"></b>
+                                    <b style="left:76.386%;top:24.765%;width:11.931%;height:14.958%"></b>
+                                    <b style="left:77.982%;top:40.594%;width:17.395%;height:14.211%"></b>
+                                    <b style="left:78.780%;top:55.951%;width:12.943%;height:12.765%"></b>
+                                    <b style="left:54.153%;top:42.823%;width:22.077%;height:13.129%"></b>
+                                    <b style="left:9.469%;top:61.784%;width:16.868%;height:16.932%"></b>
+                                    <b style="left:27.137%;top:66.161%;width:16.868%;height:16.714%"></b>
+                                    <b style="left:61.331%;top:68.381%;width:13.046%;height:13.351%"></b>
+                                    <b style="left:44.802%;top:67.410%;width:15.729%;height:17.816%"></b>
+                                    <b style="left:49.118%;top:56.690%;width:12.214%;height:10.187%"></b>
+                                    <b style="left:61.991%;top:56.606%;width:15.037%;height:11.319%"></b>
+                                    <b style="left:56.135%;top:31.635%;width:18.590%;height:10.738%"></b>
+                                </div>
+                                <p class="mk-hbd-month">SEPTEMBER</p>
+                                <div class="mk-hbd-cal">
+                                    <div class="mk-hbd-head"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+                                    <div class="mk-hbd-rule"></div>
+                                    <div class="mk-hbd-grid"><span></span><span></span><span></span><span></span><span></span></div>
+                                </div>
+                                <div class="mk-hbd-garland"><i></i><i></i><i></i><i></i><i></i></div>
+                                <div class="mk-hbd-quote"><span></span><span></span><span></span><span></span></div>
+                                <div class="mk-hbd-close"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="birthday">Birthday Calendar, Photo Cascade</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster trib">
+                                <div class="mk-tb-strings"><i></i><i></i><i></i><i></i></div>
+                                <div class="mk-tb-boxes">
+                                    <b style="left:56.039%;top:42.687%;width:18.983%;height:11.020%"></b>
+                                    <b style="left:75.022%;top:47.978%;width:17.437%;height:27.181%"></b>
+                                    <b style="left:25.099%;top:27.371%;width:10.805%;height:7.053%"></b>
+                                    <b class="tint" style="left:50.286%;top:67.467%;width:24.738%;height:20.048%"></b>
+                                    <b style="left:35.904%;top:27.077%;width:10.701%;height:10.726%"></b>
+                                    <b style="left:46.607%;top:26.489%;width:10.234%;height:12.857%"></b>
+                                    <b style="left:56.840%;top:26.000%;width:11.274%;height:6.624%"></b>
+                                    <b style="left:75.022%;top:36.921%;width:12.728%;height:11.056%"></b>
+                                    <b style="left:56.840%;top:32.623%;width:19.013%;height:10.359%"></b>
+                                    <b style="left:43.089%;top:53.708%;width:16.322%;height:13.761%"></b>
+                                    <b style="left:59.411%;top:53.380%;width:15.613%;height:14.087%"></b>
+                                    <b style="left:75.022%;top:74.874%;width:13.488%;height:8.704%"></b>
+                                    <b style="left:30.784%;top:67.467%;width:19.466%;height:22.207%"></b>
+                                    <b style="left:17.689%;top:71.028%;width:13.012%;height:15.627%"></b>
+                                    <b style="left:4.114%;top:69.432%;width:13.409%;height:10.675%"></b>
+                                </div>
+                                <p class="mk-tb-month">OCTOBER</p>
+                                <div class="mk-tb-cal">
+                                    <div class="mk-tb-head"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+                                    <div class="mk-tb-rule"></div>
+                                    <div class="mk-tb-grid"><span></span><span></span><span></span><span></span><span></span></div>
+                                </div>
+                                <div class="mk-tb-msg"><b></b><span></span><span></span><span></span></div>
+                                <div class="mk-tb-title"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="tribute">Birthday Tribute, Photo Wall</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster love">
+                                <div class="mk-lv-ring"></div>
+                                <div class="mk-lv-boxes">
+                                    <b style="left:3.005%;top:32.644%;width:22.050%;height:28.978%"></b>
+                                    <b class="mount" style="left:18.729%;top:36.172%;width:22.630%;height:22.174%"></b>
+                                    <b style="left:25.857%;top:59.290%;width:22.630%;height:21.230%"></b>
+                                    <b style="left:3.005%;top:62.382%;width:22.050%;height:18.138%"></b>
+                                    <b class="mount" style="left:65.208%;top:81.169%;width:24.558%;height:16.282%"></b>
+                                    <b style="left:3.005%;top:82.508%;width:27.715%;height:14.454%"></b>
+                                    <b style="left:32.447%;top:82.508%;width:24.473%;height:14.176%"></b>
+                                    <b class="mount" style="left:52.091%;top:83.893%;width:15.693%;height:12.421%"></b>
+                                </div>
+                                <div class="mk-lv-toprule"></div>
+                                <p class="mk-lv-month">SEPTEMBER</p>
+                                <div class="mk-lv-cal">
+                                    <div class="mk-lv-head"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+                                    <div class="mk-lv-rule"></div>
+                                    <div class="mk-lv-grid"><span></span><span></span><span></span><span></span><span></span></div>
+                                </div>
+                                <div class="mk-lv-tray"></div>
+                                <div class="mk-lv-msg"><span></span><span></span><span></span><em><span></span><i></i></em><span></span><span></span><span></span></div>
+                                <div class="mk-lv-title"></div>
+                                <div class="mk-lv-div"></div>
+                                <div class="mk-lv-names"></div>
+                                <div class="mk-lv-div low"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="love">Love Story Calendar, Photo Cascade</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster couple">
+                                <div class="mk-cp-grid">
+                                    <b></b><b></b><b></b>
+                                    <b></b><b></b><b></b>
+                                    <b></b><b></b><b></b>
+                                </div>
+                                <div class="mk-cp-word"></div>
+                                <div class="mk-cp-brk"></div>
+                                <div class="mk-cp-def"><span></span><span></span><span></span><span></span></div>
+                                <div class="mk-cp-close"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="couple">Anniversary Definition, Nine Photos</a></h3>
+                    </div>
+                </article>
+
+                <article class="template-card" data-category="canvas">
+                    <div class="card-preview" aria-hidden="true">
+                        <div class="card-media">
+                            <div class="mock-doc poster tune">
+                                <div class="mk-sp-greet"></div>
+                                <div class="mk-sp-heart">
+                                    <b style="left:12.444%;top:0%;width:25%;height:33.411%"></b>
+                                    <b style="left:62.556%;top:0%;width:25%;height:33.411%"></b>
+                                    <b style="left:0%;top:16.998%;width:12.444%;height:16.413%"></b>
+                                    <b style="left:87.556%;top:16.998%;width:12.444%;height:16.413%"></b>
+                                    <b style="left:37.444%;top:17.115%;width:25.111%;height:33.09%"></b>
+                                    <b style="left:0%;top:33.411%;width:12.444%;height:16.706%"></b>
+                                    <b style="left:12.444%;top:33.411%;width:25%;height:33.177%"></b>
+                                    <b style="left:62.556%;top:33.411%;width:25%;height:33.177%"></b>
+                                    <b style="left:87.556%;top:33.411%;width:12.444%;height:16.706%"></b>
+                                    <b style="left:37.444%;top:50.205%;width:25.111%;height:33.294%"></b>
+                                    <b style="left:25%;top:66.589%;width:12.444%;height:16.91%"></b>
+                                    <b style="left:62.556%;top:66.589%;width:12.444%;height:16.91%"></b>
+                                    <b style="left:37.444%;top:83.499%;width:12.556%;height:16.501%"></b>
+                                    <b style="left:50%;top:83.499%;width:12.556%;height:16.501%"></b>
+                                </div>
+                                <div class="mk-sp-code"><em></em><span><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+                                <div class="mk-sp-title"></div>
+                                <div class="mk-sp-bar"><u></u></div>
+                                <div class="mk-sp-row"><s></s><s></s><s class="disc"></s><s></s><s></s></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Posters and Prints</p>
+                        <h3 class="card-title"><a class="card-link" href="poster.html" data-target="poster" data-doc="tune">Song Poster, Photo Heart</a></h3>
+                    </div>
+                </article>
+
+                <!-- Was the drawn vector tee with its three colour dots until
+                     September 2, 2026. It is a photograph on a hanger now, so
+                     it is an ordinary photo card like the rest. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white/tshirt-hanger-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
                         <p class="card-category">Product Mockups</p>
-                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">T-Shirt Mockup</a></h3>
                     </div>
                 </article>
 
                 <!-- Split out of the former "T-Shirt and Hoodie" card: the
                      editor's template picker was removed, so one card can
                      only ever open one product. -->
+                <!-- Was the drawn vector hoodie with its three colour dots until
+                     September 3, 2026. A photograph on a hanger now, so it is
+                     an ordinary photo card like the rest. -->
                 <article class="template-card" data-category="mockups">
-                    <div class="card-preview" aria-hidden="true">
+                    <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc mockup">
-                                <div class="mk-product">
-                                    <div class="mk-shape hoodie"><span class="mk-art">LOGO</span></div>
-                                </div>
-                                <div class="dot-row">
-                                    <span class="dot" style="background-color:#1A1A1A"></span>
-                                    <span class="dot" style="background-color:#B9B7B2"></span>
-                                    <span class="dot" style="background-color:#1F2A44"></span>
-                                </div>
-                            </div>
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/hoodies/hoodie-hanger-white/hoodie-hanger-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="card-category">Product Mockups</p>
-                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></h3>
                     </div>
                 </article>
 
+                <!-- The first template carrying two garments, and the first
+                     two-zone entry outside the business card pair: the chest
+                     and the cap front are separate print zones with their own
+                     layers. The terracotta wall is load-bearing rather than
+                     decorative -- at saturation p1 81-115 against a gate of
+                     14 it cannot classify as fabric, which is what keeps the
+                     backdrop out of the recolour mask. -->
                 <article class="template-card" data-category="mockups">
-                    <div class="card-preview" aria-hidden="true">
+                    <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc mockup">
-                                <div class="mk-product">
-                                    <div class="mk-shape mug"><span class="mk-art">ART</span></div>
-                                </div>
-                                <div class="dot-row">
-                                    <span class="dot" style="background-color:#FFFFFF"></span>
-                                    <span class="dot" style="background-color:#1A1A1A"></span>
-                                    <span class="dot" style="background-color:#B5352E"></span>
-                                </div>
-                            </div>
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/sets/tshirt-cap-clay/tshirt-cap-clay-thumb.jpg" alt="" width="600" height="750" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="card-category">Product Mockups</p>
-                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="tshirt-cap-clay">T-Shirt and Cap Mockup</a></h3>
                     </div>
                 </article>
 
+                <!-- The card that ended the drawn era: this replaced the
+                     vector mug, the last product rendered from code rather
+                     than photographed. Square-on frame, so its aperture is a
+                     real axis-aligned rectangle and it needs no occlusion
+                     overlay, unlike the leaning interior frame. -->
                 <article class="template-card" data-category="mockups">
-                    <div class="card-preview" aria-hidden="true">
+                    <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <div class="mock-doc mockup">
-                                <div class="mk-product">
-                                    <div class="mk-shape box"><span class="mk-art">MARK</span></div>
-                                </div>
-                                <div class="dot-row">
-                                    <span class="dot" style="background-color:#C48A4A"></span>
-                                    <span class="dot" style="background-color:#FFFFFF"></span>
-                                    <span class="dot" style="background-color:#1A1A1A"></span>
-                                </div>
-                            </div>
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-shelf/frame-black-shelf-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-shelf/frame-black-shelf-thumb.jpg" alt="" width="600" height="750" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
                         <p class="card-category">Product Mockups</p>
-                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></h3>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="frame-black-shelf">Framed Poster Wall Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- The fourth frame, and the first whose maps came out of
+                     tools/mockup-admin.html's algorithm with NOTHING bypassed.
+                     The warm linen fails the saturation gate on every sample
+                     (p1 16/19/19 against 14) and every prop sits clear of the
+                     frame, so neither the trapezoid nor the dilation-bridge
+                     problem the other three hit arises here. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/posters-and-frames/frame-wood-linen/frame-wood-linen-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/posters-and-frames/frame-wood-linen/frame-wood-linen-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="frame-wood-linen">Linen Framed Print Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- Was the drawn vector box with its three colour dots until
+                     September 3, 2026, the last drawn product to be replaced by
+                     a photograph. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/packaging/bags/bag-paper-held/bag-paper-held-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/packaging/bags/bag-paper-held/bag-paper-held-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="bag-paper-held">Packaging Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- The first card whose print surfaces are quads rather than
+                     rectangles. js/mockup.js gained the inverse homography on
+                     September 3, 2026 so a warped zone is grabbable. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/business-cards/card-white-duotone/card-white-duotone-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/business-cards/card-white-duotone/card-white-duotone-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="card-white-duotone">Duotone Business Card Mockup</a></h3>
                     </div>
                 </article>
 
@@ -667,8 +1433,8 @@
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4-thumb-blank.webp" alt="" width="800" height="1000" loading="lazy">
-                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4-thumb.webp" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4/wood-a4-thumb-blank.webp" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4/wood-a4-thumb.webp" alt="" width="800" height="1000" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -683,8 +1449,8 @@
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
-                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-thumb.webp" alt="" width="800" height="1000" loading="lazy">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white/tshirt-model-white-thumb.webp" alt="" width="800" height="1000" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -701,8 +1467,8 @@
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
-                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white/cap-model-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -718,8 +1484,8 @@
                 <article class="template-card" data-category="mockups">
                     <div class="card-preview photo" aria-hidden="true">
                         <div class="card-media">
-                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/packaging/bags/bag-paper-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
-                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/packaging/bags/bag-paper-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/packaging/bags/bag-paper-white/bag-paper-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/packaging/bags/bag-paper-white/bag-paper-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
                         </div>
                     </div>
                     <div class="card-body">
@@ -728,12 +1494,154 @@
                     </div>
                 </article>
 
+                <!-- The first template with TWO printable surfaces: the
+                     registry declares warpZones, the editor gains a
+                     Front/Back switch, and each card carries its own design
+                     stack. Also the first whose base is an opaque scene, so
+                     it has no Background panel -- the walnut is the product,
+                     not a backdrop to be recoloured. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/business-cards/card-white-walnut/card-white-walnut-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/business-cards/card-white-walnut/card-white-walnut-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- The first template to ship FOUR maps instead of seven:
+                     blank banner vinyl has no colour variant and a design
+                     covers the whole face, so there is nothing for a garment
+                     mask, a tone map or a grain map to serve. 1.5MB against
+                     the paper bag's 11.3MB. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/signage/banner-rollup-white/banner-rollup-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/signage/banner-rollup-white/banner-rollup-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- The same stand tilted, and the first template that is both
+                     warped and shaded: a warped quad skips the displacement
+                     pass, so its sheen rides in the overlay instead. The base
+                     is flattened to its reference white and the overlay
+                     carries it back, which is what keeps an empty template
+                     from being darkened twice. Two maps, 1.27MB. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/signage/banner-rollup-angled/banner-rollup-angled-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/signage/banner-rollup-angled/banner-rollup-angled-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="banner-rollup-angled">Angled Roll-Up Banner Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- Heavy fleece, and the first template built after the
+                     colourway chips landed: its heather fractions and its
+                     grain map are reachable from the editor on day one, which
+                     was not true of the shirt or the cap. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white/hoodie-model-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- A styled room rather than an isolated product, and the
+                     first template to ship no `light` map at all: this poster
+                     has 3.4 luma levels of specular headroom, so the map would
+                     have been amplified noise rather than surface. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior/frame-black-interior-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior/frame-black-interior-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- The first template whose classifier thresholds are tuned
+                     per image rather than left at the factory defaults: this
+                     hat's own saturation straddles the default gate, and the
+                     brim rests on the forehead, so luma is what separates hat
+                     from skin. See the registry entry. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/hats/bucket-hats/bucket-hat-white/bucket-hat-white-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- The first second VIEW of a product already in the catalog
+                     rather than a new product. It is a separate card, not a
+                     variant of the T-Shirt one, because the registry keys
+                     templates by id and data-doc is what opens the editor. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back/tshirt-model-white-back-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="tshirt-model-white-back">White T-Shirt Back Mockup</a></h3>
+                    </div>
+                </article>
+
+                <!-- Second view of the hoodie, and the second such pair. The
+                     hood is what makes this a different template rather than a
+                     mirrored one: it occupies the top of the back, so the
+                     print zone starts below it. -->
+                <article class="template-card" data-category="mockups">
+                    <div class="card-preview photo" aria-hidden="true">
+                        <div class="card-media">
+                            <img class="card-thumb card-thumb-blank" src="assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-thumb-blank.jpg" alt="" width="600" height="750" loading="lazy">
+                            <img class="card-thumb card-thumb-hover" src="assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-back/hoodie-model-white-back-thumb.jpg" alt="" width="600" height="750" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-category">Product Mockups</p>
+                        <h3 class="card-title"><a class="card-link" href="mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie Back Mockup</a></h3>
+                    </div>
+                </article>
+
             </div>
 
             <!-- Shown by js/app.js when a search matches nothing -->
             <p class="catalog-empty" data-catalog-empty hidden>
                 <strong>No templates match that search.</strong>
-                Try a broader term, or clear the search to see all 20.
+                Try a broader term, or clear the search to see all 53.
             </p>
         </section>
 

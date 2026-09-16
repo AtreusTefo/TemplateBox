@@ -68,6 +68,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Installed app (Tier 0 PWA). The manifest is what makes Chrome offer
+         "Install"; iOS ignores its icons array entirely and reads the
+         apple-touch-icon link below, so both are needed. js/app.js registers
+         sw.js on window load, deliberately after the ad scripts.
+         Reference: docs/implementation/PWA_INSTALLABLE_APP.md -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="assets/icon-180.png">
+    <meta name="apple-mobile-web-app-title" content="TemplateBox">
+    <!-- Both spellings on purpose: mobile-web-app-capable is the standard,
+         and the apple- prefixed original is still the only one iOS before 18
+         understands. Dropping it puts Safari chrome back over a home-screen
+         launch on those devices. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- Status bar and task-switcher tint; visible only once installed.
+         js/app.js rewrites both once it knows whether the visitor chose a
+         theme explicitly rather than inheriting the system one -- see
+         syncThemeColor() there. -->
+    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">
     <!-- Theme, applied before first paint so a returning visitor never sees a
          flash of the wrong one. Deliberately inline and synchronous: an
          external file would load after the first paint and the flash is
@@ -159,11 +179,34 @@
 
             <!-- Left pane: input form -->
             <section class="editor-pane" aria-label="Resume form">
+                <h2>Template</h2>
+                <!-- Built by js/resume.js from the registry in
+                     js/resume-templates.js, never hand-listed here, so adding
+                     a template stays the data-only edit that file promises.
+                     Empty in the served markup and filled on load; with no
+                     script it stays empty and the editor renders Classic,
+                     which is what it did before a picker existed. -->
+                <div class="template-row" id="template-row" role="group" aria-label="Resume template"></div>
+
                 <h2>Accent Color</h2>
                 <div class="swatch-row" id="swatch-row" aria-label="Accent color choices">
+                    <!-- INVARIANT: every template's `defaultAccent` must be a
+                         swatch on this row. applyAccent() marks a swatch
+                         active by matching its hex exactly, so a default that
+                         is not here opens the editor with the row showing
+                         nothing selected and the colour unreachable again once
+                         changed. Two of the four templates rely on this: the
+                         green below is Ruled Serif's, the graphite is the
+                         two-column template's. -->
                     <button type="button" class="swatch is-active" data-accent="#1A1A1A" style="background-color:#1A1A1A" aria-label="Charcoal accent"></button>
+                    <button type="button" class="swatch" data-accent="#4A4A4A" style="background-color:#4A4A4A" aria-label="Graphite accent"></button>
                     <button type="button" class="swatch" data-accent="#1F4E79" style="background-color:#1F4E79" aria-label="Navy accent"></button>
                     <button type="button" class="swatch" data-accent="#2E5E4E" style="background-color:#2E5E4E" aria-label="Forest accent"></button>
+                    <!-- The Ruled Serif template's own green. It is here so
+                         that template's colour is reachable again after the
+                         visitor has changed it: the picker applies it once,
+                         on selection, and never re-applies. -->
+                    <button type="button" class="swatch" data-accent="#327B3C" style="background-color:#327B3C" aria-label="Green accent"></button>
                     <button type="button" class="swatch" data-accent="#7A2E2E" style="background-color:#7A2E2E" aria-label="Burgundy accent"></button>
                     <button type="button" class="swatch" data-accent="#8A6D1D" style="background-color:#8A6D1D" aria-label="Gold accent"></button>
                 </div>
@@ -179,9 +222,113 @@
                             <label for="f-name">Full Name</label>
                             <input type="text" id="f-name" data-bind="name" maxlength="50" required>
                         </div>
+                        <!-- The only file input on this page, and the only
+                             field here that is not a [data-bind] control: the
+                             photograph is cropped and re-encoded by
+                             js/resume.js and kept under its own localStorage
+                             key, so the form sweep neither collects nor
+                             restores it.
+
+                             data-needs="photo" rather than a data-templates
+                             LIST. Which templates draw a photograph is a fact
+                             about the registry, and a hand-maintained list of
+                             them goes stale the moment one is added -- it
+                             already had, so the Labelled Sections CV drew a
+                             photo frame with no way to fill it. Like every
+                             other gated field it keeps its value while
+                             hidden, so switching away and back does not lose
+                             the upload. -->
+                        <div class="field" data-needs="photo">
+                            <label for="f-photo">Profile Photo</label>
+                            <input type="file" id="f-photo" accept="image/*">
+                            <p class="upload-hint">JPG, PNG or WebP. Choose another at any time to replace it. It stays on this device: nothing is uploaded, here or at export.</p>
+                            <p class="form-error" id="f-photo-error" role="alert"></p>
+                            <div class="photo-chip" id="photo-preview" hidden>
+                                <img id="photo-thumb" alt="Your profile photo as it will appear on the sheet">
+                                <button type="button" class="entry-remove" id="photo-remove">Remove Photo</button>
+                            </div>
+                            <!-- Framing. The whole photograph is kept and the
+                                 frame is cut from it on every change, so these
+                                 three are lossless against the upload rather
+                                 than a crop of a crop. -->
+                            <div class="photo-frame-controls" id="photo-frame" hidden>
+                                <div class="field">
+                                    <label for="f-photo-zoom">Size</label>
+                                    <input type="range" id="f-photo-zoom" min="100" max="300" step="1" value="100">
+                                </div>
+                                <div class="field">
+                                    <label for="f-photo-x">Move across</label>
+                                    <input type="range" id="f-photo-x" min="-100" max="100" step="1" value="0">
+                                </div>
+                                <div class="field">
+                                    <label for="f-photo-y">Move up and down</label>
+                                    <input type="range" id="f-photo-y" min="-100" max="100" step="1" value="0">
+                                </div>
+                                <p class="upload-hint">At the smallest size the whole width of the frame is filled and there is nothing to move; zoom in and the two sliders have somewhere to go. <button type="button" class="btn btn-secondary btn-small" id="photo-reset">Reset framing</button></p>
+                            </div>
+                        </div>
+                        <!-- data-templates lists the templates that DRAW a
+                             field. Anything not listed is hidden for the
+                             current template but still collected and saved,
+                             deliberately, so switching templates never
+                             discards what the visitor typed -- the same
+                             judgement js/docs.js makes for its [data-for]
+                             fields. -->
+                        <!-- Every template draws a professional title now, so
+                             this one carries no data-templates gate. It was
+                             classic-only while it was the only descriptor with
+                             a titleLine role, which meant switching template
+                             hid a field the visitor had already filled in. -->
                         <div class="field">
                             <label for="f-title">Professional Title</label>
                             <input type="text" id="f-title" data-bind="title" maxlength="60">
+                        </div>
+                        <!-- The biodata format's own two. Gated, because no
+                             other template has anywhere to put them -- and
+                             still collected while hidden, so switching away
+                             and back does not lose them. -->
+                        <div class="field" data-templates="boxed-biodata">
+                            <label for="f-father-name">Father's Name</label>
+                            <input type="text" id="f-father-name" data-bind="fatherName" maxlength="60">
+                        </div>
+                        <div class="field" data-templates="boxed-biodata peach-portrait">
+                            <label for="f-dob">Date of Birth</label>
+                            <input type="text" id="f-dob" data-bind="dateOfBirth" maxlength="40" placeholder="12 January 2004">
+                        </div>
+                        <!-- The line under the portrait. Its own field rather
+                             than a second use of the summary, which this design
+                             already spends on the objective beside it. -->
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-tagline">Tagline</label>
+                            <input type="text" id="f-tagline" data-bind="tagline" maxlength="120" placeholder="A fast learner who adapts quickly to change.">
+                        </div>
+                        <!-- The personal-information block. Conventional on a
+                             CV in much of Asia and unusual elsewhere, which is
+                             why they are gated to the one template that draws
+                             them rather than offered to everybody. -->
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-place-birth">Place of Birth</label>
+                            <input type="text" id="f-place-birth" data-bind="placeOfBirth" maxlength="60">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-marital">Marital Status</label>
+                            <input type="text" id="f-marital" data-bind="maritalStatus" maxlength="30">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-nationality">Nationality</label>
+                            <input type="text" id="f-nationality" data-bind="nationality" maxlength="40">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-height">Height</label>
+                            <input type="text" id="f-height" data-bind="height" maxlength="20" placeholder="5'3 ft">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-weight">Weight</label>
+                            <input type="text" id="f-weight" data-bind="weight" maxlength="20" placeholder="55 kg">
+                        </div>
+                        <div class="field" data-templates="peach-portrait">
+                            <label for="f-religion">Religion</label>
+                            <input type="text" id="f-religion" data-bind="religion" maxlength="40">
                         </div>
                         <div class="field">
                             <label for="f-email">Email</label>
@@ -194,6 +341,35 @@
                         <div class="field">
                             <label for="f-location">Location</label>
                             <input type="text" id="f-location" data-bind="location" maxlength="60">
+                        </div>
+                        <!-- The four the two-column template needs for its
+                             sidebar contact block. It sets the address across
+                             three lines and offers a second phone, where the
+                             single-column templates run one joined line off
+                             `location` and `phone`. Hidden for those, and
+                             still collected, like every other conditional
+                             field here. -->
+                        <!-- boxed-biodata joins these three into its Address
+                             row, so it draws them as surely as grey-rail's
+                             sidebar does. A gate that lists only one of the
+                             two would render a field the form gives no way to
+                             fill, which is the fault this file has shipped
+                             twice already. -->
+                        <div class="field" data-templates="grey-rail boxed-biodata">
+                            <label for="f-address">Street Address</label>
+                            <input type="text" id="f-address" data-bind="address" maxlength="80">
+                        </div>
+                        <div class="field" data-templates="grey-rail boxed-biodata">
+                            <label for="f-city">City</label>
+                            <input type="text" id="f-city" data-bind="city" maxlength="60">
+                        </div>
+                        <div class="field" data-templates="grey-rail boxed-biodata">
+                            <label for="f-postcode">Postcode</label>
+                            <input type="text" id="f-postcode" data-bind="postcode" maxlength="20">
+                        </div>
+                        <div class="field" data-templates="grey-rail">
+                            <label for="f-phone-alt">Second Phone</label>
+                            <input type="tel" id="f-phone-alt" data-bind="phoneAlt" maxlength="30">
                         </div>
                     </fieldset>
 
@@ -211,6 +387,18 @@
                         <button type="button" class="btn btn-secondary btn-block" id="add-experience">Add Experience Entry</button>
                     </fieldset>
 
+                    <!-- Directly after Work Experience, which is where all
+                         three templates draw it and where a reader expects it:
+                         projects are what the experience above did not have
+                         room for, not an appendix. Ungated, like every other
+                         section since the title and languages were ungated on
+                         September 1 -- all three descriptors render it. -->
+                    <fieldset>
+                        <legend>Projects</legend>
+                        <div id="projects-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-project">Add Project</button>
+                    </fieldset>
+
                     <fieldset>
                         <legend>Education</legend>
                         <div id="education-list"></div>
@@ -223,6 +411,62 @@
                             <label for="f-skills">Skills (comma separated)</label>
                             <input type="text" id="f-skills" data-bind="skills" maxlength="300">
                         </div>
+                    </fieldset>
+
+                    <!-- One row per language, not a free-text block. It WAS a
+                         textarea taking "Name: Level" lines, with a hint
+                         explaining that a CEFR band or a percentage drew the
+                         proficiency bar and anything else did not. That put
+                         the rule in a sentence and left the visitor guessing
+                         which wordings counted. The levels that draw a bar
+                         are the choices now, so the rule is the control. -->
+                    <!-- Ungated for the same reason as the title above: all
+                         three templates render languages now. They render them
+                         DIFFERENTLY -- Ruled Serif draws proficiency bars from
+                         the level, the other two set "English: Native" as a
+                         bullet -- which is a property of each design, not a
+                         reason to withhold the field. -->
+                    <fieldset>
+                        <legend>Languages</legend>
+                        <div id="language-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-language">Add Language</button>
+                    </fieldset>
+
+                    <fieldset data-templates="ruled-serif photo-rail">
+                        <legend>Accomplishments</legend>
+                        <div class="field">
+                            <label for="f-accomplishments">Accomplishments (one per line)</label>
+                            <textarea id="f-accomplishments" data-bind="accomplishments" maxlength="600" rows="4"></textarea>
+                        </div>
+                    </fieldset>
+                    <!-- The signed statement an Indian biodata closes on. No
+                         other template draws it, and it sits here rather than
+                         after References because on the sheet it comes last
+                         but one, above the date and signature blanks -- which
+                         are drawn furniture, not fields: they exist to be
+                         written on after printing. -->
+                    <fieldset data-templates="boxed-biodata">
+                        <legend>Declaration</legend>
+                        <div class="field">
+                            <label for="f-declaration">Declaration</label>
+                            <textarea id="f-declaration" data-bind="declaration" maxlength="300" rows="3"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <!-- Last, because a reference is the last thing a reader
+                         reaches and every template draws it there. A row is
+                         five fields and any of them may be left out: the
+                         engine's buildRuns drops an empty field together with
+                         the separator that would dangle after it, so a
+                         reference with only a name and a phone sets as
+                         "Jane Adeyemi" over "+267 71 000 000" rather than
+                         carrying two stray commas. That is what makes a
+                         "Available on request" reference -- name alone -- a
+                         supported entry rather than a broken one. -->
+                    <fieldset>
+                        <legend>References</legend>
+                        <div id="references-list"></div>
+                        <button type="button" class="btn btn-secondary btn-block" id="add-reference">Add Reference</button>
                     </fieldset>
                 </form>
             </section>
@@ -268,6 +512,14 @@
                 <label>Company</label>
                 <input type="text" data-entry-field="company" maxlength="60">
             </div>
+            <!-- grey-rail's entry sub is "Company, Place" and Ruled Serif
+                 stacks the place on its own baseline, so BOTH draw this. It
+                 was gated to Ruled Serif alone, which meant the two-column
+                 template rendered a field the form gave no way to fill. -->
+            <div class="field" data-templates="ruled-serif grey-rail photo-rail">
+                <label>Location</label>
+                <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone, Botswana">
+            </div>
             <div class="field">
                 <label>Dates</label>
                 <input type="text" data-entry-field="dates" maxlength="40" placeholder="2022 - Present">
@@ -275,8 +527,58 @@
             <div class="field">
                 <label>Description</label>
                 <textarea data-entry-field="description" maxlength="400" rows="3"></textarea>
+                <!-- Only where the description is actually MARKED. Classic
+                     sets it as prose -- its entryBody role carries marker ""
+                     and indent 0 -- so a line there is a paragraph, and
+                     telling that visitor they are writing bullets is a lie
+                     the preview immediately contradicts. -->
+                <p class="upload-hint" data-templates="ruled-serif grey-rail photo-rail">One bullet per line.</p>
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <!-- A language row. The option VALUES are the level text written onto the
+         sheet, so each carries its CEFR code in brackets and the template's
+         `levels` map in js/resume-templates.js recognises every one of them --
+         change either and the other must move with it, or the picker offers a
+         level that draws no bar. "Native" has no CEFR code and is a key of its
+         own there.
+
+         This markup is also the single source of the known-level list:
+         js/resume.js reads these option values back out of the template rather
+         than repeating them, so a level added here needs no script change.
+         __custom__ is the sentinel that reveals the free-text field; it is
+         deliberately not a plausible level anyone would type. -->
+    <template id="tpl-language">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Language</label>
+                <input type="text" data-entry-field="name" maxlength="40" placeholder="English">
+            </div>
+            <div class="field">
+                <label>Level</label>
+                <select data-entry-field="level">
+                    <option value="">Select a level</option>
+                    <option value="Native">Native</option>
+                    <option value="Fluent (C2)">Fluent (C2)</option>
+                    <option value="Advanced (C1)">Advanced (C1)</option>
+                    <option value="Upper intermediate (B2)">Upper intermediate (B2)</option>
+                    <option value="Intermediate (B1)">Intermediate (B1)</option>
+                    <option value="Elementary (A2)">Elementary (A2)</option>
+                    <option value="Beginner (A1)">Beginner (A1)</option>
+                    <option value="__custom__">Other (write your own)</option>
+                </select>
+            </div>
+            <div class="field" data-language-custom hidden>
+                <label>Your own wording</label>
+                <input type="text" data-entry-field="custom" maxlength="40" placeholder="Conversational">
+                <!-- A percentage genuinely does draw a bar -- meterFraction in
+                     js/resume-engine.js matches one before it consults the
+                     template's level names -- so the hint has to say so. -->
+                <p class="upload-hint">Written on the sheet as typed. A percentage such as 70% still draws a bar; any other wording sets the level with no bar.</p>
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Language</button>
         </div>
     </template>
 
@@ -290,9 +592,84 @@
                 <label>Institution</label>
                 <input type="text" data-entry-field="school" maxlength="80">
             </div>
+            <!-- As in the experience row above: grey-rail's education sub
+                 sets "School - Place". -->
+            <div class="field" data-templates="ruled-serif grey-rail photo-rail">
+                <label>Location</label>
+                <input type="text" data-entry-field="place" maxlength="60" placeholder="Gaborone">
+            </div>
             <div class="field">
                 <label>Dates</label>
                 <input type="text" data-entry-field="dates" maxlength="40" placeholder="2018 - 2022">
+            </div>
+            <!-- The marks column of the biodata sheet's education table. Free
+                 text rather than a number: a percentage, a CGPA and a grade
+                 letter are all valid answers and only one of them is numeric. -->
+            <div class="field" data-templates="boxed-biodata">
+                <label>Percentage or Grade</label>
+                <input type="text" data-entry-field="score" maxlength="20" placeholder="72%">
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <template id="tpl-project">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Project Name</label>
+                <input type="text" data-entry-field="name" maxlength="70" placeholder="Depot Routing Rebuild">
+            </div>
+            <!-- Deliberately open-ended rather than a "Role" box: on a project
+                 the useful second line is as often the stack or the client as
+                 the job title, and one label that admits all three beats three
+                 fields where two are always empty. -->
+            <div class="field">
+                <label>Your Role or Stack</label>
+                <input type="text" data-entry-field="role" maxlength="70" placeholder="Lead engineer - Python, PostgreSQL">
+            </div>
+            <div class="field">
+                <label>Dates</label>
+                <input type="text" data-entry-field="dates" maxlength="40" placeholder="2023">
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <textarea data-entry-field="description" maxlength="400" rows="3"></textarea>
+                <!-- Gated exactly as the experience row's hint is, and for the
+                     same reason: Classic sets a description as prose, so a
+                     line there is a paragraph and not a bullet. -->
+                <p class="upload-hint" data-templates="ruled-serif grey-rail photo-rail">One bullet per line.</p>
+            </div>
+            <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
+        </div>
+    </template>
+
+    <template id="tpl-reference">
+        <div class="entry-row" data-entry>
+            <div class="field">
+                <label>Name</label>
+                <input type="text" data-entry-field="name" maxlength="60" placeholder="Jane Adeyemi">
+            </div>
+            <div class="field">
+                <label>Job Title</label>
+                <input type="text" data-entry-field="title" maxlength="60" placeholder="Operations Manager">
+            </div>
+            <div class="field">
+                <label>Company</label>
+                <input type="text" data-entry-field="company" maxlength="60" placeholder="Northwind Logistics">
+            </div>
+            <!-- Only the portrait CV prints a referee's address; every other
+                 template sets name, title, company and one contact line. -->
+            <div class="field" data-templates="peach-portrait">
+                <label>Address</label>
+                <input type="text" data-entry-field="refAddress" maxlength="90">
+            </div>
+            <div class="field">
+                <label>Email</label>
+                <input type="email" data-entry-field="email" maxlength="100">
+            </div>
+            <div class="field">
+                <label>Phone</label>
+                <input type="tel" data-entry-field="phone" maxlength="30">
             </div>
             <button type="button" class="entry-remove" data-entry-remove>Remove Entry</button>
         </div>
@@ -306,6 +683,11 @@
 
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
+    <!-- Registry then engine then editor, in that order and without defer:
+         resume.js reads window.TB_RESUME_TEMPLATES while building the picker,
+         so both must have executed first. -->
+    <script src="js/resume-templates.js"></script>
+    <script src="js/resume-engine.js"></script>
     <script src="js/resume.js"></script>
 </body>
 </html>

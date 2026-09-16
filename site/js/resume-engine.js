@@ -46,6 +46,38 @@ window.TBResume = (() => {
         mono:  { css: "'Courier New', Courier, monospace", pdf: "courier" }
     };
 
+    /* Profile photographs. ONE ratio, owned here rather than by a descriptor,
+       and exported so js/resume.js crops every upload to exactly what a photo
+       block will draw. 4:5 portrait is the shape the rest of the site already
+       reshapes uploads to -- see the card window in js/admin-image.js -- and
+       a single fixed ratio is what makes a stretched face impossible: the
+       bitmap arrives at the drawn aspect, so neither painter ever rescales
+       one axis against the other. Switching template cannot re-crop anything,
+       because there is nothing to re-crop to. */
+    const PHOTO_RATIO = 4 / 5;
+
+    /* The prompt's height where a photograph is missing. See the photo block:
+       it is not the photograph's own height on purpose. */
+    const PHOTO_SLOT_H = 44;
+
+    /* Filled bands are drawn this much wider than their share, so adjacent
+       segments overlap instead of sharing an edge. See the `bar` block. */
+    const OVERLAP = 0.4;
+
+    /* The ONLY images this engine will draw are base64 bitmaps that a canvas
+       in js/resume.js produced. `state.photo` reaches here from localStorage,
+       which is writable by anything else running on the origin, so it is
+       treated as untrusted: an SVG data URI can carry markup, and "javascript:"
+       or a remote URL would make the sheet fetch something. Anything that is
+       not a base64 PNG or JPEG draws no photo at all, exactly as if none had
+       been uploaded. */
+    const PHOTO_URL = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=\s]+$/;
+
+    function photoUrl(state) {
+        const url = state && state.photo;
+        return (typeof url === "string" && PHOTO_URL.test(url)) ? url : "";
+    }
+
     function desanitize(value) {
         if (window.TB && typeof window.TB.desanitize === "function") {
             return window.TB.desanitize(value);
@@ -67,12 +99,23 @@ window.TBResume = (() => {
     /* Colour roles never reach a painter as a role: everything in the display
        list is already a hex string. `accent` is per-document runtime state. */
     function colorOf(role, template, state) {
-        if (role === "accent") {
+        const p = template.palette || {};
+        /* ONE level of indirection: a palette entry may itself name `accent`
+           rather than a hex. That is how a template makes a named role follow
+           the document's colour -- grey-rail's rail and display ink are one
+           colour and both track the swatch row -- without every block in the
+           descriptor having to say `accent` and lose the role's name.
+
+           Resolved before the accent test rather than after, because the
+           lookup used to return the palette's value verbatim: an entry of
+           "accent" reached the painters as the literal string, which is not a
+           colour any medium understands. */
+        const resolved = (p[role] === undefined) ? role : p[role];
+        if (resolved === "accent") {
             const a = state && state.accent;
             return /^#[0-9A-Fa-f]{6}$/.test(a) ? a : "#1A1A1A";
         }
-        const p = template.palette || {};
-        return p[role] || role || "#000000";
+        return resolved || "#000000";
     }
 
     /* ----------------------------------------------------------------------
@@ -100,14 +143,31 @@ window.TBResume = (() => {
         const out = [];
         (spec.runs || []).forEach((run) => {
             if (run.literal !== undefined) {
-                if (out.length) out.push({ text: run.literal, type: run.type, pending: true });
+                /* Pushed whether or not anything precedes it, so a literal can
+                   LEAD a line -- "Name: Marcus Ellery" -- and not only sit
+                   between two fields as a separator. It is pending either way,
+                   so a label whose field turns out empty is dropped with it
+                   and never strands a bare "Name:" on the sheet. The guard
+                   that used to require out.length made a leading label
+                   impossible to express at all.
+
+                   `keep` opts out of pending, for a literal that is a line in
+                   its OWN right rather than a label for something -- the
+                   "Work Responsibilities" caption this design sets above each
+                   entry's bullets. Without it such a line can never render,
+                   because nothing follows to clear the flag. */
+                out.push({ text: run.literal, type: run.type,
+                           pending: !run.keep });
                 return;
             }
             const text = readField(source, run.field);
             if (!text) return;
             /* A pending separator is only kept once real text follows it. */
             out.forEach((r) => { r.pending = false; });
-            out.push({ text: text, type: run.type });
+            /* `field` rides along so the painters can say which control drew
+               this run. Literals above deliberately carry none -- a ", " is
+               punctuation the template owns, not the visitor's text. */
+            out.push({ text: text, type: run.type, field: run.field });
         });
         return out.filter((r) => !r.pending);
     }
@@ -127,19 +187,59 @@ window.TBResume = (() => {
     function sectionHasContent(body, state) {
         if (!body) return false;
         if (body.kind === "lines") return (body.lines || []).length > 0;
+        /* A contact block used as a section body: present only if at least
+           one row would draw. That is what lets a CONTACT heading disappear
+           along with its rows on a document that has no contact details,
+           instead of standing over nothing. */
+        if (body.kind === "contact") {
+            return (body.rows || []).some((row) => joinFields(row, state.fields));
+        }
         if (body.kind === "paragraph") {
             return Boolean(readField(state.fields, body.field));
         }
         if (body.kind === "list" || body.kind === "meters") {
             return splitList((state.fields || {})[body.field], body.split).length > 0;
         }
+        /* A row counts when any cell in it carries text. The header alone is
+           furniture, so a table whose source is empty draws no heading -- the
+           same rule every other body follows. */
+        if (body.kind === "table") {
+            const rows = state[body.source] || [];
+            return rows.some((row) => (body.columns || [])
+                .some((c) => String(row[c.field] || "").trim()));
+        }
+        if (body.kind === "fields") {
+            return (body.rows || []).some((r) => Boolean(
+                r.fields ? joinFields(r, state.fields)
+                         : readField(state.fields, r.field)));
+        }
         if (body.kind === "entries") {
             const rows = state[body.source] || [];
-            return rows.some((row) =>
-                buildRuns(body.head || {}, row).length > 0 ||
-                (body.bullets && splitList(row[body.bullets.field], body.bullets.split).length));
+            return rows.some((row) => entryHasContent(body, row));
         }
         return false;
+    }
+
+    /* Normalizes `sub`, which is one line spec or an array of them. Kept a
+       function rather than inlined twice, because the section gate and the
+       row loop below must reach the same answer about what a row draws. */
+    function subSpecs(body) {
+        if (!body.sub) return [];
+        return Array.isArray(body.sub) ? body.sub : [body.sub];
+    }
+
+    /* Does one entry row draw anything at all? Every part of the row counts,
+       not just the head: an entry whose company is blank but whose role,
+       place or dates are typed used to vanish silently, taking the visitor's
+       text with it. The section gate and the row loop share this so they can
+       never disagree -- a drift between them renders a heading over nothing,
+       or hides a heading over something. */
+    function entryHasContent(body, row) {
+        if (buildRuns(body.head || {}, row).length) return true;
+        if (subSpecs(body).some((spec) => buildRuns(spec, row).length)) return true;
+        if (body.aside && buildRuns(body.aside, row).length) return true;
+        return Boolean(body.bullets &&
+            splitList(row[body.bullets.field], body.bullets.split).length);
     }
 
     /* ----------------------------------------------------------------------
@@ -205,8 +305,28 @@ window.TBResume = (() => {
             measureDoc.setFont(FAMILY[t.family].pdf, t.weight);
             measureDoc.setFontSize(t.size);
         };
-        ctx.measure = (text, t) => { setFont(t); return measureDoc.getTextWidth(text); };
-        ctx.wrap = (text, t, w) => { setFont(t); return measureDoc.splitTextToSize(text, w); };
+        /* `tracking` is letter-spacing, and it has to be added HERE as well as
+           painted, or every measurement downstream is short: a heading box
+           sized to a tracked label would cut the label off, and a tracked line
+           would wrap early. SVG's letter-spacing and PDF's Tc both add their
+           space after every glyph including the last, so the two painters
+           agree with each other; the visible INK extent is one gap fewer,
+           which is what a box or a wrap wants. */
+        const track = (text, t) =>
+            (t.tracking ? t.tracking * Math.max(0, String(text).length - 1) : 0);
+        ctx.measure = (text, t) => {
+            setFont(t);
+            return measureDoc.getTextWidth(text) + track(text, t);
+        };
+        ctx.wrap = (text, t, w) => {
+            setFont(t);
+            /* Wrap to a width reduced by the tracking a full line would add,
+               rather than post-checking each line: splitTextToSize knows
+               nothing about letter-spacing. */
+            const perChar = t.tracking || 0;
+            const guess = perChar ? Math.max(20, w - perChar * (w / Math.max(1, t.size * 0.5))) : w;
+            return measureDoc.splitTextToSize(text, guess);
+        };
 
         paintRail(ctx, 0);
 
@@ -224,9 +344,22 @@ window.TBResume = (() => {
             layoutBlock(ctx, block, key, cursor, started, pageOf);
         });
 
+        /* HOW FAR over, not only whether: the editor turns this into a
+           warning, and "your side column runs 84pt past the page" is a
+           different message from "it runs 4pt past it". The main column
+           paginates, so its flag is informational; the sidebar does not, so
+           its flag is the one that means content will be lost. */
         ctx.overflow = {
             main: cursor.main > cols.main.bottom,
-            sidebar: Boolean(cols.sidebar) && cursor.sidebar > cols.sidebar.bottom
+            mainBy: Math.max(0, cursor.main - cols.main.bottom),
+            sidebar: Boolean(cols.sidebar) && cursor.sidebar > cols.sidebar.bottom,
+            sidebarBy: cols.sidebar
+                ? Math.max(0, cursor.sidebar - cols.sidebar.bottom) : 0,
+            /* Past the paper itself, rather than past the column's own
+               reservation boundary. Anything here is not merely tight, it is
+               not on the sheet at all. */
+            sidebarOffPage: Boolean(cols.sidebar) &&
+                cursor.sidebar > ctx.template.page.height
         };
         return ctx;
     }
@@ -235,6 +368,13 @@ window.TBResume = (() => {
         const L = ctx.template.layout;
         const c = ctx.cols.sidebar;
         if (!c) return;
+        /* A sidebar that declares no background paints NOTHING. It used to
+           paint `colorOf(undefined)`, which falls through that function's last
+           line to #000000 -- so a two-column template whose columns are the
+           same colour got a solid black rail. Every two-column template until
+           now declared a tint, so the path was never taken and the default was
+           never wrong out loud. */
+        if (!L.sidebar.background) return;
         ctx.ops.push({
             op: "rect", page: page,
             x: c.boxX, y: 0, w: c.boxW, h: ctx.template.page.height,
@@ -260,6 +400,31 @@ window.TBResume = (() => {
        SAME x -- jsPDF's align option and SVG's text-anchor agree on what the
        coordinate means -- so alignment is decided once here rather than
        measured separately in each medium. */
+    /* Runs `fn` with one column temporarily narrowed.
+
+       Everything downstream reads `ctx.cols[key]` at the moment it draws --
+       wrapping width, alignment anchors, bullet boxes, an entry's dates ranged
+       to the right edge -- so narrowing the column is all it takes to put a
+       block BESIDE something instead of under it, and nothing else in the
+       engine has to learn about it. The cursor is untouched, which is what
+       keeps pagination working inside an inset block.
+
+       Restored in a `finally`: a throw part way through a block must not leave
+       the column narrowed for the rest of the page. */
+    function withColumn(ctx, key, narrowed, fn) {
+        const full = ctx.cols[key];
+        ctx.cols[key] = narrowed;
+        try { return fn(); } finally { ctx.cols[key] = full; }
+    }
+
+    function insetOf(col, inset) {
+        const left = inset.left || 0;
+        const right = inset.right || 0;
+        return Object.assign({}, col, {
+            x: col.x + left, width: col.width - left - right
+        });
+    }
+
     function anchorX(col, align) {
         if (align === "center") return col.x + col.width / 2;
         if (align === "right") return col.x + col.width;
@@ -281,16 +446,102 @@ window.TBResume = (() => {
         });
     }
 
-    function text(ctx, page, x, y, str, t, widthForAlign) {
-        ctx.ops.push({
+    /* `ruleBefore` may be ONE spec or several drawn on the same line.
+
+       A separator is sometimes one horizontal feature made of two strokes
+       rather than two features: the Labelled Sections CV draws a heavy rule
+       across its label gutter and a hairline across the full width, at the
+       same y. Expressing that as two `ruleBefore` entries keeps it one thing
+       in the descriptor, which is what it is on the page.
+
+       `gapAfter` is taken from the LAST, so a set behaves exactly as the
+       single spec it generalises and no existing template changes. */
+    function rulesBefore(t) {
+        if (!t.ruleBefore) { return []; }
+        return Array.isArray(t.ruleBefore) ? t.ruleBefore : [t.ruleBefore];
+    }
+
+    function emitRulesBefore(ctx, page, col, specs, y) {
+        specs.forEach((spec) => emitRule(ctx, page, col, spec, y + (spec.dy || 0)));
+        return specs.length ? (specs[specs.length - 1].gapAfter || 0) : 0;
+    }
+
+    /* `edit` is PROVENANCE: which form control produced this run, so the
+       preview can be clicked into. It is carried on the display list and read
+       only by paintSvg, which writes it onto the <text> node; paintPdf reads
+       named keys and never sees it, so an exported file cannot carry editing
+       metadata. Call sites that omit it produce text nobody can click --
+       section headings are template labels, not the visitor's words.
+
+       Shape, and both forms may carry `part` to address one item inside a
+       multi-value field:
+         { bind: "name" }                        a [data-bind] control
+         { entry: { list, index, key } }         a row in a repeating list
+         { part: { split: ",", index: 2 } }      one segment of that value
+         { multi: true }                         several runs, ONE value: the
+                                                 overlay covers the group, not
+                                                 the line that was clicked
+         { inline: false }                       no overlay can be honest --
+                                                 half a value, a joined line,
+                                                 a <select>, a composed row
+
+       `multi` and `inline: false` were one flag until the editing layer could
+       cover a group. Everything that wrapped was handed to the form, which
+       meant clicking your own summary scrolled the sheet out from under you
+       -- the two are separate now because they are separate problems: `multi`
+       is "this value is bigger than the run you clicked", `inline: false` is
+       "this run is not the whole of any one value". */
+    function text(ctx, page, x, y, str, t, widthForAlign, edit, trackingOverride) {
+        const op = {
             op: "text", page: page, x: x, y: y, text: str,
             family: t.family, size: t.size, weight: t.weight,
             color: colorOf(t.color, ctx.template, ctx.state),
             align: t.align || "left", boxWidth: widthForAlign
-        });
+        };
+        /* An override is how a justified line carries its own spacing: the
+           role's tracking is a design constant, the override is computed per
+           line to make it fill the measure. */
+        const tr = trackingOverride === undefined ? t.tracking : trackingOverride;
+        if (tr) op.tracking = tr;
+        if (edit) op.edit = edit;
+        ctx.ops.push(op);
     }
 
+    /* Provenance for a field named by a descriptor. `inline` defaults to true
+       and is turned off by the caller for anything an overlay cannot honestly
+       sit on top of. */
+    function fieldEdit(name, extra) {
+        if (!name) return null;
+        return Object.assign({ bind: name }, extra || {});
+    }
+
+    /* Provenance for one field of one row in a repeating list. `index` is the
+       row's position in the STATE array, which is also its position in the
+       DOM: rows that render nothing are skipped by the painter but still
+       occupy their slot in both, so the two cannot slide apart. */
+    function entryEdit(ref, key) {
+        if (!ref || !key) return null;
+        return { entry: { list: ref.list, index: ref.index, key: key } };
+    }
+
+    /* `inset` puts a block in part of its column rather than all of it. The
+       masthead of a photo-beside-name sheet is the case it exists for: the
+       name and the contact rows are inset past the photograph's width, and the
+       photo block that follows them only ever pushes the cursor DOWN, so the
+       three end up side by side with no second layout pass.
+
+       It is deliberately not a property of the column: two blocks in one
+       column may want different insets, and a column that carried one would
+       have to be un-narrowed by whatever came next. */
     function layoutBlock(ctx, block, key, cursor, started, pageOf) {
+        if (!block.inset) {
+            return layoutBlockIn(ctx, block, key, cursor, started, pageOf);
+        }
+        return withColumn(ctx, key, insetOf(ctx.cols[key], block.inset),
+            () => layoutBlockIn(ctx, block, key, cursor, started, pageOf));
+    }
+
+    function layoutBlockIn(ctx, block, key, cursor, started, pageOf) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
         const page = pageOf[key];
@@ -306,9 +557,18 @@ window.TBResume = (() => {
                 const i = value.indexOf(" ");
                 lines = i > 0 ? [value.slice(0, i), value.slice(i + 1)] : [value];
             }
+            /* A split name is two lines showing halves of ONE field, and an
+               overlay over half a value would let the visitor edit a fragment
+               that does not exist in the form. Those hand off; an unsplit name
+               takes the overlay. The uppercase transform is the same story --
+               the sheet shows CALLING JOHNSON and the field holds Calling
+               Johnson -- but the overlay carries the field's value, not the
+               drawn one, so that stays honest either way. */
+            const nameEdit = fieldEdit(block.field,
+                lines.length > 1 ? { inline: false } : null);
             const nameX = anchorX(col, t.align);
             lines.forEach((line, idx) => {
-                text(ctx, page, nameX, cursor[key], line, t);
+                text(ctx, page, nameX, cursor[key], line, t, undefined, nameEdit);
                 if (idx < lines.length - 1) cursor[key] += t.lineHeight || t.size;
             });
             if (block.rule) {
@@ -326,6 +586,53 @@ window.TBResume = (() => {
             return;
         }
 
+        /* A paragraph that belongs to no section: the professional title and
+           the contact line of a plain single-column CV, which sit under the
+           name with no heading over them.
+
+           `field` reads one value; `fields` joins several with `separator`,
+           dropping the separator around values that are empty, so a visitor
+           who filled in only a phone number gets no dangling bars. Unlike
+           `display` -- which is the one-line masthead and never wraps -- this
+           wraps to the column, and it leaves the cursor on its LAST baseline,
+           which is the convention every other body in this engine follows. */
+        if (block.kind === "text") {
+            const t = T[block.type || "body"];
+            const value = block.fields
+                ? joinFields(block, ctx.state.fields)
+                : readField(ctx.state.fields, block.field);
+            if (!value) return;
+
+            cursor[key] += block.gapBefore || 0;
+            const wrapped = ctx.wrap(value, t, col.width);
+            /* A joined line is several FIELDS sharing one run, so there is no
+               single control to put a caret in and it hands off. A wrapped one
+               is several RUNS sharing one field, which the overlay can cover
+               as a group. A single field on a single line -- the professional
+               title, nearly always -- is the plain case. */
+            const textEdit = block.fields
+                ? fieldEdit(block.fields[0], { inline: false })
+                : fieldEdit(block.field, wrapped.length > 1 ? { multi: true } : null);
+            wrapped.forEach((line, i) => {
+                if (i) cursor[key] += t.lineHeight || t.size;
+                ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
+                /* Same per-line tracking the paragraph body uses, and for the
+                   same reason: it is the one spacing both painters honour
+                   identically. */
+                let tr;
+                if (block.justify && i < wrapped.length - 1) {
+                    const extra = (col.width - ctx.measure(line, t))
+                        / Math.max(1, String(line).length - 1);
+                    if (extra > 0 && extra < t.size * 0.35) tr = (t.tracking || 0) + extra;
+                }
+                text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], line, t,
+                     undefined, textEdit, tr);
+            });
+            cursor[key] += block.gapAfter || 0;
+            started[key] = true;
+            return;
+        }
+
         /* A rule that belongs to no heading -- the hairline above the name
            on a fully ruled sheet. Kept a block rather than another optional
            key on `display`, because it is page furniture in its own right and
@@ -335,6 +642,305 @@ window.TBResume = (() => {
             ensureRoom(ctx, key, cursor, pageOf, block.gapAfter || 0);
             emitRule(ctx, pageOf[key], col, block, cursor[key]);
             cursor[key] += block.gapAfter || 0;
+            started[key] = true;
+            return;
+        }
+
+        /* A band of equal segments across the column -- the multi-colour bar
+           that closes a photo CV's masthead. It is a `bar` rather than a
+           `rule` with a list of colours because a rule is a stroked line and
+           this is a run of filled rectangles: giving `rule` a second, mutually
+           exclusive drawing mode would make every existing rule read as
+           though it might be one.
+
+           Segments overlap by OVERLAP. Two rectangles that merely share an
+           edge leave a hairline of white between them wherever the device
+           pixel grid falls between the two coordinates -- visible in the PDF
+           at any zoom, and the reason the seam is closed here rather than by
+           rounding the coordinates, which cannot be done without changing the
+           bar's total width. */
+        if (block.kind === "bar") {
+            const colors = block.colors || ["ink"];
+            const h = block.height || 4;
+            cursor[key] += block.gapBefore || 0;
+            ensureRoom(ctx, key, cursor, pageOf, h);
+            const barY = cursor[key];
+            const seg = col.width / colors.length;
+            colors.forEach((role, i) => {
+                const last = i === colors.length - 1;
+                ctx.ops.push({
+                    op: "rect", page: pageOf[key],
+                    x: col.x + seg * i, y: barY,
+                    w: seg + (last ? 0 : OVERLAP), h: h,
+                    fill: colorOf(role, ctx.template, ctx.state)
+                });
+            });
+            cursor[key] = barY + h + (block.gapAfter || 0);
+            started[key] = true;
+            return;
+        }
+
+        /* The visitor's own photograph.
+
+           IT DRAWS NOTHING WITHOUT ONE. No placeholder, no grey box with
+           initials: a document nobody uploaded a photo to simply starts its
+           sidebar at the next block, which is the convention every other
+           block here already follows for an empty field. The alternative was
+           tried on paper and rejected -- a placeholder that reads as a
+           deliberate design in the preview is an embarrassment in an exported
+           PDF, and the engine has no way to draw one in the preview alone
+           without breaking the one-layout-two-painters rule this file exists
+           to enforce.
+
+           IT IS POSITIONED ABSOLUTELY, by `top`, and reads the cursor not at
+           all. That is deliberate and it is what makes the no-photo case
+           correct. The first version took the cursor as a box top, which
+           meant the column's `firstBaseline` had to be a box top too -- so a
+           document with no photograph put the first HEADING on that
+           coordinate, 54pt above where a baseline belongs, and the panel sat
+           tight against the paper edge. With an absolute `top` the column's
+           firstBaseline stays an ordinary baseline for the block that
+           actually lands on it, and a masthead photograph is what it looks
+           like: a fixed position on the page, not a thing in a flow.
+
+           It still leaves the cursor BELOW itself, so whatever follows is
+           laid out under the photograph rather than behind it.
+
+           THE HEIGHT IS NOT THE TEMPLATE'S TO CHOOSE. A descriptor names the
+           width; the height is that width over PHOTO_RATIO, the one ratio
+           js/resume.js crops every upload to. If a template could name both,
+           a mismatch would stretch a face -- and it would do so silently,
+           since neither painter can tell a distorted photograph from an
+           intended one. One number in, no distortion possible. */
+        /* The hand-completed foot of a printed sheet: labelled blanks on the
+           left, a signature rule on the right. Deliberately NOT fields -- the
+           rules are there to be written on after printing, so there is nothing
+           to collect and nothing a parser should find. The labels are real
+           text and cost a parser nothing; the rules are lines and are
+           invisible to one. */
+        if (block.kind === "signoff") {
+            const t = T[block.type || "body"];
+            const lh = t.lineHeight || t.size;
+            const rowGap = block.rowGap === undefined ? lh + 8 : block.rowGap;
+            const sep = block.separator === undefined ? " : " : block.separator;
+            const ruleWidth = block.ruleWidth || 110;
+            const spec = block.rule || {};
+            const ruleColor = colorOf(spec.color || "ink", ctx.template, ctx.state);
+            const ruleW = spec.width || 0.8;
+            const rows = block.left || [];
+
+            cursor[key] += block.gapBefore || 0;
+            /* rows.length - 1, because the first row sits ON the cursor and
+               only the ones after it cost a rowGap. Reserving for the full
+               count over-reserved by a whole row, which broke the page 1.3pt
+               short of fitting a block that had 89pt of room under it. The
+               1.2 covers the signature caption, which hangs 0.6 of a line
+               below the last row. */
+            ensureRoom(ctx, key, cursor, pageOf,
+                       rowGap * Math.max(0, rows.length - 1) + lh * 1.2);
+            const page = pageOf[key];
+            const top = cursor[key];
+
+            rows.forEach((row, i) => {
+                const y = top + rowGap * i;
+                text(ctx, page, col.x, y, row.label, t);
+                const lx = col.x + (block.labelWidth || 46);
+                text(ctx, page, lx, y, sep, t);
+                const rx = lx + ctx.measure(sep, t);
+                ctx.ops.push({ op: "line", page: page,
+                    x1: rx, y1: y + 2, x2: rx + ruleWidth, y2: y + 2,
+                    color: ruleColor, width: ruleW });
+            });
+
+            if (block.right) {
+                /* The signature rule is NOT level with the last labelled row.
+                   The reference sets it BETWEEN the two, 8.9pt under the first
+                   row's baseline, and insets it from the right margin rather
+                   than running it to the edge -- so both are parameters here
+                   rather than derived from the rows. */
+                const w = block.rightWidth || 130;
+                const inset = block.rightInset || 0;
+                const ry = top + (block.rightOffset === undefined
+                    ? rowGap * Math.max(0, rows.length - 1) - lh * 0.4
+                    : block.rightOffset);
+                const rx = col.x + col.width - inset;
+                ctx.ops.push({ op: "line", page: page,
+                    x1: rx - w, y1: ry, x2: rx, y2: ry,
+                    color: ruleColor, width: ruleW });
+                text(ctx, page, rx, ry + (block.rightGap === undefined ? lh : block.rightGap),
+                     block.right.label,
+                     Object.assign({}, t, { align: "right", weight: "bold" }));
+            }
+
+            cursor[key] = top + rowGap * Math.max(0, rows.length - 1) + lh;
+            started[key] = true;
+            return;
+        }
+
+        /* A masthead band: one filled rectangle with text set inside it, at
+           absolute page coordinates, bleeding wherever it is told to. It does
+           NOT advance the cursor -- the column's own firstBaseline is set
+           below it, exactly as the photo block leaves the cursor alone -- so a
+           template that drops the banner keeps the rest of its layout. */
+        if (block.kind === "banner") {
+            const bx = block.bleed === "page" ? 0 : col.boxX;
+            const bw = block.bleed === "page" ? ctx.template.page.width : col.boxW;
+            ctx.ops.push({
+                op: "rect", page: page, x: bx, y: block.top || 0,
+                w: bw, h: block.height || 0,
+                fill: colorOf(block.fill, ctx.template, ctx.state)
+            });
+            (block.lines || []).forEach((line) => {
+                const t = T[line.type];
+                const value = line.literal
+                    || readField(ctx.state.fields, line.field)
+                    || line.fallback || "";
+                if (!value) return;
+                text(ctx, page, col.x + (line.dx || 0), line.baseline,
+                     line.uppercase ? value.toUpperCase() : value, t,
+                     undefined, fieldEdit(line.field));
+            });
+            started[key] = true;
+            return;
+        }
+
+        /* A vertical rule: the divider between two columns. Absolute, and it
+           advances nothing, because it is furniture spanning content rather
+           than a step in the flow. */
+        if (block.kind === "vrule") {
+            ctx.ops.push({
+                op: "line", page: page,
+                x1: block.x, y1: block.y1, x2: block.x, y2: block.y2,
+                color: colorOf(block.color, ctx.template, ctx.state),
+                width: block.width || 0.8
+            });
+            return;
+        }
+
+        if (block.kind === "photo") {
+            const url = photoUrl(ctx.state);
+            if (!url) {
+                /* No photograph: a prompt where one would begin, and NOTHING
+                   else. The cursor is deliberately not advanced, exactly as
+                   before, so a sheet without a photograph lays out and prints
+                   byte for byte as it always has -- reserving the photo's
+                   space would put a hole in every photo-less export.
+
+                   Which is also why the prompt is far shorter than the
+                   photograph it stands for: the full box runs from y=32 to
+                   y=240 on photo-rail, and the sidebar's first heading sits at
+                   y=86 when there is no photograph, so a true-size prompt would
+                   cover the visitor's own contact details. It marks the top-left
+                   corner and the width instead. If another template ever gains
+                   a photo block, check this height against what follows it. */
+                if (block.shape === "circle") {
+                    /* A ring where the portrait will go, and nothing else.
+                       Same discipline as the rectangular slot: preview only,
+                       never advancing the cursor, so a sheet with no
+                       photograph lays out exactly as it always did. */
+                    const r = block.r || (block.width || col.width) / 2;
+                    ctx.ops.push({
+                        op: "photoSlot", page: page, round: true,
+                        x: col.boxX + (block.cx === undefined ? col.boxW / 2 : block.cx) - r,
+                        y: (block.cy || 0) - r, w: r * 2, h: r * 2,
+                        color: colorOf("accent", ctx.template, ctx.state),
+                        label: "Add a photo"
+                    });
+                    return;
+                }
+                ctx.ops.push({
+                    op: "photoSlot", page: page,
+                    x: col.x, y: block.top || 0,
+                    w: block.width || col.width, h: PHOTO_SLOT_H,
+                    /* The document's own accent, not a fixed colour. This
+                       prompt sits on whatever the template puts behind the
+                       photograph, and photo-rail's sidebar is PALE (#EEF1F6):
+                       a white prompt drawn there is invisible, which is what
+                       the first version of this shipped as. The accent is the
+                       one role guaranteed to contrast with the sheet, because
+                       it is what the headings are already drawn in, and it
+                       follows the visitor's colour choice for free. */
+                    color: colorOf("accent", ctx.template, ctx.state),
+                    label: "Add a photo"
+                });
+                return;
+            }
+            /* A circular crop. The stored bitmap is 4:5 and PHOTO_RATIO is
+               fixed site-wide so no painter can ever stretch a face, so the
+               circle is cut OUT of a correctly-proportioned image rather than
+               the image being squashed into a square: the photo is drawn at
+               2r wide, its natural 2.5r tall, centred on the circle, and
+               clipped. What the circle shows is the middle band of the frame,
+               which is where the editor's own framing controls put a face. */
+            if (block.shape === "circle") {
+                const r = block.r || (block.width || col.width) / 2;
+                const cx = col.boxX + (block.cx === undefined ? col.boxW / 2 : block.cx);
+                const cy = block.cy || 0;
+                const iw = r * 2;
+                const ih = iw / PHOTO_RATIO;
+                /* The bitmap is 4:5 and the circle is round, so the image is
+                   always TALLER than the circle it fills -- 255pt against a
+                   204pt circle here. Centring it on the circle therefore puts
+                   its top above the sheet whenever the circle sits near it,
+                   which is exactly where a portrait goes: this drew from
+                   y=-4.5 until the suite caught it.
+
+                   Clamped into the band that still covers the circle
+                   (`cy + r - ih` to `cy - r`) intersected with the page, so
+                   the crop slides down rather than hanging off. Nothing about
+                   what the circle SHOWS changes unless the image had nowhere
+                   to slide, and the aspect is untouched either way. */
+                const pageH = ctx.template.page.height;
+                const pageW = ctx.template.page.width;
+                const fit = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+                if (block.ring) {
+                    ctx.ops.push({
+                        op: "circle", page: page, cx: cx, cy: cy,
+                        r: r + (block.ring.width || 4) / 2,
+                        fill: colorOf(block.ring.color, ctx.template, ctx.state)
+                    });
+                }
+                ctx.ops.push({
+                    op: "imageCircle", page: page, url: url,
+                    cx: cx, cy: cy, r: r,
+                    x: fit(cx - iw / 2, Math.max(cx + r - iw, 0),
+                           Math.min(cx - r, pageW - iw)),
+                    y: fit(cy - ih / 2, Math.max(cy + r - ih, 0),
+                           Math.min(cy - r, pageH - ih)),
+                    w: iw, h: ih
+                });
+                started[key] = true;
+                return;
+            }
+            const w = block.width || col.width;
+            const h = w / PHOTO_RATIO;
+            const x = col.x;
+            const top = block.top || 0;
+            /* An offset block of colour behind the photograph, showing at one
+               corner. Drawn first and at the SAME size, so the photo covers
+               all of it but the offset corner. */
+            if (block.backdrop) {
+                ctx.ops.push({
+                    op: "rect", page: page,
+                    x: x + (block.backdrop.dx || 0), y: top + (block.backdrop.dy || 0),
+                    w: w, h: h,
+                    fill: colorOf(block.backdrop.color, ctx.template, ctx.state)
+                });
+            }
+            ctx.ops.push({ op: "image", page: page, url: url, x: x, y: top, w: w, h: h });
+            /* A keyline ON the photograph's edge, drawn after it so the image
+               cannot cover it. Straddles the edge by half its width, which is
+               what a frame drawn in a vector editor does. */
+            if (block.border) {
+                ctx.ops.push({
+                    op: "rect", page: page, x: x, y: top, w: w, h: h,
+                    stroke: colorOf(block.border.color, ctx.template, ctx.state),
+                    strokeWidth: block.border.width || 1
+                });
+            }
+            /* Never ABOVE where the column already was: a photograph placed
+               high on the page must not pull a cursor backwards. */
+            cursor[key] = Math.max(cursor[key], top + h + (block.gapAfter || 0));
             started[key] = true;
             return;
         }
@@ -357,23 +963,98 @@ window.TBResume = (() => {
         if (block.kind === "section") {
             if (!sectionHasContent(block.body, ctx.state)) return;
             const t = T[block.headingType || "heading"];
-            if (started[key]) cursor[key] += t.gapBefore || 0;
-
-            const label = t.uppercase ? block.label.toUpperCase() : block.label;
-            /* Enough room for the whole heading assembly, so a page never
-               breaks between a rule and the heading it belongs to. */
-            ensureRoom(ctx, key, cursor, pageOf, t.ruleBefore ? 72 : 40);
-
-            if (t.ruleBefore) {
-                emitRule(ctx, pageOf[key], col, t.ruleBefore, cursor[key]);
-                cursor[key] += t.ruleBefore.gapAfter || 0;
+            /* A block may set its own gap ABOVE the heading, mirroring the
+               gapAfter override below it. The first section of a sheet often
+               needs a different one from the rest -- it follows a masthead
+               rather than a body -- and without this the choice is one value
+               that is too large at the top or too small everywhere after. */
+            if (started[key]) {
+                cursor[key] += (block.gapBefore === undefined
+                    ? (t.gapBefore || 0) : block.gapBefore);
             }
 
-            text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], label, t);
+            const label = t.uppercase ? block.label.toUpperCase() : block.label;
+
+            /* A GUTTER heading is a different assembly from a stacked one: the
+               label sits to the LEFT of the body rather than above it, both
+               start on the same baseline, and the band is as deep as whichever
+               of the two runs longer. */
+            if (t.gutter) {
+                layoutGutterSection(ctx, block, t, label, key, cursor, pageOf, col);
+                started[key] = true;
+                return;
+            }
+
+            /* Enough room for the whole heading assembly AND the first line of
+               what it introduces, so a page can break neither between a rule
+               and its heading nor between a heading and its body.
+
+               The body half was missing until September 1, 2026, and it left a
+               heading alone at the foot of a page: the assembly fitted, then
+               the body's own reservation did not, so the body moved to the
+               next page and the heading stayed behind. It took a document with
+               enough sections to land a heading in that narrow band before it
+               showed -- adding Projects and References did, and Classic ended
+               page one on a bare REFERENCES.
+
+               The body minimum is READ from the body rather than guessed, so
+               the two reservations cannot drift: see bodyFirstLine. */
+            ensureRoom(ctx, key, cursor, pageOf,
+                       (t.ruleBefore ? 72 : 40) + bodyFirstLine(block.body, T));
+
+            cursor[key] += emitRulesBefore(ctx, pageOf[key], col,
+                rulesBefore(t), cursor[key]);
+
+            /* A label knocked out of a filled box, and the rule picking up
+               where the box ends. Optional, and absent everywhere else, so the
+               five templates that predate it are untouched.
+
+               The box is drawn BEFORE the label and the label keeps its own
+               colour role, so what reaches the PDF is an ordinary filled
+               rectangle with ordinary text over it. It reads as a graphic and
+               extracts as text, which is why a design this decorative costs
+               nothing at parse time. */
+            let boxRight = 0;
+            if (t.box) {
+                const padX = t.box.padX === undefined ? 7 : t.box.padX;
+                const above = t.box.above === undefined ? t.size : t.box.above;
+                const below = t.box.below === undefined ? t.size * 0.35 : t.box.below;
+                /* `full` spans the column's BOX rather than its text measure,
+                   and bleeds to the page edge where the box does. A band is
+                   page furniture, so it follows the column it belongs to
+                   rather than the margin the text keeps inside it. */
+                const bx = t.box.full ? col.boxX : col.x;
+                const w = t.box.full
+                    ? col.boxW
+                    : ctx.measure(label, t) + padX * 2;
+                ctx.ops.push({
+                    op: "rect", page: pageOf[key], x: bx,
+                    y: cursor[key] - above, w: w, h: above + below,
+                    fill: colorOf(t.box.color, ctx.template, ctx.state)
+                });
+                boxRight = bx + w;
+                text(ctx, pageOf[key], (t.box.full ? bx : col.x) + padX,
+                     cursor[key], label, t);
+            } else {
+                text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], label, t);
+            }
 
             if (t.rule) {
                 const ry = cursor[key] + (t.rule.offset || 2);
-                emitRule(ctx, pageOf[key], col, t.rule, ry);
+                /* `fromBox` runs the rule from the box's right edge instead of
+                   the column's left, which is what makes the box and the rule
+                   read as one horizontal feature rather than two. */
+                if (t.box && t.rule.fromBox !== undefined) {
+                    const rx = boxRight + t.rule.fromBox;
+                    ctx.ops.push({
+                        op: "line", page: pageOf[key], x1: rx, y1: ry,
+                        x2: col.x + col.width, y2: ry,
+                        color: colorOf(t.rule.color, ctx.template, ctx.state),
+                        width: t.rule.width || 1
+                    });
+                } else {
+                    emitRule(ctx, pageOf[key], col, t.rule, ry);
+                }
                 cursor[key] = ry;
             }
             /* A block may tighten its own heading-to-body gap: entry lists
@@ -385,18 +1066,324 @@ window.TBResume = (() => {
         }
     }
 
+    /* A section whose label sits in a gutter beside its body.
+
+       The label WRAPS inside the gutter -- the longest of these labels sets
+       two lines on the artwork this was built from, which is how you know the
+       gutter's width is the constraint rather than the label's -- so the room
+       reserved is the taller of the wrapped label and the body's own first
+       line, never their sum.
+
+       The body is laid into the same column narrowed to the right of the
+       gutter, so paragraphs wrap to it, bullets indent from it and an entry's
+       dates range to its right edge, all without a second code path.
+
+       Page breaks are handled by NOT taking the maximum across one. If the
+       body broke, the label is on the page above and the cursor belongs to the
+       page below; comparing the two would push the new page's first band down
+       by the height of a label that is not on it. */
+    function layoutGutterSection(ctx, block, t, label, key, cursor, pageOf, col) {
+        const T = ctx.template.type;
+        const lh = t.gutter.lineHeight || t.lineHeight || t.size;
+        const lines = ctx.wrap(label, t, t.gutter.width);
+
+        const before = rulesBefore(t);
+        ensureRoom(ctx, key, cursor, pageOf,
+                   (before.length ? (before[before.length - 1].gapAfter || 0) : 0) +
+                   Math.max(lines.length * lh, bodyFirstLine(block.body, T)));
+
+        cursor[key] += emitRulesBefore(ctx, pageOf[key], col, before, cursor[key]);
+
+        const top = cursor[key];
+        const page = pageOf[key];
+        lines.forEach((line, i) => {
+            text(ctx, page, col.x, top + i * lh, line, t);
+        });
+        const labelBottom = top + (lines.length - 1) * lh;
+
+        withColumn(ctx, key, insetOf(col, { left: t.gutter.width }),
+            () => layoutBody(ctx, block.body, key, cursor, pageOf));
+
+        if (pageOf[key] === page) {
+            cursor[key] = Math.max(cursor[key], labelBottom);
+        }
+    }
+
+    /* What layoutBody below will reserve for the FIRST thing it draws. Every
+       number here is the one its own branch passes to ensureRoom, which is the
+       point: a section heading reserves room for its body by asking the body,
+       not by carrying a second copy of the body's arithmetic. */
+    function bodyFirstLine(body, T) {
+        if (!body) return 0;
+        if (body.kind === "entries") return 40;
+        /* Header band plus one data row: a table whose heading fits but whose
+           header lands alone at the foot of a page is the same defect as an
+           orphaned heading, one level down. */
+        if (body.kind === "table") {
+            const t = T[body.cellType || "body"];
+            const lh = t ? (t.lineHeight || t.size) : 14;
+            return (lh + (body.padY === undefined ? 5 : body.padY) * 2) * 2;
+        }
+        if (body.kind === "fields") {
+            const t = T[body.type || "body"];
+            return t ? (t.lineHeight || t.size) : 14;
+        }
+        if (body.kind === "contact") {
+            const t = T[body.type || "sidebarContact"];
+            return t ? (t.lineHeight || t.size) : 14;
+        }
+        if (body.kind === "meters") {
+            const t = T[body.type || "body"];
+            return (t.lineHeight || t.size) * 3;
+        }
+        const t = T[body.type || (body.kind === "list" ? "bullet" : "body")];
+        return t ? (t.lineHeight || t.size) : 14;
+    }
+
+    /* ----------------------------------------------------------------------
+       Label-and-value rows: "Date of Birth : 12 January 2004".
+
+       The colons align on a fixed column, which is the whole look of a biodata
+       sheet, and the value wraps into whatever is left. Three runs per row --
+       label, separator, value -- emitted in that order, so the PDF's content
+       stream reads the way the line reads. A parser that took the labels as
+       one column and the values as another would return six labels followed by
+       six unrelated values; emission order is the only thing preventing that,
+       and it is free here because the engine decides its own draw order.
+
+       A row whose field is empty draws nothing at all rather than a label over
+       a blank, so a sheet that skips the father's name simply closes up.
+       ---------------------------------------------------------------------- */
+    function layoutFields(ctx, body, key, cursor, pageOf) {
+        const col = ctx.cols[key];
+        const T = ctx.template.type;
+        const t = T[body.type || "body"];
+        const labelType = T[body.labelType || body.type || "body"];
+        const lh = t.lineHeight || t.size;
+        const sep = body.separator === undefined ? " : " : body.separator;
+        /* "auto" sets the separator immediately after the label instead of
+           on a fixed column, which is the difference between a form-style
+           block whose colons line up and a prose-style one that reads
+           "Date of Birth: 9 February". Both appear on real CVs and the
+           reference for this template uses the second. */
+        const autoWidth = body.labelWidth === "auto";
+        const labelWidth = autoWidth ? 0 : (body.labelWidth || 110);
+        /* The reference aligns these labels with the heading chip's TEXT
+           rather than with the chip's left edge, which is the margin. One
+           inset carries the whole block over, colons included. */
+        const indent = body.indent || 0;
+        const labelX = col.x + indent;
+        const sepWidth = ctx.measure(sep, labelType);
+        const valueX = labelX + labelWidth + sepWidth;
+        const valueWidth = col.width - indent - labelWidth - sepWidth;
+
+        /* `valueWidth` caps the measure a value wraps to, which is how the
+           address stays clear of a photograph sitting to its right without the
+           whole block -- heading, box and rule included -- being inset away
+           from the margin. */
+        const measure = Math.min(body.valueWidth || valueWidth, valueWidth);
+
+        let emitted = 0;
+        (body.rows || []).forEach((row) => {
+            /* A row may name one field or join several. The address is three
+               fields on this sheet, and joinFields drops an empty one along
+               with the separator that would dangle after it. */
+            const value = row.fields
+                ? joinFields(row, ctx.state.fields)
+                : readField(ctx.state.fields, row.field);
+            if (!value) return;
+            if (emitted) cursor[key] += body.rowGap === undefined ? 0 : body.rowGap;
+            emitted += 1;
+
+            const lw = autoWidth ? ctx.measure(row.label, labelType) : labelWidth;
+            const vx = labelX + lw + sepWidth;
+            const lines = ctx.wrap(value, t, autoWidth
+                ? Math.min(body.valueWidth || (col.width - indent - lw - sepWidth),
+                           col.width - indent - lw - sepWidth)
+                : measure);
+            ensureRoom(ctx, key, cursor, pageOf, lh * lines.length);
+            const page = pageOf[key];
+            /* A joined row is several fields in one run, so no overlay can
+               stand in for it and it hands off to the form -- the answer every
+               joined line in this engine gives. */
+            const edit = row.fields
+                ? fieldEdit(row.fields[0], { inline: false })
+                : fieldEdit(row.field, lines.length > 1 ? { multi: true } : null);
+
+            text(ctx, page, labelX, cursor[key], row.label, labelType);
+            text(ctx, page, labelX + lw, cursor[key], sep, labelType);
+            lines.forEach((line, i) => {
+                if (i) cursor[key] += lh;
+                text(ctx, page, vx, cursor[key], line, t, undefined, edit);
+            });
+            cursor[key] += lh;
+        });
+        /* The loop leaves the cursor one line PAST the last baseline, because
+           each row advances after drawing. Step back onto it, which is the
+           convention every other body here follows. */
+        if (emitted) cursor[key] -= lh;
+    }
+
+    /* ----------------------------------------------------------------------
+       A ruled table.
+
+       Emitted ROW-MAJOR, and that is the point rather than an implementation
+       detail. An applicant tracking system reads the PDF's text stream in the
+       order the text was drawn; a table drawn column by column extracts as
+       four unrelated lists and every qualification loses its board, its year
+       and its mark. Drawn row by row it extracts as records. The engine owns
+       its own draw order, so this is a guarantee rather than a hope -- which a
+       table in a word processor cannot offer.
+
+       Borders are lines, invisible to a text extractor, so they cost nothing
+       at parse time. The risk in a table is reading order alone.
+
+       A row is never split across a page: each reserves its own full height
+       before drawing. The header does not repeat on the second page, which is
+       a real limitation and an acceptable one for a document whose tables run
+       to a handful of rows.
+       ---------------------------------------------------------------------- */
+    function layoutTable(ctx, body, key, cursor, pageOf) {
+        const col = ctx.cols[key];
+        const T = ctx.template.type;
+        const cells = T[body.cellType || "body"];
+        const heads = T[body.headerType || body.cellType || "body"];
+        const lh = cells.lineHeight || cells.size;
+        const padX = body.padX === undefined ? 6 : body.padX;
+        const padY = body.padY === undefined ? 5 : body.padY;
+        const cols = body.columns || [];
+        const border = body.border || {};
+        const borderColor = colorOf(border.color || "ink", ctx.template, ctx.state);
+        const borderWidth = border.width || 0.8;
+
+        /* Fractions of the column, so the table tracks the text measure rather
+           than carrying absolute widths that would break on a narrower page. */
+        let total = 0;
+        cols.forEach((c) => { total += c.width || 0; });
+        const widths = cols.map((c) => col.width * ((c.width || 0) / (total || 1)));
+        const xs = [];
+        let x = col.x;
+        widths.forEach((w) => { xs.push(x); x += w; });
+
+        const rows = (ctx.state[body.source] || [])
+            .filter((row) => cols.some((c) => String(row[c.field] || "").trim()));
+
+        /* One band: the cells wrapped, and the height the tallest of them
+           needs. Measured before anything is drawn, because the row's borders
+           have to know how deep the row is. */
+        const band = (values, type) => {
+            const wrapped = values.map((v, i) =>
+                ctx.wrap(String(v || ""), type, Math.max(4, widths[i] - padX * 2)));
+            let deepest = 1;
+            wrapped.forEach((w) => { deepest = Math.max(deepest, w.length); });
+            return { wrapped: wrapped, height: deepest * lh + padY * 2 };
+        };
+
+        const drawBand = (b, type, fill, editFor) => {
+            ensureRoom(ctx, key, cursor, pageOf, b.height);
+            const page = pageOf[key];
+            const top = cursor[key];
+
+            if (fill) {
+                ctx.ops.push({ op: "rect", page: page, x: col.x, y: top,
+                               w: col.width, h: b.height,
+                               fill: colorOf(fill, ctx.template, ctx.state) });
+            }
+
+            /* Cells first, left to right, then the rules. Text before lines so
+               the content stream reads as the table reads. */
+            b.wrapped.forEach((lines, i) => {
+                const align = cols[i].align || "left";
+                const cx = align === "center" ? xs[i] + widths[i] / 2
+                         : align === "right" ? xs[i] + widths[i] - padX
+                         : xs[i] + padX;
+                lines.forEach((line, j) => {
+                    text(ctx, page, cx, top + padY + lh * (j + 1) - lh * 0.25, line,
+                         Object.assign({}, type, { align: align }),
+                         undefined, editFor ? editFor(i) : undefined);
+                });
+            });
+
+            const bottom = top + b.height;
+            const hline = (y) => ctx.ops.push({ op: "line", page: page,
+                x1: col.x, y1: y, x2: col.x + col.width, y2: y,
+                color: borderColor, width: borderWidth });
+            hline(top);
+            hline(bottom);
+            xs.concat([col.x + col.width]).forEach((vx) => {
+                ctx.ops.push({ op: "line", page: page, x1: vx, y1: top,
+                               x2: vx, y2: bottom, color: borderColor,
+                               width: borderWidth });
+            });
+            cursor[key] = bottom;
+        };
+
+        /* The cursor arrives on a BASELINE; a table is a box, so it starts one
+           line-height above it. Without this the header sits a line lower than
+           every other body's first line and the section looks mis-set. */
+        cursor[key] -= lh * 0.75;
+
+        if (body.header !== false) {
+            drawBand(band(cols.map((c) => c.label || ""), heads), heads,
+                     body.headerFill);
+        }
+        rows.forEach((row, ri) => {
+            drawBand(band(cols.map((c) => row[c.field]), cells), cells, null,
+                /* Provenance per cell: the form keeps these as rows, so a
+                   click lands in the right control rather than nowhere. */
+                (ci) => entryEdit({ list: body.source, index: ri }, cols[ci].field));
+        });
+
+        /* Leave the cursor on a baseline again, so whatever follows spaces
+           itself from the table exactly as it would from a paragraph. */
+        cursor[key] += lh * 0.75;
+    }
+
     function layoutBody(ctx, body, key, cursor, pageOf) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
+
+        if (body.kind === "fields") {
+            layoutFields(ctx, body, key, cursor, pageOf);
+            return;
+        }
+
+        if (body.kind === "table") {
+            layoutTable(ctx, body, key, cursor, pageOf);
+            return;
+        }
 
         if (body.kind === "paragraph") {
             const t = T[body.type || "body"];
             const value = readField(ctx.state.fields, body.field);
             if (!value) return;
-            ctx.wrap(value, t, col.width).forEach((line, i) => {
+            /* Prose is always several runs to one field, so the overlay has
+               to cover all of them; it is NOT a hand-off, because the field
+               behind it is a textarea holding exactly this value. */
+            const edit = fieldEdit(body.field, { multi: true });
+            const lines = ctx.wrap(value, t, col.width);
+            lines.forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
                 ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
-                text(ctx, pageOf[key], col.x, cursor[key], line, t);
+                /* Justification as per-line TRACKING rather than word spacing.
+                   Word spacing would need each painter to distribute it the
+                   same way and they do not: SVG stretches inter-glyph space
+                   and jsPDF stretches word space, so the two would disagree
+                   about where a line ends. Tracking is one number both already
+                   honour exactly, so the line fills the measure identically in
+                   preview and export. The LAST line is never justified, which
+                   is what makes a paragraph a paragraph. */
+                let tr;
+                if (body.justify && i < lines.length - 1) {
+                    const natural = ctx.measure(line, t);
+                    const gaps = Math.max(1, String(line).length - 1);
+                    const extra = (col.width - natural) / gaps;
+                    if (extra > 0 && extra < t.size * 0.35) {
+                        tr = (t.tracking || 0) + extra;
+                    }
+                }
+                text(ctx, pageOf[key], col.x, cursor[key], line, t, undefined,
+                     edit, tr);
             });
             return;
         }
@@ -405,12 +1392,26 @@ window.TBResume = (() => {
             const t = T[body.type || "bullet"];
             const items = splitList((ctx.state.fields || {})[body.field], body.split);
             if (body.columns) {
-                layoutListColumns(ctx, items, t, body.columns, key, cursor, pageOf);
+                layoutListColumns(ctx, items, t, body.columns, key, cursor, pageOf,
+                                  body.field, body.split);
                 return;
             }
             items.forEach((item, i) => {
                 if (i) cursor[key] += t.itemGap || t.lineHeight;
-                layoutBulletItem(ctx, item, t, key, cursor, pageOf);
+                /* `entryList` is for a field the FORM keeps as rows and the
+                   engine reads as one composed string -- languages. One item
+                   is then "English: Native", two controls' worth of value in
+                   a single run, so it hands off to the form rather than
+                   taking an overlay that could only write back half of it.
+                   The index counts rendered items and the composer drops
+                   unnamed rows; the resolver in js/resume.js filters the same
+                   way, which is what keeps the two ends on the same row. */
+                layoutBulletItem(ctx, item, t, key, cursor, pageOf, undefined,
+                    body.entryList
+                        ? Object.assign(
+                            entryEdit({ list: body.entryList, index: i }, "name"),
+                            { inline: false })
+                        : fieldEdit(body.field, { part: { split: body.split, index: i } }));
             });
             return;
         }
@@ -420,6 +1421,15 @@ window.TBResume = (() => {
            imported descriptor render immediately for review instead of
            having to be finished first. Not for production templates -- a
            shipped template maps to fields. */
+        /* The stacked icon rows, under a heading. `contact` is a BLOCK in
+           its own right as well, for the templates that set the rows with no
+           heading over them; both reach the same function, so the two forms
+           cannot draw differently. */
+        if (body.kind === "contact") {
+            layoutContact(ctx, body, key, cursor, pageOf);
+            return;
+        }
+
         if (body.kind === "lines") {
             const t = T[body.type || "body"];
             (body.lines || []).forEach((ln, i) => {
@@ -463,7 +1473,20 @@ window.TBResume = (() => {
 
                 ensureRoom(ctx, key, cursor, pageOf, lh * 3);
                 const page = pageOf[key];
-                text(ctx, page, col.x, cursor[key], name + (level ? ":" : ""), t);
+                /* `meters` reads one composed string, but the FORM behind it is
+                   a list of rows, so provenance is an entry reference. The
+                   index counts rendered rows, and the composer drops any row
+                   with no language name -- the resolver in js/resume.js closes
+                   that gap by counting only named rows, which is the same rule
+                   from the other end. The level is a <select> plus an optional
+                   free-text box, which no single overlay can stand in for, so
+                   it hands off. */
+                const langName = entryEdit({ list: "language", index: i }, "name");
+                const langLevel = Object.assign(
+                    entryEdit({ list: "language", index: i }, "level"),
+                    { inline: false });
+                text(ctx, page, col.x, cursor[key], name + (level ? ":" : ""), t,
+                     undefined, langName);
 
                 if (fraction === null) {
                     if (level) cursor[key] += lh;
@@ -484,7 +1507,10 @@ window.TBResume = (() => {
                     cursor[key] += bar.gapAfter === undefined ? 16 : bar.gapAfter;
                 }
 
-                if (level) text(ctx, pageOf[key], col.x, cursor[key], level, t);
+                if (level) {
+                    text(ctx, pageOf[key], col.x, cursor[key], level, t,
+                         undefined, langLevel);
+                }
             });
             return;
         }
@@ -492,16 +1518,17 @@ window.TBResume = (() => {
         if (body.kind === "entries") {
             const rows = ctx.state[body.source] || [];
             let emitted = 0;
-            rows.forEach((row) => {
+            rows.forEach((row, rowIndex) => {
+                if (!entryHasContent(body, row)) return;
+                const entryRef = { list: body.source, index: rowIndex };
                 const headRuns = buildRuns(body.head || {}, row, ctx.template);
                 const bullets = body.bullets
                     ? splitList(row[body.bullets.field], body.bullets.split) : [];
-                if (!headRuns.length && !bullets.length) return;
 
                 if (emitted) cursor[key] += body.entryGap || 20;
                 ensureRoom(ctx, key, cursor, pageOf, 40);
 
-                if (headRuns.length) layoutRuns(ctx, headRuns, key, cursor, pageOf);
+                if (headRuns.length) layoutRuns(ctx, headRuns, key, cursor, pageOf, entryRef);
 
                 /* Dates set flush right on the head's OWN baseline, so the
                    cursor must not have moved yet -- that is why this is laid
@@ -509,23 +1536,42 @@ window.TBResume = (() => {
                 if (body.aside) {
                     const asideRuns = buildRuns(body.aside, row, ctx.template);
                     if (asideRuns.length) {
-                        layoutRunsRight(ctx, asideRuns, key, cursor[key], pageOf[key]);
+                        layoutRunsRight(ctx, asideRuns, key, cursor[key], pageOf[key], entryRef);
                     }
                 }
 
-                const subRuns = body.sub ? buildRuns(body.sub, row, ctx.template) : [];
-                if (subRuns.length) {
-                    cursor[key] += (body.sub.gapBefore || 13);
+                /* `sub` is one line, or an ARRAY of them. Three-line entry
+                   heads -- company, then role, then place, each on its own
+                   baseline -- are common enough in CV artwork that folding
+                   them into one comma-joined line misrepresents the design.
+                   Each element keeps its own runs and its own gapBefore, and
+                   a line whose every field is empty is skipped without
+                   consuming its gap. A plain object still means exactly what
+                   it did, so no existing descriptor changes. */
+                subSpecs(body).forEach((spec) => {
+                    const subRuns = buildRuns(spec, row, ctx.template);
+                    if (!subRuns.length) return;
+                    cursor[key] += (spec.gapBefore || 13);
                     ensureRoom(ctx, key, cursor, pageOf, 14);
-                    layoutRuns(ctx, subRuns, key, cursor, pageOf);
-                }
+                    layoutRuns(ctx, subRuns, key, cursor, pageOf, entryRef);
+                });
 
                 if (bullets.length) {
-                    const t = T["bullet"];
+                    /* The entry body names its own type. It used to be hard
+                       wired to T.bullet, which forces every template's entry
+                       description to be a bulleted list -- but a plain CV sets
+                       the description as PROSE while still wanting markers on
+                       its skills, and one role cannot be both. Defaults to
+                       "bullet", so no existing descriptor changes. */
+                    const t = T[body.bullets.type || "bullet"];
                     cursor[key] += (body.bullets.gapBefore || 16);
                     bullets.forEach((item, i) => {
                         if (i) cursor[key] += t.itemGap || t.lineHeight;
-                        layoutBulletItem(ctx, item, t, key, cursor, pageOf);
+                        layoutBulletItem(ctx, item, t, key, cursor, pageOf, undefined,
+                            entryEdit(entryRef, body.bullets.field)
+                                ? Object.assign(entryEdit(entryRef, body.bullets.field),
+                                    { part: { split: body.bullets.split, index: i } })
+                                : null);
                     });
                 }
                 emitted += 1;
@@ -533,17 +1579,65 @@ window.TBResume = (() => {
         }
     }
 
-    /* One baseline, several fonts. Each run is measured and the pen advances,
-       which is how a PDF draws mixed weights -- a single text call cannot
-       change font mid-string. */
-    function layoutRuns(ctx, runs, key, cursor, pageOf) {
+    /* Several fonts sharing a baseline, WRAPPED to the column. Each run is
+       measured and the pen advances, which is how a PDF draws mixed weights --
+       a single text call cannot change font mid-string.
+
+       It used to be one baseline and no wrapping at all, and that was a real
+       defect rather than a simplification: a composed line wider than its
+       column did not wrap, it kept going. On a two-column sheet it kept going
+       ACROSS THE GUTTER and drew over the other column. Found September 15,
+       2026 on the Peach Portrait CV, whose referee block composes
+       "Address: " with a field -- a normal street address put 13.9pt of the
+       visitor's own text into the main column, on top of whatever was there.
+
+       Wrapping a RUN GROUP is not the same problem as wrapping a paragraph,
+       which is why ctx.wrap cannot be used here: the first line starts at
+       whatever x the preceding runs left the pen at, so how much fits on it
+       depends on the runs before it, and each run may be a different size.
+       The measure is therefore consumed left to right, word by word, with the
+       pen carrying over between runs.
+
+       It advances cursor[key] by one line height for every line it had to
+       break, and callers rely on that: they add the NEXT line's gapBefore to
+       wherever this left the cursor, so a wrapped value pushes what follows
+       down instead of being drawn under it. */
+    function layoutRuns(ctx, runs, key, cursor, pageOf, entryRef) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
+        /* Half a point of tolerance, the same slack the off-page check uses:
+           a value that measures exactly to the edge is not an overflow. */
+        const right = col.x + col.width + 0.5;
         let x = col.x;
         runs.forEach((run) => {
             const t = T[run.type];
-            text(ctx, pageOf[key], x, cursor[key], run.text, t);
-            x += ctx.measure(run.text, t);
+            const lh = t.lineHeight || t.size;
+            const edit = entryEdit(entryRef, run.field);
+            if (x + ctx.measure(run.text, t) <= right) {
+                text(ctx, pageOf[key], x, cursor[key], run.text, t, undefined, edit);
+                x += ctx.measure(run.text, t);
+                return;
+            }
+            const words = String(run.text).split(/\s+/).filter(Boolean);
+            let line = "";
+            words.forEach((word) => {
+                const probe = line ? line + " " + word : word;
+                if (x + ctx.measure(probe, t) <= right) { line = probe; return; }
+                /* An empty line here means the word does not fit even from the
+                   column's left edge. Drawing it overlong is deliberate and is
+                   what the paragraph wrapper does too: breaking inside a word
+                   would hyphenate an email address or a URL at an arbitrary
+                   point, which is worse than one line running wide. */
+                if (!line) { line = word; return; }
+                text(ctx, pageOf[key], x, cursor[key], line, t, undefined, edit);
+                cursor[key] += lh;
+                x = col.x;
+                line = word;
+            });
+            if (line) {
+                text(ctx, pageOf[key], x, cursor[key], line, t, undefined, edit);
+                x += ctx.measure(line, t);
+            }
         });
     }
 
@@ -551,7 +1645,7 @@ window.TBResume = (() => {
        to right from an x that lands its last glyph on the column's right
        edge. Right-anchoring each run on its own would stack them all at the
        same place, so the measurement has to finish before anything is drawn. */
-    function layoutRunsRight(ctx, runs, key, y, page) {
+    function layoutRunsRight(ctx, runs, key, y, page, entryRef) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
         let total = 0;
@@ -559,7 +1653,7 @@ window.TBResume = (() => {
         let x = col.x + col.width - total;
         runs.forEach((run) => {
             const t = T[run.type];
-            text(ctx, page, x, y, run.text, t);
+            text(ctx, page, x, y, run.text, t, undefined, entryEdit(entryRef, run.field));
             x += ctx.measure(run.text, t);
         });
     }
@@ -574,7 +1668,7 @@ window.TBResume = (() => {
        mid-column would leave its two halves on different pages, which reads
        as a rendering fault rather than a longer document -- the same
        judgement the sidebar's single-page rule already makes. */
-    function layoutListColumns(ctx, items, t, spec, key, cursor, pageOf) {
+    function layoutListColumns(ctx, items, t, spec, key, cursor, pageOf, field, split) {
         const col = ctx.cols[key];
         const count = Math.max(2, spec.count || 2);
         const gutter = spec.gutter === undefined ? 12 : spec.gutter;
@@ -606,7 +1700,11 @@ window.TBResume = (() => {
             const subPage = { col: pageOf[key] };
             slice.forEach((item, i) => {
                 if (i) sub.col += t.itemGap || lh;
-                layoutBulletItem(ctx, item, t, "col", sub, subPage, box);
+                /* The index within the WHOLE field, not within this
+                   sub-column: editing the right-hand column would otherwise
+                   rewrite the wrong comma-separated segment. */
+                layoutBulletItem(ctx, item, t, "col", sub, subPage, box,
+                    fieldEdit(field, { part: { split: split, index: ci * perColumn + i } }));
             });
             if (slice.length) deepest = Math.max(deepest, sub.col);
         });
@@ -638,19 +1736,36 @@ window.TBResume = (() => {
     /* `box` overrides the column, for sub-column layout; `t.inset` moves the
        whole item in from the column edge, which is how bullets sit indented
        under a full-width heading. */
-    function layoutBulletItem(ctx, item, t, key, cursor, pageOf, box) {
+    function layoutBulletItem(ctx, item, t, key, cursor, pageOf, box, edit) {
         const col = box || ctx.cols[key];
         const inset = t.inset || 0;
-        const indent = t.indent || 8;
+        /* `=== undefined`, not `||`: an explicit `indent: 0` is a real value
+           and `0 || 8` silently becomes 8. That is how an unmarked prose body
+           -- an entry description that is not a list -- came out indented 8pt
+           from the margin AND wrapped to a column 8pt narrower than it should
+           have been. Found by the Classic equivalence check, not by eye. */
+        const indent = t.indent === undefined ? 8 : t.indent;
         const x = col.x + inset;
         const lines = ctx.wrap(item, t, col.width - inset - indent);
+        /* One item that WRAPPED is several runs to one value, so the overlay
+           covers the group -- the same answer a paragraph gets. `part` is what
+           keeps the caret on that item alone inside a comma- or
+           newline-separated field, and it survives the group because the whole
+           group addresses the same segment. An item that already hands off
+           (a composed language row) keeps doing so: Object.assign leaves an
+           existing `inline: false` in place. The marker carries the same
+           provenance as its text, so clicking the bullet does what clicking
+           the words does rather than nothing. */
+        const itemEdit = (edit && lines.length > 1)
+            ? Object.assign({}, edit, { multi: true })
+            : edit;
         lines.forEach((line, i) => {
             if (i) cursor[key] += t.lineHeight || t.size;
             ensureRoom(ctx, key, cursor, pageOf, t.lineHeight || t.size);
             if (i === 0 && t.marker) {
-                text(ctx, pageOf[key], x, cursor[key], t.marker, t);
+                text(ctx, pageOf[key], x, cursor[key], t.marker, t, undefined, itemEdit);
             }
-            text(ctx, pageOf[key], x + indent, cursor[key], line, t);
+            text(ctx, pageOf[key], x + indent, cursor[key], line, t, undefined, itemEdit);
         });
     }
 
@@ -663,10 +1778,24 @@ window.TBResume = (() => {
     function layoutContact(ctx, block, key, cursor, pageOf) {
         const col = ctx.cols[key];
         const T = ctx.template.type;
-        const t = T.sidebarContact;
+        /* The block names its own role, like every other body does. It was
+           hard-wired to `sidebarContact`, which silently required every
+           template with contact rows to use that one name -- a template that
+           called the role anything else got `undefined` and threw inside the
+           measurer, several frames from the descriptor that caused it.
+           Defaults to the old name, so the templates that use it are
+           untouched. */
+        const t = T[block.type || "sidebarContact"];
         const r = (block.iconSize || 15) / 2;
-        const disc = colorOf(block.disc, ctx.template, ctx.state);
+        /* `disc` is optional: omit it and the glyphs sit straight on the
+           column's background at full size. `knockout` is then what fills the
+           hollows in them -- name the column's own background role, or the
+           pin's hole comes out the wrong colour. It defaults to the disc so
+           a template that draws one needs no second key. */
+        const disc = block.disc ? colorOf(block.disc, ctx.template, ctx.state) : null;
         const glyph = colorOf(block.glyph, ctx.template, ctx.state);
+        const knock = block.knockout
+            ? colorOf(block.knockout, ctx.template, ctx.state) : disc;
         const page = pageOf[key];
 
         let emitted = 0;
@@ -681,7 +1810,7 @@ window.TBResume = (() => {
 
             const lines = ctx.wrap(value, t, col.width - (block.textOffset || 28));
             const cy = cursor[key] - t.size * 0.32;
-            drawIcon(ctx, page, row.icon, col.x + r, cy, r, disc, glyph);
+            drawIcon(ctx, page, row.icon, col.x + r, cy, r, disc, glyph, knock);
 
             lines.forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
@@ -704,9 +1833,14 @@ window.TBResume = (() => {
         const size = sep.size || 7;
         const gap = sep.gap === undefined ? 12 : sep.gap;
 
-        const values = (block.fields || [])
-            .map((n) => readField(ctx.state.fields, n))
-            .filter(Boolean);
+        /* Field names ride along with their values through the empty-filter.
+           Mapping `values[i]` back to `block.fields[i]` afterwards would be
+           off by one for every empty field before it, which is how a caret
+           lands in the wrong box. */
+        const pairs = (block.fields || [])
+            .map((n) => ({ field: n, value: readField(ctx.state.fields, n) }))
+            .filter((p) => p.value);
+        const values = pairs.map((p) => p.value);
         if (!values.length) return;
 
         cursor[key] += block.gapBefore || 0;
@@ -727,7 +1861,7 @@ window.TBResume = (() => {
 
         const glyph = colorOf(sep.color || "body", ctx.template, ctx.state);
         values.forEach((value, i) => {
-            text(ctx, page, x, y, value, t);
+            text(ctx, page, x, y, value, t, undefined, fieldEdit(pairs[i].field));
             x += widths[i];
             if (i < values.length - 1) {
                 drawSeparator(ctx, page, sep.shape, x + gap + size / 2,
@@ -754,33 +1888,121 @@ window.TBResume = (() => {
         ctx.ops.push({ op: "circle", page: page, cx: cx, cy: cy, r: r, fill: color });
     }
 
-    function drawIcon(ctx, page, kind, cx, cy, r, disc, glyph) {
-        const P = ctx.ops;
-        P.push({ op: "circle", page: page, cx: cx, cy: cy, r: r, fill: disc });
+    /* Contact glyphs, drawn from primitives so the export stays vector and
+       the template needs no image asset.
 
+       `disc` is OPTIONAL. With one, the glyph is knocked out of a filled
+       circle; without one it sits directly on the column's own background,
+       which is what a dark rail wants and what lets the glyph use the whole
+       icon box instead of the ~62% a disc leaves it. `knock` is the colour
+       BEHIND the glyph either way -- the disc where there is a disc, the rail
+       where there is not -- and it is what cuts the hole out of the pin and
+       the crease out of the envelope. Getting it wrong is invisible on a
+       white disc and glaring on a rail, which is why it is passed in rather
+       than assumed to be the disc.
+
+       Every coordinate below is a multiple of `u`, the glyph's own half
+       extent, so the three shapes are written once and scale together. */
+    function drawIcon(ctx, page, kind, cx, cy, r, disc, glyph, knock) {
+        const P = ctx.ops;
+        if (disc) {
+            P.push({ op: "circle", page: page, cx: cx, cy: cy, r: r, fill: disc });
+        }
+        const u = disc ? r * 0.62 : r;
+        const hole = knock || disc || "#FFFFFF";
+
+        /* Map pin: a disc and a tapering body that share an edge, so the two
+           primitives union into one teardrop rather than reading as a circle
+           sitting on a triangle. The triangle's top edge is the disc's
+           DIAMETER, at the centre line -- any higher and the join shows. */
         if (kind === "pin") {
-            P.push({ op: "circle", page: page, cx: cx, cy: cy - 0.16 * r, r: 0.30 * r, fill: glyph });
+            P.push({ op: "circle", page: page,
+                     cx: cx, cy: cy - 0.30 * u, r: 0.62 * u, fill: glyph });
             P.push({ op: "poly", page: page, fill: glyph, points: [
-                [cx - 0.28 * r, cy + 0.02 * r],
-                [cx + 0.28 * r, cy + 0.02 * r],
-                [cx, cy + 0.60 * r]
+                [cx - 0.62 * u, cy - 0.30 * u],
+                [cx + 0.62 * u, cy - 0.30 * u],
+                [cx, cy + 0.95 * u]
             ]});
+            P.push({ op: "circle", page: page,
+                     cx: cx, cy: cy - 0.30 * u, r: 0.26 * u, fill: hole });
             return;
         }
+
+        /* Handset: a crescent that thickens into a cup at each end, tilted the
+           way a receiver is held. Sampled off an arc rather than written out
+           as vertices, because the two things that make it read as a phone at
+           13pt -- the bow of the handle and the flare of the cups -- are both
+           curves, and a polygon written by hand can only approximate them at
+           one size.
+
+           There is no rotate operation in the display list, deliberately:
+           jsPDF and SVG express rotation differently and a display list that
+           carried one would have to be interpreted twice. The tilt is applied
+           to the sampled points instead, so ONE set of numbers describes the
+           glyph however it is angled. `k` scales the arc to the icon box; the
+           radii below are in units of that box's half extent before it.
+
+           WHICH WAY IT FACES is the sign of TILT, and it is easy to get
+           backwards because the arc is symmetrical -- a mirrored handset is
+           still a plausible drawing, just not the one anybody recognises. The
+           earpiece belongs at the TOP LEFT and the mouthpiece at the bottom
+           right, so the cord would leave toward the lower left; the hollow of
+           the crescent faces up and to the right. A negative tilt runs it the
+           other way, lower left to upper right, which is what this drew
+           first. */
         if (kind === "phone") {
-            P.push({ op: "roundrect", page: page, fill: glyph,
-                     x: cx - 0.26 * r, y: cy - 0.50 * r, w: 0.52 * r, h: 1.00 * r, r: 0.12 * r });
-            P.push({ op: "line", page: page, color: disc, width: Math.max(0.4, 0.10 * r),
-                     x1: cx - 0.10 * r, y1: cy - 0.34 * r, x2: cx + 0.10 * r, y2: cy - 0.34 * r });
+            const k = 0.72 * u;
+            const RO = 1.62 * k;   /* outer radius of the crescent     */
+            const RI = 1.30 * k;   /* inner radius: the gap is the bar */
+            const OY = -1.05 * k;  /* arc centre, above the glyph      */
+            /* Deep enough that the cups read as cups at 13pt rather than as a
+               bar that happens to thicken. Their thickness is the handle plus
+               twice this, so 0.40 puts them at three and a half times it. */
+            const FLARE = 0.40 * k;
+            const A0 = 46 * Math.PI / 180;
+            const A1 = 134 * Math.PI / 180;
+            const TILT = 40 * Math.PI / 180;
+            const ct = Math.cos(TILT);
+            const st = Math.sin(TILT);
+            const N = 16;
+            const pts = [];
+            /* Ramps from 0 across the middle of the arc to 1 at either end, so
+               the cups grow out of the handle instead of being butted onto
+               it. Squared, which is what stops the join showing as a corner. */
+            const edge = (s) => {
+                const d = Math.max(0, 1 - Math.min(s, 1 - s) / 0.26);
+                return d * d;
+            };
+            const put = (s, radius) => {
+                const ang = A0 + (A1 - A0) * s;
+                const lx = Math.cos(ang) * radius;
+                const ly = OY + Math.sin(ang) * radius;
+                pts.push([cx + lx * ct - ly * st, cy + lx * st + ly * ct]);
+            };
+            for (let i = 0; i <= N; i += 1) {
+                put(i / N, RO + FLARE * edge(i / N));
+            }
+            for (let i = N; i >= 0; i -= 1) {
+                put(i / N, RI - FLARE * edge(i / N));
+            }
+            P.push({ op: "poly", page: page, fill: glyph, points: pts });
             return;
         }
-        /* envelope */
+
+        /* Envelope: a solid body with the flap cut back out of it as a
+           chevron that runs corner to corner. A knocked-out triangle was the
+           obvious alternative and is what this drew before; it removes the
+           top two thirds of the body and leaves a shape that reads as an
+           arrow, not an envelope. */
         P.push({ op: "rect", page: page, fill: glyph,
-                 x: cx - 0.44 * r, y: cy - 0.32 * r, w: 0.88 * r, h: 0.64 * r });
-        P.push({ op: "poly", page: page, fill: disc, points: [
-            [cx - 0.44 * r, cy - 0.32 * r],
-            [cx + 0.44 * r, cy - 0.32 * r],
-            [cx, cy + 0.06 * r]
+                 x: cx - 0.90 * u, y: cy - 0.62 * u, w: 1.80 * u, h: 1.24 * u });
+        P.push({ op: "poly", page: page, fill: hole, points: [
+            [cx - 0.90 * u, cy - 0.62 * u],
+            [cx,            cy + 0.06 * u],
+            [cx + 0.90 * u, cy - 0.62 * u],
+            [cx + 0.90 * u, cy - 0.38 * u],
+            [cx,            cy + 0.30 * u],
+            [cx - 0.90 * u, cy - 0.38 * u]
         ]});
     }
 
@@ -802,7 +2024,10 @@ window.TBResume = (() => {
         const bg = document.createElementNS(SVG_NS, "rect");
         bg.setAttribute("width", String(tpl.page.width));
         bg.setAttribute("height", String(tpl.page.height));
-        bg.setAttribute("fill", "#FFFFFF");
+        /* A template may tint the whole sheet. Defaults to white, so every
+           template that says nothing is unchanged. */
+        bg.setAttribute("fill", tpl.background
+            ? colorOf(tpl.background, tpl, ctx.state) : "#FFFFFF");
         svg.appendChild(bg);
 
         ctx.ops.filter((o) => (o.page || 0) === page).forEach((o) => {
@@ -817,7 +2042,14 @@ window.TBResume = (() => {
             n = document.createElementNS(SVG_NS, "rect");
             n.setAttribute("x", o.x); n.setAttribute("y", o.y);
             n.setAttribute("width", o.w); n.setAttribute("height", o.h);
-            n.setAttribute("fill", o.fill);
+            /* A rect may be a fill, a keyline, or both. "none" rather than an
+               omitted attribute: SVG's default fill is black, so a stroked
+               box with no fill named would come out solid. */
+            n.setAttribute("fill", o.fill || "none");
+            if (o.stroke) {
+                n.setAttribute("stroke", o.stroke);
+                n.setAttribute("stroke-width", o.strokeWidth || 1);
+            }
         } else if (o.op === "roundrect") {
             n = document.createElementNS(SVG_NS, "rect");
             n.setAttribute("x", o.x); n.setAttribute("y", o.y);
@@ -827,16 +2059,99 @@ window.TBResume = (() => {
             n = document.createElementNS(SVG_NS, "circle");
             n.setAttribute("cx", o.cx); n.setAttribute("cy", o.cy);
             n.setAttribute("r", o.r); n.setAttribute("fill", o.fill);
+        } else if (o.op === "imageCircle") {
+            /* A <clipPath> per photograph, with an id unique to the page and
+               the op, because two sheets in one preview would otherwise share
+               one id and the second would clip to the first's circle. */
+            const gid = "rt-clip-" + o.page + "-" + Math.round(o.cx) + "-" + Math.round(o.cy);
+            n = document.createElementNS(SVG_NS, "g");
+            const clip = document.createElementNS(SVG_NS, "clipPath");
+            clip.setAttribute("id", gid);
+            const cc = document.createElementNS(SVG_NS, "circle");
+            cc.setAttribute("cx", o.cx); cc.setAttribute("cy", o.cy);
+            cc.setAttribute("r", o.r);
+            clip.appendChild(cc);
+            n.appendChild(clip);
+            const img = document.createElementNS(SVG_NS, "image");
+            img.setAttributeNS("http://www.w3.org/1999/xlink", "href", o.url);
+            img.setAttribute("href", o.url);
+            img.setAttribute("x", o.x); img.setAttribute("y", o.y);
+            img.setAttribute("width", o.w); img.setAttribute("height", o.h);
+            img.setAttribute("clip-path", "url(#" + gid + ")");
+            img.setAttribute("preserveAspectRatio", "xMidYMid slice");
+            n.appendChild(img);
         } else if (o.op === "poly") {
             n = document.createElementNS(SVG_NS, "polygon");
             n.setAttribute("points", o.points.map((p) => p[0] + "," + p[1]).join(" "));
             n.setAttribute("fill", o.fill);
+        } else if (o.op === "image") {
+            n = document.createElementNS(SVG_NS, "image");
+            n.setAttribute("x", o.x); n.setAttribute("y", o.y);
+            n.setAttribute("width", o.w); n.setAttribute("height", o.h);
+            /* SVG2 `href` for current browsers, the xlink form alongside it
+               for older WebKit, which ignores the unprefixed one and would
+               render an empty box. Both name the same value, so a browser
+               that understands either draws the photograph.
+
+               preserveAspectRatio="none" is SAFE here and nowhere else: the
+               bitmap is already PHOTO_RATIO, so there is nothing to distort.
+               Any of the "meet" values would letterbox a rounding difference
+               into a visible seam against the panel; "slice" would crop in
+               the preview and NOT in the PDF, since jsPDF's addImage has no
+               source rectangle -- the one disagreement between the mediums
+               this engine cannot tolerate. */
+            n.setAttribute("preserveAspectRatio", "none");
+            n.setAttribute("href", o.url);
+            n.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", o.url);
         } else if (o.op === "line") {
             n = document.createElementNS(SVG_NS, "line");
             n.setAttribute("x1", o.x1); n.setAttribute("y1", o.y1);
             n.setAttribute("x2", o.x2); n.setAttribute("y2", o.y2);
             n.setAttribute("stroke", o.color);
             n.setAttribute("stroke-width", o.width);
+        } else if (o.op === "photoSlot") {
+            /* PREVIEW ONLY, like `edit` below: paintPdf() returns on this op
+               before it reads anything, so an exported file cannot carry it.
+
+               A group rather than one node because it is a box and a word, and
+               js/resume.js binds the click to the group -- the whole prompt is
+               the target, not just the glyphs. */
+            n = document.createElementNS(SVG_NS, "g");
+            n.setAttribute("class", "rt-photo-slot");
+            n.setAttribute("data-photo-slot", "1");
+
+            const box = o.round
+                ? document.createElementNS(SVG_NS, "circle")
+                : document.createElementNS(SVG_NS, "rect");
+            if (o.round) {
+                box.setAttribute("cx", o.x + o.w / 2);
+                box.setAttribute("cy", o.y + o.h / 2);
+                box.setAttribute("r", o.w / 2);
+            } else {
+                box.setAttribute("x", o.x); box.setAttribute("y", o.y);
+                box.setAttribute("width", o.w); box.setAttribute("height", o.h);
+                box.setAttribute("rx", "4");
+            }
+            /* No fill: the panel behind this is the template's, and tinting it
+               would be a second colour decision on top of the accent. */
+            box.setAttribute("fill", "none");
+            box.setAttribute("stroke", o.color);
+            box.setAttribute("stroke-width", "1");
+            box.setAttribute("stroke-dasharray", "5 4");
+            box.setAttribute("stroke-opacity", "0.7");
+            n.appendChild(box);
+
+            const label = document.createElementNS(SVG_NS, "text");
+            label.setAttribute("x", o.x + o.w / 2);
+            /* Optically centred: half the box plus about a third of the cap
+               height, which is where a baseline sits in a centred line. */
+            label.setAttribute("y", o.y + o.h / 2 + 4);
+            label.setAttribute("text-anchor", "middle");
+            label.setAttribute("font-family", FAMILY.sans.css);
+            label.setAttribute("font-size", "11");
+            label.setAttribute("fill", o.color);
+            label.textContent = o.label;
+            n.appendChild(label);
         } else {
             n = document.createElementNS(SVG_NS, "text");
             n.setAttribute("x", o.x); n.setAttribute("y", o.y);
@@ -844,6 +2159,7 @@ window.TBResume = (() => {
             n.setAttribute("font-size", o.size);
             n.setAttribute("font-weight", o.weight === "bold" ? "700" : "400");
             n.setAttribute("fill", o.color);
+            if (o.tracking) n.setAttribute("letter-spacing", o.tracking);
             /* The same x the PDF anchors: jsPDF's align option and SVG's
                text-anchor place a centred or right-aligned string identically
                about the coordinate, so no second measurement is needed here
@@ -857,6 +2173,17 @@ window.TBResume = (() => {
                so the symptom is a glyph sitting flush against the previous
                run rather than a shifted line. */
             n.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+            /* Provenance for click-to-edit, PREVIEW ONLY. paintPdf reads named
+               keys and never looks at `edit`, so an exported file cannot carry
+               it. Serialized rather than spread across attributes so the node
+               carries one self-describing value; js/resume.js parses it back.
+               Text with no `edit` gets no attribute and no cursor, which is
+               how section headings stay inert -- they are the template's
+               words, not the visitor's. */
+            if (o.edit) {
+                n.setAttribute("data-edit", JSON.stringify(o.edit));
+                n.setAttribute("class", "rt-editable");
+            }
             /* textContent only: no markup path for document data. */
             n.textContent = o.text;
         }
@@ -872,8 +2199,18 @@ window.TBResume = (() => {
        ---------------------------------------------------------------------- */
     function paintPdf(ctx) {
         const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+        const tpl = ctx.template;
         for (let page = 0; page < ctx.pages; page += 1) {
             if (page) doc.addPage();
+            /* The sheet's own tint, under everything, on every page. A PDF
+               page has no background of its own -- it is whatever the reader
+               paints behind it -- so a tinted design has to fill it or it
+               prints white with tinted bands floating on it. */
+            if (tpl.background) {
+                const c = hexToRgb(colorOf(tpl.background, tpl, ctx.state));
+                doc.setFillColor(c[0], c[1], c[2]);
+                doc.rect(0, 0, tpl.page.width, tpl.page.height, "F");
+            }
             ctx.ops.filter((o) => (o.page || 0) === page).forEach((o) => pdfOp(doc, o));
         }
         return doc;
@@ -881,10 +2218,21 @@ window.TBResume = (() => {
 
     function pdfOp(doc, o) {
         if (o.op === "rect" || o.op === "roundrect") {
-            const c = hexToRgb(o.fill);
-            doc.setFillColor(c[0], c[1], c[2]);
-            if (o.op === "rect") doc.rect(o.x, o.y, o.w, o.h, "F");
-            else doc.roundedRect(o.x, o.y, o.w, o.h, o.r, o.r, "F");
+            if (o.fill) {
+                const c = hexToRgb(o.fill);
+                doc.setFillColor(c[0], c[1], c[2]);
+            }
+            if (o.stroke) {
+                const sc = hexToRgb(o.stroke);
+                doc.setDrawColor(sc[0], sc[1], sc[2]);
+                doc.setLineWidth(o.strokeWidth || 1);
+            }
+            /* jsPDF takes the style as a string: fill, stroke, or both. An
+               op with neither would draw nothing, so it falls back to a fill
+               and matches what this did before strokes existed. */
+            const style = o.fill && o.stroke ? "FD" : (o.stroke ? "S" : "F");
+            if (o.op === "rect") doc.rect(o.x, o.y, o.w, o.h, style);
+            else doc.roundedRect(o.x, o.y, o.w, o.h, o.r, o.r, style);
             return;
         }
         if (o.op === "circle") {
@@ -904,6 +2252,37 @@ window.TBResume = (() => {
             doc.lines(rel, start[0], start[1], [1, 1], "F", true);
             return;
         }
+        /* Editor chrome, and the reason this is a RETURN rather than an
+           omission: the chain below ends in a text fallthrough, so an op this
+           function does not recognise is not skipped -- it is read as a string
+           and reaches FAMILY[undefined].pdf. Anything preview-only has to say
+           so here explicitly. */
+        if (o.op === "photoSlot") {
+            return;
+        }
+        /* The format is read off the data URI rather than assumed: jsPDF
+           needs to be told, and telling it "JPEG" for a PNG produces a
+           corrupt page rather than an error. photoUrl() has already
+           guaranteed it is one of these two. */
+        if (o.op === "image") {
+            doc.addImage(o.url, /^data:image\/png/.test(o.url) ? "PNG" : "JPEG",
+                         o.x, o.y, o.w, o.h);
+            return;
+        }
+        /* The circular crop. Clipping is bracketed by save/restore of the
+           graphics state, because a clip left open would silently cut every
+           later op on the page down to this circle. `discardPath` drops the
+           circle itself so the clip shape is never also painted. */
+        if (o.op === "imageCircle") {
+            doc.saveGraphicsState();
+            doc.circle(o.cx, o.cy, o.r, null);
+            doc.clip();
+            doc.discardPath();
+            doc.addImage(o.url, /^data:image\/png/.test(o.url) ? "PNG" : "JPEG",
+                         o.x, o.y, o.w, o.h);
+            doc.restoreGraphicsState();
+            return;
+        }
         if (o.op === "line") {
             const c = hexToRgb(o.color);
             doc.setDrawColor(c[0], c[1], c[2]);
@@ -915,8 +2294,13 @@ window.TBResume = (() => {
         doc.setFont(FAMILY[o.family].pdf, o.weight);
         doc.setFontSize(o.size);
         doc.setTextColor(c[0], c[1], c[2]);
-        doc.text(o.text, o.x, o.y, o.align && o.align !== "left"
-            ? { align: o.align } : undefined);
+        /* charSpace as a per-call OPTION, never doc.setCharSpace: that sets
+           it on the document and every later string inherits it, so one
+           tracked heading would letter-space the whole sheet. */
+        const opts = {};
+        if (o.align && o.align !== "left") opts.align = o.align;
+        if (o.tracking) opts.charSpace = o.tracking;
+        doc.text(o.text, o.x, o.y, Object.keys(opts).length ? opts : undefined);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -945,6 +2329,15 @@ window.TBResume = (() => {
         renderPreview: renderPreview,
         buildPdf: buildPdf,
         sectionHasContent: sectionHasContent,
+        /* js/resume.js crops to this. Exported rather than duplicated: a
+           second copy of the number is a stretched face waiting to happen. */
+        PHOTO_RATIO: PHOTO_RATIO,
+        /* And the same for the guard. js/resume.js has to apply it too --
+           on the way out of storage, so a hostile value never reaches the
+           form -- and a security rule kept in two places is the worst kind
+           to let drift: the copies would still agree the day they were
+           written and stop agreeing the day one was widened. */
+        isPhotoUrl: (url) => Boolean(photoUrl({ photo: url })),
         FAMILY: FAMILY
     };
 })();

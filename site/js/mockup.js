@@ -1,8 +1,7 @@
 /* ==========================================================================
    TemplateBox - Product Mockup Generator Core Logic
-   Responsibilities: strict client-side image mime-type validation, flat
-   vector product illustrations composed on HTML5 Canvas (t-shirt, hoodie,
-   mug, packaging box), photographic mockup templates composited with the
+   Responsibilities: strict client-side image mime-type validation,
+   photographic mockup templates composited with the
    three-layer "Sandwich Method" (scene photograph, warped/placed design,
    shadow-and-glare overlay), an ORDERED STACK of design layers each with its
    own position, size, rotation and visibility, direct manipulation of the
@@ -19,10 +18,19 @@
 
     const STORAGE_KEY = "tb_mockup_v1";
 
-    /* Internal resolution for the vector products: the visible element
-       scales via CSS while exports render at full 1000 x 1000 quality.
-       Photographic templates instead resize the canvas to the base
-       photograph's native dimensions so exports keep the photo's quality. */
+    /* Upper bound on printable surfaces per template, used only to bound a
+       restored layer's zone index before the live template is known. Nothing
+       stops a template declaring fewer; layerZone() clamps to the real count. */
+    const MAX_ZONES = 8;
+
+    /* This WAS the internal resolution of the vector products, and they are
+       all retired. Two uses keep it alive and neither is about drawn products:
+       the loading placeholder sizes the canvas to it before a base photograph
+       has arrived, and the upload prompt scales its dashed border and type by
+       `canvas.width / CANVAS_W` so the chrome is the same visual size on a
+       1024px base as on a 2048px one. A photographic template otherwise
+       resizes the canvas to its base photograph's native dimensions, so
+       exports keep the photo's quality. */
     const CANVAS_W = 1000;
     const CANVAS_H = 1000;
 
@@ -73,212 +81,34 @@
        into.
        ---------------------------------------------------------------------- */
 
-    function drawTshirtBody(context, hex, outline) {
-        context.save();
-        context.fillStyle = hex;
-        context.strokeStyle = outline;
-        context.lineWidth = 6;
-        context.beginPath();
-        context.moveTo(430, 140);
-        context.lineTo(330, 170);
-        context.lineTo(170, 230);
-        context.lineTo(110, 430);
-        context.lineTo(300, 380);
-        context.lineTo(300, 900);
-        context.lineTo(700, 900);
-        context.lineTo(700, 380);
-        context.lineTo(890, 430);
-        context.lineTo(830, 230);
-        context.lineTo(670, 170);
-        context.lineTo(570, 140);
-        context.quadraticCurveTo(500, 210, 430, 140);
-        context.closePath();
-        context.fill();
-        context.stroke();
+    /* Every drawn product's shape stood here once. `drawTshirtBody` and
+       `drawHoodieBody` went on September 3, 2026, `drawBoxBody` with them,
+       and `drawMugBody` on September 5 when the drawn `mug` became the
+       photographic `frame-black-shelf`. THERE ARE NO DRAWN PRODUCTS LEFT,
+       so `roundRectPath` above now serves only the selection chrome and the
+       upload prompt.
 
-        /* Collar rib detail */
-        context.beginPath();
-        context.moveTo(450, 150);
-        context.quadraticCurveTo(500, 200, 550, 150);
-        context.lineWidth = 4;
-        context.stroke();
-        context.restore();
-    }
+       Retiring the mug meant answering the question the previous three
+       retirements could dodge, because each of them still left a drawn
+       product for the editor to fall back to. The claim that stood here was
+       that a fallback "has to paint immediately, and a photographic template
+       cannot until seven maps have downloaded". That is only half true:
+       drawPhoto() has always had a loading state, and it paints on the first
+       frame. What a cold start loses is a finished product for the fraction
+       of a second before the base image arrives -- it now shows the same
+       "Loading mockup template..." panel a template switch has always
+       shown, which is a far smaller cost than keeping a vector mug in a
+       catalog of photographs for it. */
 
-    function drawHoodieBody(context, hex, outline) {
-        drawTshirtBody(context, hex, outline);
+    /* Empty, and that is the whole story of September 2-5, 2026: `tshirt`,
+       `hoodie`, `box` and finally `mug` were all replaced by photographs.
+       Every product the editor offers now comes from the registry below.
 
-        context.save();
-        context.fillStyle = hex;
-        context.strokeStyle = outline;
-        context.lineWidth = 6;
-
-        /* Hood, folded down across the shoulders */
-        context.beginPath();
-        context.moveTo(330, 170);
-        context.quadraticCurveTo(500, 90, 670, 170);
-        context.quadraticCurveTo(650, 230, 500, 250);
-        context.quadraticCurveTo(350, 230, 330, 170);
-        context.closePath();
-        context.fill();
-        context.stroke();
-
-        /* Drawstrings */
-        context.lineWidth = 6;
-        [460, 540].forEach((sx) => {
-            context.beginPath();
-            context.moveTo(sx, 250);
-            context.lineTo(sx, 300);
-            context.stroke();
-            context.beginPath();
-            context.arc(sx, 306, 6, 0, Math.PI * 2);
-            context.fillStyle = outline;
-            context.fill();
-        });
-
-        /* Kangaroo pocket, below the print area */
-        context.fillStyle = hex;
-        roundRectPath(context, 380, 700, 240, 130, 14);
-        context.fill();
-        context.stroke();
-
-        /* Sleeve cuffs, sized to stay within the sleeve silhouette */
-        context.fillStyle = outline;
-        context.fillRect(125, 405, 35, 45);
-        context.fillRect(840, 405, 35, 45);
-        context.restore();
-    }
-
-    function drawMugBody(context, hex, outline) {
-        context.save();
-
-        /* Handle, drawn first so the body seam sits cleanly on top of it.
-           The angle range deliberately overshoots 90 degrees on each side so
-           both ends land to the left of the body's right edge (x = 700) and
-           are hidden underneath it, instead of floating disconnected. */
-        context.beginPath();
-        context.arc(700, 560, 150, -1.9, 1.9);
-        context.lineWidth = 55;
-        context.strokeStyle = hex;
-        context.stroke();
-        context.lineWidth = 6;
-        context.strokeStyle = outline;
-        context.stroke();
-
-        /* Body */
-        context.fillStyle = hex;
-        context.strokeStyle = outline;
-        context.lineWidth = 6;
-        roundRectPath(context, 300, 320, 400, 480, 18);
-        context.fill();
-        context.stroke();
-
-        /* Base shadow band */
-        context.globalAlpha = 0.12;
-        context.beginPath();
-        context.ellipse(500, 780, 190, 16, 0, 0, Math.PI, false);
-        context.fillStyle = outline;
-        context.fill();
-        context.globalAlpha = 1;
-
-        /* Rim opening */
-        context.beginPath();
-        context.ellipse(500, 320, 200, 40, 0, 0, Math.PI * 2);
-        context.fillStyle = outline;
-        context.fill();
-        context.beginPath();
-        context.ellipse(500, 314, 188, 32, 0, 0, Math.PI * 2);
-        context.fillStyle = hex;
-        context.fill();
-        context.lineWidth = 4;
-        context.strokeStyle = outline;
-        context.stroke();
-        context.restore();
-    }
-
-    function drawBoxBody(context, hex, outline) {
-        context.save();
-        context.fillStyle = hex;
-        context.strokeStyle = outline;
-        context.lineWidth = 6;
-
-        /* Front face */
-        context.fillRect(280, 340, 440, 460);
-        context.strokeRect(280, 340, 440, 460);
-
-        /* Top and side flap strips suggest depth without a gradient */
-        context.fillStyle = outline;
-        context.globalAlpha = 0.55;
-        context.beginPath();
-        context.moveTo(280, 340);
-        context.lineTo(360, 260);
-        context.lineTo(800, 260);
-        context.lineTo(720, 340);
-        context.closePath();
-        context.fill();
-
-        context.beginPath();
-        context.moveTo(720, 340);
-        context.lineTo(800, 260);
-        context.lineTo(800, 680);
-        context.lineTo(720, 760);
-        context.closePath();
-        context.fill();
-        context.globalAlpha = 1;
-
-        /* Packing tape tabs, positioned clear of the print area */
-        context.fillStyle = outline;
-        context.fillRect(470, 340, 60, 50);
-        context.fillRect(470, 750, 60, 50);
-
-        context.strokeRect(280, 340, 440, 460);
-        context.restore();
-    }
-
-    const PRODUCTS = {
-        tshirt: {
-            label: "T-Shirt",
-            printArea: { x: 360, y: 400, w: 280, h: 300 },
-            drawBase: drawTshirtBody,
-            colors: {
-                white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" },
-                black: { name: "Black", hex: "#1A1A1A", outline: "#000000" },
-                heather: { name: "Heather Gray", hex: "#B9B7B2", outline: "#98968F" },
-                navy: { name: "Navy", hex: "#1F2A44", outline: "#141B2C" }
-            }
-        },
-        hoodie: {
-            label: "Hoodie",
-            printArea: { x: 370, y: 380, w: 260, h: 230 },
-            drawBase: drawHoodieBody,
-            colors: {
-                black: { name: "Black", hex: "#1A1A1A", outline: "#000000" },
-                heather: { name: "Heather Gray", hex: "#B9B7B2", outline: "#98968F" },
-                navy: { name: "Navy", hex: "#1F2A44", outline: "#141B2C" },
-                white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" }
-            }
-        },
-        mug: {
-            label: "Mug",
-            printArea: { x: 340, y: 400, w: 320, h: 300 },
-            drawBase: drawMugBody,
-            colors: {
-                white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" },
-                black: { name: "Black", hex: "#1A1A1A", outline: "#000000" },
-                red: { name: "Red", hex: "#B5352E", outline: "#8F2A24" }
-            }
-        },
-        box: {
-            label: "Packaging Box",
-            printArea: { x: 330, y: 430, w: 340, h: 260 },
-            drawBase: drawBoxBody,
-            colors: {
-                kraft: { name: "Kraft Brown", hex: "#C48A4A", outline: "#9C6B34" },
-                white: { name: "White", hex: "#FFFFFF", outline: "#D8D6D0" },
-                black: { name: "Black", hex: "#1A1A1A", outline: "#000000" }
-            }
-        }
-    };
+       The object stays rather than being deleted because the registry loop
+       writes into it and the guard against an id colliding with a drawn
+       product is still the right check -- it simply has nothing to collide
+       with today. */
+    const PRODUCTS = {};
 
     /* ----------------------------------------------------------------------
        Photographic mockup templates ("Sandwich Method").
@@ -299,13 +129,26 @@
        "source-over" for a conventional pre-masked transparent PNG. */
     const OVERLAY_BLENDS = ["multiply", "screen", "source-over"];
 
+    /* One quad of four numeric corners. */
+    function validQuad(zone) {
+        return Array.isArray(zone) && zone.length === 4 &&
+            zone.every((p) => p && typeof p.x === "number" && typeof p.y === "number");
+    }
+
     PHOTO_REGISTRY.forEach((tpl) => {
         const valid = tpl &&
             typeof tpl.id === "string" && tpl.id &&
             !Object.prototype.hasOwnProperty.call(PRODUCTS, tpl.id) &&
             typeof tpl.base === "string" &&
-            Array.isArray(tpl.warpZone) && tpl.warpZone.length === 4 &&
-            tpl.warpZone.every((p) => p && typeof p.x === "number" && typeof p.y === "number");
+            validQuad(tpl.warpZone) &&
+            /* `warpZones` is optional and additive: a template that declares
+               it carries one printable surface per entry, and `warpZone` stays
+               the first of them so every existing path keeps working. An
+               invalid extra zone rejects the whole template rather than
+               silently printing on one card and not the other. */
+            (!Object.prototype.hasOwnProperty.call(tpl, "warpZones") ||
+                (Array.isArray(tpl.warpZones) && tpl.warpZones.length > 0 &&
+                    tpl.warpZones.every(validQuad)));
         if (!valid) {
             return;
         }
@@ -326,6 +169,48 @@
     });
 
     /* Axis-aligned bounding box of a four-corner warp zone. */
+    /* Every printable surface on a template, in order. Single-zone templates
+       -- which is all of them except the business card pair -- return their
+       one `warpZone`, so callers never branch on which kind they have. */
+    function zonesOf(tpl) {
+        return (tpl && Array.isArray(tpl.warpZones) && tpl.warpZones.length)
+            ? tpl.warpZones
+            : [tpl.warpZone];
+    }
+
+    /* Which surface new uploads land on, and which the layer list shows. Only
+       ever non-zero on a multi-zone template; clamped whenever the product
+       changes so switching from the two-card mockup to a t-shirt cannot leave
+       it pointing at a surface that no longer exists. */
+    let activeZone = 0;
+
+    function zoneCount() {
+        const config = PRODUCTS[currentProduct];
+        return (config && config.template) ? zonesOf(config.template).length : 1;
+    }
+
+    function clampActiveZone() {
+        activeZone = clamp(Math.round(activeZone) || 0, 0, zoneCount() - 1);
+    }
+
+    /* A layer belongs to exactly one surface. Absent or corrupt values read as
+       surface 0, which is what every layer saved before this existed has. */
+    function layerZone(layer) {
+        const z = Math.round(layer && layer.zone);
+        return (isFinite(z) && z >= 0 && z < zoneCount()) ? z : 0;
+    }
+
+    /* Whether a surface is showing its "Upload your design" prompt rather than
+       a design.
+
+       One predicate with two readers: drawLayersInArea() decides what to PAINT
+       from it, and the canvas click decides what to DO from it. Written twice
+       they would eventually disagree, and the failure would be a prompt that
+       does nothing or an invisible click target where the artwork is. */
+    function zoneIsEmpty(index) {
+        return !layers.some((layer) => layer.img && layerZone(layer) === index);
+    }
+
     function zoneBounds(zone) {
         const xs = zone.map((p) => p.x);
         const ys = zone.map((p) => p.y);
@@ -455,7 +340,7 @@
     /* The flattened artwork sheet handed to the warp, sized to the zone's
        bounding box so layer placement carries across unchanged. The white
        fill is the paper backing the previous single-design path drew. */
-    function renderSheet(area) {
+    function renderSheet(area, zoneIndex) {
         const w = Math.max(1, Math.round(area.w));
         const h = Math.max(1, Math.round(area.h));
         if (!sheetCanvas) {
@@ -469,7 +354,12 @@
         sctx.clearRect(0, 0, w, h);
         sctx.fillStyle = "#FFFFFF";
         sctx.fillRect(0, 0, w, h);
-        paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, false);
+        /* recordRects is TRUE since September 3, 2026. The rectangles this
+           writes are in SHEET space, not canvas space, which is exactly what
+           `toZoneSpace` carries a pointer back into. Before the inverse
+           homography existed there was nothing to compare them against, so
+           they were discarded. */
+        paintLayers(sctx, { x: 0, y: 0, w: w, h: h }, true, zoneIndex);
         return sheetCanvas;
     }
 
@@ -482,7 +372,11 @@
        perspective warp this path keeps drag-to-position working. */
     let fabricSheet = null;
 
-    function renderFabricSheet(area) {
+    /* Every surface is painted into ONE canvas-sized sheet, so the shader
+       still runs a single pass no matter how many cards a template has: the
+       displacement, shading and specular maps already cover the whole
+       photograph, and the pass discards wherever the sheet is empty. */
+    function renderFabricSheet(zones) {
         if (!fabricSheet) {
             fabricSheet = document.createElement("canvas");
         }
@@ -492,21 +386,148 @@
         }
         const sctx = fabricSheet.getContext("2d");
         sctx.clearRect(0, 0, fabricSheet.width, fabricSheet.height);
-        sctx.save();
-        sctx.beginPath();
-        sctx.rect(area.x, area.y, area.w, area.h);
-        sctx.clip();
-        paintLayers(sctx, area, true);
-        sctx.restore();
+        zones.forEach((zone, index) => {
+            const area = zoneBounds(zone);
+            sctx.save();
+            sctx.beginPath();
+            sctx.rect(area.x, area.y, area.w, area.h);
+            sctx.clip();
+            paintLayers(sctx, area, true, index);
+            sctx.restore();
+        });
         return fabricSheet;
     }
 
-    function drawWarpedDesign(zone) {
+
+    /* ----------------------------------------------------------------------
+       Pointer mapping for warped surfaces.
+
+       A zone that is not an axis-aligned rectangle is drawn by warping an
+       offscreen sheet onto its quad on the GPU. That pass is one-way: it takes
+       sheet pixels to canvas pixels and hands nothing back, which is why this
+       file used to null every hit rect on a warped zone and say so -- direct
+       manipulation was not offered, and the framed poster lost move, scale and
+       rotate to exactly that.
+
+       Nothing about it was fundamental. The forward map is a homography fixed
+       by four corner correspondences, so the inverse is too, and eight
+       unknowns from eight equations is a linear solve. With the inverse in
+       hand a pointer can be carried back into sheet space, where the layer's
+       hit rectangle already lives, and every gesture works as it does on a
+       flat zone.
+
+       Rectangular zones never touch any of this: `zoneWarp` stays empty for
+       them and `toZoneSpace` returns the point unchanged.
+       ---------------------------------------------------------------------- */
+
+    /* Canvas-space -> sheet-space transforms, one slot per zone index. A null
+       slot means "this zone is a plain rectangle", which is the common case
+       and costs a single array read. */
+    let zoneWarp = [];
+    let zoneUnwarp = [];
+
+    /* The homography taking four source points to four destination points,
+       as [a, b, c, d, e, f, g, h] for
+           X = (a*x + b*y + c) / (g*x + h*y + 1)
+           Y = (d*x + e*y + f) / (g*x + h*y + 1)
+       Solved by plain Gaussian elimination with partial pivoting: an 8x8
+       system runs once per warped zone per repaint, which is nothing, and a
+       closed form here would be harder to check than it is to run. */
+    function solveHomography(src, dst) {
+        const A = [];
+        for (let i = 0; i < 4; i += 1) {
+            const x = src[i][0], y = src[i][1], X = dst[i][0], Y = dst[i][1];
+            A.push([x, y, 1, 0, 0, 0, -X * x, -X * y, X]);
+            A.push([0, 0, 0, x, y, 1, -Y * x, -Y * y, Y]);
+        }
+        for (let col = 0; col < 8; col += 1) {
+            let pivot = col;
+            for (let r = col + 1; r < 8; r += 1) {
+                if (Math.abs(A[r][col]) > Math.abs(A[pivot][col])) { pivot = r; }
+            }
+            /* A degenerate quad -- three corners in a line, or two the same --
+               has no inverse. Returning null puts the zone back on the old
+               behaviour rather than producing nonsense coordinates. */
+            if (Math.abs(A[pivot][col]) < 1e-9) { return null; }
+            const swap = A[col]; A[col] = A[pivot]; A[pivot] = swap;
+            for (let r = 0; r < 8; r += 1) {
+                if (r === col) { continue; }
+                const f = A[r][col] / A[col][col];
+                for (let c = col; c < 9; c += 1) { A[r][c] -= f * A[col][c]; }
+            }
+        }
+        const out = [];
+        for (let i = 0; i < 8; i += 1) { out.push(A[i][8] / A[i][i]); }
+        return out;
+    }
+
+    function applyHomography(m, x, y) {
+        const den = m[6] * x + m[7] * y + 1;
+        if (!den) { return { x: x, y: y }; }
+        return {
+            x: (m[0] * x + m[1] * y + m[2]) / den,
+            y: (m[3] * x + m[4] * y + m[5]) / den
+        };
+    }
+
+    /* The transform a pointer needs for one zone: canvas pixels back to the
+       offscreen sheet the layers were painted into.
+
+       The GPU pass composes two steps -- the sheet is stretched to the full
+       canvas, then that canvas rectangle is warped onto the quad -- so the
+       inverse composes them the other way round: undo the quad, then undo the
+       stretch. Both are folded into one matrix here so the per-pointer cost
+       is a single homography. */
+    function warpTransformFor(zone, area) {
+        const m = solveHomography(
+            [[zone[0].x, zone[0].y], [zone[1].x, zone[1].y],
+             [zone[2].x, zone[2].y], [zone[3].x, zone[3].y]],
+            [[0, 0], [area.w, 0], [area.w, area.h], [0, area.h]]
+        );
+        return m;
+    }
+
+    /* The same map the other way: sheet space back out to canvas space.
+
+       Needed because hit rects are RECORDED in sheet space but the selection
+       chrome is DRAWN on the canvas. Without this the box and its handles are
+       painted at sheet coordinates -- on the tilted banner the box appeared
+       around (165,435)-(384,929) while the corner it represents was really at
+       (637,965), so every handle was visible where it could not be grabbed and
+       grabbable where it could not be seen. The pointer maths was never wrong;
+       only the drawing was, which is why pressing a computed handle position
+       worked all along. */
+    function unwarpTransformFor(zone, area) {
+        return solveHomography(
+            [[0, 0], [area.w, 0], [area.w, area.h], [0, area.h]],
+            [[zone[0].x, zone[0].y], [zone[1].x, zone[1].y],
+             [zone[2].x, zone[2].y], [zone[3].x, zone[3].y]]
+        );
+    }
+
+    /* Sheet space for a warped zone, canvas space for a flat one. Callers do
+       not branch: they ask for the point in the zone's own space and get it. */
+    function toZoneSpace(pt, zoneIndex) {
+        const m = zoneWarp[typeof zoneIndex === "number" ? zoneIndex : 0];
+        if (!m) { return pt; }
+        return applyHomography(m, pt.x, pt.y);
+    }
+
+    /* The exact inverse of toZoneSpace, for anything that has a point in a
+       zone's own space and needs it on the canvas -- which is the selection
+       chrome, and only the selection chrome. */
+    function fromZoneSpace(pt, zoneIndex) {
+        const m = zoneUnwarp[typeof zoneIndex === "number" ? zoneIndex : 0];
+        if (!m) { return pt; }
+        return applyHomography(m, pt.x, pt.y);
+    }
+
+    function drawWarpedDesign(zone, zoneIndex) {
         const area = zoneBounds(zone);
         if (warpLibState === "ready") {
             try {
                 fxCanvas = fxCanvas || window.fx.canvas();
-                const texture = fxCanvas.texture(renderSheet(area));
+                const texture = fxCanvas.texture(renderSheet(area, zoneIndex));
                 fxCanvas.draw(texture, canvas.width, canvas.height).perspective(
                     [0, 0, canvas.width, 0, canvas.width, canvas.height, 0, canvas.height],
                     [
@@ -518,15 +539,26 @@
                 ).update();
                 ctx.drawImage(fxCanvas, 0, 0);
                 texture.destroy();
-                /* Direct manipulation is not offered on warped quads: mapping
-                   a pointer back into sheet space needs the inverse of the
-                   perspective transform, which the GPU pass above does not
-                   hand back. Layers keep no hit rect, so nothing on the
-                   canvas is grabbable and the sidebar controls are the only
-                   way to place artwork here. */
-                layers.forEach((layer) => {
-                    layer.rect = null;
-                });
+                /* Direct manipulation IS offered on warped quads since
+                   September 3, 2026. The hit rectangles renderSheet() just
+                   wrote are in sheet space; this is the transform that carries
+                   a pointer back there. If the quad is degenerate the solve
+                   returns null and the zone falls back to the old behaviour --
+                   ungrabbable, sidebar only -- rather than to bad coordinates. */
+                const back = warpTransformFor(zone, area);
+                const slot = typeof zoneIndex === "number" ? zoneIndex : 0;
+                zoneWarp[slot] = back;
+                /* Only solved when the inverse solved: a degenerate quad must
+                   leave BOTH directions empty, or the chrome would be mapped
+                   by a transform the pointer maths is not using. */
+                zoneUnwarp[slot] = back ? unwarpTransformFor(zone, area) : null;
+                if (!back) {
+                    layers.forEach((layer) => {
+                        if (typeof zoneIndex !== "number" || layerZone(layer) === zoneIndex) {
+                            layer.rect = null;
+                        }
+                    });
+                }
                 return;
             } catch (err) {
                 warpLibState = "failed";
@@ -534,7 +566,10 @@
         } else {
             ensureWarpLib();
         }
-        drawLayersInArea(area, 0);
+        /* No WebGL, so the artwork cannot be warped -- but it must still be
+           confined to the quad rather than to its bounding box, or the
+           degraded path puts ink outside the product. */
+        drawLayersInArea(area, 0, zoneIndex, zone);
     }
 
     /* ----------------------------------------------------------------------
@@ -542,58 +577,10 @@
        sRGB triples -- no library, no CDN, no canvas readback.
        ---------------------------------------------------------------------- */
 
-    function hexToRgb(value) {
-        const raw = String(value == null ? "" : value).trim().replace(/^#/, "");
-        const full = raw.length === 3
-            ? raw[0] + raw[0] + raw[1] + raw[1] + raw[2] + raw[2]
-            : raw;
-        if (!/^[0-9a-f]{6}$/i.test(full)) {
-            return null;
-        }
-        const n = parseInt(full, 16);
-        return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-    }
+    const hexToRgb = window.TBColor.hexToRgb;
 
-    function rgbToHex(r, g, b) {
-        const part = (v) => {
-            const s = clamp(Math.round(v), 0, 255).toString(16);
-            return s.length === 1 ? "0" + s : s;
-        };
-        return ("#" + part(r) + part(g) + part(b)).toUpperCase();
-    }
+    const rgbToHex = window.TBColor.rgbToHex;
 
-    function rgbToHsv(r, g, b) {
-        const rn = r / 255;
-        const gn = g / 255;
-        const bn = b / 255;
-        const max = Math.max(rn, gn, bn);
-        const min = Math.min(rn, gn, bn);
-        const d = max - min;
-        let h = 0;
-        if (d !== 0) {
-            if (max === rn) { h = ((gn - bn) / d) % 6; }
-            else if (max === gn) { h = (bn - rn) / d + 2; }
-            else { h = (rn - gn) / d + 4; }
-            h *= 60;
-            if (h < 0) { h += 360; }
-        }
-        return { h: h, s: max === 0 ? 0 : d / max, v: max };
-    }
-
-    function hsvToRgb(h, s, v) {
-        const c = v * s;
-        const hp = (((h % 360) + 360) % 360) / 60;
-        const x = c * (1 - Math.abs((hp % 2) - 1));
-        let rgb = [0, 0, 0];
-        if (hp < 1) { rgb = [c, x, 0]; }
-        else if (hp < 2) { rgb = [x, c, 0]; }
-        else if (hp < 3) { rgb = [0, c, x]; }
-        else if (hp < 4) { rgb = [0, x, c]; }
-        else if (hp < 5) { rgb = [x, 0, c]; }
-        else { rgb = [c, 0, x]; }
-        const m = v - c;
-        return { r: (rgb[0] + m) * 255, g: (rgb[1] + m) * 255, b: (rgb[2] + m) * 255 };
-    }
 
     /* Vector products need an outline colour as well as a fill. The shipped
        colorways carry a hand-picked one; a freely chosen colour derives its
@@ -605,14 +592,6 @@
         return rgbToHex(c.r * 0.78, c.g * 0.78, c.b * 0.78);
     }
 
-    /* Presets mirror the reference picker: a greyscale run, then a spread of
-       saturated hues wide enough to reach most brand colours in one click. */
-    const COLOR_PRESETS = [
-        "#FFFFFF", "#D6D6D6", "#9B9B9B", "#4A4A4A", "#000000", "#E9A13B", "#F5D547",
-        "#8B5A2B", "#6E8B3D", "#7ED321", "#22B573", "#4A90D9", "#2F4FCD", "#8E44AD",
-        "#1A1A1A", "#6B6B66", "#B9B7B2", "#D0021B", "#00C853", "#0033CC", "#FFEB00",
-        "#FF2D95", "#00E0E0", "#F5A623", "#5B2C82", "#0B6E2E", "#1F2A44", "#B5352E"
-    ];
 
     /* ----------------------------------------------------------------------
        DOM references
@@ -662,6 +641,7 @@
     const fileInput = document.getElementById("m-design");
     const fileError = document.getElementById("m-design-error");
     const layerList = document.getElementById("m-layer-list");
+    const zoneSwitch = document.getElementById("m-zone-switch");
     const layerActions = document.getElementById("m-layer-actions");
     const addDesignBtn = document.getElementById("m-add-design");
     const uploadDesignBtn = document.getElementById("m-upload-design");
@@ -723,7 +703,22 @@
        a real composition never needs this many. */
     const MAX_LAYERS = 12;
 
-    let currentProduct = "tshirt";
+    /* A named default WITH a backstop, and both halves are deliberate.
+
+       A bare literal is what dangled at every retirement -- this line has read
+       `tshirt`, then `hoodie`, then `mug` -- so the fallback behind it is what
+       stops that happening a fourth time. The name in front of it is not
+       arbitrary either: the first registry entry is `wood-a4`, a leaning
+       frame with no colourways, and defaulting to it hides the editor's colour
+       controls from anyone arriving without a preset. `tshirt-model-white` is
+       the archetypal print-on-demand product, declares both `garment` and
+       `garmentColors`, and is `background: true`, so the default view shows
+       the full set of controls the way the drawn mug's did. */
+    const DEFAULT_PRODUCT = PRODUCTS["tshirt-model-white"]
+        ? "tshirt-model-white"
+        : Object.keys(PRODUCTS)[0] || "";
+
+    let currentProduct = DEFAULT_PRODUCT;
     let currentColor = "black";
     let customHex = "#FFFFFF";
     /* The canvas background, or null for transparent -- which is the default
@@ -767,8 +762,17 @@
     /* Paints every layer into `area` of `context`. Hit rectangles are recorded
        only for the real canvas: the offscreen warp sheet shares this painter
        but its coordinates mean nothing to a pointer. */
-    function paintLayers(context, area, recordRects) {
+    function paintLayers(context, area, recordRects, zoneIndex) {
+        /* `zoneIndex` absent means "every layer, one surface" -- the vector
+           products and the flattened export sheet. When it is given, a layer
+           belonging to another surface is skipped entirely, INCLUDING its hit
+           rectangle: the caller loops the surfaces and each pass must leave
+           the other surfaces' rectangles alone rather than nulling them. */
+        const scoped = typeof zoneIndex === "number";
         layers.forEach((layer) => {
+            if (scoped && layerZone(layer) !== zoneIndex) {
+                return;
+            }
             if (recordRects) {
                 layer.rect = null;
             }
@@ -809,16 +813,49 @@
         });
     }
 
-    function drawLayersInArea(area, cornerRadius) {
+    /* The print SURFACE as a path, which stops being the same thing as its
+       bounding box the moment a zone is a warped quad. `zoneBounds` squares
+       the quad off, so the tilted banner's box reaches 21px above the vinyl
+       onto the top rail, past the cassette at the foot, and out over the
+       transparent surround -- 700,446px of box around a quad that only
+       covers part of it.
+
+       Everything that paints or clips "the print area" has to follow this
+       rather than the box, which is why it is one function: the two used to
+       be the same call and the difference is invisible until a zone tilts.
+
+       Returns whether it used the quad, because the caller then also wants
+       the quad's centroid rather than the box's centre. */
+    function zonePath(context, area, radius, zone) {
+        if (zone && !zoneIsRect(zone)) {
+            context.beginPath();
+            context.moveTo(zone[0].x, zone[0].y);
+            context.lineTo(zone[1].x, zone[1].y);
+            context.lineTo(zone[2].x, zone[2].y);
+            context.lineTo(zone[3].x, zone[3].y);
+            context.closePath();
+            return true;
+        }
+        roundRectPath(context, area.x, area.y, area.w, area.h, radius);
+        return false;
+    }
+
+    function drawLayersInArea(area, cornerRadius, zoneIndex, zone) {
         const r = typeof cornerRadius === "number" ? cornerRadius : 16;
         /* Placeholder styling scales with the canvas, which runs at 1000px
            for vector products but at the base photograph's native size for
            photographic templates. */
         const k = canvas.width / CANVAS_W;
 
-        if (!readyLayers().length) {
+        /* Emptiness is per surface: on the two-card template a design on the
+           front must not suppress the "Upload your design" prompt on the back,
+           or the second card silently looks like part of the photograph. */
+        const scoped = typeof zoneIndex === "number";
+        const empty = scoped ? zoneIsEmpty(zoneIndex) : !readyLayers().length;
+
+        if (empty) {
             ctx.save();
-            roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
+            const warped = zonePath(ctx, area, r, zone);
             ctx.fillStyle = "#F4F3EF";
             ctx.fill();
             ctx.setLineDash([12 * k, 8 * k]);
@@ -830,18 +867,29 @@
             ctx.font = "400 " + Math.round(32 * k) + 'px "Inter", sans-serif';
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("Upload your design", area.x + area.w / 2, area.y + area.h / 2, area.w - 40 * k);
+            /* The quad's centroid, not the box's centre: on a tilted surface
+               those are different points and the box's one can sit off the
+               product entirely. */
+            const promptX = warped
+                ? (zone[0].x + zone[1].x + zone[2].x + zone[3].x) / 4
+                : area.x + area.w / 2;
+            const promptY = warped
+                ? (zone[0].y + zone[1].y + zone[2].y + zone[3].y) / 4
+                : area.y + area.h / 2;
+            ctx.fillText("Upload your design", promptX, promptY, area.w - 40 * k);
             ctx.restore();
             layers.forEach((layer) => {
-                layer.rect = null;
+                if (!scoped || layerZone(layer) === zoneIndex) {
+                    layer.rect = null;
+                }
             });
             return;
         }
 
         ctx.save();
-        roundRectPath(ctx, area.x, area.y, area.w, area.h, r);
+        zonePath(ctx, area, r, zone);
         ctx.clip();
-        paintLayers(ctx, area, true);
+        paintLayers(ctx, area, true, zoneIndex);
         ctx.restore();
     }
 
@@ -867,26 +915,30 @@
     }
 
     function paint() {
-        const product = PRODUCTS[currentProduct] ? currentProduct : "tshirt";
-        currentProduct = product;
+        /* Rebuilt by drawWarpedDesign() on every repaint that needs it. Cleared
+           here so a template switch, or a zone that stops being warped, cannot
+           leave a stale transform behind for a pointer to fall through. */
+        zoneWarp = [];
+        zoneUnwarp = [];
+        const product = PRODUCTS[currentProduct] ? currentProduct : DEFAULT_PRODUCT;
+        currentProduct = product || "";
         const config = PRODUCTS[currentProduct];
 
-        if (config.type === "photo") {
-            drawPhoto(config);
+        /* No products at all means the registry script failed to load, which
+           is the one case this cannot paint through. Leaving the canvas as it
+           was beats throwing on `config.type` and taking the rest of the
+           editor's setup down with it. */
+        if (!config) {
             return;
         }
 
-        if (canvas.width !== CANVAS_W || canvas.height !== CANVAS_H) {
-            canvas.width = CANVAS_W;
-            canvas.height = CANVAS_H;
-        }
-
-        const color = activeColor(config);
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        paintBackground();
-        config.drawBase(ctx, color.hex, color.outline);
-        drawLayersInArea(config.printArea, 16);
+        /* Every product is photographic now, so there is no longer a branch to
+           choose between. The drawn path stood here until September 5, 2026 --
+           canvas resized to CANVAS_W x CANVAS_H, `config.drawBase`, then
+           `drawLayersInArea` over a fixed `printArea` -- and went with `mug`.
+           Re-adding a drawn product means restoring those four lines and a
+           `config.type === "photo"` test in front of this call. */
+        drawPhoto(config);
     }
 
     /* Publishes the canvas's real aspect ratio to CSS, which uses it to bound
@@ -1012,8 +1064,60 @@
         return tintCanvas;
     }
 
+    /* The template's asset state, in the DOM rather than only in painted
+       pixels.
+
+       This is here for OBSERVABILITY, and it is worth being straight about
+       that: docs/error-fixes/MOCKUP_BACKGROUND_CHECK_SAMPLED_A_LOADING_PLACEHOLDER.md
+       solved the same class of problem in September 2026 without touching this
+       file, on the explicit grounds that "a test hook added to production code
+       for a test's convenience is a liability the next refactor has to carry".
+       That reasoning was right for its scope and is being reversed knowingly.
+
+       What changed is that the signal it used -- the canvas being at the base
+       image's natural size rather than the 1000x1000 placeholder -- was a
+       per-template constant written into the suite as a literal 1024x1536. That
+       works for exactly one check on exactly one template. It cannot serve
+       section 4, which measures this page at every width and cannot hold a
+       table of every template's dimensions without becoming a second source of
+       truth, and it cannot tell a template still LOADING from one that has
+       FAILED, because both leave the canvas at 1000x1000. Those are different
+       facts: one is a wait, the other is a defect, and a check that conflates
+       them reports a slow network as a broken template.
+
+       So the coupling is now explicit and named instead of implicit and
+       numeric, which is the honest version of the same dependency.
+
+       An attribute rather than a global because it is per-element state and CSS
+       can reach it.
+
+       It also drives what the canvas TELLS a screen-reader user. The label used
+       to name the product unconditionally, so someone was told "White T-Shirt
+       on Model mockup preview" of a canvas that actually read "Loading mockup
+       template..." in grey text -- and told exactly the same thing when the
+       photograph had failed outright. Both are now said plainly. */
+    let assetState = "";
+
+    function publishAssetState(state) {
+        if (assetState === state) {
+            return;
+        }
+        assetState = state;
+        if (canvasWrap) {
+            canvasWrap.setAttribute("data-mockup-state", state);
+        }
+        /* aria-busy is the machine-readable half and the label is the human
+           half. Neither substitutes for the other: aria-busy is what lets
+           assistive technology hold off and re-announce when it clears, and it
+           cannot express WHICH of loading and failed this is, which is the one
+           thing a person most needs to know. */
+        canvas.setAttribute("aria-busy", state === "loading" ? "true" : "false");
+        syncCanvasLabel();
+    }
+
     function drawPhoto(config) {
         const assets = ensurePhotoAssets(currentProduct);
+        publishAssetState(assets.status);
 
         if (assets.status !== "ready") {
             if (canvas.width !== CANVAS_W || canvas.height !== CANVAS_H) {
@@ -1059,8 +1163,11 @@
         paintBackground();
 
         const tpl = config.template;
-        const rectZone = zoneIsRect(tpl.warpZone);
-        const area = zoneBounds(tpl.warpZone);
+        const zones = zonesOf(tpl);
+        /* Every surface has to be a rectangle for the shading pass to run:
+           the perspective warp is checked first and returns, so one tilted
+           card would cost BOTH cards their displacement and lighting. */
+        const rectZone = zones.every(zoneIsRect);
 
         /* A paper sheet sits behind artwork that does not fill a frame's
            window, and keeps exports opaque behind a transparent base. A
@@ -1073,16 +1180,17 @@
 
         const paintDesign = () => {
             if (readyLayers().length && !rectZone) {
-                drawWarpedDesign(tpl.warpZone);
+                zones.forEach(drawWarpedDesign);
                 return;
             }
             /* Fabric: displace the artwork around the folds and shade it
                with the garment's own light, in one GPU pass. Returning null
                means no WebGL, which is a quality loss and not an error -- the
-               flat draw below is exactly what shipped before this existed. */
+               flat draw below is exactly what shipped before this existed.
+               One pass covers every surface: the sheet carries them all. */
             if (readyLayers().length && assets.displace && window.TB_Displace) {
                 const out = window.TB_Displace.render(
-                    renderFabricSheet(area),
+                    renderFabricSheet(zones),
                     assets.displace,
                     assets.shade,
                     tpl.displaceStrength,
@@ -1094,11 +1202,14 @@
                     return;
                 }
             }
-            if (backing) {
-                ctx.fillStyle = backing;
-                ctx.fillRect(area.x, area.y, area.w, area.h);
-            }
-            drawLayersInArea(area, 0);
+            zones.forEach((zone, index) => {
+                const area = zoneBounds(zone);
+                if (backing) {
+                    ctx.fillStyle = backing;
+                    ctx.fillRect(area.x, area.y, area.w, area.h);
+                }
+                drawLayersInArea(area, 0, index, zone);
+            });
         };
 
         if (tpl.mode === "surface") {
@@ -1308,8 +1419,19 @@
         }
 
         const k = canvasPerScreenPx();
-        const corners = rectCorners(layer.rect);
-        const rot = rotateHandlePoint(layer.rect, k);
+        /* rectCorners and rotateHandlePoint both work in the layer's OWN
+           space, which is sheet space on a warped zone and canvas space on a
+           flat one. The canvas is what gets painted, so carry them out --
+           a no-op for every flat template, since fromZoneSpace returns the
+           point untouched when the zone has no transform.
+
+           A rotated rectangle on a tilted plane projects to a general quad,
+           not to a rectangle, so drawing the mapped corners as a closed path
+           is not an approximation: it is the outline's true shape on screen. */
+        const zi = layerZone(layer);
+        const corners = rectCorners(layer.rect).map((p) => fromZoneSpace(p, zi));
+        const rot = fromZoneSpace(rotateHandlePoint(layer.rect, k), zi);
+        const centre = fromZoneSpace({ x: layer.rect.cx, y: layer.rect.cy }, zi);
 
         octx.save();
         octx.strokeStyle = CHROME_COLOR;
@@ -1351,7 +1473,9 @@
            since canvas has no cursor-per-pixel to rely on. */
         octx.lineWidth = Math.max(1, k);
         corners.forEach((p) => {
-            const angle = Math.atan2(p.y - layer.rect.cy, p.x - layer.rect.cx);
+            /* Measured from the MAPPED centre, so the arrow still points out
+               of the box once perspective has skewed it. */
+            const angle = Math.atan2(p.y - centre.y, p.x - centre.x);
             drawResizeGlyph(octx, p.x, p.y, angle, side * 0.62, side * 0.22);
         });
         drawRotateGlyph(octx, rot.x, rot.y, rotR * 0.6);
@@ -1395,14 +1519,72 @@
         return btn;
     }
 
+    /* One button per printable surface, built from the registry's own labels.
+       Hidden and emptied below two surfaces, so every existing template is
+       byte-identical to having no switch at all. */
+    function renderZoneSwitch() {
+        const count = zoneCount();
+        while (zoneSwitch.firstChild) {
+            zoneSwitch.removeChild(zoneSwitch.firstChild);
+        }
+        zoneSwitch.hidden = count < 2;
+        if (count < 2) {
+            return;
+        }
+        const config = PRODUCTS[currentProduct];
+        const labels = (config && config.template && Array.isArray(config.template.zoneLabels))
+            ? config.template.zoneLabels
+            : [];
+        for (let i = 0; i < count; i += 1) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "zone-tab";
+            btn.setAttribute("aria-pressed", String(i === activeZone));
+            /* textContent, never innerHTML -- the project's DOM-XSS rule
+               applies to registry strings the same as to visitor input. */
+            btn.textContent = (typeof labels[i] === "string" && labels[i])
+                ? labels[i]
+                : ("Card " + (i + 1));
+            btn.addEventListener("click", (function (index) {
+                return function () {
+                    if (activeZone === index) {
+                        return;
+                    }
+                    activeZone = index;
+                    /* The selected layer lives on the surface being left, and
+                       leaving it selected would point the size and rotation
+                       controls at a row the list no longer shows. */
+                    selectedId = null;
+                    renderLayerList();
+                    syncScaleControls();
+                    syncLayerActions();
+                    drawOverlay();
+                };
+            }(i)));
+            zoneSwitch.appendChild(btn);
+        }
+    }
+
     function renderLayerList() {
+        /* Both run here rather than at every product-change site: this is
+           already called on init, on every layer edit and on a tray restore,
+           so the switch cannot drift out of step with the template. */
+        clampActiveZone();
+        renderZoneSwitch();
+
         while (layerList.firstChild) {
             layerList.removeChild(layerList.firstChild);
         }
 
+        /* The list is scoped to the surface being edited. Both surfaces still
+           RENDER -- this is which one the controls act on. */
+        const shown = zoneCount() < 2
+            ? layers.slice()
+            : layers.filter((layer) => layerZone(layer) === activeZone);
+
         /* Front-most first: the list reads top-to-bottom as front-to-back,
            the reverse of the paint order. */
-        layers.slice().reverse().forEach((layer) => {
+        shown.slice().reverse().forEach((layer) => {
             const readable = TB.desanitize(layer.name);
             const li = document.createElement("li");
             li.className = "layer-row" +
@@ -1467,11 +1649,22 @@
             layerList.appendChild(li);
         });
 
-        layerList.hidden = layers.length === 0;
+        layerList.hidden = shown.length === 0;
         /* The full-width upload button is the empty state; once a stack
-           exists the "+" in the section header is the way to extend it. */
-        uploadDesignBtn.hidden = layers.length > 0;
-        addDesignBtn.disabled = layers.length >= MAX_LAYERS;
+           exists the "+" in the section header is the way to extend it.
+           Scoped to the surface, so an empty back card offers the same
+           first-run affordance the front did.
+
+           The CAP is not scoped, though, and both controls have to honour it.
+           It bounds render cost, and every surface is drawn in one shader
+           pass, so the total is what matters -- but with the list scoped, a
+           full front card used to leave the back showing an empty list, a
+           disabled "+", and an ENABLED upload button that dead-ended in an
+           error message. Disabling both makes the state legible. */
+        const atCap = layers.length >= MAX_LAYERS;
+        uploadDesignBtn.hidden = shown.length > 0;
+        uploadDesignBtn.disabled = atCap;
+        addDesignBtn.disabled = atCap;
     }
 
     function syncLayerActions() {
@@ -1480,6 +1673,13 @@
 
     function selectLayer(id) {
         selectedId = id;
+        /* A canvas click can land on a layer belonging to the other surface.
+           Following it keeps the list, the controls and the selection talking
+           about the same thing. */
+        const picked = selectedLayer();
+        if (picked) {
+            activeZone = layerZone(picked);
+        }
         renderLayerList();
         syncScaleControls();
         syncLayerActions();
@@ -1488,20 +1688,65 @@
         drawOverlay();
     }
 
+    /* What the FIRST upload on a template opens at, as a fraction of the
+       contain-fit inside the print zone.
+
+       0.75 is right where the artwork is a print ON a product: a chest graphic
+       that filled the whole print area edge to edge would not read as a
+       t-shirt. It is wrong where the artwork IS the product -- a poster fills
+       its frame, a banner fills its face -- and there the default left a
+       visible margin the visitor had to drag out by hand every time. Templates
+       say which they are with `designScale`; anything without it keeps 0.75.
+
+       `"cover"` goes further and fills the opening whatever the artwork's
+       aspect, which is what a frame actually wants: a landscape photo dropped
+       into a portrait frame should look like a framed print, not a small
+       picture floating in white. Everything downstream is unchanged -- this
+       only picks the STARTING scale, the fit underneath stays contain, and the
+       overflow is cropped by the zone clip that was already there. Nothing is
+       destroyed: Design Size scales back down to reveal the whole image. */
+    function firstLayerScale(img) {
+        const config = PRODUCTS[currentProduct];
+        const tpl = config && config.template;
+        const want = tpl ? tpl.designScale : undefined;
+
+        if (want === "cover" && img && img.width && img.height) {
+            const zones = zonesOf(tpl);
+            const area = zoneBounds(zones[Math.min(activeZone, zones.length - 1)]);
+            const contain = Math.min(area.w / img.width, area.h / img.height);
+            const cover = Math.max(area.w / img.width, area.h / img.height);
+            /* paintLayers multiplies by the contain fit, so the scale that
+               covers is just the ratio between the two. Equal aspects give
+               exactly 1. */
+            return contain > 0 ? clamp(cover / contain, MIN_SCALE, MAX_SCALE) : DEFAULT_SCALE;
+        }
+        return clamp(typeof want === "number" ? want : DEFAULT_SCALE, MIN_SCALE, MAX_SCALE);
+    }
+
     function addLayer(img, name) {
         layerCounter += 1;
+        /* Counted PER SURFACE, not across the mockup. On the two-card
+           template the first design dropped on the back card is layer two
+           overall, so counting globally gave it EXTRA_SCALE and a stagger
+           offset -- it arrived small and off-centre instead of filling the
+           card, which is the opposite of what the surface switch promises.
+           Each surface gets its own first-upload treatment. */
+        const onThisZone = layers.filter((layer) => layerZone(layer) === activeZone).length;
         /* Stagger each addition so a second upload reads as its own object
            instead of hiding exactly behind the first. */
-        const step = (layers.length % 4) * 24;
+        const step = (onThisZone % 4) * 24;
         layers.push({
             id: "L" + layerCounter + "-" + Date.now(),
             name: name,
             img: img,
-            scale: layers.length ? EXTRA_SCALE : DEFAULT_SCALE,
+            scale: onThisZone ? EXTRA_SCALE : firstLayerScale(img),
             offsetX: step,
             offsetY: step,
             rotation: 0,
             visible: true,
+            /* The surface being edited. Always 0 on a single-zone template,
+               so this is inert everywhere except the two-card mockup. */
+            zone: activeZone,
             rect: null
         });
         selectedId = layers[layers.length - 1].id;
@@ -1535,7 +1780,12 @@
         }
 
         if (uploadIntent.mode === "add" && layers.length >= MAX_LAYERS) {
-            fileError.textContent = "That is the maximum number of designs on one mockup.";
+            /* "on one mockup", not "on this card": the cap is across every
+               surface, and on a two-card template the visitor is looking at
+               one of them. */
+            fileError.textContent = zoneCount() > 1
+                ? "That is the maximum number of designs on one mockup, counted across both surfaces."
+                : "That is the maximum number of designs on one mockup.";
             fileInput.value = "";
             return;
         }
@@ -1636,6 +1886,52 @@
         return color ? color.hex : customHex;
     }
 
+    /* The product's own colourways, for the picker's preset grid.
+
+       These are here for the same reason the background's Transparent chip is:
+       a state no hex can express would otherwise have no way back. `original`
+       SKIPS the tint rather than painting a colour, so typing #E9E9EC is not
+       "As photographed" -- it dyes the garment its own photographed shade,
+       which is a different render. A heather is not a hex at all: the dye is
+       mixed toward undyed fibre and the weave is screened back over it.
+
+       Before this existed the colourway row had been removed (August 25, 2026)
+       and nothing replaced it, so every route into the picker went through
+       setCustomColor and set currentColor to CUSTOM. The eight colourways the
+       shirt declares were unreachable, "As photographed" was one-way, and the
+       heather fractions -- and the grain maps that serve them, 2.3MB across
+       the shirt and the cap -- were shipped code that nothing could run. */
+    function colorwayList() {
+        const config = PRODUCTS[currentProduct];
+        if (!config || !config.colors) {
+            return [];
+        }
+        return Object.keys(config.colors).map((key) => {
+            const c = config.colors[key];
+            const heather = typeof c.heather === "number" ? clamp(c.heather, 0, 1) : 0;
+            return {
+                key: key,
+                name: c.name || key,
+                /* The chip shows what the visitor will GET. A heather swatch
+                   painted at full dye strength would promise a colour the
+                   render never produces. */
+                swatch: heather > 0 ? mixToward(c.hex, NATURAL_FIBRE, heather) : c.hex
+            };
+        });
+    }
+
+    function setColorway(key) {
+        const config = PRODUCTS[currentProduct];
+        if (!config || !config.colors || !config.colors[key]) {
+            return false;
+        }
+        currentColor = key;
+        syncColorUI();
+        persist();
+        draw();
+        return true;
+    }
+
     /* The colourway swatch row this used to build is gone (August 25, 2026);
        what is left is the one job that could not go with it. A photographic
        template has no colorway concept, so the whole field disappears rather
@@ -1686,246 +1982,10 @@
                 setHex(hex, skip)   commit a colour; returns truthy on success
        ---------------------------------------------------------------------- */
 
-    function trackRatio(el, evt) {
-        const rect = el.getBoundingClientRect();
-        return {
-            x: rect.width ? clamp((evt.clientX - rect.left) / rect.width, 0, 1) : 0,
-            y: rect.height ? clamp((evt.clientY - rect.top) / rect.height, 0, 1) : 0
-        };
-    }
 
-    function bindTrack(el, apply) {
-        if (!el) {
-            return;
-        }
-        let active = false;
-        el.addEventListener("pointerdown", (evt) => {
-            active = true;
-            el.setPointerCapture(evt.pointerId);
-            apply(evt);
-            evt.preventDefault();
-        });
-        el.addEventListener("pointermove", (evt) => {
-            if (active) {
-                apply(evt);
-            }
-        });
-        const stop = () => { active = false; };
-        el.addEventListener("pointerup", stop);
-        el.addEventListener("pointercancel", stop);
-    }
-
-    function createColorPicker(nodes, options) {
-        let hue = 0;
-
-        /* Two strips, one hue. The popover's, and -- on the product picker --
-           the one standing in the panel where the swatch row used to be. They
-           are the same control at two sizes, so they share this instance's
-           `hue`, the handler below and the repaint in sync(); neither knows
-           the other exists. An instance given only a popover strip simply has
-           a one-entry list. */
-        const hueTracks = [
-            { track: nodes.hue, thumb: nodes.hueThumb },
-            { track: nodes.hueInline, thumb: nodes.hueInlineThumb }
-        ].filter((entry) => !!entry.track);
-
-        function commit(hex, skip) {
-            return options.setHex(hex, skip);
-        }
-
-        /* Repaints every part of this picker from its current colour. `skip`
-           names an input the visitor is currently typing in, which must not be
-           rewritten underneath the caret. */
-        function sync(skip) {
-            const hex = options.getHex();
-            /* No colour at all (the background's Transparent state): the
-               gradients keep their last position rather than snapping, and
-               the fields empty. Painting white here would say the background
-               IS white, which is a different export. */
-            const rgb = hexToRgb(hex) || { r: 255, g: 255, b: 255 };
-            const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
-
-            /* A greyscale colour carries no meaningful hue, so the strip keeps
-               its last position instead of snapping to red. */
-            if (hsv.s > 0.001 && hsv.v > 0.001) {
-                hue = hsv.h;
-            }
-
-            if (nodes.sv) {
-                nodes.sv.style.setProperty("--picker-hue", String(Math.round(hue)));
-            }
-            if (nodes.svThumb) {
-                nodes.svThumb.style.left = (hsv.s * 100) + "%";
-                nodes.svThumb.style.top = ((1 - hsv.v) * 100) + "%";
-                nodes.svThumb.style.backgroundColor = hex || "transparent";
-            }
-            hueTracks.forEach((track) => {
-                if (track.thumb) {
-                    track.thumb.style.left = ((hue / 360) * 100) + "%";
-                }
-            });
-
-            const fields = hex ? { hex: hex, r: rgb.r, g: rgb.g, b: rgb.b }
-                : { hex: "", r: "", g: "", b: "" };
-            if (nodes.inHex && skip !== nodes.inHex) { nodes.inHex.value = fields.hex; }
-            if (nodes.inR && skip !== nodes.inR) { nodes.inR.value = String(fields.r); }
-            if (nodes.inG && skip !== nodes.inG) { nodes.inG.value = String(fields.g); }
-            if (nodes.inB && skip !== nodes.inB) { nodes.inB.value = String(fields.b); }
-        }
-
-        function buildPresets() {
-            if (!nodes.presets) {
-                return;
-            }
-            while (nodes.presets.firstChild) {
-                nodes.presets.removeChild(nodes.presets.firstChild);
-            }
-
-            /* "No colour at all" as the first preset, for the instance that
-               has such a state -- the background's Transparent (August 25,
-               2026). It moved in here when the quick-pick row that used to
-               carry it was removed: every other colour on that row is in the
-               grid below, but this one is not a colour and no hex can express
-               it, so dropping the row without moving it would have stranded
-               the default state with no way back. */
-            if (options.allowClear) {
-                const clear = document.createElement("button");
-                clear.type = "button";
-                clear.className = "color-preset swatch-transparent";
-                clear.setAttribute("aria-label", "Transparent");
-                clear.setAttribute("title", "Transparent");
-                clear.addEventListener("click", () => commit(null));
-                nodes.presets.appendChild(clear);
-            }
-
-            /* Native colour sampling where the browser offers it (Chromium's
-               EyeDropper). No polyfill and no button at all elsewhere: a
-               control that silently does nothing is worse than one that is
-               absent. */
-            if (window.EyeDropper) {
-                const drop = document.createElement("button");
-                drop.type = "button";
-                drop.className = "color-eyedropper";
-                drop.setAttribute("aria-label", "Pick a colour from the screen");
-                drop.setAttribute("title", "Pick a colour from the screen");
-                drop.appendChild(icon([
-                    "m2 22 4-1 11-11-3-3L3 18l-1 4Z",
-                    "m15 5 4-4 4 4-4 4",
-                    "m13 7 4 4"
-                ]));
-                drop.addEventListener("click", () => {
-                    new window.EyeDropper().open().then((result) => {
-                        commit(result.sRGBHex);
-                    }, () => {
-                        /* Dismissed with Escape: nothing to do. */
-                    });
-                });
-                nodes.presets.appendChild(drop);
-            }
-
-            COLOR_PRESETS.forEach((hex) => {
-                const btn = document.createElement("button");
-                btn.type = "button";
-                btn.className = "color-preset";
-                btn.style.backgroundColor = hex;
-                btn.setAttribute("aria-label", hex);
-                btn.setAttribute("title", hex);
-                btn.addEventListener("click", () => commit(hex));
-                nodes.presets.appendChild(btn);
-            });
-        }
-
-        /* --- popover open/close --- */
-
-        function onOutside(evt) {
-            if (nodes.popover.contains(evt.target) || nodes.trigger.contains(evt.target)) {
-                return;
-            }
-            close();
-        }
-
-        function onKey(evt) {
-            if (evt.key === "Escape") {
-                close();
-                nodes.trigger.focus();
-            }
-        }
-
-        function open() {
-            nodes.popover.hidden = false;
-            nodes.trigger.setAttribute("aria-expanded", "true");
-            sync();
-            document.addEventListener("pointerdown", onOutside, true);
-            document.addEventListener("keydown", onKey, true);
-        }
-
-        function close() {
-            nodes.popover.hidden = true;
-            nodes.trigger.setAttribute("aria-expanded", "false");
-            document.removeEventListener("pointerdown", onOutside, true);
-            document.removeEventListener("keydown", onKey, true);
-        }
-
-        if (nodes.trigger && nodes.popover) {
-            nodes.trigger.addEventListener("click", () => {
-                if (nodes.popover.hidden) {
-                    open();
-                } else {
-                    close();
-                }
-            });
-        }
-
-        /* --- gradient tracks --- */
-
-        bindTrack(nodes.sv, (evt) => {
-            const r = trackRatio(nodes.sv, evt);
-            const rgb = hsvToRgb(hue, r.x, 1 - r.y);
-            commit(rgbToHex(rgb.r, rgb.g, rgb.b));
-        });
-
-        hueTracks.forEach((entry) => {
-            bindTrack(entry.track, (evt) => {
-                hue = trackRatio(entry.track, evt).x * 360;
-                const current = hexToRgb(options.getHex()) || { r: 255, g: 255, b: 255 };
-                const hsv = rgbToHsv(current.r, current.g, current.b);
-                /* A pure white or black start has no saturation to rotate, so
-                   the new hue would produce the same greyscale colour and the
-                   strip would look broken. Fall back to a fully saturated
-                   sample. */
-                const s = hsv.s > 0.001 ? hsv.s : 1;
-                const v = hsv.v > 0.001 ? hsv.v : 1;
-                const rgb = hsvToRgb(hue, s, v);
-                commit(rgbToHex(rgb.r, rgb.g, rgb.b));
-            });
-        });
-
-        /* --- hex / R / G / B --- */
-
-        if (nodes.inHex) {
-            nodes.inHex.addEventListener("input", () => {
-                if (hexToRgb(nodes.inHex.value)) {
-                    commit(nodes.inHex.value, nodes.inHex);
-                }
-            });
-            nodes.inHex.addEventListener("blur", () => sync());
-        }
-
-        [nodes.inR, nodes.inG, nodes.inB].forEach((input) => {
-            if (!input) {
-                return;
-            }
-            input.addEventListener("input", () => {
-                const r = clamp(parseInt(nodes.inR.value, 10) || 0, 0, 255);
-                const g = clamp(parseInt(nodes.inG.value, 10) || 0, 0, 255);
-                const b = clamp(parseInt(nodes.inB.value, 10) || 0, 0, 255);
-                commit(rgbToHex(r, g, b), input);
-            });
-            input.addEventListener("blur", () => sync());
-        });
-
-        return { sync: sync, buildPresets: buildPresets, close: close };
-    }
+    /* The picker itself is js/color-picker.js, shared with the poster
+       editor's heart colour. Loaded before this file. */
+    const createColorPicker = window.TBColor.createColorPicker;
 
     const productPicker = createColorPicker({
         trigger: colorTrigger, popover: colorPopover,
@@ -1934,7 +1994,12 @@
         inHex: inHex, inR: inR, inG: inG, inB: inB, presets: presetGrid
     }, {
         getHex: () => activeHex(),
-        setHex: (hex, skip) => setCustomColor(hex, skip)
+        setHex: (hex, skip) => setCustomColor(hex, skip),
+        /* Only the product picker has named colourways; the background is a
+           plain colour with a Transparent state and no palette of its own. */
+        colorways: () => colorwayList(),
+        setColorway: (key) => setColorway(key),
+        activeColorway: () => currentColor
     });
 
     /* Repaints the whole colourway UI: the picker's own nodes, plus the two
@@ -2132,13 +2197,24 @@
         const tol = HANDLE_HIT * k;
         const sel = selectedLayer();
 
+        /* Each layer is compared in ITS OWN zone's space, because a template
+           can mix flat and warped surfaces and a rectangle recorded in sheet
+           space means nothing in canvas space. For a flat zone this is the
+           identity and the comparison is what it always was.
+
+           The tolerance is not rescaled into sheet space. It is exact for a
+           rectangle, and for a warp it is off by the quad's own foreshortening
+           -- about 15% on the business cards, which is invisible on a handle
+           radius. A template with a hard-angled quad would want the local
+           Jacobian here instead. */
         if (sel && sel.rect && sel.visible) {
-            if (distance(pt, rotateHandlePoint(sel.rect, k)) <= tol) {
+            const sp = toZoneSpace(pt, layerZone(sel));
+            if (distance(sp, rotateHandlePoint(sel.rect, k)) <= tol) {
                 return { mode: "rotate", layer: sel };
             }
             const corners = rectCorners(sel.rect);
             for (let i = 0; i < corners.length; i += 1) {
-                if (distance(pt, corners[i]) <= tol) {
+                if (distance(sp, corners[i]) <= tol) {
                     return { mode: "resize", layer: sel };
                 }
             }
@@ -2146,11 +2222,64 @@
 
         for (let i = layers.length - 1; i >= 0; i -= 1) {
             const layer = layers[i];
-            if (layer.rect && layer.visible && hitsBody(layer.rect, pt)) {
+            if (layer.rect && layer.visible
+                && hitsBody(layer.rect, toZoneSpace(pt, layerZone(layer)))) {
                 return { mode: "move", layer: layer };
             }
         }
         return null;
+    }
+
+    /* The empty print surface under a point, or -1.
+
+       Tested against zonePath(), the SAME path the prompt is painted with, and
+       deliberately not against zoneBounds(). On a perspective template those
+       are different regions -- the box reaches off the product entirely, which
+       is the defect recorded in
+       docs/error-fixes/WARPED_ZONE_CHROME_AND_PROMPT_DRAWN_IN_SHEET_SPACE.md
+       for the prompt itself. Hit-testing the box would put that same fault back
+       as a click target: an area that uploads a design while showing bare
+       photograph. */
+    function emptyZoneAt(pt) {
+        const config = PRODUCTS[currentProduct];
+        const tpl = config && config.template;
+        if (!tpl) {
+            return -1;
+        }
+        const zones = zonesOf(tpl);
+        for (let i = 0; i < zones.length; i += 1) {
+            if (!zoneIsEmpty(i)) {
+                continue;
+            }
+            const zone = zones[i];
+            ctx.save();
+            /* Identity, because the point is already in canvas pixels and
+               isPointInPath reads the CURRENT transform. */
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            zonePath(ctx, zoneBounds(zone), 0, zone);
+            const inside = ctx.isPointInPath(pt.x, pt.y);
+            ctx.restore();
+            if (inside) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /* Moves the editor to a surface, the way the surface tabs do. Extracted so
+       clicking a surface on the canvas and clicking its tab leave the editor in
+       the same state -- the selected layer has to go, or the size and rotation
+       controls point at a row the list no longer shows. */
+    function focusZone(index) {
+        if (activeZone === index) {
+            return;
+        }
+        activeZone = index;
+        selectedId = null;
+        renderLayerList();
+        syncScaleControls();
+        syncLayerActions();
+        drawOverlay();
     }
 
     canvas.addEventListener("pointerdown", (evt) => {
@@ -2159,6 +2288,20 @@
         const hit = hitTest(pt, k);
 
         if (!hit) {
+            /* An empty print surface opens the design picker. The words on it
+               say "Upload your design", and until now that was a caption
+               rather than a control -- the visitor read an instruction and had
+               to go and find the button that carried it out.
+
+               On a two-surface template the click also moves to the surface it
+               landed on, so the design arrives where it was aimed rather than
+               on whichever card the tabs happened to be showing. */
+            const zone = emptyZoneAt(pt);
+            if (zone !== -1) {
+                focusZone(zone);
+                requestUpload("add", null);
+                return;
+            }
             if (selectedId !== null) {
                 selectLayer(null);
             }
@@ -2171,16 +2314,22 @@
 
         const rect = hit.layer.rect;
         const center = { x: rect.cx, y: rect.cy };
+        /* The whole gesture is measured in the layer's zone space: the anchor
+           here and every move below. Mixing the two spaces would send a drag
+           off at an angle on a warped surface. */
+        const zone = layerZone(hit.layer);
+        const zpt = toZoneSpace(pt, zone);
         drag = {
             mode: hit.mode,
             layer: hit.layer,
-            start: pt,
+            zone: zone,
+            start: zpt,
             center: center,
             startOffset: { x: hit.layer.offsetX, y: hit.layer.offsetY },
             startScale: hit.layer.scale,
-            startDistance: distance(pt, center),
+            startDistance: distance(zpt, center),
             startRotation: hit.layer.rotation,
-            startAngle: Math.atan2(pt.y - center.y, pt.x - center.x)
+            startAngle: Math.atan2(zpt.y - center.y, zpt.x - center.x)
         };
 
         canvas.setPointerCapture(evt.pointerId);
@@ -2190,13 +2339,21 @@
 
     canvas.addEventListener("pointermove", (evt) => {
         const k = canvasPerScreenPx();
-        const pt = getCanvasPoint(evt);
+        const raw = getCanvasPoint(evt);
+        /* hitTest maps per layer; a live drag is already committed to one. */
+        const pt = drag ? toZoneSpace(raw, drag.zone) : raw;
 
         if (!drag) {
-            const hit = hitTest(pt, k);
-            canvas.style.cursor = hit
-                ? (hit.mode === "move" ? "grab" : (hit.mode === "rotate" ? "crosshair" : "nwse-resize"))
-                : "default";
+            const hit = hitTest(raw, k);
+            if (hit) {
+                canvas.style.cursor = hit.mode === "move"
+                    ? "grab"
+                    : (hit.mode === "rotate" ? "crosshair" : "nwse-resize");
+            } else {
+                /* Without this the prompt is a control that looks exactly like
+                   a caption. */
+                canvas.style.cursor = emptyZoneAt(raw) === -1 ? "default" : "pointer";
+            }
             return;
         }
 
@@ -2262,7 +2419,8 @@
                 offsetX: layer.offsetX,
                 offsetY: layer.offsetY,
                 rotation: layer.rotation,
-                visible: layer.visible
+                visible: layer.visible,
+                zone: layerZone(layer)
             })),
             label: TB.sanitize(labelInput.value)
         });
@@ -2401,6 +2559,13 @@
             offsetY: layer.offsetY,
             rotation: layer.rotation,
             visible: layer.visible,
+            /* The surface the layer belongs to. Omitting it here silently
+               collapsed a two-card mockup onto card 1 on reopen: the tray
+               round-trips through this function, layerZone() reads a missing
+               value as 0, and the back design landed on top of the front one.
+               persist() and the restore path both carry it; this was the one
+               copy that did not. */
+            zone: layerZone(layer),
             rect: null
         }));
     }
@@ -2653,6 +2818,18 @@
        mockup, so it carries the whole burden for screen-reader users.
        ---------------------------------------------------------------------- */
 
+    /* What the label ends with while the photograph is not on the canvas.
+
+       A suffix rather than a prefix, so the product still leads: someone
+       skimming hears what the image IS first and the qualifier after it, which
+       is where English puts a qualifier. It also keeps the label's opening
+       words stable, which matters beyond prose -- several checks in
+       tests/verify-layout.js identify this canvas by the start of its label. */
+    const LABEL_STATE = {
+        loading: ", still loading",
+        error: ", could not be loaded"
+    };
+
     /* With the template picker gone this label is the only thing naming the
        mockup for a screen-reader user. Now that the colourway changes what is
        rendered, it has to name that too -- otherwise choosing a colour
@@ -2661,7 +2838,8 @@
         const config = PRODUCTS[currentProduct];
         const color = activeColor(config);
         const suffix = color && !color.original ? " in " + color.name : "";
-        canvas.setAttribute("aria-label", config.label + suffix + " mockup preview");
+        canvas.setAttribute("aria-label",
+            config.label + suffix + " mockup preview" + (LABEL_STATE[assetState] || ""));
     }
 
     /* ----------------------------------------------------------------------
@@ -2710,6 +2888,11 @@
                 offsetY: numberIn(row.offsetY, -5000, 5000, 0),
                 rotation: numberIn(row.rotation, -Math.PI * 4, Math.PI * 4, 0),
                 visible: row.visible !== false,
+                /* Clamped against MAX_ZONES rather than the current
+                   template's count: the product is restored separately and
+                   may not be resolved yet, and layerZone() re-checks against
+                   the live count on every read anyway. */
+                zone: numberIn(row.zone, 0, MAX_ZONES - 1, 0),
                 rect: null
             });
         });

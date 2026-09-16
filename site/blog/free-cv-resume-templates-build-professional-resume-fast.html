@@ -16,14 +16,16 @@
     <meta property="og:title" content="Free CV and Resume Templates: Build a Professional Resume Fast">
     <meta property="og:description" content="How to build an ATS-friendly resume in your browser in minutes with TemplateBox&#39;s free CV templates. No sign-up, no watermark, instant PDF download.">
     <meta property="og:url" content="https://templatebox.win/blog/free-cv-resume-templates-build-professional-resume-fast.html">
-    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+    <meta property="og:image" content="https://templatebox.win/assets/og-cover.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta property="article:published_time" content="2026-07-18">
     <meta property="article:modified_time" content="2026-07-18">
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Free CV and Resume Templates: Build a Professional Resume Fast">
     <meta name="twitter:description" content="How to build an ATS-friendly resume in your browser in minutes with TemplateBox&#39;s free CV templates. No sign-up, no watermark, instant PDF download.">
-    <meta name="twitter:image" content="https://templatebox.win/assets/logo.png">
+    <meta name="twitter:image" content="https://templatebox.win/assets/og-cover.png">
 
     <script type="application/ld+json">
 {
@@ -62,6 +64,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="../assets/logo-mark.svg">
+    <!-- Installed app (Tier 0 PWA). The manifest is what makes Chrome offer
+         "Install"; iOS ignores its icons array entirely and reads the
+         apple-touch-icon link below, so both are needed. js/app.js registers
+         sw.js on window load, deliberately after the ad scripts.
+         Reference: docs/implementation/PWA_INSTALLABLE_APP.md -->
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="apple-touch-icon" href="../assets/icon-180.png">
+    <meta name="apple-mobile-web-app-title" content="TemplateBox">
+    <!-- Both spellings on purpose: mobile-web-app-capable is the standard,
+         and the apple- prefixed original is still the only one iOS before 18
+         understands. Dropping it puts Safari chrome back over a home-screen
+         launch on those devices. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- Status bar and task-switcher tint; visible only once installed.
+         js/app.js rewrites both once it knows whether the visitor chose a
+         theme explicitly rather than inheriting the system one -- see
+         syncThemeColor() there. -->
+    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">
     <!-- Theme, applied before first paint so a returning visitor never sees a
          flash of the wrong one. Deliberately inline and synchronous: an
          external file would load after the first paint and the flash is
@@ -118,7 +140,9 @@
                             <li><a href="../cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
                             <li><a href="../itemized-receipt-template.html">Itemized Business Receipt</a></li>
                             <li><a href="../sales-receipt-template.html">Sales Receipt Form</a></li>
+                            <li><a href="../trade-counter-receipt-template.html">Trade Counter Receipt</a></li>
                             <li><a href="../free-invoice-template.html">Free Invoice Template</a></li>
+                            <li><a href="../editable-invoice-template.html">Editable Invoice with Logo</a></li>
                             <li><a href="../employee-warning-notice-template.html">Employee Warning Notice</a></li>
                         </ul>
                     </div>
@@ -128,6 +152,7 @@
                             <li><a href="../ats-resume-template.html">ATS Resume Template</a></li>
                             <li><a href="../poster-maker.html">Poster Maker</a></li>
                             <li><a href="../tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
+                            <li><a href="../anniversary-calendar-poster.html">Anniversary Calendar Poster</a></li>
                         </ul>
                     </div>
                     <div>
@@ -203,7 +228,7 @@
                 <p>Most mid-size and large employers run resumes through an Applicant Tracking System before a human sees them. Resumes exported as images or scanned documents often fail this step because the software cannot read the text. Every TemplateBox resume exports with true vector text, so parsing systems read your name, roles, and skills exactly as you wrote them.</p>
                 <div class="ad-break" data-ad-incontent=""></div>
                 <h2>Three layouts, one workflow</h2>
-                <ul><li><strong>Executive Resume</strong> - a commanding serif-led layout for senior roles.</li><li><strong>Modern Professional CV</strong> - clean accent-colored sections with a live preview.</li><li><strong>Minimalist ATS Resume</strong> - a distraction-free single-column format tuned for tracking systems.</li></ul>
+                <ul><li><strong>Modern Professional CV</strong> - clean accent-colored sections with a live preview.</li><li><strong>Minimalist ATS Resume</strong> - a distraction-free single-column format tuned for tracking systems.</li></ul>
                 <p>Each template uses the same split-pane editor: type on the left, watch the finished document update live on the right, then download. Your progress saves automatically in your browser, so you can close the tab and pick up where you left off.</p>
                 <h2>Build yours now</h2>
                 <p>Open the <a href="../index.html#templates">template catalog</a>, pick a resume layout, and you can have a polished, ATS-safe PDF in under ten minutes.</p>

@@ -11,14 +11,16 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="TemplateBox">
     <meta property="og:title" content="Free Receipt, Invoice and Warning Notice Maker | TemplateBox">
-    <meta property="og:description" content="Editable rent receipts, payment receipts, invoices and employee warning notices with automatic totals and PDF export. Free, local, no sign-up.">
+    <meta property="og:description" content="Editable rent receipts, payment receipts, invoices with your own logo, and employee warning notices with automatic totals and PDF export. Free, local, no sign-up.">
     <meta property="og:url" content="https://templatebox.win/docs.html">
-    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+    <meta property="og:image" content="https://templatebox.win/assets/og-cover.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <!-- Twitter Card: without these every share renders as a bare link -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Free Receipt, Invoice and Warning Notice Maker | TemplateBox">
-    <meta name="twitter:description" content="Editable rent receipts, payment receipts, invoices and employee warning notices with automatic totals and PDF export. Free, local, no sign-up.">
-    <meta name="twitter:image" content="https://templatebox.win/assets/logo.png">
+    <meta name="twitter:description" content="Editable rent receipts, payment receipts, invoices with your own logo, and employee warning notices with automatic totals and PDF export. Free, local, no sign-up.">
+    <meta name="twitter:image" content="https://templatebox.win/assets/og-cover.png">
 
     <script type="application/ld+json">
     {
@@ -29,8 +31,8 @@
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "All",
         "browserRequirements": "Requires JavaScript and HTML5 support",
-        "description": "Free browser-based builder for rent receipts, cash payment receipts, itemized business receipts, sales receipt forms, invoices and employee warning notices. Automatic totals, amount in words, and selectable-text PDF export. Nothing is uploaded.",
-        "featureList": "Six document types, automatic totals and tax, amount in words, blank printable form mode, selectable-text PDF export, print stylesheet",
+        "description": "Free browser-based builder for rent receipts, cash payment receipts, itemized business receipts, sales receipt forms, invoices, a ruled invoice carrying the visitor's own logo, and employee warning notices. Automatic totals, amount in words, and selectable-text PDF export. Nothing is uploaded.",
+        "featureList": "Seven document types, automatic totals and tax, amount in words, blank printable form mode, selectable-text PDF export, print stylesheet",
         "offers": { "@type": "Offer", "price": "0.00", "priceCurrency": "USD" }
     }
     </script>
@@ -66,6 +68,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Installed app (Tier 0 PWA). The manifest is what makes Chrome offer
+         "Install"; iOS ignores its icons array entirely and reads the
+         apple-touch-icon link below, so both are needed. js/app.js registers
+         sw.js on window load, deliberately after the ad scripts.
+         Reference: docs/implementation/PWA_INSTALLABLE_APP.md -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="assets/icon-180.png">
+    <meta name="apple-mobile-web-app-title" content="TemplateBox">
+    <!-- Both spellings on purpose: mobile-web-app-capable is the standard,
+         and the apple- prefixed original is still the only one iOS before 18
+         understands. Dropping it puts Safari chrome back over a home-screen
+         launch on those devices. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- Status bar and task-switcher tint; visible only once installed.
+         js/app.js rewrites both once it knows whether the visitor chose a
+         theme explicitly rather than inheriting the system one -- see
+         syncThemeColor() there. -->
+    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">
     <!-- Theme, applied before first paint so a returning visitor never sees a
          flash of the wrong one. Deliberately inline and synchronous: an
          external file would load after the first paint and the flash is
@@ -171,7 +193,7 @@
 
             <!-- Left pane: input form. Fieldsets and fields carry data-for
                  listing the document types they belong to; js/docs.js toggles
-                 them so one form drives all six documents. -->
+                 them so one form drives all seven documents. -->
             <section class="editor-pane" aria-label="Document form">
 
                 <!-- Section jump list, built by initFormNav() in js/app.js
@@ -184,8 +206,8 @@
                         <legend>Document</legend>
                         <!-- The "Document Type" select stood here until
                              August 11, 2026. It was removed because it undid
-                             the funnel that leads here: six catalog cards and
-                             six landing pages exist to choose the document
+                             the funnel that leads here: seven catalog cards
+                             and seven landing pages exist to choose the document
                              BEFORE the editor opens, and a switcher inside the
                              editor made that choice pointless. The type is now
                              set once on arrival from the card's data-doc
@@ -210,13 +232,33 @@
                         </div>
                     </fieldset>
 
+                    <!-- Ruled invoice only. The file is read by FileReader,
+                         drawn to a canvas at no more than 320px on its long
+                         edge, and kept as a PNG data URI in the same
+                         localStorage record as the typed fields. Nothing is
+                         uploaded and there is nowhere for it to go: the site
+                         has no server. -->
+                    <fieldset data-for="logo-invoice trade-receipt">
+                        <legend>Logo</legend>
+                        <div class="field">
+                            <label for="f-logo">Logo Image</label>
+                            <input type="file" id="f-logo" accept="image/*">
+                            <p class="upload-hint">PNG, JPG or WebP. A PNG with a transparent background sits best beside the business name. The file stays on this device.</p>
+                            <p class="upload-hint" id="logo-error" role="status" aria-live="polite"></p>
+                            <button type="button" class="btn btn-secondary btn-small" id="logo-remove" hidden>Remove Logo</button>
+                        </div>
+                    </fieldset>
+
                     <fieldset>
                         <legend data-label="issuerLegend">Issued By</legend>
                         <div class="field">
                             <label for="f-issuer-name" data-label="issuerName">Business Name</label>
                             <input type="text" id="f-issuer-name" data-bind="issuerName" maxlength="70">
                         </div>
-                        <div class="field">
+                        <!-- Every type but the ruled invoice: that sheet shows the
+                             business as a wordmark beside its logo and carries its
+                             contact details in the footer strip instead. -->
+                        <div class="field" data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice warning-notice trade-receipt">
                             <label for="f-issuer-details">Address and Contact (one item per line)</label>
                             <textarea id="f-issuer-details" data-bind="issuerDetails" maxlength="240" rows="4"></textarea>
                         </div>
@@ -228,7 +270,14 @@
                             <label for="f-recipient-name" data-label="recipientName">Received From</label>
                             <input type="text" id="f-recipient-name" data-bind="recipientName" maxlength="70">
                         </div>
-                        <div class="field" data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice">
+                        <!-- The trade receipt's header card carries a single
+                             Cell No. row rather than an address block: the
+                             artwork gives it one line beside Date and Client. -->
+                        <div class="field" data-for="trade-receipt">
+                            <label for="f-client-phone">Cell No.</label>
+                            <input type="tel" id="f-client-phone" data-bind="clientPhone" maxlength="32">
+                        </div>
+                        <div class="field" data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice logo-invoice">
                             <label for="f-recipient-details">Address and Contact (one item per line)</label>
                             <textarea id="f-recipient-details" data-bind="recipientDetails" maxlength="240" rows="4"></textarea>
                         </div>
@@ -244,13 +293,13 @@
                             <label for="f-doc-date" data-label="docDate">Date</label>
                             <input type="date" id="f-doc-date" data-bind="docDate">
                         </div>
-                        <div class="field" data-for="invoice">
+                        <div class="field" data-for="invoice logo-invoice">
                             <label for="f-due-date">Payment Due Date</label>
                             <input type="date" id="f-due-date" data-bind="dueDate">
                         </div>
                     </fieldset>
 
-                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice">
+                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice logo-invoice trade-receipt">
                         <legend>Currency</legend>
                         <div class="field">
                             <label for="f-currency">Currency</label>
@@ -300,15 +349,19 @@
                         </div>
                     </fieldset>
 
-                    <fieldset data-for="business-receipt sales-receipt invoice">
+                    <fieldset data-for="business-receipt sales-receipt invoice logo-invoice trade-receipt">
                         <legend>Line Items</legend>
                         <div id="item-list"></div>
                         <button type="button" class="btn btn-secondary btn-block" id="add-item">Add Line Item</button>
                     </fieldset>
 
-                    <fieldset data-for="business-receipt sales-receipt invoice">
+                    <fieldset data-for="business-receipt sales-receipt invoice logo-invoice trade-receipt">
                         <legend>Totals</legend>
-                        <div class="field">
+                        <!-- The trade receipt's totals block is three rows and the
+                             artwork gives it nowhere to put a discount or an amount
+                             already paid, so those two are held back rather than
+                             computed into a total that nothing on the sheet shows. -->
+                        <div class="field" data-for="business-receipt sales-receipt invoice logo-invoice">
                             <label for="f-discount">Discount Amount</label>
                             <input type="number" id="f-discount" data-bind="discount" min="0" max="99999999" step="0.01">
                         </div>
@@ -320,13 +373,13 @@
                             <label for="f-tax-rate">Tax Rate (percent)</label>
                             <input type="number" id="f-tax-rate" data-bind="taxRate" min="0" max="100" step="0.01">
                         </div>
-                        <div class="field">
+                        <div class="field" data-for="business-receipt sales-receipt invoice logo-invoice">
                             <label for="f-paid" data-label="paid">Amount Paid</label>
                             <input type="number" id="f-paid" data-bind="amountPaid" min="0" max="99999999" step="0.01">
                         </div>
                     </fieldset>
 
-                    <fieldset data-for="invoice">
+                    <fieldset data-for="invoice logo-invoice">
                         <legend>Payment Instructions</legend>
                         <div class="field">
                             <label for="f-terms">Payment Terms</label>
@@ -335,6 +388,79 @@
                         <div class="field">
                             <label for="f-bank">Bank / Payment Details (one item per line)</label>
                             <textarea id="f-bank" data-bind="bankDetails" maxlength="240" rows="4" placeholder="Bank Name: Example Bank&#10;Account Number: 0123 4567 89"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <!-- Ruled invoice only: the icon contact strip along the
+                         foot of the sheet, and the name printed under the
+                         first signature rule. -->
+                    <fieldset data-for="logo-invoice trade-receipt">
+                        <legend>Contact Details</legend>
+                        <div class="field" data-for="logo-invoice">
+                            <label for="f-contact-phone">Phone</label>
+                            <input type="tel" id="f-contact-phone" data-bind="contactPhone" maxlength="32" placeholder="+1 (555) 018-2244">
+                        </div>
+                        <div class="field">
+                            <label for="f-contact-email">Email</label>
+                            <input type="email" id="f-contact-email" data-bind="contactEmail" maxlength="60" placeholder="billing@example.com">
+                        </div>
+                        <div class="field">
+                            <label for="f-contact-site">Website</label>
+                            <input type="text" id="f-contact-site" data-bind="contactSite" maxlength="60" placeholder="www.example.com">
+                        </div>
+                        <div class="field" data-for="logo-invoice">
+                            <label for="f-signer">Name Above the Signature Line</label>
+                            <input type="text" id="f-signer" data-bind="signerName" maxlength="70">
+                        </div>
+                    </fieldset>
+
+                    <!-- Trade receipt only. Seven fixed labels with a field each
+                         rather than the free-text block the invoices use: on this
+                         sheet the labels are printed furniture in a ruled block and
+                         their alignment is part of the design. Every one ships
+                         EMPTY, and nothing here carries a real account. -->
+                    <fieldset data-for="trade-receipt">
+                        <legend>Account Details</legend>
+                        <div class="field">
+                            <label for="f-acct-name">Account Name</label>
+                            <input type="text" id="f-acct-name" data-bind="acctName" maxlength="70">
+                        </div>
+                        <div class="field">
+                            <label for="f-bank-name">Bank Name</label>
+                            <input type="text" id="f-bank-name" data-bind="bankName" maxlength="70">
+                        </div>
+                        <div class="field">
+                            <label for="f-acct-number">Account Number</label>
+                            <input type="text" id="f-acct-number" data-bind="acctNumber" maxlength="34">
+                        </div>
+                        <div class="field">
+                            <label for="f-branch-name">Branch Name</label>
+                            <input type="text" id="f-branch-name" data-bind="branchName" maxlength="70">
+                        </div>
+                        <div class="field">
+                            <label for="f-branch-code">Branch Code</label>
+                            <input type="text" id="f-branch-code" data-bind="branchCode" maxlength="24">
+                        </div>
+                        <div class="field">
+                            <label for="f-swift-code">Swift Code</label>
+                            <input type="text" id="f-swift-code" data-bind="swiftCode" maxlength="24">
+                        </div>
+                        <div class="field">
+                            <label for="f-bank-address">Bank Address</label>
+                            <input type="text" id="f-bank-address" data-bind="bankAddress" maxlength="90">
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-for="trade-receipt">
+                        <legend>Terms and Conditions</legend>
+                        <div class="field">
+                            <label for="f-terms-intro">Line Above the Terms</label>
+                            <input type="text" id="f-terms-intro" data-bind="termsIntro" maxlength="90" placeholder="PLEASE NOTE THAT ALL GOODS SHOULD BE:">
+                        </div>
+                        <div class="field">
+                            <label for="f-terms">Terms (one per line, numbered automatically)</label>
+                            <textarea id="f-terms" data-bind="terms" maxlength="600" rows="6"></textarea>
+                            <p class="upload-hint">Leave this empty to print a general returns policy you can edit afterwards.</p>
                         </div>
                     </fieldset>
 
@@ -401,7 +527,7 @@
                         </div>
                     </fieldset>
 
-                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice">
+                    <fieldset data-for="rent-receipt payment-receipt business-receipt sales-receipt invoice trade-receipt">
                         <legend>Payment Method</legend>
                         <div class="check-grid" id="method-row">
                             <label class="radio-option"><input type="checkbox" data-check="cash"> Cash</label>
@@ -464,6 +590,14 @@
          only, user data is always injected through textContent bindings) -->
     <template id="tpl-item">
         <div class="entry-row" data-entry>
+            <!-- Ruled invoice only. js/docs.js re-applies the [data-for]
+                 rule to each cloned row, because applyDocType sweeps the
+                 document once and a row added later has never been seen
+                 by it. -->
+            <div class="field" data-for="logo-invoice">
+                <label>Date</label>
+                <input type="text" data-entry-field="date" maxlength="16" placeholder="12 Aug">
+            </div>
             <div class="field">
                 <label>Item Description</label>
                 <input type="text" data-entry-field="description" maxlength="90">

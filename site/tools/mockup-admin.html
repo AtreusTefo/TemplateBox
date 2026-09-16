@@ -226,7 +226,7 @@
 
             <label for="tpl-category">Category folder</label>
             <input type="text" id="tpl-category" value="apparel" placeholder="apparel/hats/baseball-caps">
-            <p class="hint">A taxonomy path, and the same one is written into both trees: assets/mockups/&lt;category&gt;/ for the maps and assets/thumbnails/product-mockups/&lt;category&gt;/ for the thumbnail. Nest as deep as the product needs -- apparel/t-shirts, apparel/hats/baseball-caps, drinkware/mugs, packaging/boxes, print/posters-and-frames. Lowercase and hyphenated; slashes are kept, everything else is slugged. Leave the word "mockup" out of the segments, the tree is already under assets/mockups/.</p>
+            <p class="hint">A taxonomy path, and the same one is written into both trees: assets/mockups/&lt;category&gt;/ for the maps and assets/thumbnails/product-mockups/&lt;category&gt;/ for the thumbnail. Nest as deep as the product needs -- apparel/t-shirts, apparel/hats/baseball-caps, drinkware/mugs, packaging/boxes, print/business-cards, print/signage. Lowercase and hyphenated; slashes are kept, everything else is slugged. Leave the word "mockup" out of the segments, the tree is already under assets/mockups/.</p>
 
             <label for="tpl-mode">Mode</label>
             <select id="tpl-mode">
@@ -250,9 +250,10 @@
             <p class="status" id="copy-status"></p>
 
             <ol id="checklist">
-                <li>Create site/assets/mockups/&lt;category&gt;/ and site/assets/thumbnails/product-mockups/&lt;category&gt;/ if this is the first template in that category -- git tracks files, not directories, so a category folder only exists once it holds something.</li>
+                <li>Create site/assets/mockups/&lt;category&gt;/&lt;id&gt;/ and site/assets/thumbnails/product-mockups/&lt;category&gt;/&lt;id&gt;/ -- one folder per mockup, since September 3, 2026. Git tracks files, not directories, so both only exist once they hold something.</li>
                 <li>Save the map downloads into the first and the thumbnail into the second.</li>
                 <li>Save the base photograph itself as &lt;id&gt;-base.png beside the maps.</li>
+                <li>The file names keep the id even though the folder already carries it. That is deliberate: it is what lets an asset identify itself in a network waterfall, a downloads folder or a flat storage bucket, where the folder is not visible.</li>
                 <li>Paste the entry into js/mockup-templates.js.</li>
                 <li>Add a catalog card in index.html with data-target="mockup" data-doc="&lt;id&gt;".</li>
                 <li>Run node tests/verify-layout.js.</li>
@@ -474,14 +475,23 @@
         }
 
         const label = new Int32Array(N).fill(-1);
-        let best = -1, bestCount = 0, zoneLabel = -1;
+        let best = -1, bestCount = 0;
+        const zoneLabels = [];
 
-        /* The print zone's own centre, when the corners are in. */
-        let seed = -1;
+        /* One seed per print zone. This picker only ever supplies one, but a
+           template can declare several -- `warpZones` in the registry, which
+           the business card pair uses -- and there the zones are SEPARATE
+           regions with bare background between them. Seeding from one would
+           keep that card and discard the other, and the discarded one renders
+           its design with no shading and stays undyed on recolour. Dilation
+           cannot rescue it either: it bridges a groove, not a deliberate gap.
+           So this takes a list, and a second zone added by hand to the
+           registry must be added to the derive as a second seed. */
+        const seeds = [];
         if (points.length === 4) {
             const a = zoneRect();
             const cx = Math.round(a.x + a.w / 2), cy = Math.round(a.y + a.h / 2);
-            if (cx >= 0 && cy >= 0 && cx < W && cy < H) { seed = cy * W + cx; }
+            if (cx >= 0 && cy >= 0 && cx < W && cy < H) { seeds.push(cy * W + cx); }
         }
 
         let next = 0;
@@ -509,16 +519,20 @@
             if (count > bestCount) { bestCount = count; best = id; }
         }
 
-        /* The seed only has to land in the dilated region, not on a classified
-           pixel: a zone centre sitting on a groove is exactly the case this
-           change exists to survive. */
-        if (seed >= 0 && dil[seed] && label[seed] !== -1) { zoneLabel = label[seed]; }
-        const keep = zoneLabel !== -1 ? zoneLabel : best;
-        if (keep === -1) { return { dropped: 0 }; }
+        /* A seed only has to land in the dilated region, not on a classified
+           pixel: a zone centre sitting on a groove is exactly the case the
+           dilation exists to survive. */
+        seeds.forEach((seed) => {
+            if (seed >= 0 && dil[seed] && label[seed] !== -1 && zoneLabels.indexOf(label[seed]) === -1) {
+                zoneLabels.push(label[seed]);
+            }
+        });
+        const keep = zoneLabels.length ? zoneLabels : (best === -1 ? [] : [best]);
+        if (!keep.length) { return { dropped: 0 }; }
 
         let after = 0;
         for (let i = 0; i < N; i++) {
-            if (fabric[i] && label[i] !== keep) { fabric[i] = 0; } else { after += fabric[i]; }
+            if (fabric[i] && keep.indexOf(label[i]) === -1) { fabric[i] = 0; } else { after += fabric[i]; }
         }
         return { dropped: before - after };
     }
@@ -991,19 +1005,19 @@
             "    {\n" +
             "        id: \"" + id + "\",\n" +
             "        title: \"" + title.replace(/\\/g, "").replace(/"/g, "'") + "\",\n" +
-            "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "-thumb.jpg\",\n" +
-            "        base: \"assets/mockups/" + category + "/" + id + "-base.png\",\n";
+            "        thumb: \"assets/thumbnails/product-mockups/" + category + "/" + id + "/" + id + "-thumb.jpg\",\n" +
+            "        base: \"assets/mockups/" + category + "/" + id + "/" + id + "-base.png\",\n";
 
         if (fabric) {
             body +=
                 "        overlay: null,\n" +
-                "        displace: \"assets/mockups/" + category + "/" + id + "-displace.png\",\n" +
-                "        shade: \"assets/mockups/" + category + "/" + id + "-shade.png\",\n" +
-                "        light: \"assets/mockups/" + category + "/" + id + "-light.png\",\n" +
+                "        displace: \"assets/mockups/" + category + "/" + id + "/" + id + "-displace.png\",\n" +
+                "        shade: \"assets/mockups/" + category + "/" + id + "/" + id + "-shade.png\",\n" +
+                "        light: \"assets/mockups/" + category + "/" + id + "/" + id + "-light.png\",\n" +
                 "        lightGain: " + Number($("light-gain").value) + ",\n" +
-                "        garment: \"assets/mockups/" + category + "/" + id + "-garment.png\",\n" +
-                "        tone: \"assets/mockups/" + category + "/" + id + "-tone.png\",\n" +
-                "        grain: \"assets/mockups/" + category + "/" + id + "-grain.png\",\n" +
+                "        garment: \"assets/mockups/" + category + "/" + id + "/" + id + "-garment.png\",\n" +
+                "        tone: \"assets/mockups/" + category + "/" + id + "/" + id + "-tone.png\",\n" +
+                "        grain: \"assets/mockups/" + category + "/" + id + "/" + id + "-grain.png\",\n" +
                 "        garmentColors: {\n" +
                 "            original: { name: \"As photographed\", hex: \"#E9E9EC\", original: true },\n" +
                 "            black: { name: \"Black\", hex: \"#1A1A1A\" },\n" +
@@ -1019,7 +1033,7 @@
                 "        backing: null,\n";
         } else {
             body +=
-                "        overlay: \"assets/mockups/" + category + "/" + id + "-overlay.png\",\n" +
+                "        overlay: \"assets/mockups/" + category + "/" + id + "/" + id + "-overlay.png\",\n" +
                 "        overlayBlend: \"" + $("tpl-blend").value + "\",\n" +
                 "        mode: \"" + $("tpl-mode").value + "\",\n";
         }

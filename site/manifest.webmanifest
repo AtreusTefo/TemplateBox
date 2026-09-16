@@ -1,0 +1,57 @@
+{
+    "name": "TemplateBox - Invoice, Receipt and Resume Maker",
+    "short_name": "TemplateBox",
+    "description": "Create invoices, receipts, resumes, posters and product mockups free in your browser. No sign-up, no database, nothing leaves your device.",
+    "id": "/",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "lang": "en",
+    "dir": "ltr",
+    "background_color": "#F4F3EF",
+    "theme_color": "#F4F3EF",
+    "categories": ["business", "productivity", "utilities"],
+    "icons": [
+        {
+            "src": "assets/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "assets/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "assets/icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "New resume",
+            "short_name": "Resume",
+            "url": "/loading.html?target=resume"
+        },
+        {
+            "name": "New invoice or receipt",
+            "short_name": "Invoice",
+            "url": "/loading.html?target=docs"
+        },
+        {
+            "name": "New poster",
+            "short_name": "Poster",
+            "url": "/loading.html?target=poster"
+        },
+        {
+            "name": "New product mockup",
+            "short_name": "Mockup",
+            "url": "/loading.html?target=mockup"
+        }
+    ]
+}

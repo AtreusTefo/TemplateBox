@@ -87,12 +87,30 @@ A 1.6pt measurement difference decides one line break, and everything below shif
 1. **New state fields.** The descriptor reads `address`, `city`, `postcode`, `phoneAlt`, `place`, and `education[].field`, none of which the current resume state or form has. Integration means extending both.
 2. **Bullet descriptions.** `experience[].description` is currently one prose block; this template splits it on newlines into bullets.
 3. **Sidebar pagination.** Main-column pagination is implemented; the sidebar is deliberately single-page and reports overflow instead. A rail that splits mid-list reads as a fault rather than a longer document.
+
+   **Updated September 15, 2026: the report is now consumed, and from the engine being built on August 2, 2026 until now it was not.** "Reports overflow instead" was only ever half a contract -- `layout()` set `ctx.overflow` faithfully from the first two-column template onward and **no caller read it**, so the deliberate design decision above degraded into silent data loss the moment a template put enough in the rail to reach the boundary. The Peach Portrait CV reached it: a fourth referee left eight lines off the paper, in the preview and the exported PDF alike, with nothing said anywhere.
+
+   `ctx.overflow` now carries the magnitude and the severity, not just the fact:
+
+   | key | meaning |
+   | --- | --- |
+   | `main` / `sidebar` | past that column's declared `bottom` |
+   | `mainBy` / `sidebarBy` | by how many points |
+   | `sidebarOffPage` | past the sheet itself, so lines are not on the paper at all |
+
+   **A template author does not need to do anything to get this** -- `js/resume.js` reads it after every paint, so a future two-column design inherits the notice. What a future author must NOT do is put the notice into the display list: preview and PDF are painted from the same list, so anything drawn there is exported into the file. It is editor chrome, added after the paint like the page labels, and the print stylesheet hides it because a browser print takes the DOM rather than the list. Suite section 9b holds this, and was proved by disabling the fix first.
 4. **Long unbreakable tokens.** A long email wraps mid-word (`example-exampl / e.co.uk`). The source artwork has the same behaviour; a break-on-punctuation rule would improve it.
+
+   **Composed lines wrap as of September 15, 2026, and did not before.** `layoutRuns` -- the path that sets several runs on ONE baseline, which is how a label and a field become "Address: 14 Mabini Street" -- had no wrapping at all. A composed line wider than its column did not break; it kept going, and on a two-column sheet it kept going across the gutter and drew over the other column. It is not the same problem as wrapping a paragraph and `ctx.wrap` cannot serve it: the first line starts at whatever x the preceding runs left the pen at, so how much fits depends on the runs before it, and each run may be a different size. The measure is now consumed left to right, word by word, with the pen carrying over between runs, and the cursor advances one line height per break so a wrapped value pushes what follows down. A word too long for the column from its own left edge is still drawn overlong rather than broken, which is the same choice the paragraph wrapper makes and the reason this item stays open.
 5. **`resume.js` is untouched.** Migrating the three existing single-column templates onto this engine is a separate step, and should follow the equivalence check in the sketch: compare output both ways before deleting the hand-written renderers.
 
 ## ATS Position
 
 Two-column layouts carry parsing risk, and that matters because ATS-safety is an explicit claim on the resume tools. Two mitigations are real here: there is no photograph, and because the engine controls `doc.text()` call order, extraction order is deterministic rather than interleaved. Ship this template as design-led, with the single-column templates retaining the unqualified ATS claim.
+
+Tables joined the question on September 15, 2026, when the Boxed Headings Biodata CV shipped with a ruled marks table. The same mitigation carries it: a table drawn column by column extracts as unrelated lists and every row loses its record, so `layoutTable` emits ROW-MAJOR and each row extracts contiguously. Cell borders are vector lines and invisible to a text extractor, and a heading knocked out of a filled box is ordinary text over a rect, so neither costs anything at parse time. The risk in a table is reading order alone, and this engine owns its own draw order. That template keeps the unqualified claim; its photograph is opt-in and an unfilled slot never reaches the PDF. See `BOXED_BIODATA_RESUME_TEMPLATE.md` for the extracted-text dump.
+
+A photo-led two-column sheet joined the question on September 15, 2026 with the Peach Portrait CV. It fails two of the three conditions by construction -- two columns and a portrait that is the design's centrepiece -- so it ships DESIGN-LED like grey-rail rather than carrying the unqualified claim. It keeps the third and that is worth stating: because the engine decides its own draw order, the whole sidebar extracts and then the whole main column, never interleaved across the gutter. The photograph costs the text stream nothing either, and a sheet without one carries no image object at all. See `PEACH_PORTRAIT_CV_TEMPLATE.md`.
 
 ## Adding a Template
 

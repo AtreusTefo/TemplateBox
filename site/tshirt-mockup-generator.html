@@ -13,13 +13,15 @@
     <meta property="og:title" content="Free T-Shirt Mockup Generator | No Photoshoot Needed">
     <meta property="og:description" content="Drop your design onto a t-shirt, hoodie, mug or box and export a PNG. Free print-on-demand mockup generator running entirely in your browser. No sign-up.">
     <meta property="og:url" content="https://templatebox.win/tshirt-mockup-generator.html">
-    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+    <meta property="og:image" content="https://templatebox.win/assets/og-mockup.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
 
     <!-- Twitter Card: without these every share renders as a bare link -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Free T-Shirt Mockup Generator | No Photoshoot Needed">
     <meta name="twitter:description" content="Drop your design onto a t-shirt, hoodie, mug or box and export a PNG. Free print-on-demand mockup generator running entirely in your browser. No sign-up.">
-    <meta name="twitter:image" content="https://templatebox.win/assets/logo.png">
+    <meta name="twitter:image" content="https://templatebox.win/assets/og-mockup.png">
 
     <script type="application/ld+json">
     {
@@ -126,6 +128,26 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Installed app (Tier 0 PWA). The manifest is what makes Chrome offer
+         "Install"; iOS ignores its icons array entirely and reads the
+         apple-touch-icon link below, so both are needed. js/app.js registers
+         sw.js on window load, deliberately after the ad scripts.
+         Reference: docs/implementation/PWA_INSTALLABLE_APP.md -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="assets/icon-180.png">
+    <meta name="apple-mobile-web-app-title" content="TemplateBox">
+    <!-- Both spellings on purpose: mobile-web-app-capable is the standard,
+         and the apple- prefixed original is still the only one iOS before 18
+         understands. Dropping it puts Safari chrome back over a home-screen
+         launch on those devices. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- Status bar and task-switcher tint; visible only once installed.
+         js/app.js rewrites both once it knows whether the visitor chose a
+         theme explicitly rather than inheriting the system one -- see
+         syncThemeColor() there. -->
+    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">
     <!-- Theme, applied before first paint so a returning visitor never sees a
          flash of the wrong one. Deliberately inline and synchronous: an
          external file would load after the first paint and the flash is
@@ -184,7 +206,9 @@
                             <li><a href="cash-payment-receipt-template.html">Cash Payment Receipt</a></li>
                             <li><a href="itemized-receipt-template.html">Itemized Business Receipt</a></li>
                             <li><a href="sales-receipt-template.html">Sales Receipt Form</a></li>
+                            <li><a href="trade-counter-receipt-template.html">Trade Counter Receipt</a></li>
                             <li><a href="free-invoice-template.html">Free Invoice Template</a></li>
+                            <li><a href="editable-invoice-template.html">Editable Invoice with Logo</a></li>
                             <li><a href="employee-warning-notice-template.html">Employee Warning Notice</a></li>
                         </ul>
                     </div>
@@ -194,19 +218,31 @@
                             <li><a href="ats-resume-template.html">ATS Resume Template</a></li>
                             <li><a href="poster-maker.html">Poster Maker</a></li>
                             <li><a href="tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>
+                            <li><a href="anniversary-calendar-poster.html">Anniversary Calendar Poster</a></li>
                         </ul>
                     </div>
                     <div>
                         <h2>Product Mockups</h2>
                         <ul>
                             <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-model-white-back">White T-Shirt Back Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="card-white-duotone">Duotone Business Card Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="banner-rollup-angled">Angled Roll-Up Banner Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie Back Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-cap-clay">T-Shirt and Cap Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">T-Shirt Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></li>
                             <li><a href="mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>
-                            <li><a href="mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-black-shelf">Framed Poster Wall Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="frame-wood-linen">Linen Framed Print Mockup</a></li>
+                            <li><a href="mockup.html" data-target="mockup" data-doc="bag-paper-held">Packaging Mockup</a></li>
                         </ul>
                     </div>
                     <div>
@@ -349,6 +385,7 @@
         <section class="related-tools" aria-label="Related templates">
             <h2>Related templates</h2>
             <ul class="related-list">
+                <li><a href="anniversary-calendar-poster.html">Anniversary calendar poster</a></li>
                 <li><a href="mockup.html" data-target="mockup">Open the mockup generator</a></li>
                 <li><a href="poster-maker.html">Poster maker</a></li>
                 <li><a href="ats-resume-template.html">ATS resume template</a></li>

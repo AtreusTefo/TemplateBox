@@ -248,7 +248,9 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../cash-payment-receipt-template.html">Cash Payment Receipt</a></li>\n' +
 '                            <li><a href="../itemized-receipt-template.html">Itemized Business Receipt</a></li>\n' +
 '                            <li><a href="../sales-receipt-template.html">Sales Receipt Form</a></li>\n' +
+'                            <li><a href="../trade-counter-receipt-template.html">Trade Counter Receipt</a></li>\n' +
 '                            <li><a href="../free-invoice-template.html">Free Invoice Template</a></li>\n' +
+'                            <li><a href="../editable-invoice-template.html">Editable Invoice with Logo</a></li>\n' +
 '                            <li><a href="../employee-warning-notice-template.html">Employee Warning Notice</a></li>\n' +
 '                        </ul>\n' +
 '                    </div>\n' +
@@ -258,19 +260,31 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../ats-resume-template.html">ATS Resume Template</a></li>\n' +
 '                            <li><a href="../poster-maker.html">Poster Maker</a></li>\n' +
 '                            <li><a href="../tshirt-mockup-generator.html">T-Shirt Mockup Generator</a></li>\n' +
+'                            <li><a href="../anniversary-calendar-poster.html">Anniversary Calendar Poster</a></li>\n' +
 '                        </ul>\n' +
 '                    </div>\n' +
 '                    <div>\n' +
 '                        <h2>Product Mockups</h2>\n' +
 '                        <ul>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-model-white">White T-Shirt Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-model-white-back">White T-Shirt Back Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="cap-model-white">White Baseball Cap Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bag-paper-white">White Paper Bag Mockup</a></li>\n' +
-'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt">T-Shirt Mockup</a></li>\n' +
-'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie">Hoodie Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="card-white-walnut">Business Card Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="card-white-duotone">Duotone Business Card Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="banner-rollup-white">Roll-Up Banner Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="banner-rollup-angled">Angled Roll-Up Banner Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white">White Hoodie Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-model-white-back">White Hoodie Back Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-cap-clay">T-Shirt and Cap Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">T-Shirt Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
-'                            <li><a href="../mockup.html" data-target="mockup" data-doc="mug">Mug Mockup</a></li>\n' +
-'                            <li><a href="../mockup.html" data-target="mockup" data-doc="box">Packaging Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-shelf">Framed Poster Wall Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-wood-linen">Linen Framed Print Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="bag-paper-held">Packaging Mockup</a></li>\n' +
 '                        </ul>\n' +
 '                    </div>\n' +
 '                    <div>\n' +
@@ -367,7 +381,20 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
             schema.image = cover;
         }
 
-        const ogImage = cover || (POST_ORIGIN + "/assets/logo.png");
+        /* og-cover.png, not logo.png. The logo is 1219x1509, so every OG
+           consumer cropped it to its own 1.91:1 frame and a post with no
+           cover image shared as a mangled square. og-cover.png is the
+           site-wide 1200x630 card, which is what that frame expects.
+
+           The declared width/height pair goes with the FALLBACK only: its
+           dimensions are known, whereas a post's own cover is whatever the
+           author uploaded, and a wrong declared pair renders the card badly
+           where a missing one only costs a measuring round trip. That is the
+           same reasoning that stripped the pair from the logo.png pages. */
+        const ogImage = cover || (POST_ORIGIN + "/assets/og-cover.png");
+        const ogImageDims = cover ? "" :
+'    <meta property="og:image:width" content="1200">\n' +
+'    <meta property="og:image:height" content="630">\n';
         const fonts = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap";
 
         /* Indented to sit inside <article>, which is now one level deeper
@@ -393,6 +420,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '    <meta property="og:description" content="' + desc + '">\n' +
 '    <meta property="og:url" content="' + url + '">\n' +
 '    <meta property="og:image" content="' + ogImage + '">\n' +
+    ogImageDims +
 '    <meta property="article:published_time" content="' + (post.date || "") + '">\n' +
 '    <meta property="article:modified_time" content="' + (post.updated || post.date || "") + '">\n\n' +
 '    <meta name="twitter:card" content="summary_large_image">\n' +
@@ -413,6 +441,26 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n' +
 '    <link rel="stylesheet" media="print" onload="this.media=\'all\'" href="' + fonts + '">\n' +
 '    <noscript><link rel="stylesheet" href="' + fonts + '"></noscript>\n' +
+'    <link rel="icon" type="image/svg+xml" href="../assets/logo-mark.svg">\n\n' +
+
+/* Installed-app head block. This is the same block every hand-written page
+   carries, with ../ paths because an exported post lands in blog/.
+
+   It is here for the reason MEGA_MENU is: a post exported from admin.html is
+   a real page of this site, and anything the other pages have in <head> that
+   it does not is drift that only shows up months later on one URL. A post
+   opened as the app's entry point without a manifest link is not installable
+   from there, and on iOS shows a screenshot of the page instead of the mark.
+
+   Reference: docs/implementation/PWA_INSTALLABLE_APP.md */
+'    <link rel="manifest" href="../manifest.webmanifest">\n' +
+'    <link rel="apple-touch-icon" href="../assets/icon-180.png">\n' +
+'    <meta name="apple-mobile-web-app-title" content="TemplateBox">\n' +
+'    <meta name="mobile-web-app-capable" content="yes">\n' +
+'    <meta name="apple-mobile-web-app-capable" content="yes">\n' +
+'    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">\n' +
+'    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">\n\n' +
+
 '    <link rel="stylesheet" href="../css/style.css">\n' +
 '</head>\n' +
 '<body>\n\n' +
@@ -1394,36 +1442,130 @@ body + '\n' +
         { id: "business-receipt", title: "Itemized Business Receipt", category: "documents", doc: "business-receipt" },
         { id: "sales-receipt", title: "Sales and Cash Receipt Form", category: "documents", doc: "sales-receipt" },
         { id: "invoice", title: "Professional Invoice", category: "documents", doc: "invoice" },
+        { id: "logo-invoice", title: "Editable Invoice with Logo", category: "documents", doc: "logo-invoice" },
+        { id: "trade-receipt", title: "Trade Counter Receipt", category: "documents", doc: "trade-receipt" },
         { id: "warning-notice", title: "Employee Warning Notice", category: "documents", doc: "warning-notice" },
-        { id: "executive-resume", title: "Executive Resume", category: "resumes", doc: null },
-        { id: "modern-professional-cv", title: "Modern Professional CV", category: "resumes", doc: null },
-        { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: null },
+        { id: "grey-rail", title: "Modern Professional CV", category: "resumes", doc: "grey-rail" },
+        { id: "minimalist-ats-resume", title: "Minimalist ATS Resume", category: "resumes", doc: "minimalist-ats-resume" },
+        { id: "ruled-serif", title: "Ruled Serif CV", category: "resumes", doc: "ruled-serif" },
+        { id: "photo-rail", title: "Photo Profile CV", category: "resumes", doc: "photo-rail" },
+        { id: "label-rail", title: "Labelled Sections CV", category: "resumes", doc: "label-rail" },
+        { id: "boxed-biodata", title: "Boxed Headings Biodata CV", category: "resumes", doc: "boxed-biodata" },
+        { id: "peach-portrait", title: "Peach Portrait CV", category: "resumes", doc: "peach-portrait" },
         /* These three carried a `framed: true` flag until August 23, 2026,
            when the wood-a4 hover composite was removed at the owner's
            request. They are ordinary photo cards now: two thumbnails, the
            second optional, exactly like every other entry here. */
-        { id: "framed-photo-poster", title: "Framed Photo Poster", category: "canvas", doc: null },
-        { id: "matte-wood-canvas", title: "Matte Wood Canvas", category: "canvas", doc: null },
-        { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: null },
-        { id: "tshirt", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt" },
-        { id: "hoodie", title: "Hoodie Mockup", category: "mockups", doc: "hoodie" },
-        { id: "mug", title: "Mug Mockup", category: "mockups", doc: "mug" },
-        { id: "box", title: "Packaging Mockup", category: "mockups", doc: "box" },
+        { id: "framed-photo-poster", title: "Framed Photo Poster", category: "canvas", doc: "framed-photo-poster" },
+        { id: "matte-wood-canvas", title: "Matte Wood Canvas", category: "canvas", doc: "matte-wood-canvas" },
+        { id: "polished-gold-frame", title: "Polished Gold Frame", category: "canvas", doc: "polished-gold-frame" },
+        /* Every canvas entry names a poster STYLE rather than a document
+           variant, because the poster editor's preset selects a style.
+
+           These three carried `doc: null` until September 10, 2026, which meant
+           they opened the editor on whatever it last held. That was survivable
+           while the poster editor had four near-identical frames and the
+           difference between them was one control away. It stopped being
+           survivable when three of the ten styles became whole LAYOUTS: a card
+           titled "Framed Photo Poster", showing a photograph in a black frame,
+           would open a search-results screen because that is what the visitor
+           happened to build last. Reported as exactly that.
+
+           Their ids are not FRAME_STYLES keys the way `hearts` is -- they name
+           a catalog entry and, for the first, a thumbnail file on disk.
+           js/poster.js maps them; see PRESET_ALIASES there and the note on why
+           the id did not move instead. */
+        { id: "hearts", title: "Queen and King of Hearts", category: "canvas", doc: "hearts" },
+        { id: "spades", title: "King and Queen of Spades", category: "canvas", doc: "spades" },
+        { id: "diamonds", title: "Queen and King of Diamonds", category: "canvas", doc: "diamonds" },
+        { id: "clubs", title: "King and Queen of Clubs", category: "canvas", doc: "clubs" },
+        { id: "split", title: "Queen and King, Two Photos", category: "canvas", doc: "split" },
+        { id: "split-spades", title: "King and Queen of Spades, Two Photos", category: "canvas", doc: "split-spades" },
+        { id: "split-diamonds", title: "Queen and King of Diamonds, Two Photos", category: "canvas", doc: "split-diamonds" },
+        { id: "split-clubs", title: "King and Queen of Clubs, Two Photos", category: "canvas", doc: "split-clubs" },
+        { id: "browser", title: "Search Screen, Six Photos", category: "canvas", doc: "browser" },
+        { id: "player", title: "Now Playing, Music Poster", category: "canvas", doc: "player" },
+        { id: "anniversary", title: "Anniversary Calendar, Photo Heart", category: "canvas", doc: "anniversary" },
+        { id: "birthday", title: "Birthday Calendar, Photo Cascade", category: "canvas", doc: "birthday" },
+        { id: "tribute", title: "Birthday Tribute, Photo Wall", category: "canvas", doc: "tribute" },
+        { id: "love", title: "Love Story Calendar, Photo Cascade", category: "canvas", doc: "love" },
+        { id: "couple", title: "Anniversary Definition, Nine Photos", category: "canvas", doc: "couple" },
+        { id: "tune", title: "Song Poster, Photo Heart", category: "canvas", doc: "tune" },
+        {
+            id: "tshirt-hanger-white", title: "T-Shirt Mockup", category: "mockups", doc: "tshirt-hanger-white",
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-hanger-white"
+        },
+        {
+            id: "hoodie-hanger-white", title: "Hoodie Mockup", category: "mockups", doc: "hoodie-hanger-white",
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-hanger-white"
+        },
+        {
+            id: "frame-black-shelf", title: "Framed Poster Wall Mockup", category: "mockups", doc: "frame-black-shelf",
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-shelf"
+        },
+        {
+            id: "frame-wood-linen", title: "Linen Framed Print Mockup", category: "mockups", doc: "frame-wood-linen",
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-wood-linen"
+        },
+        {
+            id: "bag-paper-held", title: "Packaging Mockup", category: "mockups", doc: "bag-paper-held",
+            folder: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-held"
+        },
         {
             id: "wood-a4", title: "Leaning Wood Frame Poster Mockup", category: "mockups", doc: "wood-a4",
-            folder: "assets/thumbnails/product-mockups/print/posters-and-frames"
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames/wood-a4"
         },
         {
             id: "tshirt-model-white", title: "White T-Shirt on Model Mockup", category: "mockups", doc: "tshirt-model-white",
-            folder: "assets/thumbnails/product-mockups/apparel/t-shirts"
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white"
         },
         {
             id: "cap-model-white", title: "White Baseball Cap Mockup", category: "mockups", doc: "cap-model-white",
-            folder: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps"
+            folder: "assets/thumbnails/product-mockups/apparel/hats/baseball-caps/cap-model-white"
         },
         {
             id: "bag-paper-white", title: "White Paper Bag Mockup", category: "mockups", doc: "bag-paper-white",
-            folder: "assets/thumbnails/product-mockups/packaging/bags"
+            folder: "assets/thumbnails/product-mockups/packaging/bags/bag-paper-white"
+        },
+        {
+            id: "card-white-walnut", title: "Business Card Mockup", category: "mockups", doc: "card-white-walnut",
+            folder: "assets/thumbnails/product-mockups/print/business-cards/card-white-walnut"
+        },
+        {
+            id: "card-white-duotone", title: "Duotone Business Card Mockup", category: "mockups", doc: "card-white-duotone",
+            folder: "assets/thumbnails/product-mockups/print/business-cards/card-white-duotone"
+        },
+        {
+            id: "banner-rollup-white", title: "Roll-Up Banner Mockup", category: "mockups", doc: "banner-rollup-white",
+            folder: "assets/thumbnails/product-mockups/print/signage/banner-rollup-white"
+        },
+        {
+            id: "banner-rollup-angled", title: "Angled Roll-Up Banner Mockup", category: "mockups", doc: "banner-rollup-angled",
+            folder: "assets/thumbnails/product-mockups/print/signage/banner-rollup-angled"
+        },
+        {
+            id: "hoodie-model-white", title: "White Hoodie Mockup", category: "mockups", doc: "hoodie-model-white",
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white"
+        },
+        {
+            id: "frame-black-interior", title: "Interior Framed Poster Mockup", category: "mockups", doc: "frame-black-interior",
+            folder: "assets/thumbnails/product-mockups/print/posters-and-frames/frame-black-interior"
+        },
+        {
+            id: "bucket-hat-white", title: "White Bucket Hat Mockup", category: "mockups", doc: "bucket-hat-white",
+            folder: "assets/thumbnails/product-mockups/apparel/hats/bucket-hats/bucket-hat-white"
+        },
+        {
+            id: "tshirt-cap-clay", title: "T-Shirt and Cap Mockup", category: "mockups", doc: "tshirt-cap-clay",
+            folder: "assets/thumbnails/product-mockups/apparel/sets/tshirt-cap-clay"
+        },
+        {
+            id: "tshirt-model-white-back", title: "White T-Shirt Back Mockup", category: "mockups", doc: "tshirt-model-white-back",
+            folder: "assets/thumbnails/product-mockups/apparel/t-shirts/tshirt-model-white-back"
+        },
+        {
+            id: "hoodie-model-white-back", title: "White Hoodie Back Mockup", category: "mockups", doc: "hoodie-model-white-back",
+            folder: "assets/thumbnails/product-mockups/apparel/hoodies/hoodie-model-white-back"
         }
     ];
 

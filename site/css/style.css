@@ -16,6 +16,79 @@
    square corners. No gradients, no drop shadows anywhere.
    ========================================================================== */
 
+/* ==========================================================================
+   HOW THIS FILE IS ORGANISED
+   ==========================================================================
+
+   One stylesheet serves all 26 public pages. That is deliberate, not
+   legacy: the site has no build step (netlify.toml runs an empty build
+   command), the shared surface below -- tokens, header, buttons, forms, the
+   ad rails, print, dark mode -- is the majority of this file, and splitting
+   it per page would mean either duplicating those rules or serving several
+   blocking requests per page on a multi-page flow. It compresses to roughly
+   51 KB and is cached once for the whole session.
+
+   ONE exception: css/admin.css, loaded only by admin.html and
+   tools/og-image.html. Those are private operator tools, so their chrome
+   has no reason to ship to visitors. Nothing else may be split out on the
+   same reasoning without re-reading docs/implementation/STYLESHEET_STRUCTURE.md.
+
+   NAVIGATING: every section below opens with a banner carrying a bracketed
+   tag. Search for the tag -- [S09] -- to jump straight to it. Tags are used
+   instead of line numbers on purpose: line numbers rot on the first edit
+   and then actively mislead, and a tag survives any amount of insertion.
+
+   TWO CONVENTIONS THAT ARE LOAD-BEARING, not style preferences:
+
+   1. When two page families need the same component, they share ONE
+      selector list -- `.editor-rail, .home-rail, .content-rail { ... }` --
+      never two similar blocks. Two blocks drift the first time either is
+      touched, and the drift is silent. Copying a rule to "keep the pages
+      independent" is the specific mistake this rule exists to prevent.
+
+   2. Retiring a component deletes the rules sized for it, in the same
+      change. A live rule for a dead element has twice caused measurable
+      bugs here -- a reservation for a retired ad unit that went on holding
+      116px under a 50px bar, and a button row that outlived its buttons.
+
+   Media queries carry NO specificity. A rule written inside one does not
+   beat an equally specific rule outside it -- only declaration order
+   decides. Several places in this file depend on that; they say so.
+
+   ==========================================================================
+   CONTENTS
+   ==========================================================================
+
+   [S01]  DESIGN TOKENS AND THEME
+   [S02]  RESET AND BASE ELEMENTS
+   [S03]  SITE SHELL: HEADER, NAV, MEGA-MENU, SEARCH
+   [S04]  PAGE HEADINGS AND THE CONTINUE STRIP
+   [S05]  HOMEPAGE CATALOG FEED
+   [S06]  BUTTONS
+   [S07]  LOADING INTERSTITIAL
+   [S08]  EDITORS: SHARED SHELL
+   [S09]  ADVERTISING: RAILS, ANCHORS AND RESERVATIONS
+   [S10]  EDITORS: PANES AND FORM NAVIGATION
+   [S11]  EDITOR TOOLBARS AND THE DOWNLOAD PANEL
+   [S12]  FORM CONTROLS
+   [S13]  RESUME EDITOR
+   [S14]  BUSINESS DOCUMENT EDITOR
+   [S15]  POSTER EDITOR
+   [S16]  MOCKUP EDITOR
+   [S17]  GUIDES STRIP AND SEARCH PAGE
+   [S18]  CONTENT PAGES: LANDING, STATIC, BLOG, POST
+   [S19]  RESPONSIVE RULES
+   [S20]  PRINT
+
+   ========================================================================== */
+
+/* ==========================================================================
+   [S01]  DESIGN TOKENS AND THEME
+   ==========================================================================
+   The --l-* / --d-* source pairs, the --color-* aliases every rule reads,
+   spacing and motion tokens, dark mode, reduced motion.
+   ========================================================================== */
+
 :root {
     /* ----------------------------------------------------------------------
        Source palettes. Each colour is written ONCE here, in an --l-* (light)
@@ -225,6 +298,13 @@
     }
 }
 
+/* ==========================================================================
+   [S02]  RESET AND BASE ELEMENTS
+   ==========================================================================
+   Box sizing, html/body, headings, links, images, focus treatment,
+   .sr-only, the skip link.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Reset and base
    -------------------------------------------------------------------------- */
@@ -328,6 +408,14 @@ button {
     left: var(--space-xs);
     top: var(--space-xs);
 }
+
+/* ==========================================================================
+   [S03]  SITE SHELL: HEADER, NAV, MEGA-MENU, SEARCH
+   ==========================================================================
+   The sticky .site-header shared by every page: wordmark, nav links,
+   hamburger and search toggles, theme toggle, header search field, the
+   More mega-menu.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Layout shell
@@ -864,7 +952,13 @@ button {
    panel cannot be clamped at all. */
 .nav-more-panel {
     position: absolute;
-    top: calc(100% + 0.75rem);
+    /* One token, used by BOTH `top` and `max-height` below. The panel hangs
+       this far under the header, so this is exactly the room it loses -- and
+       a gap changed in one place without the other would leave the height
+       silently wrong. The narrow rule sets it to 0px because it uses
+       top: 100%. */
+    --nav-more-gap: 0.75rem;
+    top: calc(100% + var(--nav-more-gap));
     right: var(--space-lg);
     z-index: 30;
     display: grid;
@@ -875,6 +969,54 @@ button {
     padding: var(--space-lg) var(--space-xl);
     width: 52rem;
     max-width: calc(100% - 2 * var(--space-lg));
+
+    /* ----------------------------------------------------------------------
+       The panel scrolls rather than running off the bottom of the screen.
+
+       Without this it simply overflowed: measured on about.html at 1440x900,
+       1121px of panel hanging from y=96 in a 900px viewport, its foot 317px
+       past the bottom edge. And it could not be scrolled to. `.site-header`
+       is sticky, the panel is absolute against it, so scrolling the PAGE
+       moves the document underneath a panel that stays exactly where it is --
+       measured: panel top unchanged at 96 after scrolling 600px.
+
+       What that stranded was `.nav-more-social`, which since the footer was
+       folded into this menu on August 13, 2026 is the ONLY route to the
+       social links anywhere on the site.
+
+       --header-h is the header's real rendered height, republished by
+       initHeaderHeight() in js/app.js through a ResizeObserver, so this
+       tracks the header growing a second row instead of assuming it cannot.
+       The 5.25rem fallback matches the other consumers of that property.
+
+       --anchor-h is set ONLY by body.has-site-anchor / body.has-ad-anchor, on
+       the same rules that reserve the page's bottom padding for a mounted
+       anchor, so the allowance cannot drift from the reservation -- it is the
+       same declaration. It falls back to 0px where no anchor is mounted.
+
+       SUBTRACTING THE ANCHOR IS THE ONLY REMEDY, NOT A PREFERENCE. The panel
+       cannot be lifted above the anchor by any z-index: `.site-header` is
+       `position: sticky; z-index: 20`, which makes it a stacking context, so
+       every z-index inside it is resolved against siblings within the header
+       and the whole header sits below the anchor's 30. Measured directly --
+       with the panel forced over a stand-in anchor, the anchor painted on top
+       at z-index 30, 40 AND 999.
+
+       Two declarations on purpose: dvh is what makes this correct while a
+       phone's URL bar is showing, and the vh line above it is the fallback
+       for anything that does not understand dvh. The rule this replaced used
+       a flat 75vh for exactly that slack; an exact vh-only calc would have
+       removed it and made the panel taller than the visible area.
+       ---------------------------------------------------------------------- */
+    max-height: calc(100vh - var(--header-h, 5.25rem) - var(--nav-more-gap)
+        - var(--space-lg) - var(--anchor-h, 0px));
+    max-height: calc(100dvh - var(--header-h, 5.25rem) - var(--nav-more-gap)
+        - var(--space-lg) - var(--anchor-h, 0px));
+    overflow-y: auto;
+    /* The panel is a scroller inside a page that also scrolls. Without this,
+       reaching the end of the panel hands the wheel to the document and the
+       page lurches behind an open menu. */
+    overscroll-behavior: contain;
 }
 
 .nav-more-panel[hidden] {
@@ -914,6 +1056,115 @@ button {
 .nav-more-panel a:focus-visible {
     color: var(--color-brand-ink);
     text-decoration: underline;
+}
+
+/* Backup and restore in the editor bar, for the two editors that carry no
+   mega-menu panel (resume.html and docs.html). Built by js/app.js, which
+   mounts it ONLY where there is no panel, so no page shows both.
+
+   It sits beside the save cloud because that is where the page already talks
+   about persistence. Inline rather than a block, and the status message is
+   allowed to disappear entirely rather than reserving a line: the editor bar
+   is a single row that has to survive 320px, where .site-nav already wraps,
+   and a permanently reserved line would push the row taller on every editor
+   for a message that is shown for a few seconds a month. */
+.editor-backup {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+.editor-backup-row {
+    display: inline-flex;
+    gap: var(--space-xs);
+}
+.editor-backup .btn {
+    /* Matches the other editor-bar controls rather than the page's default
+       button size, which would make these the largest thing in the row. */
+    padding: 0.375rem 0.6875rem;
+    font-size: 0.8125rem;
+}
+.editor-backup-status {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    max-width: 16rem;
+}
+.editor-backup-status.is-warn {
+    color: var(--color-warn);
+}
+/* Below 48rem the editor bar is already tight. Measured at 320px: with both
+   buttons and the status line the bar wraps and grows from 46px to 96px,
+   taking 50px off a form that has little to spare. The status still reaches a
+   screen reader through role="status", and Restore is still one tap away on
+   the homepage -- which is where a visitor restoring onto a new phone arrives
+   anyway, since they have nothing to open an editor with yet. */
+/* Gone entirely on phones, not trimmed down.
+
+   Measured on resume.html at 320px, where .site-header is STICKY and so every
+   pixel it takes is taken for the whole session:
+
+     both buttons   186px header   (+101 over HEAD's 85)
+     one button     126px header   (+41)
+     none            85px header   (unchanged)
+
+   The editor bar already wraps at that width, so any button added lands on a
+   row of its own. Forty-one permanent pixels off a 720px phone is a poor
+   trade for a control used a few times a year, and it is the same trade that
+   was refused one step earlier when the pair became one -- refusing it once
+   and accepting it the second time would only mean stopping halfway.
+
+   Nothing is lost that is not one tap away: the homepage continuation strip
+   carries "Back up my work" and appears exactly when there is work to lose,
+   and the homepage is also where a visitor restoring onto a new phone arrives,
+   since they have nothing to open an editor with yet.
+
+   Hidden at the wrapper rather than per control, so a button added to this
+   row later inherits the decision instead of quietly reopening it. */
+@media (max-width: 48rem) {
+    .editor-backup {
+        display: none;
+    }
+}
+
+/* Backup and restore controls, appended to the panel by js/app.js.
+
+   Full width under the columns, for the same reason the social row is: two
+   buttons and a status line in a 9rem column would wrap to three lines each
+   and stretch the other five columns through the grid's own minmax.
+
+   It is the FIRST child of the panel, and that is a reachability fix rather
+   than emphasis: the panel is over 1200px tall at 1440x900 with no
+   max-height and no internal scroll, and the sticky header pins it, so
+   anything appended sits below the fold where no amount of scrolling reaches
+   it. See buildBackupControls() in js/app.js for the measurements. The rule
+   therefore divides DOWNWARD, unlike .nav-more-social which divides upward.
+
+   The controls themselves are built in JavaScript rather than shipped in
+   markup -- they are buttons, so there is nothing for a crawler to follow,
+   and the panel's real-anchors rule is about links. */
+.nav-more-tools {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-md);
+}
+.nav-more-tools-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+.nav-more-tools-status {
+    margin: var(--space-xs) 0 0;
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    /* Reserved whether or not there is a message, so the panel does not jump
+       by a line the first time one appears -- the panel is anchored to the
+       header and a height change moves nothing else, but the buttons under
+       the pointer would shift out from under it. */
+    min-height: 1.2em;
+}
+.nav-more-tools-status.is-warn {
+    color: var(--color-warn);
 }
 
 /* Social row, the one part of the old footer that was not a link column.
@@ -971,6 +1222,11 @@ button {
            without hardcoding a header height. The header carries
            flex-wrap:wrap and grows a second row on narrow screens, so any
            fixed pixel offset would drift the moment it wrapped. */
+        /* No gap here: this variant sits flush under the header with
+           top: 100%, so it loses nothing to an offset. The base rule's
+           max-height reads this same token, which is why it does not need a
+           second formula of its own -- it used to carry a flat 75vh. */
+        --nav-more-gap: 0px;
         top: 100%;
         left: 0;
         right: 0;
@@ -981,13 +1237,22 @@ button {
         padding: var(--space-lg);
         border-left: 0;
         border-right: 0;
-        /* Long enough to run past a short phone viewport, so it scrolls
-           internally rather than off the end of the document. */
-        max-height: 75vh;
         overflow-y: auto;
-        /* Above the fixed ad anchor (z-index 30), or the foot of the panel
-           would sit behind the banner on a phone. */
-        z-index: 40;
+
+        /* THE z-index: 40 THAT USED TO BE HERE WAS INERT, AND ITS COMMENT WAS
+           WRONG. It claimed to put the panel "above the fixed ad anchor
+           (z-index 30)". It cannot. `.site-header` is `position: sticky;
+           z-index: 20` and therefore a stacking context, so a z-index on a
+           descendant is resolved among the header's own children and the
+           whole header paints below the anchor regardless. Measured with the
+           panel forced over a stand-in anchor: the anchor won at 30, at 40
+           and at 999, at 1440px and at 375px alike.
+
+           The foot of the panel is kept off the anchor by subtracting
+           --anchor-h in the base rule's max-height instead, which is the only
+           thing that actually works. Removed rather than corrected in place,
+           because a declaration that does nothing while claiming to is worse
+           than no declaration: the next person reads it as handled. */
     }
 
     .nav-more-social {
@@ -1133,6 +1398,13 @@ main {
     fill: currentColor;
 }
 
+/* ==========================================================================
+   [S04]  PAGE HEADINGS AND THE CONTINUE STRIP
+   ==========================================================================
+   Section headings used across page families, and the
+   continue-where-you-left-off band.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Hero and section headings
    -------------------------------------------------------------------------- */
@@ -1248,6 +1520,14 @@ main {
     gap: var(--space-xs);
     flex-wrap: wrap;
 }
+
+/* ==========================================================================
+   [S05]  HOMEPAGE CATALOG FEED
+   ==========================================================================
+   index.html only: the category tabs, hide-on-scroll, the CSS Grid card
+   ladder, the CSS document miniatures, card titles as links, hover zoom
+   and hover previews.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Homepage: a feed, not a landing page.
@@ -1781,6 +2061,8 @@ body.is-nav-hidden .site-header:focus-within {
 .mock-doc.accent-navy { --mk-accent: #1F4E79; }
 .mock-doc.accent-forest { --mk-accent: #2E5E4E; }
 .mock-doc.accent-brand { --mk-accent: #8A5A2B; }
+.mock-doc.accent-green { --mk-accent: #327B3C; }
+.mock-doc.accent-graphite { --mk-accent: #4A4A4A; }
 
 /* Resume miniature */
 
@@ -1828,6 +2110,311 @@ body.is-nav-hidden .site-header:focus-within {
 .mk-p {
     font-size: 0.3125rem;
     color: var(--color-muted);
+}
+
+/* Peach Portrait CV miniature. A charcoal banner, a round portrait and blush
+   bands across two columns -- the three things that identify the design at
+   card size. Everything else is the shared .mk- set. */
+
+.mock-doc.portrait {
+    background-color: #F9EEEA;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.portrait .mk-banner {
+    background-color: #322E2F;
+    padding: 0.1875rem 0.25rem 0.1875rem 45%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.0625rem;
+}
+
+.mock-doc.portrait .mk-banner-name {
+    font-size: 0.4375rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #C79B80;
+    text-transform: uppercase;
+}
+
+.mock-doc.portrait .mk-banner-role {
+    font-size: 0.25rem;
+    letter-spacing: 0.12em;
+    color: #FFFFFF;
+    text-transform: uppercase;
+}
+
+.mock-doc.portrait .mk-cols {
+    display: grid;
+    grid-template-columns: 43% 57%;
+    gap: 0.1875rem;
+    padding: 0.125rem 0.25rem 0.25rem;
+}
+
+/* The one hairline that separates the columns in the template itself. */
+.mock-doc.portrait .mk-main {
+    border-left: 1px solid #C9BDB7;
+    padding-left: 0.1875rem;
+}
+
+/* Pulled up so it straddles the banner, as the portrait does on the sheet. */
+.mock-doc.portrait .mk-round {
+    width: 62%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: #D8C3B4;
+    border: 2px solid #F9EEEA;
+    margin: -2.25rem auto 0.1875rem;
+}
+
+.mock-doc.portrait .mk-band {
+    background-color: #F3D8C5;
+    font-size: 0.25rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.0625rem 0.125rem;
+    margin: 0.1875rem 0 0.0625rem;
+    color: #2B2B2B;
+}
+
+/* Boxed Headings Biodata CV miniature. A centred banner, section labels
+   knocked out of a filled chip with the rule carrying on from it, and a ruled
+   marks table. The chip needs the label in a <span> so the flex row can size
+   it to the text and let the ::after rule take the remaining width -- the same
+   assembly the template itself draws, where the heading box hugs its label and
+   the rule runs on from the box's right edge. */
+
+.mock-doc.biodata .mk-name {
+    font-family: var(--font-sans);
+    text-align: center;
+    letter-spacing: 0.1em;
+    font-size: 0.5625rem;
+    border-bottom: 1px solid var(--mk-accent);
+    padding-bottom: 0.125rem;
+    margin-bottom: 0.125rem;
+}
+
+.mock-doc.biodata .mk-h {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    border-bottom: 0;
+    padding: 0;
+    margin-top: 0.1875rem;
+}
+
+.mock-doc.biodata .mk-h > span {
+    background-color: var(--mk-accent);
+    color: #FFFFFF;
+    padding: 0.0625rem 0.1875rem;
+}
+
+.mock-doc.biodata .mk-h::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-color: var(--mk-accent);
+}
+
+/* The education table. A grid rather than a real <table>: the miniature is
+   decoration with aria-hidden on its container, so it owes nothing to the
+   semantics and a grid collapses the borders without markup for them. */
+.mock-doc.biodata .mk-grid {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1.2fr 1fr;
+    gap: 1px;
+    background-color: var(--color-border-strong);
+    border: 1px solid var(--color-border-strong);
+    margin-top: 0.125rem;
+}
+
+.mock-doc.biodata .mk-grid > span {
+    background-color: #FFFFFF;
+    font-size: 0.25rem;
+    padding: 0.0625rem 0.125rem;
+    color: var(--color-muted);
+}
+
+.mock-doc.biodata .mk-grid > span:nth-child(-n + 4) {
+    background-color: #DCE4F0;
+    font-weight: 600;
+    color: #1A1A1A;
+}
+
+/* Ruled Serif CV miniature. Centred serif headings sandwiched between two
+   full-width rules ARE the visual signature of that template, so the default
+   miniature -- left-aligned headings on a single accent underline -- would
+   depict a different document on its card. Only the rules, the centring and
+   the two-up skills grid are added here; every other .mk- class is shared, so
+   the two resume miniatures cannot drift apart in anything else. */
+
+.mock-doc.ruled .mk-name,
+.mock-doc.ruled .mk-contact {
+    text-align: center;
+}
+
+.mock-doc.ruled .mk-name {
+    border-top: 1.5px solid var(--color-text);
+    padding-top: 0.1875rem;
+}
+
+.mock-doc.ruled .mk-h {
+    font-family: var(--font-serif);
+    font-size: 0.4375rem;
+    letter-spacing: 0.04em;
+    text-align: center;
+    /* The rules are ink, not accent: in the source artwork only the heading
+       TEXT is green and the rules stay black. */
+    border-top: 1.5px solid var(--color-text);
+    border-bottom: 1.5px solid var(--color-text);
+    padding: 0.0625rem 0;
+    margin-top: 0.125rem;
+}
+
+.mock-doc.ruled .mk-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 0.25rem;
+}
+
+/* Modern Professional CV miniature: the site's only TWO-COLUMN resume, whose
+   whole signature is a full-bleed rail down the right edge carrying the
+   contact details and skills in white. The container drops its own padding so
+   the rail can reach all four edges -- a rail inset from them would read as a
+   panel rather than as the edge of the sheet -- and each column carries its
+   own padding instead. */
+
+.mock-doc.railed {
+    flex-direction: row;
+    padding: 0;
+    gap: 0;
+}
+
+.mock-doc.railed .mk-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1875rem;
+    padding: 0.625rem 0.5rem;
+}
+
+/* 37.65% is the descriptor's own sidebar fraction (224 of 595), so the card
+   depicts the proportion the export actually produces. */
+.mock-doc.railed .mk-rail {
+    flex: 0 0 37.65%;
+    background-color: var(--mk-accent);
+    color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.625rem 0.375rem;
+}
+
+.mock-doc.railed .mk-rail-h {
+    font-size: 0.3125rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+    padding-bottom: 0.0625rem;
+    margin-top: 0.1875rem;
+}
+
+.mock-doc.railed .mk-rail-line {
+    font-size: 0.28125rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+/* The name stacks onto two lines in this design, one word per line. */
+.mock-doc.railed .mk-name {
+    line-height: 1.05;
+}
+
+/* Photo Profile CV miniature. The panel is on the LEFT and pale rather than
+   filled with the accent, because that is what distinguishes this design from
+   the two-column card above it -- and because the portrait block at the top of
+   the panel, the one thing no other card has, has to read against something.
+   Everything else is the shared .mk- set. */
+
+.mock-doc.photo {
+    flex-direction: row;
+    padding: 0;
+    gap: 0;
+}
+
+/* 35.5% is the descriptor's own sidebar fraction, so the card depicts the
+   proportion the export actually produces. */
+.mock-doc.photo .mk-panel {
+    flex: 0 0 35.5%;
+    /* The descriptor's own panel hex, not a theme token. The paper-surface
+       block above re-declares the LIGHT palette inside .mock-doc for exactly
+       eight variables, and --color-surface is not one of them -- using it
+       would paint a dark panel onto white paper in dark mode, which is the
+       defect that block exists to prevent. A fixed panel is a fixed hex in
+       the descriptor too, so there is nothing here for a theme to decide. */
+    background-color: #EEF1F6;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.375rem 0.3125rem;
+}
+
+/* 4:5, the ratio js/resume.js crops every upload to and the engine draws.
+   Drawn rather than photographed: the card must not promise a face the
+   visitor's own upload will replace. */
+.mock-doc.photo .mk-portrait {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    background-image: linear-gradient(150deg, var(--mk-accent) 0%, #7E8CA6 55%, #C6CEDB 100%);
+    margin-bottom: 0.1875rem;
+}
+
+.mock-doc.photo .mk-panel-h {
+    font-size: 0.28125rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mk-accent);
+    border-bottom: 1px solid var(--mk-accent);
+    padding-bottom: 0.0625rem;
+    margin-top: 0.1875rem;
+}
+
+.mock-doc.photo .mk-panel-line {
+    font-size: 0.25rem;
+    line-height: 1.5;
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+}
+
+.mock-doc.photo .mk-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.5rem 0.4375rem;
+}
+
+.mock-doc.photo .mk-name {
+    font-family: var(--font-sans);
+    font-size: 0.5rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-text);
+}
+
+/* The masthead bar, four segments, opening on the accent exactly as the
+   descriptor's `bar` block does. */
+.mock-doc.photo .mk-bar {
+    height: 0.09375rem;
+    margin: 0.125rem 0 0.0625rem;
+    background-image: linear-gradient(to right,
+        var(--mk-accent) 0 25%, #2F6FD0 25% 50%, #23B0C9 50% 75%, #7A4BC0 75% 100%);
 }
 
 /* Shared: document title, ruled label/value rows, spacer */
@@ -1929,6 +2516,83 @@ body.is-nav-hidden .site-header:focus-within {
     margin-top: 0.09375rem;
 }
 
+
+/* Ruled invoice miniature: a masthead with a logo mark, ruled reference
+   lines and a five-column grid, so the card reads as a printed form and
+   not as a second copy of the Professional Invoice card beside it. */
+.mock-doc.invoiced .mk-inv-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    margin-bottom: 0.125rem;
+}
+
+.mk-inv-title {
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    line-height: 1;
+    color: var(--color-text);
+}
+
+.mk-inv-mark {
+    display: block;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border: 1px solid var(--color-text);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.mk-grid {
+    display: grid;
+    grid-template-columns: 0.5fr 1fr 0.6fr 0.35fr 0.6fr;
+    font-size: 0.28125rem;
+    margin: 0.1875rem 0;
+}
+
+.mk-grid span {
+    border: 1px solid var(--color-border);
+    padding: 0.0625rem;
+    min-height: 0.4375rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mk-grid .mk-gh {
+    background-color: var(--color-bg);
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--color-muted);
+}
+
+.mk-inv-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+}
+
+.mk-inv-thanks {
+    font-size: 0.4375rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--color-text);
+}
+
+.mk-inv-box {
+    font-size: 0.3125rem;
+    font-weight: 700;
+    border: 1px solid var(--color-text);
+    background-color: var(--color-bg);
+    padding: 0.0625rem 0.1875rem;
+    white-space: nowrap;
+}
+
 /* Checkbox rows for the warning-notice miniature */
 
 .mk-check {
@@ -2020,6 +2684,411 @@ body.is-nav-hidden .site-header:focus-within {
 .mock-doc.poster.gold .mk-plate { background-color: #E4DCC8; }
 .mock-doc.poster.gold .mk-plate::before { background-color: #B9A46C; }
 
+/* "Queen and King of Hearts" miniature. The three above it are frames, so
+   there the border IS the picture frame; this one is white paper with a ruled
+   photo panel, which is why the border goes and the plate carries the rule
+   instead. The panel percentages are the CARD.panel fractions from
+   js/poster.js, so the miniature and the poster it opens are the same layout.
+
+   The indices sit in the paper margin and overlap the panel vertically, as
+   they do on the poster, which is what the absolute positioning buys over
+   stacking them above and below it. The foot index is mirrored in y rather
+   than rotated, again matching drawCardIndex(): its markup order is letter
+   then pip, and scaleY(-1) is what puts the pip on top. */
+.mock-doc.poster[data-suit] {
+    display: block;
+    position: relative;
+    /* The one container query on the site, and it earns itself here: the
+       indices are a percentage of the poster's width in the artwork, and the
+       catalog card is not a fixed size. A rem value cannot serve this tile --
+       inside the two-column band alone the card runs from about 136px at 320px
+       wide to about 360px just under 48rem, so any single size is either
+       clipped by the panel at one end or a speck at the other. */
+    container-type: inline-size;
+    border: 0;
+    padding: 0;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster[data-suit] .mk-plate {
+    position: absolute;
+    left: 12.5%;
+    top: 7%;
+    width: 75%;
+    height: 86%;
+    border: 1px solid #000000;
+}
+
+/* The rank is 14 per cent of the page width in the artwork, so it is 14cqw
+   here. The rem value on the line above each cqw is the fallback a browser
+   without container queries keeps: it is the size that suits the widest card,
+   which is the one most likely to be a laptop.
+
+   The pip is 9.3 per cent of the page WIDE, and a heart glyph renders at about
+   0.85em, so the em size that produces that width is 11cqw rather than 9.3. */
+.mk-index {
+    position: absolute;
+    font-family: var(--font-serif);
+    font-size: 2.375rem;
+    font-size: 14cqw;
+    font-weight: 700;
+    line-height: 1;
+    color: #000000;
+}
+
+.mk-index::after {
+    content: "\2665";
+    display: block;
+    margin-top: 0.05em;
+    font-size: 1.625rem;
+    font-size: 11cqw;
+    line-height: 1;
+    color: #BE1E2D;
+}
+
+/* Each further suit is the same tile with a different pip. Keyed on the same
+   data-suit attribute the layout rules use, so a fifth would be three lines
+   here and nowhere else, and an attribute selector plus two classes outranks
+   the rule above -- source order is not what is carrying this.
+
+   The glyphs are the Unicode suits rather than the renderer's own paths: at a
+   tile this size the difference is invisible, and a CSS pseudo-element cannot
+   hold a path anyway. */
+.mock-doc.poster[data-suit="spades"] .mk-index::after {
+    content: "\2660";
+    color: #000000;
+}
+
+.mock-doc.poster[data-suit="clubs"] .mk-index::after {
+    content: "\2663";
+    color: #000000;
+}
+
+.mock-doc.poster[data-suit="diamonds"] .mk-index::after {
+    content: "\2666";
+    color: #BE1E2D;
+}
+
+/* The split layout's tile. The plate is the artwork's two flat colours rather
+   than the shared horizon-and-sun motif, so both of the plate's pseudo-elements
+   are taken over: ::before carries the motif and is dropped, ::after becomes
+   the lower region.
+
+   The polygon is the renderer's own seam -- 23.7 per cent down the left edge to
+   79.1 per cent down the right -- so the tile and the poster it opens are cut
+   on the same line. */
+.mock-doc.poster[data-layout="split"] .mk-plate {
+    background-color: #BE1E2D;
+}
+
+.mock-doc.poster[data-layout="split"] .mk-plate::before {
+    content: none;
+}
+
+/* Every one of these declarations is undoing the sun motif's own: it is a
+   22-per-cent-inset circle with an aspect-ratio and a radius, and this is a
+   full-bleed clipped polygon. `inset: 0` sets all four offsets, so do NOT
+   follow it with `right: auto` or `top: auto` -- that strips two of the four
+   anchors and, with width and height auto, collapses the element to nothing.
+   Which it did, and the tile showed as flat red. */
+.mock-doc.poster[data-layout="split"] .mk-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    aspect-ratio: auto;
+    border-radius: 0;
+    background-color: #00AEEF;
+    clip-path: polygon(0 23.7%, 100% 79.1%, 100% 100%, 0 100%);
+}
+
+/* The search-screen tile. Unlike the five above it this one carries no
+   data-suit, because the layout has no corner indices -- its pips are a row
+   along the foot, which is one element rather than two positioned ones.
+
+   Every percentage is the artwork's own fraction of the 595.28 x 841.89 page,
+   the same numbers SCREEN holds in js/poster.js, so the tile and the poster it
+   opens are the same composition. The masonry is a two-column grid whose row
+   sizes are the artwork's card heights in fr units: written that way the two
+   columns end level at the foot without either one being told where the foot
+   is, which is what the artwork does and what a list of six percentages would
+   have to be kept in step with by hand. */
+.mock-doc.poster[data-layout="browser"] {
+    display: block;
+    position: relative;
+    container-type: inline-size;
+    border: 0;
+    padding: 0;
+    background-color: #070807;
+}
+
+/* The wordmark, in the tile's own width like the card indices above: the
+   catalog card runs from about 136px to about 360px wide, so a rem value is
+   either clipped at one end or unreadable at the other. The rem on the line
+   above is the fallback for a browser without container queries, sized for the
+   widest card. */
+.mock-doc.poster[data-layout="browser"] .mk-wordmark {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3.4%;
+    text-align: center;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-size: 7cqw;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    color: #FFFFFF;
+}
+
+/* The account circle, at the artwork's own centre and radius. */
+.mock-doc.poster[data-layout="browser"] .mk-avatar {
+    position: absolute;
+    left: 79.03%;
+    top: 3.31%;
+    width: 6.55%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-bar {
+    position: absolute;
+    left: 14.63%;
+    top: 9.97%;
+    width: 70.99%;
+    height: 6.31%;
+    border-radius: 999px;
+    background-color: #4E5257;
+}
+
+/* The tab strip's hairline. The tab words themselves are not drawn: at this
+   size they are two pixels of grey mush, and the rule alone is what reads as a
+   results page rather than a photo album. */
+.mock-doc.poster[data-layout="browser"] .mk-rule {
+    position: absolute;
+    left: 11.25%;
+    top: 23.15%;
+    width: 77.57%;
+    height: 1px;
+    background-color: #FFFFFF;
+    opacity: 0.81;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-grid {
+    position: absolute;
+    left: 12.73%;
+    top: 24.34%;
+    width: 74.39%;
+    height: 62.71%;
+    display: grid;
+    grid-template-columns: 48.79% 48.79%;
+    gap: 0 2.43%;
+}
+
+/* One column each, so the two different row gaps stay separate the way the
+   artwork has them -- 23.35pt on the left against 23.02 on the right. */
+.mock-doc.poster[data-layout="browser"] .mk-col {
+    display: grid;
+    gap: 4.42%;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-col-left {
+    grid-template-rows: 216.04fr 144.5fr 120.74fr;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-col-right {
+    grid-template-rows: 157.06fr 157.06fr 167.4fr;
+}
+
+.mock-doc.poster[data-layout="browser"] .mk-col span {
+    display: block;
+    border-radius: 2px;
+    background-color: #FFFFFF;
+}
+
+/* The four pips. Unicode hearts rather than the renderer's traced path, on the
+   same argument as the suit tiles above: at this size the difference is
+   invisible and a pseudo-element cannot hold a path. The artwork's spacing is
+   deliberately uneven and this is not -- four hearts three millimetres apart on
+   a 100-pixel tile is a distinction with nothing on the other side of it. */
+.mock-doc.poster[data-layout="browser"] .mk-hearts {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 88.5%;
+    text-align: center;
+    font-size: 0.5rem;
+    font-size: 6cqw;
+    line-height: 1;
+    letter-spacing: 0.15em;
+    color: #E93625;
+}
+
+/* The music-player tile. Like the search screen's it carries data-layout and
+   no data-suit, because this layout has no pip and no corner index.
+
+   Percentages are the artwork's own fractions of its 597.45 x 841.89 page, so
+   the tile and the poster it opens are the same composition. The chevron and
+   the three dots are a pixel each at this size and are left out rather than
+   rendered as grit; everything else is here, including the scan-code strip,
+   which was left out of the first version and took a third of the tile's height
+   with it -- the poster is bottom-heavy without it and the tile looked
+   unfinished rather than minimal. */
+.mock-doc.poster[data-layout="player"] {
+    display: block;
+    position: relative;
+    container-type: inline-size;
+    border: 0;
+    padding: 0;
+    background-color: #231F20;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-album {
+    position: absolute;
+    left: 15.24%;
+    top: 4.85%;
+    width: 69.65%;
+    height: 50.24%;
+    border-radius: 2px;
+    background-color: #FFFFFF;
+}
+
+/* Two bars standing in for the title and the artist, at their own baselines
+   and weights: the title is the taller one. */
+.mock-doc.poster[data-layout="player"] .mk-song,
+.mock-doc.poster[data-layout="player"] .mk-artist {
+    position: absolute;
+    left: 15.73%;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-song {
+    top: 59.6%;
+    width: 38%;
+    height: 3.2%;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-artist {
+    top: 64.4%;
+    width: 24%;
+    height: 2%;
+    opacity: 0.75;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-heart {
+    position: absolute;
+    left: 78.7%;
+    top: 60.1%;
+    width: 6.7%;
+    height: 4.4%;
+    color: #55BA5D;
+    font-size: 0.5rem;
+    font-size: 6cqw;
+    line-height: 1;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-bar {
+    position: absolute;
+    left: 15.43%;
+    top: 69.8%;
+    width: 69.5%;
+    height: 0.6%;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.74);
+}
+
+/* The knob, at the artwork's own 25.6 per cent of the track rather than at the
+   times' 21.8: the tile has no times to follow. */
+.mock-doc.poster[data-layout="player"] .mk-bar::after {
+    content: "";
+    position: absolute;
+    left: 25.6%;
+    top: 50%;
+    width: 2.3%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: #FFFFFF;
+    transform: translate(-50%, -50%);
+}
+
+/* The transport row as five marks, the middle one the play disc. */
+.mock-doc.poster[data-layout="player"] .mk-transport {
+    position: absolute;
+    left: 15.4%;
+    top: 76.5%;
+    width: 69.6%;
+    height: 8.5%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-transport span {
+    width: 7%;
+    height: 30%;
+    border-radius: 1px;
+    background-color: #FFFFFF;
+}
+
+/* The play disc. aspect-ratio rather than a width, because `border-radius: 50%`
+   on a box that is not square is an ELLIPSE -- which is what the first version
+   drew, and it is obvious at a glance and invisible in any measurement. */
+.mock-doc.poster[data-layout="player"] .mk-transport span:nth-child(3) {
+    width: auto;
+    height: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+}
+
+/* The scan code, at the artwork's own box: a dark plate with a few bars
+   standing in for the pattern. Never the real thing -- the poster's code is
+   whatever the visitor uploads, and this repository ships none. */
+.mock-doc.poster[data-layout="player"] .mk-code {
+    position: absolute;
+    left: 11.48%;
+    top: 85.43%;
+    width: 77.13%;
+    height: 13.68%;
+    border-radius: 2px;
+    background-color: #0A0A0A;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 7%;
+}
+
+/* THIN bars with air between them, which is the only thing that reads as a
+   scannable code rather than a row of pills. The first version gave each bar
+   `flex: 1` and they came out a tenth of the strip wide apiece -- measurably
+   present, visibly wrong. */
+.mock-doc.poster[data-layout="player"] .mk-code span {
+    flex: 0 0 3.4%;
+    border-radius: 999px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(3n+1) { height: 62%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(3n+2) { height: 30%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(3n) { height: 84%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(4) { height: 45%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(7) { height: 72%; }
+.mock-doc.poster[data-layout="player"] .mk-code span:nth-child(10) { height: 38%; }
+
+.mk-index-head {
+    left: 2%;
+    top: 4%;
+}
+
+.mk-index-foot {
+    right: 2%;
+    bottom: 4%;
+    transform: scaleY(-1);
+}
+
 .mk-caption {
     font-family: var(--font-serif);
     font-size: 0.4375rem;
@@ -2056,100 +3125,25 @@ body.is-nav-hidden .site-header:focus-within {
     justify-content: center;
 }
 
-/* One silhouette for both garments: the hoodie is the tee outline plus a
-   hood opening and a pocket, exactly how js/mockup.js builds it on canvas.
-   Shared in a single rule so the two cannot drift apart. */
-.mk-shape.tee,
-.mk-shape.hoodie {
+/* The tee silhouette. This was shared with `.mk-shape.hoodie` -- one rule so
+   the two drawn garments could not drift apart -- until September 3, 2026,
+   when the drawn hoodie was replaced by a photograph and its half of the rule,
+   plus the hood and pocket pseudo-elements, went with it. Retiring a component
+   should delete the rules drawn for it. `.tee` is NOT dead with it:
+   tshirt-mockup-generator.html still uses this shape. */
+.mk-shape.tee {
     width: 78%;
     aspect-ratio: 1 / 1;
     background-color: #1A1A1A;
     clip-path: polygon(30% 8%, 40% 4%, 60% 4%, 70% 8%, 100% 22%, 90% 42%, 78% 36%, 78% 96%, 22% 96%, 22% 36%, 10% 42%, 0 22%);
 }
 
-/* Hood opening at the collar. Both pseudo-elements are clipped by the
-   silhouette above, which is what keeps them inside the garment. */
-.mk-shape.hoodie::before {
-    content: "";
-    position: absolute;
-    top: 4%;
-    left: 34%;
-    right: 34%;
-    height: 14%;
-    border-radius: 0 0 50% 50%;
-    background-color: rgba(255, 255, 255, 0.28);
-}
-
-/* Kangaroo pocket */
-.mk-shape.hoodie::after {
-    content: "";
-    position: absolute;
-    left: 30%;
-    right: 30%;
-    bottom: 10%;
-    height: 22%;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    border-bottom: 0;
-}
-
-.mk-shape.mug {
-    width: 58%;
-    aspect-ratio: 1 / 0.92;
-    background-color: #B5352E;
-    border-radius: 0.125rem 0.125rem 0.375rem 0.375rem;
-}
-
-/* Handle sweeps past 90 degrees each side so it tucks behind the body
-   edge rather than floating free, the same correction js/mockup.js makes */
-.mk-shape.mug::after {
-    content: "";
-    position: absolute;
-    right: -30%;
-    top: 18%;
-    width: 38%;
-    height: 52%;
-    border: 0.1875rem solid #B5352E;
-    border-left-color: transparent;
-    border-radius: 0 50% 50% 0;
-}
-
-.mk-shape.box {
-    width: 72%;
-    aspect-ratio: 1 / 0.78;
-    background-color: #C48A4A;
-    border: 1px solid #A87338;
-}
-
-.mk-shape.box::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background-color: #A87338;
-}
-
-/* The uploaded design, sitting on the product */
-.mk-art {
-    width: 42%;
-    aspect-ratio: 1;
-    background-color: var(--color-card);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-serif);
-    font-size: 0.5rem;
-    font-weight: 700;
-    color: #1A1A1A;
-    position: relative;
-    z-index: 1;
-}
-
-.mk-shape.mug .mk-art {
-    width: 46%;
-    margin-right: 8%;
-}
+/* `.mk-shape.mug`, its handle pseudo-element and its `.mk-art` inset stood
+   here until September 5, 2026, when the drawn mug became the photographic
+   `frame-black-shelf` and index.html's card -- their only user -- became a
+   photo card. `.mk-shape.box` went the same way on September 3 and
+   `.mk-shape.hoodie` the day before. `.mk-shape.tee` above is the last one
+   standing, and only because tshirt-mockup-generator.html still draws it. */
 
 .dot-row {
     display: flex;
@@ -2376,6 +3370,12 @@ body.is-nav-hidden .site-header:focus-within {
     }
 }
 
+/* ==========================================================================
+   [S06]  BUTTONS
+   ==========================================================================
+   The .btn family. 44px / 2.75rem minimum touch targets throughout.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Buttons (44px / 2.75rem minimum touch targets throughout)
    -------------------------------------------------------------------------- */
@@ -2399,6 +3399,15 @@ body.is-nav-hidden .site-header:focus-within {
     transition: background-color var(--motion-fast) var(--ease),
         border-color var(--motion-fast) var(--ease),
         color var(--motion-fast) var(--ease);
+}
+
+/* An author display declaration beats the UA sheet's [hidden] rule, so a
+   .btn toggled with element.hidden stays on screen and only the
+   accessibility tree agrees it is gone. Hit twice before, on admin.html's
+   catalog preview and on mockup.html's two panels; this closes it for every
+   button the site hides that way, starting with Remove Logo. */
+.btn[hidden] {
+    display: none !important;
 }
 
 /* Softened from the previous full black-to-white inversion, which was the
@@ -2425,6 +3434,23 @@ body.is-nav-hidden .site-header:focus-within {
     width: 100%;
     margin-top: 0.75rem;
 }
+
+/* Lived in the admin section until September 1, 2026, purely because
+   admin.html needed it first. It is applied by js/docs.js and js/resume.js
+   -- the sample-notice "Start blank" button -- so it could not follow the
+   admin rules into css/admin.css. */
+.btn-small {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    font-size: 0.8125rem;
+}
+
+/* ==========================================================================
+   [S07]  LOADING INTERSTITIAL
+   ==========================================================================
+   loading.html only: progress bar, numeric countdown, the two isolated
+   banner slots.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Loading page (loading.html)
@@ -2904,6 +3930,13 @@ body.is-nav-hidden .site-header:focus-within {
     overflow-x: auto;
 }
 
+/* ==========================================================================
+   [S08]  EDITORS: SHARED SHELL
+   ==========================================================================
+   The two-pane .editor-shell / .editor-layout grid shared by all four
+   editors.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Editor shell (shared by the resume and poster editors)
    -------------------------------------------------------------------------- */
@@ -2924,6 +3957,15 @@ body.is-nav-hidden .site-header:focus-within {
     min-width: 0;
 }
 
+/* ==========================================================================
+   [S09]  ADVERTISING: RAILS, ANCHORS AND RESERVATIONS
+   ==========================================================================
+   The fixed full-height rail shared by the editors, homepage and content
+   pages as ONE selector list; the site-wide foot anchor; the body padding
+   that reserves each. Read CLAUDE.md before changing a band gate: the
+   reservation and the mounted creative must move together.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Editor advertising
    Editors are the longest sessions on the site, so they carry a passive
@@ -2936,19 +3978,32 @@ body.is-nav-hidden .site-header:focus-within {
 /* The editor page's width with NO rail in play. These two tiers widened the
    page so the old in-flow rail was added beside the panes rather than taken
    out of them. The rail is out of flow now (see the Photopea-layout note
-   below), so what these describe is only the layout a visitor sees when the
-   zone is dormant, the script is blocked, or an ad blocker is running -- and
-   that layout is precisely the one that must not change. Left untouched for
-   that reason; the override once a rail does mount is further down. */
-@media (min-width: 84rem) {
-    main:has(.editor-shell) {
-        max-width: 84rem;
-    }
-}
+   below), so what these describe is the layout a visitor sees when the zone is
+   dormant, the script is blocked, or an ad blocker is running.
 
-@media (min-width: 93rem) {
+   ONE tier since August 30, 2026, at 100rem, replacing an 84rem/93rem ladder.
+   That reverses this block's own previous instruction to leave it alone: it
+   was left alone because the August 10 rail work must not have altered the
+   no-rail layout, which was a correct constraint for THAT change rather than a
+   permanent freeze.
+
+   Two reasons it moved. First, the rule below now lets the editors fill the
+   width beside a mounted rail, and had this stayed at 93rem then turning an ad
+   blocker ON would have made the workspace NARROWER than turning it off, which
+   is backwards; at 1920 the panes measure 764px here against 754px with a
+   rail, so the two agree to within ten pixels. Second, the ladder left the
+   editors capped by the site-wide `main { max-width: 72rem }` all the way up
+   to 1344px -- and that is a CONTENT-page cap, there to hold a line of prose
+   to a readable measure. An editor is a workspace, not an article. It produced
+   the same centred dead space the rail rule has just stopped producing, one
+   band lower: at a 1165px tablet the workspace sat in 1152px with the slack
+   split either side, and at 1343px it wasted 191px.
+
+   Gated at 72rem because that is where the base cap starts to bind; below it
+   the viewport decides the width and this rule would do nothing. */
+@media (min-width: 72rem) {
     main:has(.editor-shell) {
-        max-width: 93rem;
+        max-width: 100rem;
     }
 }
 
@@ -3218,9 +4273,42 @@ body.is-nav-hidden .site-header:focus-within {
    there -- the body padding is, and the panes absorb it. That is the
    accepted cost of the lower floor, not an oversight; a cap cannot give
    back width the viewport does not have. */
+/* REVISED August 30, 2026: the editors FILL the width beside the rail rather
+   than sitting in a 72.75rem column with the slack split either side.
+
+   Reported as dead space on the far left of laptop and desktop screens, and it
+   measured worse than it looked. At 1920 the old cap put a 1164px column in
+   the 1581px left of the rail and centred it, so the workspace carried 209px
+   of nothing on its left AND 232px on its right -- 441px, nearly a quarter of
+   the window, on a page that is a two-pane workspace rather than an article.
+
+   Two changes, and both are needed. `max-width: 100rem` is generous enough
+   that the viewport decides the width at every laptop and desktop size (it
+   only binds past about 2100px, where it holds the panes at roughly 764px
+   instead of letting them sprawl). `margin-left: 0` then puts the slack in ONE
+   place instead of two: the rail owns the right edge of the window, so the
+   workspace belongs against the left, and the freed width becomes a single
+   gutter before the column rather than a gap on each side.
+
+   Left-aligning is right HERE and would be wrong on the no-rail rule above,
+   which stays centred -- with no rail there is nothing owning the right edge
+   for the workspace to sit away from.
+
+   It also lands the panes where they belong: `main`'s 1.5rem padding matches
+   `.site-header`'s, so the form pane's left edge is now flush under the site
+   mark in the bar rather than 209px adrift of it.
+
+   What this gives up is the note this rule used to carry: 72.75rem was 93rem
+   minus the 324px three-slot column, chosen so no pane was narrower than the
+   pre-rail tiered layout (546px). That guarantee is kept and beaten -- panes
+   measure 754px at 1920 rather than 546px -- but the arithmetic tying the cap
+   to the rail width is gone, so a future change to --ad-rail-w no longer needs
+   a matching edit here. The body padding already reserves the column, which is
+   the only coupling that has to hold. */
 @media (min-width: 75rem) {
     body.has-ad-rail main:has(.editor-shell) {
-        max-width: 72.75rem;
+        max-width: 100rem;
+        margin-left: 0;
     }
 }
 
@@ -3329,12 +4417,14 @@ body.is-nav-hidden .site-header:focus-within {
    has to move with it; `${tag}: anchor reservation matches the mounted unit`
    in tests/verify-layout.js fails if they ever disagree. */
 body.has-site-anchor {
-    padding-bottom: 4.75rem;
+    --anchor-h: 4.75rem;
+    padding-bottom: var(--anchor-h);
 }
 
 @media (min-width: 48.0625rem) {
     body.has-site-anchor {
-        padding-bottom: 7.25rem;
+        --anchor-h: 7.25rem;
+        padding-bottom: var(--anchor-h);
     }
 }
 
@@ -3365,7 +4455,8 @@ body.has-site-anchor {
     /* Reserve the space the fixed anchor occupies. Without this the last of
        the page sits underneath it and cannot be scrolled clear. */
     body.has-ad-anchor {
-        padding-bottom: 4.75rem;
+        --anchor-h: 4.75rem;
+        padding-bottom: var(--anchor-h);
     }
 
     /* The export action is itself sticky at bottom:0, so it would otherwise
@@ -3398,28 +4489,38 @@ body.has-site-anchor {
    has-site-anchor note above for why that matters. */
 @media (min-width: 48.0625rem) and (max-width: 74.9375rem) {
     body.has-ad-anchor {
-        padding-bottom: 7.25rem;
+        --anchor-h: 7.25rem;
+        padding-bottom: var(--anchor-h);
     }
 
-    /* 8.25rem, not the 7.25rem the reservation uses, and the extra 1rem is
-       measured rather than padding-by-feel.
+    /* The lift matches the reservation exactly here, because in THIS part of
+       the tablet tier the preview pane is not sticky.
 
-       In this band -- and only in this band -- .preview-pane is
-       position: sticky (its rule starts at 48.0625rem), and with a sticky
-       pane the export bar's stuck position comes out a consistent 12px lower
-       than its `bottom` nominally asks for: at 1024x768 a `bottom: 116px`
-       bar sits with its foot at 664 where the arithmetic says 652, and the
-       same 12px appears at 769px and 1199px. Below 48.0625rem the pane is
-       not sticky and the offset lands exactly on its nominal value (measured
-       724 against 724 at 400x800), which is why the phone tier above needs
-       no such allowance and must not copy this one.
+       It used to be 8.25rem across the whole tier. That extra 1rem is a
+       measured allowance for stickiness: with a sticky pane the export bar's
+       stuck position comes out a consistent 12px lower than its `bottom`
+       nominally asks for -- at 1024x768 a `bottom: 116px` bar sits with its
+       foot at 664 where the arithmetic says 652 -- and at 7.25rem the bar
+       finished 11.4px INSIDE the 115.4px-tall anchor, which is z-index 30
+       against the bar's 5 and so painted over the export control.
 
-       At 7.25rem the bar therefore finished 11.4px INSIDE the 115.4px-tall
-       anchor on all four editors at every tablet width -- the anchor is
-       z-index 30 against the bar's 5, so it painted over the export control.
-       8.25rem clears it by 4.6px. `${tag}: export bar clears the anchor` in
-       tests/verify-layout.js is what stops this silently regressing if the
-       pane's stickiness or the anchor's height ever changes. */
+       The pane's sticky rule moved from 48.0625rem to 64rem on
+       August 30, 2026 when the split view did, so 48.0625-64rem is now a
+       NON-sticky band and the offset lands exactly on its nominal value, the
+       same as the phone tier above. Applying the sticky allowance here would
+       now lift the bar 16px clear of an anchor it no longer touches.
+       `${tag}: export bar clears the anchor` in tests/verify-layout.js is
+       what stops either half of this silently regressing. */
+    body.has-ad-anchor .preview-actions {
+        bottom: 7.25rem;
+    }
+}
+
+/* The sticky half of the tablet tier: same 728x90 anchor and the same 7.25rem
+   reservation, but the pane IS sticky from 64rem, so the export bar needs
+   the measured 1rem allowance described above. Splitting the tier in two is
+   what keeps the lift tracking the PANE rather than the anchor. */
+@media (min-width: 64rem) and (max-width: 74.9375rem) {
     body.has-ad-anchor .preview-actions {
         bottom: 8.25rem;
     }
@@ -3450,6 +4551,12 @@ body.has-site-anchor {
     margin-bottom: 1rem;
 }
 
+/* ==========================================================================
+   [S10]  EDITORS: PANES AND FORM NAVIGATION
+   ==========================================================================
+   The sticky live-preview pane and the form section jump list.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Sticky live preview (split view only)
 
@@ -3466,7 +4573,15 @@ body.has-site-anchor {
    fill the track and have nowhere to move.
    -------------------------------------------------------------------------- */
 
-@media (min-width: 48.0625rem) {
+/* Gated at 64rem since August 30, 2026, not 48.0625rem. Sticky only makes
+   sense once the preview sits BESIDE a scrolling form, and the split now
+   starts at 64rem rather than 48rem -- between the two the editor is a single
+   tabbed column, where a sticky pane would pin the document to the top of the
+   viewport while the form scrolled underneath it. The two boundaries are one
+   decision: move the split and this has to move with it, along with the export
+   bar's lift below, which carries an allowance that exists only because the
+   pane is sticky. */
+@media (min-width: 64rem) {
     .preview-pane {
         position: sticky;
         top: 5.75rem;
@@ -3476,6 +4591,54 @@ body.has-site-anchor {
            export bar inside it stick to the pane rather than the page. */
         max-height: calc(100vh - 7rem);
         overflow-y: auto;
+        /* Reserve the scrollbar's width whether or not one is showing.
+
+           Without this the pane is BISTABLE, and measurably so. The document
+           inside it is an SVG at `width: 100%; height: auto`, so its height is
+           locked to the pane's content width -- and `overflow-y: auto` makes
+           that width depend on whether a scrollbar is present. At an
+           ads-blocked 1200px the two states are a closed loop: content
+           measures 791 against a 788 cap, so a scrollbar appears; the 17px it
+           takes shrinks the sheet from 480.5 to 465.5 wide and therefore from
+           679.1 to 657.9 tall; content is now 770, the overflow is gone and
+           the scrollbar can go with it, which puts it back at 791.
+
+           Which of the two the browser settles in is a timing coin-flip, so
+           the same page measured 788 in one run and 771.5 in the next. That
+           surfaced as a flaky failure in section 4 of tests/verify-layout.js,
+           where the working tree and a byte-identical HEAD copy disagreed and
+           the two values SWAPPED between runs -- but the test was reporting
+           real instability, not inventing it. A visitor at that width gets a
+           document rendered 15px narrower on the losing toss.
+
+           Reserving the gutter unconditionally makes the content width a
+           constant, which breaks the loop at its only circular link. The
+           @supports block below covers the engines that do not have this
+           property. */
+        scrollbar-gutter: stable;
+    }
+}
+
+/* The same guarantee for engines without scrollbar-gutter -- Safari before
+   18.2, and anything older. `overflow-y: scroll` reserves the width in every
+   engine ever shipped, so the content width is constant there too and the loop
+   above cannot form.
+
+   Why not just use `overflow-y: scroll` everywhere and drop the property? On a
+   classic-scrollbar platform it paints a visible empty track even when nothing
+   overflows, which is exactly the sort of dead furniture this project strips
+   out elsewhere; `scrollbar-gutter: stable` reserves the same width and paints
+   nothing. So the pretty version leads and this is the floor beneath it.
+
+   Note this costs nothing on macOS and iOS. Their scrollbars are overlays that
+   never take layout width, so the circular dependency cannot exist there at
+   all, and `scroll` reserves nothing. The whole problem, and therefore both
+   halves of the fix, only ever concerned platforms with classic scrollbars. */
+@supports not (scrollbar-gutter: stable) {
+    @media (min-width: 64rem) {
+        .preview-pane {
+            overflow-y: scroll;
+        }
     }
 }
 
@@ -3630,6 +4793,15 @@ body.has-site-anchor {
 .save-state.is-unavailable::before {
     background-color: var(--color-warn);
 }
+
+/* ==========================================================================
+   [S11]  EDITOR TOOLBARS AND THE DOWNLOAD PANEL
+   ==========================================================================
+   The .editor-bar controls: the mark, the document name, .editor-actions,
+   the mockup bar's wordmark and search, the text formatting toolbar, the
+   caption and emoji picker, the .dl / .dl-toggle / .dl-panel download
+   shell.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Poster editor toolbar (poster.html)
@@ -4269,8 +5441,21 @@ body.has-site-anchor {
 /* Below the editor's two-pane breakpoint the toolbar would otherwise wrap to
    four rows and push the canvas off screen. */
 @media (max-width: 48rem) {
+    /* 3.5rem, not 5. The basis is what the browser breaks lines on BEFORE it
+       grows anything, so on a bar whose other items are fixed -- mark, menu
+       button, and the actions -- this number alone decides whether the actions
+       wrap to a second row. At 5rem the poster bar broke at 360 and 375, which
+       is most Android phones and the SE; at 3.5rem it holds down to 348.
+       Measured, not derived: 348 is one row, 344 is two.
+
+       Lowering it costs nothing where there is room: the field still has
+       flex-grow, so above the break it fills whatever the bar has spare and
+       renders exactly as wide as it did before.
+
+       320 needs one more squeeze on top of this: see the 22.5rem block
+       below. */
     .doc-name {
-        flex-basis: 5rem;
+        flex-basis: 3.5rem;
     }
 
     .text-toolbar {
@@ -4285,6 +5470,58 @@ body.has-site-anchor {
         right: 0;
         width: auto;
         max-height: 70vh;
+    }
+}
+
+/* 320px, where the editor bar is over-subscribed by about 30px and the actions
+   wrap to a second row -- 56px of a 568px-tall phone spent on chrome that is
+   already sticky.
+
+   Paid for in WHITESPACE rather than by dropping a control. mockup.html moved
+   its download out of the bar and docs.html dropped its button labels, and
+   either would work here, but both cost the visitor something: undo, redo, the
+   save state and the exporter are all doing a job on a phone. The gutter and
+   the gaps are not. Eight pixels off the gutter and four off each of three gaps
+   is 20px, and the shorter basis finds the rest.
+
+   The buttons themselves are deliberately NOT shrunk. They are 32px already,
+   under the 44px touch target this project is otherwise careful about, and
+   trading accessibility for a row is the wrong way round. */
+@media (max-width: 22.5rem) {
+    .site-header.editor-bar {
+        --header-pad-x: var(--space-sm);
+        gap: var(--space-xs);
+    }
+
+    .editor-bar .doc-name {
+        flex-basis: 2.5rem;
+    }
+
+    /* The last 30px, and the poster bar is the only one that needs them: it
+       carries undo, redo, the save state AND the exporter, where resume and
+       docs carry fewer and already fit. The save state is the one item here
+       that is passive -- it reports, it does not act -- so it is the one that
+       gives up its space.
+
+       Hidden the .sr-only way rather than display:none, exactly as the
+       wordmark above it is: the element is role="status" aria-live="polite",
+       and taking it out of the accessibility tree would stop it announcing
+       saves to a screen reader, which is most of what it is for. It keeps
+       announcing; it just stops occupying a row on a 320px phone.
+
+       Measured against the suite's width rather than the viewport's: at a
+       320px viewport a desktop browser's scrollbar leaves 305 usable, and the
+       bar has to fit THAT to be one row where the suite looks. */
+    .editor-bar .save-cloud {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
 }
 
@@ -4407,6 +5644,13 @@ body.has-site-anchor {
     text-decoration: underline;
 }
 
+/* ==========================================================================
+   [S12]  FORM CONTROLS
+   ==========================================================================
+   Fields, labels, inputs, selects, checkboxes, entry rows. Shared by every
+   editor.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Form controls
    -------------------------------------------------------------------------- */
@@ -4484,6 +5728,108 @@ legend {
     color: var(--color-text);
 }
 
+/* The profile photo the visitor uploaded, beside its Remove button. The
+   thumbnail is fixed at the 4:5 the file was cropped to and painted with
+   object-fit: cover as a belt-and-braces measure -- the bitmap is already 4:5,
+   so cover has nothing to crop, and it only matters if that ever stops being
+   true. Reusing .entry-remove for the button rather than a photo-only variant:
+   it is the same control doing the same job as the one on every entry row. */
+/* The photograph's framing controls, under the thumbnail chip.
+
+   Grouped in a box of their own rather than left as three loose fields: they
+   are one operation on one thing, and a visitor who has just uploaded a
+   photograph should see at a glance which controls belong to it.
+
+   Hidden entirely when there is no photograph -- a disabled size slider over
+   an empty frame is furniture. */
+.photo-frame-controls {
+    margin-top: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+}
+
+.photo-frame-controls[hidden] {
+    display: none;
+}
+
+.photo-frame-controls .field {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.photo-frame-controls label {
+    margin: 0;
+    font-size: 0.8125rem;
+}
+
+.photo-frame-controls input[type="range"] {
+    width: 100%;
+    /* The form's own input rule gives every control a border, a background
+       and vertical padding, which on a range track paints a box around the
+       thumb. Ranges want the browser's own widget. */
+    padding: 0;
+    border: 0;
+    background: none;
+    accent-color: var(--color-text);
+}
+
+/* Disabled means this axis has no slack at the current size, not that the
+   control is broken, so it dims rather than disappearing. */
+.photo-frame-controls input[type="range"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.photo-frame-controls .upload-hint {
+    margin-bottom: 0;
+}
+
+.photo-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`,
+   so the chip has to opt back out by hand or js/resume.js hiding it does
+   nothing -- the same trap .layer-actions and .mockup-tray fell into. */
+.photo-chip[hidden] {
+    display: none;
+}
+
+.photo-chip img {
+    width: 3.5rem;
+    height: 4.375rem;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-card);
+}
+
+/* Also left behind by the September 1, 2026 admin split: docs.html's "Blank
+   printable form" checkbox is a .radio-option, so this is a public form
+   control that happened to be written where admin.html first used it.
+   .radio-row, the flex row that pairs with it, IS admin-only and did move. */
+.radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    font-size: 0.9375rem;
+    cursor: pointer;
+}
+
+/* ==========================================================================
+   [S13]  RESUME EDITOR
+   ==========================================================================
+   resume.html: accent swatches, the template picker, the rendered resume
+   sheet, click-to-edit on the preview.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Accent color swatches (resume builder)
    -------------------------------------------------------------------------- */
@@ -4528,9 +5874,55 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
-   Resume document preview (the html2pdf.js capture target)
+   Resume template picker (resume.html)
+   Built from the registry by js/resume.js, so this styles a row of unknown
+   length. Text buttons rather than the swatch row's colour discs: a template
+   has no single colour to show, and a miniature small enough to sit in the
+   form pane would be unreadable.
    -------------------------------------------------------------------------- */
 
+.template-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.template-pick {
+    padding: 0.4375rem 0.875rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.template-pick:hover {
+    border-color: var(--color-text);
+}
+
+/* Matches .swatch.is-active, so the two controls under the same heading read
+   as the same kind of choice. */
+.template-pick.is-active {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+    border-color: var(--color-text);
+}
+
+/* --------------------------------------------------------------------------
+   Resume document preview
+   -------------------------------------------------------------------------- */
+
+/* The bare container is the PRE-PAINT state now, not a document.
+
+   It used to be the Classic resume itself -- an HTML sheet whose .rs-* type
+   rules lived directly below this one. Classic became a descriptor on
+   August 30, 2026 and the engine draws every template, so those rules were
+   deleted with the renderer they were sized for. What is left is what the
+   pane shows before the first paint lands, or when the engine could not be
+   loaded at all: a blank sheet of the right size, so the pane never collapses
+   and never jumps. */
 .resume-sheet {
     background-color: #FFFFFF;
     border: 1px solid var(--color-border);
@@ -4541,58 +5933,180 @@ legend {
     min-height: 28rem;
 }
 
-.resume-sheet .rs-name {
-    font-family: var(--font-serif);
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--accent);
+/* Shown only when the engine or the registry failed to load. Deliberately
+   plain: it is a fault report, not part of any document. */
+.sheet-message {
+    color: var(--color-muted);
+    text-align: center;
+    max-width: 22rem;
+    margin: 4rem auto;
 }
 
-.resume-sheet .rs-title {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
+/* The side column has outrun the page. Sits on the mat ABOVE the sheet rather
+   than on it: it is a note about the document, not part of it, and the same
+   reasoning keeps the page labels off the display list. It is rebuilt with
+   every repaint, so it clears itself the moment the column fits again.
+
+   Warn colours rather than the brand's, because this one is telling the
+   visitor something is being lost. */
+.sheet-warning {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid var(--color-warn);
+    border-radius: 2px;
+    background-color: var(--color-card);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    line-height: 1.45;
 }
 
-.resume-sheet .rs-contact {
+/* An engine-drawn preview is a STACK OF PAGES, not one long sheet.
+
+   The first version of this rule made the container carry the paper: it kept
+   its own white ground and border while each <svg> page had neither, and the
+   gap between pages was therefore white on white. A two-page CV rendered as a
+   single 1116px white column with an invisible seam -- an A4 document that
+   looked like one impossibly long page, with nothing to tell the visitor
+   their resume had run over.
+
+   The container is a workspace MAT now and the paper moved onto the pages:
+   each <svg> gets its own white ground, its own edge and a soft lift, and the
+   band of mat between them is what makes the page break unmissable.
+
+   The mat inherits the light palette from the paper-surfaces rule near the
+   top of this file, so it stays light grey in dark mode rather than going
+   dark. That is deliberate: it is how every document editor presents paper --
+   a light mat under white pages, whatever the surrounding chrome is doing --
+   and it keeps the page labels legible against it in both themes.
+
+   .is-engine is added by js/resume.js only once a page has actually been
+   painted; applied to an empty container it would collapse the pane to
+   nothing. line-height: 0 removes the inline descender gap under the <svg>. */
+.resume-sheet.is-engine {
+    padding: 0.75rem;
+    min-height: 0;
+    line-height: 0;
+    background-color: var(--color-bg);
+}
+
+.resume-sheet .rt-sheet {
+    display: block;
+    width: 100%;
+    height: auto;
+    background-color: #FFFFFF;
+    border: 1px solid var(--color-border-strong);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* "Page 1 of 2", set on the mat under each page. js/resume.js adds these only
+   when there IS more than one page, so a single-page CV carries no chrome at
+   all. The bottom margin is what opens the band of mat between two pages, so
+   the last label -- which has no page after it -- drops it. */
+.resume-sheet .rt-page-label {
+    margin: 0.5rem 0 1.5rem;
+    text-align: center;
     font-size: 0.75rem;
-    color: #6B6B66;
-    margin-bottom: 1rem;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
 }
 
-.resume-sheet .rs-section {
-    margin-top: 1.25rem;
+.resume-sheet .rt-page-label:last-child {
+    margin-bottom: 0;
 }
 
-.resume-sheet .rs-heading {
-    font-family: var(--font-serif);
-    font-size: 0.9375rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--accent);
-    border-bottom: 2px solid var(--accent);
-    padding-bottom: 0.25rem;
-    margin-bottom: 0.625rem;
+/* --------------------------------------------------------------------------
+   Click-to-edit on the preview.
+
+   The engine marks every run it drew from the visitor's own words with
+   .rt-editable; template labels like the section headings get no class and
+   stay inert, which is the whole affordance: if it takes an I-beam, it is
+   yours to change.
+   -------------------------------------------------------------------------- */
+
+/* Positions the overlay, which is a child of the sheet. */
+.resume-sheet.is-engine {
+    position: relative;
 }
 
-.resume-sheet .rs-entry {
-    margin-bottom: 0.75rem;
+.rt-editable {
+    cursor: text;
 }
 
-.resume-sheet .rs-entry-head {
-    font-weight: 600;
+/* The prompt standing in for a missing profile photograph. Editor chrome: the
+   PDF painter returns on its op, and print drops it below, so it exists only
+   on screen. The pointer is what says it is a control rather than a caption --
+   the same argument as the poster's and the mockup's upload prompts. */
+.rt-photo-slot {
+    cursor: pointer;
 }
 
-.resume-sheet .rs-entry-meta {
-    font-size: 0.75rem;
-    color: #6B6B66;
-    margin-bottom: 0.25rem;
+.rt-photo-slot rect {
+    transition: fill var(--motion-fast, 120ms) var(--ease, ease);
 }
 
-.resume-sheet ul {
-    padding-left: 1.125rem;
+.rt-photo-slot:hover rect {
+    fill: rgba(0, 0, 0, 0.06);
 }
+
+@media print {
+    .rt-photo-slot {
+        display: none;
+    }
+}
+
+/* A wash rather than a box: the sheet is a document, and a bordered hit area
+   around every phrase would read as a form. Painted behind the glyphs so the
+   text never loses contrast. */
+.rt-editable:hover {
+    fill-opacity: 1;
+    paint-order: stroke fill;
+    stroke: var(--color-brand);
+    stroke-width: 6px;
+    stroke-opacity: 0.16;
+    stroke-linejoin: round;
+}
+
+/* The floating editor. It stands in for one run -- or, over a paragraph, for
+   the whole group of runs the engine drew from one value -- while it is open,
+   so it carries no chrome of its own beyond a thin ring; anything heavier and
+   the document visibly turns into a form under the cursor. Padding and border
+   are zeroed because the box is positioned from the runs' measured screen
+   boxes, and any inherited box model would shift the text off the baseline it
+   replaces. The same reason box-sizing is pinned here: js/resume.js sets width
+   and height as the CONTENT box it measured, and the site-wide border-box
+   default would eat the padding out of them. */
+.rt-inline-editor {
+    position: absolute;
+    z-index: 4;
+    box-sizing: content-box;
+    margin: 0;
+    padding: 0 2px;
+    border: 0;
+    border-radius: 2px;
+    outline: 2px solid var(--color-brand);
+    background-color: var(--color-card);
+    line-height: 1.15;
+    letter-spacing: inherit;
+}
+
+/* The multi-line form of the same overlay, used where the field behind the run
+   is a textarea: a summary, or an entry description. It is sized to the
+   engine's own leading and line count, so it must not carry a scrollbar or a
+   resize grip -- either one would change the width the text wraps to and the
+   overlay would stop matching the sheet under it. */
+textarea.rt-inline-editor {
+    display: block;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+}
+
+/* ==========================================================================
+   [S14]  BUSINESS DOCUMENT EDITOR
+   ==========================================================================
+   docs.html: the rendered document sheet for all six document types.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Business document preview (docs.html)
@@ -4969,6 +6483,303 @@ legend {
     text-align: left;
 }
 
+
+/* --------------------------------------------------------------------------
+   Ruled invoice sheet (docs.html, .doc-sheet.is-ruled-invoice)
+   The fourth layout family: a printed-form invoice carrying a logo the
+   visitor uploaded. Monochrome by construction -- the accent token reaches
+   only the masthead and the closing line, and its default IS the artwork.
+
+   Two fills carry the design, the grid header strip and the Total box, and
+   both declare print-color-adjust: browsers drop background colours from
+   print output by default and the loss is invisible on screen.
+   -------------------------------------------------------------------------- */
+
+.doc-ruled-masthead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.doc-ruled-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--accent);
+    margin: 0;
+}
+
+.doc-ruled-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-width: 0;
+}
+
+.doc-ruled-wordmark {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+    overflow-wrap: break-word;
+    min-width: 0;
+}
+
+/* The prompt standing in for a missing logo. Editor chrome: the PDF is drawn
+   from state by jsPDF and never reads this sheet, and print drops it below.
+
+   A 1.25rem SQUARE carrying a plus, rather than a labelled chip, and the size
+   is the whole point. `.doc-ruled-brand` is a flex row inside a masthead that
+   is already tight, and the wordmark wraps when the row runs out of width: an
+   "ADD LOGO" chip measured 68px and pushed the business name onto a second
+   line, taking the masthead from 40px to 45px, so the preview showed a wrapped
+   name the PDF does not wrap. Measured: it stops wrapping below 56px for THIS
+   wordmark, which is exactly why a width was not the fix -- the threshold
+   moves with the length of the name. The square is a fifth of that and it
+   shrinks before the wordmark does, so the chrome yields and the document
+   does not. What it says is in its accessible name instead. */
+.doc-logo-slot {
+    flex: 0 1 auto;
+    min-width: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 1px dashed var(--color-border);
+    border-radius: 0.1875rem;
+    background: transparent;
+    color: var(--color-muted);
+    font-family: inherit;
+    font-size: 0.75rem;
+    line-height: 1;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.doc-logo-slot:hover,
+.doc-logo-slot:focus-visible {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+}
+
+@media print {
+    .doc-logo-slot {
+        display: none;
+    }
+}
+
+/* Height-bounded with a free width, so a wide wordmark logo and a square
+   badge both sit correctly beside the business name. */
+.doc-ruled-logo {
+    height: 3rem;
+    width: auto;
+    max-width: 8rem;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Reference fields run down column 1; the payment block sits in column 2 on
+   the third row, which is what aligns it with Bill To in the reference
+   artwork. Placement, not padding: a measured offset would have to be
+   re-derived every time one of these font sizes moved. */
+.doc-ruled-top {
+    display: grid;
+    grid-template-columns: 52% 1fr;
+    column-gap: 1.5rem;
+    margin-bottom: 1.75rem;
+}
+
+.doc-ruled-field,
+.doc-ruled-address-block {
+    grid-column: 1;
+}
+
+.doc-ruled-pay {
+    grid-column: 2;
+    grid-row: 3;
+}
+
+.doc-ruled-field {
+    margin-bottom: 1rem;
+}
+
+.doc-ruled-field-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+/* The rule is drawn whether or not there is a value, so an unfilled invoice
+   prints as something to write on. */
+.doc-ruled-field-value {
+    border-bottom: 1px solid #1A1A1A;
+    min-height: 1.25rem;
+    overflow-wrap: break-word;
+}
+
+.doc-ruled-address {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: #4A4A46;
+}
+
+.doc-ruled-pay-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.375rem;
+}
+
+.doc-ruled-pay-line {
+    font-size: 0.75rem;
+    overflow-wrap: break-word;
+}
+
+.doc-ruled-table {
+    width: 100%;
+    min-width: 22rem;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.doc-ruled-table th,
+.doc-ruled-table td {
+    border: 1px solid #1A1A1A;
+    padding: 0.5rem 0.375rem;
+    font-size: 0.75rem;
+    vertical-align: top;
+    overflow-wrap: break-word;
+}
+
+.doc-ruled-table th {
+    background-color: #E8E6E1;
+    font-weight: 600;
+    text-align: center;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.doc-ruled-table td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Never fewer than eight body rows: the sheet is a printed form before it is
+   a report, and an empty row is somewhere to write. */
+.doc-ruled-table tr.is-empty td {
+    height: 1.75rem;
+}
+
+.doc-ruled-close {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-top: 1.75rem;
+}
+
+.doc-ruled-thanks {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--accent);
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+.doc-ruled-money {
+    flex: 0 0 42%;
+    max-width: 42%;
+}
+
+.doc-ruled-money .doc-total-row {
+    font-size: 0.75rem;
+}
+
+.doc-ruled-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid #1A1A1A;
+    background-color: #E8E6E1;
+    padding: 0.5rem 0.625rem;
+    margin-top: 0.375rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.doc-ruled-total-value {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.doc-ruled-foot {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+}
+
+.doc-ruled-contact {
+    min-width: 0;
+}
+
+.doc-ruled-contact-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.375rem;
+    min-width: 0;
+}
+
+.doc-ruled-contact-value {
+    overflow-wrap: anywhere;
+}
+
+/* An SVG's fill does NOT inherit from color, so without this the icons would
+   be browser-default pure black beside #1A1A1A text -- the only thing the
+   declaration actually buys, and the reason it matches its neighbours rather
+   than reading currentColor. It is not a dark-theme guard: .doc-sheet
+   re-declares the light palette and pins its own color, so currentColor would
+   resolve to the same ink in both themes. */
+.doc-ruled-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+    fill: #1A1A1A;
+}
+
+.doc-ruled-contact-row.is-blank .doc-ruled-contact-value {
+    border-bottom: 1px solid var(--color-border);
+    min-width: 8rem;
+    min-height: 0.875rem;
+}
+
+.doc-ruled-signs {
+    flex: 0 0 42%;
+    max-width: 42%;
+    padding-top: 0.25rem;
+}
+
+.doc-ruled-sign-rule {
+    border-top: 1px solid #1A1A1A;
+    margin-top: 1.5rem;
+}
+
+.doc-ruled-sign .doc-ruled-sign-rule {
+    margin-top: 0;
+}
+
+.doc-ruled-sign-label {
+    font-size: 0.6875rem;
+    color: #6B6B66;
+    padding-top: 0.25rem;
+}
+
 .item-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -4982,6 +6793,12 @@ legend {
     margin-bottom: 1rem;
 }
 
+/* ==========================================================================
+   [S15]  POSTER EDITOR
+   ==========================================================================
+   poster.html: the canvas stage and its controls.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Poster creator
    -------------------------------------------------------------------------- */
@@ -4994,10 +6811,103 @@ legend {
     justify-content: center;
 }
 
-.poster-stage canvas {
+/* The canvas and the search-bar input share one box, so the input can be
+   positioned against the canvas's rendered size rather than the pane's.
+   Width is capped here rather than on the canvas, and the canvas fills it. */
+.poster-frame {
+    position: relative;
     width: 100%;
     max-width: 26rem;
+    line-height: 0;
+}
+
+.poster-stage canvas {
+    width: 100%;
     height: auto;
+}
+
+/* Typing straight onto the poster's search bar. Transparent text, because the
+   canvas underneath is what draws the words -- see poster.html. Everything
+   here that could paint is switched off; what is left is a caret and a hit
+   area. js/poster.js sets position, size and colour from the same constants
+   the renderer uses. */
+.query-live {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: transparent;
+    font-family: "Inter", system-ui, sans-serif;
+    line-height: 1;
+    letter-spacing: 0;
+    /* Sixteen pixels and then SCALED, rather than simply set small.
+
+       iOS zooms the whole page when a field it focuses computes under 16px, and
+       the type on this poster is far under it on a phone -- about 6px at 390.
+       A transform changes what is rendered without changing the computed size,
+       which is the value iOS actually reads, so the caret still sits on the
+       drawn glyphs and the page still does not lurch. js/poster.js sets the
+       scale; the origin has to be the top-left corner or the box would grow
+       about its centre and slide off the pill. */
+    font-size: 16px;
+    transform-origin: 0 0;
+    /* Chromium paints the selection band even when the text is transparent,
+       which is the one piece of feedback that would otherwise be missing. */
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.query-live::selection {
+    background: rgba(120, 160, 255, 0.45);
+}
+
+/* The on-canvas text editor. Sits over the element it is editing, wearing its
+   font, and the canvas stops drawing that element while it is open -- see the
+   note beside #p-text-live in poster.html for why this one is opaque where
+   .query-live is transparent.
+
+   Sized at 16px and SCALED by a transform, for the same reason .query-live is:
+   iOS zooms the page when it focuses a field computing under 16px, and poster
+   text is regularly far under it. Width, height and line-height are therefore
+   pre-transform lengths. */
+.text-live {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 16px;
+    transform-origin: 0 0;
+    z-index: 3;
+}
+
+.text-live::selection {
+    background: rgba(120, 160, 255, 0.45);
+}
+
+/* Editing one of a LAYOUT'S own fields. The canvas is still drawing the words
+   -- see the note beside #p-text-live -- so this contributes a caret and a
+   selection and no ink of its own. */
+.text-live.is-ghost {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+/* The selection has to read on a near-black poster and on a white one, so it
+   is a translucent wash rather than either ink. */
+.text-live.is-ghost::selection {
+    background: rgba(120, 160, 255, 0.55);
+}
+
+.query-live:focus-visible {
+    outline: 0;
 }
 
 .upload-hint {
@@ -5005,6 +6915,14 @@ legend {
     color: var(--color-muted);
     margin-top: 0.375rem;
 }
+
+/* ==========================================================================
+   [S16]  MOCKUP EDITOR
+   ==========================================================================
+   mockup.html: both viewport-height panes, the sidebar sections, the
+   design layer list, the HSV colour picker, the action row, the preview
+   tabs, the size control.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Product mockup generator
@@ -5315,6 +7233,43 @@ main:has(.mockup-layout) .editor-head {
 .layer-list[hidden],
 .layer-actions[hidden] {
     display: none;
+}
+
+/* Surface switch, shown only on a template with more than one printable
+   surface (the two-card business card mockup). Sits directly above the layer
+   list because it scopes it: the list shows the selected surface's layers.
+   Styled off .layer-row's vocabulary so the two read as one control group. */
+.zone-switch {
+    display: flex;
+    gap: var(--space-3xs);
+    margin-bottom: var(--space-2xs);
+}
+
+.zone-switch[hidden] {
+    display: none;
+}
+
+.zone-tab {
+    flex: 1 1 0;
+    min-height: 2.25rem;
+    padding: 0 var(--space-2xs);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-muted);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) var(--ease),
+        color var(--motion-fast) var(--ease);
+}
+
+.zone-tab:hover {
+    color: var(--color-text);
+}
+
+.zone-tab[aria-pressed="true"] {
+    color: var(--color-text);
+    border-color: var(--color-brand);
 }
 
 .layer-row {
@@ -5661,6 +7616,16 @@ main:has(.mockup-layout) .editor-head {
     padding: 0;
     border: 1px solid var(--color-border-strong);
     cursor: pointer;
+}
+
+/* The product's own colourways, rendered ahead of the generic hexes in the
+   same grid. They carry a selected state because, unlike a hex, they ARE a
+   state: "As photographed" skips the tint entirely and a heather mixes toward
+   undyed fibre, so the visitor needs to see which one is live. A custom hex
+   marks none of them, which is correct -- it is not one of them. */
+.color-colorway[aria-pressed="true"] {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 1px;
 }
 
 .color-eyedropper {
@@ -6109,6 +8074,12 @@ main:has(.mockup-layout) .editor-head {
     min-height: 1.25rem;
 }
 
+/* ==========================================================================
+   [S17]  GUIDES STRIP AND SEARCH PAGE
+   ==========================================================================
+   The homepage guides band and search.html.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Homepage guides strip
    Surfaces the most recent blog posts on the homepage. The blog previously
@@ -6348,6 +8319,13 @@ main:has(.mockup-layout) .editor-head {
         flex-basis: 13rem;
     }
 }
+
+/* ==========================================================================
+   [S18]  CONTENT PAGES: LANDING, STATIC, BLOG, POST
+   ==========================================================================
+   The nine landing pages, about/terms/privacy, blog.html, post.html and
+   the generated blog/<slug>.html pages.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Document landing pages
@@ -6932,209 +8910,57 @@ main:has(.mockup-layout) .editor-head {
     text-align: center;
 }
 
-/* --------------------------------------------------------------------------
-   Blog admin panel (admin.html)
-   -------------------------------------------------------------------------- */
-
-.admin-main {
-    max-width: 56rem;
-}
-
-.admin-intro {
-    margin-bottom: 2rem;
-}
-
-.admin-intro h1 {
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
-}
-
-.admin-intro p {
-    color: var(--color-muted);
-    max-width: 44rem;
-}
-
-.admin-panel {
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.admin-panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-}
-
-.admin-panel-head h2 {
-    font-size: 1.25rem;
-}
-
-.admin-sync {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-}
-
-.admin-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 0.5rem;
-}
-
-.admin-status {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    margin-top: 0.75rem;
-    min-height: 1.25rem;
-}
-
-.admin-help {
-    margin-top: 0.75rem;
-    font-size: 0.875rem;
-    color: var(--color-muted);
-}
-
-.admin-help summary {
-    cursor: pointer;
-    font-weight: 600;
-    min-height: 2.75rem;
-    display: flex;
-    align-items: center;
-}
-
-.admin-help ol,
-.admin-help ul {
-    padding-left: 1.375rem;
-    margin: 0.5rem 0;
-}
-
-.admin-help li {
-    margin-bottom: 0.375rem;
-}
-
-.admin-empty {
-    color: var(--color-muted);
-    font-size: 0.9375rem;
-    padding: 1rem 0;
-}
-
-.admin-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    border: 1px solid var(--color-border);
-    padding: 1rem;
-    margin-bottom: 0.75rem;
-}
-
-.admin-row-title {
-    font-weight: 600;
-}
-
-.admin-row-meta {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-}
-
-.admin-row-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.btn-small {
-    min-height: 2.75rem;
-    padding: 0 1rem;
-    font-size: 0.8125rem;
-}
-
-.radio-row {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.radio-option {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 2.75rem;
-    font-size: 0.9375rem;
-    cursor: pointer;
-}
-
-.admin-cover-preview {
-    margin-top: 0.5rem;
-}
-
-.admin-cover-preview img {
-    max-width: 18rem;
-    border: 1px solid var(--color-border);
-    margin-bottom: 0.75rem;
-}
-
-.admin-preview {
-    max-width: none;
-}
-
-.mono {
-    font-family: "Consolas", "Menlo", monospace;
-    font-size: 0.875em;
-    background-color: var(--color-bg);
-    padding: 0.125rem 0.375rem;
-    border: 1px solid var(--color-border);
-}
-
-/* --------------------------------------------------------------------------
-   Catalog thumbnail workspace (admin.html)
-
-   The preview is the homepage's own markup -- .catalog-grid > .template-card
-   > .card-preview.photo -- so the 4:5 window, the hover crossfade and the
-   card chrome are inherited rather than reimplemented. Only two things are
-   admin-specific: the grid is capped to one card's width, and the hover image
-   needs a real hide.
-   -------------------------------------------------------------------------- */
-
-/* One card, at roughly the width the homepage gives a card on a laptop. The
-   column override has to sit here rather than beside .catalog-grid: media
-   queries carry no specificity, so it beats the grid's 2/3/4-column ladder
-   only by being declared after it. */
-.admin-thumb-preview {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 15rem;
-    margin-top: 0.5rem;
-}
-
-/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`.
-   Both of these carry one: .catalog-grid sets display: grid on the wrapper,
-   and .card-preview.photo .card-thumb sets display: block on the images.
-   Without the second rule the hover slot would paint over the default image
-   whenever an item has no hover thumbnail -- which is the optional case, so
-   it is the common one. */
-.admin-thumb-preview[hidden] {
-    display: none;
-}
-
-.admin-thumb-preview .card-thumb[hidden] {
-    display: none;
-}
-
-.admin-thumb-paths {
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    word-break: break-all;
-}
+/* ==========================================================================
+   [S19]  RESPONSIVE RULES
+   ==========================================================================
+   Everything viewport-gated that is not declared beside its own component.
+   Layouts are verified down to 320px.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    Responsive rules (layouts verified down to a 320px viewport)
    -------------------------------------------------------------------------- */
+
+/* The editor split collapses at 64rem, not at the 48rem the rest of this
+   section uses, which is why it is its own block rather than part of the one
+   below (August 30, 2026).
+
+   It collapsed at 48rem until then, and that made 769px the worst width on the
+   site for an editor: at 768px the visitor had one pane 705px wide, and one
+   pixel later two panes of 367px each -- the split engaged the moment the
+   layout stopped being a phone, on a viewport with nowhere near the room for
+   it. A resume preview rendered into 317px of inner width. 64rem is where two
+   panes stop being cramped: 469px each at 1024px, against 975px for the single
+   pane just below it.
+
+   Three rules move together and a fourth follows: the grid, the tab row and
+   the two pane-hiding rules here; `.preview-pane`'s sticky rule at 64rem; and
+   the export bar's anchor lift, which carries a measured 1rem allowance that
+   applies only where the pane is sticky. Move one and the others have to move
+   with it.
+
+   63.9375rem rather than the 64rem this section's other blocks would use, so
+   that 1024px itself SPLITS. An iPad in landscape is exactly 1024 CSS pixels
+   with no classic scrollbar to take width off it, and `max-width: 64rem` is
+   inclusive -- it would have handed the device this boundary was chosen for
+   the single-column layout meant for the tablet below it. */
+@media (max-width: 63.9375rem) {
+    .editor-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-tabs {
+        display: flex;
+    }
+
+    .editor-layout.show-edit .preview-pane {
+        display: none;
+    }
+
+    .editor-layout.show-preview .editor-pane {
+        display: none;
+    }
+}
 
 @media (max-width: 48rem) {
     .hero h1 {
@@ -7185,23 +9011,6 @@ main:has(.mockup-layout) .editor-head {
         align-items: center;
     }
 
-    /* Editor split view collapses into a tabbed single-column layout */
-    .editor-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .mobile-tabs {
-        display: flex;
-    }
-
-    .editor-layout.show-edit .preview-pane {
-        display: none;
-    }
-
-    .editor-layout.show-preview .editor-pane {
-        display: none;
-    }
-
     .countdown {
         font-size: 3.75rem;
     }
@@ -7224,9 +9033,43 @@ main:has(.mockup-layout) .editor-head {
     .doc-field-grid,
     .doc-sign-grid,
     .doc-check-row.grid,
+    .doc-ruled-top,
     .item-grid,
     .check-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* Both placements have to be released, not just the column:
+       grid-column: 2 against a one-column grid opens an implicit
+       second track and puts the payment block back off to the
+       side, half the sheet wide. */
+    .doc-ruled-pay {
+        grid-column: 1;
+        grid-row: auto;
+        margin-bottom: 1rem;
+    }
+
+    .doc-ruled-masthead,
+    .doc-ruled-close,
+    .doc-ruled-foot {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .doc-ruled-money,
+    .doc-ruled-signs {
+        flex-basis: auto;
+        max-width: none;
+        width: 100%;
+    }
+
+    .doc-ruled-title {
+        font-size: 2rem;
+    }
+
+    .doc-ruled-wordmark {
+        text-align: left;
     }
 
     .doc-sign-grid {
@@ -7294,6 +9137,13 @@ main:has(.mockup-layout) .editor-head {
     }
 }
 
+/* ==========================================================================
+   [S20]  PRINT
+   ==========================================================================
+   Strips the site shell so a document sheet prints on its own page. Print
+   output stays light regardless of the on-screen theme.
+   ========================================================================== */
+
 /* --------------------------------------------------------------------------
    Print: strip the site shell so the document sheet prints on its own page.
    Used by the Print action in the business document builder; the PDF export
@@ -7328,6 +9178,23 @@ main:has(.mockup-layout) .editor-head {
 
     body {
         background-color: #FFFFFF;
+    }
+
+    /* The click-to-edit overlay is a real form control floating over the
+       sheet. It closes on blur, and a print dialog usually takes focus first
+       -- but "usually" is not a guarantee, and an input box printed across a
+       resume is not a defect anyone would think to test for. */
+    .rt-inline-editor {
+        display: none;
+    }
+
+    /* The side-column overflow note. It sits on the mat above the sheet and
+       says the document is losing lines -- a remark to the person editing,
+       never part of what they are printing. The jsPDF export cannot carry it
+       (that file is painted from the display list, which this was
+       deliberately kept out of), but a browser print takes the DOM. */
+    .sheet-warning {
+        display: none;
     }
 
     .site-header,
@@ -7440,4 +9307,1529 @@ main:has(.mockup-layout) .editor-head {
     .blog-list-row .card-body {
         padding: 1.25rem;
     }
+}
+
+
+/* --------------------------------------------------------------------------
+   Trade counter receipt (docs.html, .doc-sheet.is-trade-receipt)
+   The fifth layout family: a parts-counter receipt traced from an A4 artwork,
+   carrying the seller's bank details on its face.
+
+   Proportions rather than the artwork's millimetres. The PDF writer places
+   this sheet at fixed heights because it is a form; the PREVIEW is a pane that
+   the visitor resizes, so the same figures are held here as percentages of the
+   sheet's own width and the grid keeps its shape at any size.
+
+   Four fills carry the design -- the grid header, the Total box, the reference
+   labels and the footer band -- and every one declares print-color-adjust:
+   browsers drop background colours from print output by default, and the loss
+   is invisible on screen until somebody prints.
+   -------------------------------------------------------------------------- */
+
+.doc-sheet.is-trade-receipt {
+    padding: 1.5rem 1.25rem 0;
+    color: #231F20;
+    display: flex;
+    flex-direction: column;
+}
+
+.doc-trade-card {
+    display: flex;
+    gap: 1rem;
+    border: 1px solid #231F20;
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 0.875rem;
+}
+
+.doc-trade-card-left,
+.doc-trade-card-right {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.doc-trade-card-left {
+    flex: 0 1 46%;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.doc-trade-card-right {
+    flex: 1 1 54%;
+    gap: 0.125rem;
+}
+
+.doc-trade-logo {
+    display: block;
+    max-width: 100%;
+    max-height: 4.5rem;
+    object-fit: contain;
+    object-position: left top;
+}
+
+/* Shorter than the logo it stands for, so the card does not change height when
+   there is nothing in it -- the preview would then be taller than the PDF,
+   which draws the logo from state and never reads this sheet. */
+.doc-trade-logo-slot {
+    align-self: flex-start;
+}
+
+.doc-trade-address-line {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+}
+
+.doc-trade-business {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
+.doc-trade-contact {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.doc-trade-refs {
+    margin-top: 0.5rem;
+    border: 1px solid #231F20;
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.doc-trade-ref-row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid #231F20;
+    min-height: 1.4rem;
+}
+
+.doc-trade-ref-row:last-child {
+    border-bottom: 0;
+}
+
+.doc-trade-ref-label {
+    flex: 0 0 23.7%;
+    background-color: #DBD9D9;
+    border-right: 1px solid #231F20;
+    padding: 0.0625rem 0.25rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.doc-trade-ref-value {
+    flex: 1 1 auto;
+    padding: 0.0625rem 0.375rem;
+    font-size: 0.875rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.doc-trade-account {
+    margin-bottom: 0.875rem;
+}
+
+.doc-trade-account-heading {
+    margin: 0 0 0.125rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+/* Three columns rather than a table: the labels are printed furniture and the
+   colon is a column of its own, which is what keeps every value on one left
+   edge however long the label beside it is. */
+.doc-trade-account-grid {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    column-gap: 1.25rem;
+    row-gap: 0.0625rem;
+    font-size: 0.875rem;
+}
+
+.doc-trade-account-colon {
+    text-align: center;
+}
+
+.doc-trade-account-value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.doc-trade-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.doc-trade-table th,
+.doc-trade-table td {
+    border: 1px solid #231F20;
+    padding: 0.1875rem 0.3125rem;
+    font-size: 0.8125rem;
+    vertical-align: top;
+    overflow-wrap: break-word;
+}
+
+.doc-trade-table th {
+    background-color: #F0E8CD;
+    font-weight: 400;
+    font-size: 1rem;
+    text-align: center;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.doc-trade-table td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* The minor-unit column. Left-aligned against the decimal division so figures
+   on consecutive lines stack the way they would if they were written in. */
+.doc-trade-table td.minor {
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Thirteen rows whether or not there is anything to put in them: the sheet is
+   a printed form before it is a record, and an empty row is somewhere to write. */
+.doc-trade-table tr.is-empty td {
+    height: 1.4rem;
+}
+
+.doc-trade-foot {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.doc-trade-method {
+    flex: 1 1 auto;
+    padding-top: 0.25rem;
+    min-width: 0;
+}
+
+.doc-trade-method-label {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.doc-trade-method-value {
+    margin: 0.125rem 0 0;
+    font-size: 0.8125rem;
+}
+
+/* The totals sit under the last two columns and are divided where those two
+   are divided, which is the whole reason the narrow column exists. The widths
+   below are TRADE_WIDTHS[3] and [4] of the table, so the block cannot drift
+   away from the column above it. */
+.doc-trade-totals {
+    flex: 0 0 24.79%;
+}
+
+.doc-trade-total-row {
+    display: flex;
+    border: 1px solid #231F20;
+    border-top: 0;
+    min-height: 1.5rem;
+    align-items: center;
+}
+
+.doc-trade-total-row:first-child {
+    border-top: 1px solid #231F20;
+}
+
+.doc-trade-total-row.is-total {
+    background-color: #F0E8CD;
+    border-radius: 0 0 0.5rem 0.5rem;
+    font-weight: 700;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+/* Outside the box and to its left, as the artwork has it. Absolute so a long
+   label cannot widen the block and pull it out of line with the column. */
+.doc-trade-total-label {
+    position: absolute;
+    right: 100%;
+    padding-right: 0.4rem;
+    white-space: nowrap;
+    font-size: 1rem;
+}
+
+.doc-trade-total-row {
+    position: relative;
+}
+
+.doc-trade-total-major {
+    flex: 0 0 66.56%;
+    text-align: right;
+    padding: 0 0.25rem;
+    border-right: 1px solid #231F20;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.doc-trade-total-minor {
+    flex: 1 1 auto;
+    padding: 0 0.25rem;
+    font-size: 0.875rem;
+}
+
+.doc-trade-terms {
+    margin-top: 1.25rem;
+}
+
+.doc-trade-terms-heading {
+    display: inline-block;
+    margin: 0 0 0.25rem 1.25rem;
+    padding-bottom: 0.0625rem;
+    border-bottom: 1px solid #B92025;
+    color: #B92025;
+    font-size: 0.8125rem;
+}
+
+/* Indented past the numbers, so the clauses hang off their figures and this
+   line sits inside them -- the arrangement the artwork has. */
+.doc-trade-terms-intro {
+    margin: 0 0 0.125rem 1.9rem;
+    font-size: 0.75rem;
+    line-height: 1.55;
+}
+
+.doc-trade-terms-list {
+    margin: 0;
+    padding-left: 2.5rem;
+    font-size: 0.75rem;
+    line-height: 1.55;
+}
+
+.doc-trade-note {
+    margin: 0.75rem 0 0;
+    font-size: 0.75rem;
+}
+
+/* The artwork's footer band, as two gradients and a red sweep. Decorative and
+   aria-hidden; it carries no content and exists so the sheet ends the way the
+   printed form does. margin-top: auto pins it to the foot however short the
+   receipt is, and the negative margins take it out to the sheet's own edges
+   past the padding. */
+.doc-trade-band {
+    display: block;
+    margin: auto -1.25rem 0;
+    width: calc(100% + 2.5rem);
+    height: 4.2rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+
+/* Trade counter receipt, catalog miniature. Carries only what identifies the
+   sheet at this size: the boxed header with its three ruled reference rows, the
+   account block as rules, the cream grid head over ruled rows, the cream total,
+   the red terms rule and the curved footer band.
+
+   Sized in em against .mock-doc's own 0.375rem base rather than in percentages.
+   The first version used percentage padding and gap inside a flex column, which
+   resolve against different axes and left the whole receipt stacked in the top
+   third of the tile with a void beneath it. */
+.mock-doc.trade {
+    gap: 0.45em;
+}
+
+/* Section heights follow the ARTWORK'S proportions of an A4 page, not
+   whatever is left over: header card 18.6 per cent, account block 12, grid and
+   totals 42, terms 11. Left to fill freely the grid took 68 per cent and its
+   rows came out as deep empty boxes -- a ruled form reads by having MANY thin
+   rules, not a few tall ones. */
+.mock-doc.trade .mk-tr-card {
+    display: flex;
+    gap: 0.8em;
+    align-items: stretch;
+    flex: 0 0 17%;
+    border: 1px solid #231F20;
+    border-radius: 2px;
+    padding: 0.6em;
+}
+
+.mock-doc.trade .mk-tr-brand {
+    flex: 0 0 42%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.3em;
+}
+
+/* Two solid bars for the logo, three rules for the address beneath it -- the
+   arrangement the artwork has in that corner. The bars carry the source's own
+   red and green, which are the only place those two colours appear. */
+.mock-doc.trade .mk-tr-brand b {
+    display: block;
+    height: 0.5em;
+    border-radius: 1px;
+    background-color: #B92025;
+}
+
+.mock-doc.trade .mk-tr-brand b:last-of-type {
+    width: 62%;
+    background-color: #056534;
+}
+
+.mock-doc.trade .mk-tr-brand span {
+    display: block;
+    height: 1px;
+    background-color: #B9BAC0;
+}
+
+.mock-doc.trade .mk-tr-brand span:nth-of-type(2) { width: 88%; }
+.mock-doc.trade .mk-tr-brand span:last-of-type { width: 74%; }
+
+.mock-doc.trade .mk-tr-refs {
+    flex: 1 1 auto;
+    align-self: flex-end;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #231F20;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.mock-doc.trade .mk-tr-refs span {
+    display: block;
+    height: 1em;
+    border-bottom: 1px solid #231F20;
+    background-image: linear-gradient(to right, #DBD9D9 0 24%, transparent 24%);
+}
+
+.mock-doc.trade .mk-tr-refs span:last-child {
+    border-bottom: 0;
+}
+
+.mock-doc.trade .mk-tr-acct {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 12%;
+    justify-content: space-between;
+    padding: 0.2em 0;
+}
+
+.mock-doc.trade .mk-tr-acct span {
+    display: block;
+    height: 1px;
+    background-color: #B9BAC0;
+}
+
+.mock-doc.trade .mk-tr-acct span:nth-child(odd) { width: 78%; }
+.mock-doc.trade .mk-tr-acct span:nth-child(even) { width: 64%; }
+
+/* The grid takes the slack, rather than a .mk-fill spacer below it. With a
+   spacer the receipt sat in the top 43 per cent of the tile and the rest was
+   white -- correct by every measurement and plainly wrong on sight. */
+.mock-doc.trade .mk-tr-grid {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 1px solid #231F20;
+}
+
+.mock-doc.trade .mk-tr-head {
+    display: flex;
+    background-color: #F0E8CD;
+    border-bottom: 1px solid #231F20;
+    line-height: 1.3;
+}
+
+.mock-doc.trade .mk-tr-head span {
+    text-align: center;
+    border-right: 1px solid #231F20;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* The artwork's own five proportions, so the miniature divides where the sheet
+   does. The fifth is the minor-unit column and carries no heading. */
+.mock-doc.trade .mk-tr-head span:nth-child(1) { flex: 0 0 16.45%; }
+.mock-doc.trade .mk-tr-head span:nth-child(2) { flex: 0 0 42.32%; }
+.mock-doc.trade .mk-tr-head span:nth-child(3) { flex: 0 0 16.44%; }
+.mock-doc.trade .mk-tr-head span:nth-child(4) { flex: 0 0 16.50%; }
+.mock-doc.trade .mk-tr-head span:nth-child(5) { flex: 1 1 auto; border-right: 0; }
+
+.mock-doc.trade .mk-tr-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.mock-doc.trade .mk-tr-row {
+    flex: 1 1 auto;
+    min-height: 0.8em;
+    border-bottom: 1px solid #231F20;
+    background-image: linear-gradient(to right,
+        transparent 0 calc(16.45% - 1px), #231F20 calc(16.45% - 1px) 16.45%,
+        transparent 16.45% calc(58.77% - 1px), #231F20 calc(58.77% - 1px) 58.77%,
+        transparent 58.77% calc(75.21% - 1px), #231F20 calc(75.21% - 1px) 75.21%,
+        transparent 75.21% calc(91.71% - 1px), #231F20 calc(91.71% - 1px) 91.71%,
+        transparent 91.71%);
+}
+
+.mock-doc.trade .mk-tr-row:last-child {
+    border-bottom: 0;
+}
+
+/* Under the last two columns and divided where they are, which is the whole
+   reason the artwork has a narrow fifth column. */
+.mock-doc.trade .mk-tr-totals {
+    align-self: flex-end;
+    width: 24.79%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mock-doc.trade .mk-tr-tot {
+    display: block;
+    height: 1em;
+    border: 1px solid #231F20;
+    border-top: 0;
+    background-image: linear-gradient(to right,
+        transparent 0 calc(66.56% - 1px), #231F20 calc(66.56% - 1px) 66.56%,
+        transparent 66.56%);
+}
+
+.mock-doc.trade .mk-tr-tot:first-child {
+    border-top: 1px solid #231F20;
+}
+
+.mock-doc.trade .mk-tr-tot.is-final {
+    background-color: #F0E8CD;
+    border-radius: 0 0 2px 2px;
+}
+
+.mock-doc.trade .mk-tr-terms {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 11%;
+    justify-content: space-between;
+    margin-left: 8%;
+    padding: 0.3em 0;
+}
+
+.mock-doc.trade .mk-tr-terms i {
+    display: block;
+    width: 34%;
+    height: 1px;
+    background-color: #B92025;
+}
+
+.mock-doc.trade .mk-tr-terms span {
+    display: block;
+    height: 1px;
+    width: 72%;
+    background-color: #B9BAC0;
+}
+
+.mock-doc.trade .mk-tr-terms span:last-child {
+    width: 58%;
+}
+
+/* Full bleed past the tile's padding, as it is on the sheet. */
+.mock-doc.trade .mk-tr-band {
+    display: block;
+    width: calc(100% + 1.25rem);
+    height: 1.6rem;
+    margin: 0 -0.625rem -0.625rem;
+}
+
+
+/* Anniversary calendar poster, catalog miniature. The heart is the identity,
+   so the eighteen boxes are placed as PERCENTAGES of their own container,
+   taken from the same artwork coordinates poster.js normalises -- the tile and
+   the poster cannot drift into different hearts. */
+.mock-doc.poster.anniv {
+    background-color: #050606;
+    gap: 0;
+    padding: 5% 6%;
+    justify-content: flex-start;
+}
+
+.mock-doc.poster.anniv .mk-an-names {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5%;
+    margin-bottom: 4%;
+}
+
+.mock-doc.poster.anniv .mk-an-names span {
+    display: block;
+    width: 26%;
+    height: 0.42rem;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+.mock-doc.poster.anniv .mk-an-names i {
+    display: block;
+    width: 0.34rem;
+    height: 0.3rem;
+    background-color: #E93625;
+    clip-path: polygon(50% 100%, 0 35%, 15% 0, 50% 18%, 85% 0, 100% 35%);
+}
+
+/* The collage. Aspect fixed to the artwork's own 441.37 x 367.47 so the heart
+   keeps its shape at any tile size, and 67 per cent wide because that is what
+   the poster gives it (400pt of 597.45). At full width the tile overflowed and
+   the calendar fell off the bottom -- a miniature has to be the same poster,
+   not the same elements at whatever size is left over. */
+.mock-doc.poster.anniv .mk-an-heart {
+    position: relative;
+    width: 67%;
+    margin: 0 auto 4%;
+    aspect-ratio: 441.37 / 367.47;
+}
+
+.mock-doc.poster.anniv .mk-an-heart b {
+    position: absolute;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.anniv .mk-an-code {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5%;
+    height: 0.34rem;
+    margin: 0 32% 4%;
+}
+
+.mock-doc.poster.anniv .mk-an-code span {
+    display: block;
+    flex: 0 0 4%;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+.mock-doc.poster.anniv .mk-an-code span:nth-child(odd) { height: 100%; }
+.mock-doc.poster.anniv .mk-an-code span:nth-child(even) { height: 52%; }
+
+.mock-doc.poster.anniv .mk-an-month {
+    margin: 0 0 3%;
+    text-align: center;
+    color: #FFFFFF;
+    font-family: var(--font-serif);
+    font-size: 0.34rem;
+    letter-spacing: 0.04em;
+}
+
+.mock-doc.poster.anniv .mk-an-cal {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0 14%;
+}
+
+.mock-doc.poster.anniv .mk-an-head {
+    display: flex;
+    color: #FFFFFF;
+    font-family: var(--font-serif);
+    font-size: 0.26rem;
+    line-height: 1;
+}
+
+.mock-doc.poster.anniv .mk-an-head span {
+    flex: 1 1 0;
+    text-align: center;
+}
+
+.mock-doc.poster.anniv .mk-an-rule {
+    height: 1px;
+    background-color: #FFFFFF;
+    margin: 6% 0 7%;
+}
+
+/* Six rules standing in for the weeks -- the worst case a month can need, and
+   what the poster draws for November 2025. At this size real numerals would be
+   two pixels tall and read as noise, but the ROW COUNT is what makes the block
+   look like a month, and with two rules the tile had a hole where the poster
+   has a calendar. */
+.mock-doc.poster.anniv .mk-an-grid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-top: 6%;
+}
+
+.mock-doc.poster.anniv .mk-an-grid span {
+    display: block;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Shorter rules at the ends, the way a month starts and finishes part-way
+   through a week. */
+.mock-doc.poster.anniv .mk-an-grid span:first-child { width: 16%; margin-left: auto; }
+.mock-doc.poster.anniv .mk-an-grid span:last-child { width: 30%; }
+
+.mock-doc.poster.anniv .mk-an-tag {
+    margin: auto 14% 0;
+    height: 0.34rem;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+
+/* Birthday calendar poster, catalog miniature. The cascade is the thing that
+   identifies it, so the twelve boxes are placed at the artwork's own fractions
+   of the page rather than redrawn by eye, and everything else is a bar. */
+.mock-doc.poster.hbd {
+    position: relative;
+    background-color: #231F20;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.poster.hbd .mk-hbd-boxes b {
+    position: absolute;
+    display: block;
+    background-color: #FFFFFF;
+    border: 1px solid #E93625;
+    box-sizing: border-box;
+}
+
+.mock-doc.poster.hbd .mk-hbd-month {
+    position: absolute;
+    left: 8.9%;
+    top: 4.2%;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 0.5rem;
+    line-height: 1;
+    color: #FFFFFF;
+}
+
+/* Sized to the share of the page the calendar actually occupies -- header
+   baseline 103.67 to last row 267, which is 19.4 per cent of 841.89. Left to
+   size itself the five rules bunched into a fifth of that and read as one
+   smudge under the header. */
+.mock-doc.poster.hbd .mk-hbd-cal {
+    position: absolute;
+    left: 6.1%;
+    top: 10.6%;
+    width: 45.7%;
+    height: 19.4%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mock-doc.poster.hbd .mk-hbd-head {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-serif);
+    font-size: 0.28rem;
+    line-height: 1.1;
+    color: #FFFFFF;
+}
+
+.mock-doc.poster.hbd .mk-hbd-rule {
+    height: 1px;
+    margin-top: 1px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.hbd .mk-hbd-grid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 8% 0 2%;
+}
+
+.mock-doc.poster.hbd .mk-hbd-grid span {
+    display: block;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.55);
+}
+
+/* The month opens part-way through its first week and ends part-way through
+   its last, which is what these two short rules are saying. */
+.mock-doc.poster.hbd .mk-hbd-grid span:first-child { width: 84%; margin-left: auto; }
+.mock-doc.poster.hbd .mk-hbd-grid span:last-child { width: 40%; }
+
+.mock-doc.poster.hbd .mk-hbd-garland {
+    position: absolute;
+    right: 4%;
+    top: 7%;
+    width: 34%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transform: rotate(-7deg);
+}
+
+.mock-doc.poster.hbd .mk-hbd-garland i {
+    display: block;
+    width: 0.3rem;
+    height: 0.3rem;
+    border-radius: 50% 50% 6% 50%;
+    background-color: #C190B7;
+    transform: rotate(45deg);
+}
+
+.mock-doc.poster.hbd .mk-hbd-garland i:nth-child(even) {
+    background-color: #A4B1C3;
+}
+
+.mock-doc.poster.hbd .mk-hbd-quote {
+    position: absolute;
+    left: 5.7%;
+    top: 35.4%;
+    width: 42%;
+    height: 21.7%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.mock-doc.poster.hbd .mk-hbd-quote span {
+    display: block;
+    height: 1.5px;
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.mock-doc.poster.hbd .mk-hbd-quote span:last-child { width: 46%; }
+
+.mock-doc.poster.hbd .mk-hbd-close {
+    position: absolute;
+    left: 5.7%;
+    bottom: 6%;
+    width: 78%;
+    height: 2px;
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+
+/* Birthday tribute poster, catalog miniature. The wall of red boxes is what
+   identifies it -- the sibling layout's cascade is white-filled with red
+   keylines and this one is the reverse -- so the boxes are placed at the
+   artwork's own fractions of the page and everything else is a bar. */
+.mock-doc.poster.trib {
+    position: relative;
+    background-color: #231F20;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.poster.trib .mk-tb-boxes b {
+    position: absolute;
+    display: block;
+    background-color: #E93625;
+    border: 1px solid #FFFFFF;
+    box-sizing: border-box;
+}
+
+.mock-doc.poster.trib .mk-tb-boxes b.tint {
+    background-color: #EF4136;
+}
+
+/* Four strings down from the top edge, at the artwork's own x positions and
+   each ending where its heart hangs. */
+.mock-doc.poster.trib .mk-tb-strings i {
+    position: absolute;
+    top: 1.2%;
+    width: 1px;
+    background-color: #ED1C24;
+}
+
+.mock-doc.poster.trib .mk-tb-strings i:nth-child(1) { left: 64.1%; height: 11.7%; }
+.mock-doc.poster.trib .mk-tb-strings i:nth-child(2) { left: 73.2%; height: 7.0%; }
+.mock-doc.poster.trib .mk-tb-strings i:nth-child(3) { left: 80.2%; height: 15.1%; }
+.mock-doc.poster.trib .mk-tb-strings i:nth-child(4) { left: 87.1%; height: 9.0%; }
+
+.mock-doc.poster.trib .mk-tb-strings i::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -0.16rem;
+    width: 0.2rem;
+    height: 0.2rem;
+    margin-left: -0.1rem;
+    border-radius: 50% 50% 6% 50%;
+    background-color: #E93625;
+    transform: rotate(45deg);
+}
+
+.mock-doc.poster.trib .mk-tb-month {
+    position: absolute;
+    left: 7.4%;
+    top: 4.6%;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 0.46rem;
+    line-height: 1;
+    color: #FFFFFF;
+}
+
+/* The calendar takes the share of the page it takes on the poster: header
+   baseline 90.88 to last row 216.47 is 14.9 per cent of 841.89. */
+.mock-doc.poster.trib .mk-tb-cal {
+    position: absolute;
+    left: 4.4%;
+    top: 9.0%;
+    width: 35.2%;
+    height: 16.5%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mock-doc.poster.trib .mk-tb-head {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-serif);
+    font-size: 0.26rem;
+    line-height: 1.1;
+    color: #FFFFFF;
+}
+
+.mock-doc.poster.trib .mk-tb-rule {
+    height: 1px;
+    margin-top: 1px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.trib .mk-tb-grid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 6% 0 2%;
+}
+
+.mock-doc.poster.trib .mk-tb-grid span {
+    display: block;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.55);
+}
+
+/* October opens on a Wednesday and ends on a Friday, which is what the two
+   short rules at the ends are saying. */
+.mock-doc.poster.trib .mk-tb-grid span:first-child { width: 57%; margin-left: auto; }
+.mock-doc.poster.trib .mk-tb-grid span:last-child { width: 86%; }
+
+.mock-doc.poster.trib .mk-tb-msg {
+    position: absolute;
+    left: 4.2%;
+    top: 40%;
+    width: 40%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+}
+
+.mock-doc.poster.trib .mk-tb-msg b {
+    display: block;
+    width: 62%;
+    height: 2px;
+    background-color: #E93625;
+}
+
+.mock-doc.poster.trib .mk-tb-msg span {
+    display: block;
+    height: 1.5px;
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+.mock-doc.poster.trib .mk-tb-msg span:last-child { width: 58%; }
+
+.mock-doc.poster.trib .mk-tb-title {
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    bottom: 4.5%;
+    height: 3px;
+    background-color: #FFFFFF;
+}
+
+/* The love story calendar's tile. The same idea as the tribute's above: the
+   photo boxes are what identifies the layout, so they sit at the artwork's own
+   fractions of the page and everything else is a bar. Its cascade is WHITE on
+   the dark ground with a page-coloured mount around three of them, which is
+   the reverse of the tribute's red-on-white and is the whole difference
+   between the two at thumbnail size. */
+/* The Labelled Sections CV's tile. What identifies this design at thumbnail
+   size is the left LABEL COLUMN and the ruled bands across it, so those are
+   what the tile draws at full strength; the body is bars, as the other resume
+   tiles are. The masthead is the photo box and the name side by side, which is
+   the second thing that tells it apart from Ruled Serif above. */
+.mock-doc.labelled {
+    gap: 0;
+    padding: 0.5rem 0.45rem;
+}
+
+.mock-doc.labelled .mk-lb-head {
+    display: flex;
+    gap: 0.35rem;
+    align-items: flex-start;
+    padding: 0.1rem 0.15rem 0.32rem;
+}
+
+/* A keyline box, as the sheet draws it, rather than a filled block: an empty
+   frame is what a visitor sees before they upload anything. */
+.mock-doc.labelled .mk-lb-photo {
+    flex: 0 0 18%;
+    aspect-ratio: 4 / 5;
+    border: 1px solid var(--color-text);
+    box-sizing: border-box;
+}
+
+.mock-doc.labelled .mk-lb-id {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-top: 0.15rem;
+}
+
+.mock-doc.labelled .mk-lb-id .mk-name {
+    margin: 0 0 0.16rem;
+    /* Sans, like the sheet. The shared .mk-name is a serif, which is right for
+       Ruled Serif above and wrong for this one. */
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 0.5rem;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: var(--mk-accent);
+}
+
+.mock-doc.labelled .mk-lb-id .mk-contact {
+    margin: 0 0 0.1rem;
+    font-size: 0.33rem;
+    line-height: 1.3;
+    opacity: 0.75;
+}
+
+/* One band: the rule across the top, then the label and the body beside it.
+   The rule is a border on the BAND rather than a separate element, so a band
+   and its rule cannot drift apart. */
+.mock-doc.labelled .mk-lb-band {
+    display: flex;
+    gap: 0.35rem;
+    align-items: flex-start;
+    border-top: 1px solid var(--mk-accent);
+    padding: 0.26rem 0.15rem 0.28rem;
+    /* The five bands share whatever height the masthead leaves. A sheet of
+       this design fills its page, so a tile whose rules all bunch into the top
+       half misrepresents it -- and the tile has no content of its own to grow
+       with. */
+    flex: 1 1 auto;
+}
+
+/* The marker, and it is NOT called `dot`: this stylesheet already has a
+   site-wide `.dot` -- a 14px bordered circle used for colour swatches -- and
+   the first version of this tile inherited it, which turned every bullet bar
+   into a small ring. A generic class name in one shared stylesheet is a
+   collision waiting for whoever writes the next tile. */
+
+.mock-doc.labelled .mk-lb-label {
+    flex: 0 0 24%;
+    margin: 0;
+    font-weight: 700;
+    font-size: 0.36rem;
+    line-height: 1.25;
+    text-transform: uppercase;
+    color: var(--mk-accent);
+}
+
+.mock-doc.labelled .mk-lb-body {
+    /* Basis ZERO, not auto. The entry line inside carries a role and a date
+       range with nothing breakable between them, so an auto basis sizes this
+       column to that line's own width and the bars then run past the sheet's
+       right margin. */
+    flex: 1 1 0;
+    min-width: 0;
+    /* The entry line below can be wider than the space it is given -- a role
+       and a date range with nothing breakable between them -- and without this
+       it draws past the sheet's own right margin. */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.16rem;
+    padding-top: 0.03rem;
+}
+
+.mock-doc.labelled .mk-lb-role {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.3rem;
+    margin: 0 0 0.06rem;
+    font-weight: 700;
+    font-size: 0.34rem;
+    line-height: 1.2;
+}
+
+.mock-doc.labelled .mk-lb-role b { min-width: 0; overflow: hidden; white-space: nowrap; }
+.mock-doc.labelled .mk-lb-role em { font-style: normal; white-space: nowrap; }
+
+.mock-doc.labelled .mk-lb-body span {
+    display: block;
+    height: 1px;
+    background-color: currentColor;
+    opacity: 0.55;
+}
+
+.mock-doc.labelled .mk-lb-body span.mk-li-short { width: 62%; }
+
+.mock-doc.labelled .mk-lb-body span.mk-li {
+    position: relative;
+    width: auto;
+    height: 1px;
+    border: 0;
+    border-radius: 0;
+    margin-left: 0.28rem;
+}
+
+.mock-doc.labelled .mk-lb-body span.mk-li::before {
+    content: "";
+    position: absolute;
+    left: -0.28rem;
+    top: -0.06rem;
+    width: 0.13rem;
+    height: 0.13rem;
+    border-radius: 50%;
+    background-color: currentColor;
+    opacity: 0.9;
+}
+
+/* The ninth poster's tile. What identifies this design at thumbnail size is
+   the three-by-three grid over a heavy word, so those two lead and everything
+   below them is a rule.
+
+   The one tile in this set that can be a CSS GRID rather than nine positioned
+   boxes: its cells are regular, where every other collage here has an
+   artwork's hand-set rectangles to reproduce. The single `gap` covers both
+   axes exactly, which is arithmetic rather than luck -- the gutter is the same
+   fraction of the grid's width as of its height, the grid being square.
+
+   Prefixed mk-cp- because a generic name in a stylesheet this size is a
+   collision waiting to happen: a tile's bullet markers were once called `dot`
+   here beside an existing `.dot`, and it failed silently. */
+/* The tenth poster's tile. What identifies this design at thumbnail size is
+   the heart of tiles over a row of code bars, so those two lead and the rest
+   is rules.
+
+   Prefixed mk-sp- because every other prefix in this set is taken and a
+   generic name in a stylesheet this size is a collision waiting to happen: a
+   tile's bullet markers were once called `dot` here beside an existing `.dot`,
+   and it failed silently. */
+.mock-doc.poster.tune {
+    position: relative;
+    background-color: #FFFFFF;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* The greeting, as a bar: at this size a script word is an illegible smudge
+   and the bar is what the eye reads as a line of writing. */
+.mock-doc.poster.tune .mk-sp-greet {
+    position: absolute;
+    left: 28.7%;
+    width: 42.7%;
+    top: 4.75%;
+    height: 2%;
+    background-color: #1A1A1A;
+    border-radius: 1px;
+}
+
+/* The heart. Positioned in the COLLAGE box's own percentages, which is why
+   the inline values on the card are the layout's own numbers divided by 500
+   and 387 rather than by the page -- the box is the frame of reference in
+   both places, so the tile cannot drift from the poster. */
+.mock-doc.poster.tune .mk-sp-heart {
+    position: absolute;
+    left: 12.203%;
+    top: 11.688%;
+    width: 75.594%;
+    height: 40.598%;
+}
+
+.mock-doc.poster.tune .mk-sp-heart b {
+    position: absolute;
+    display: block;
+    background-color: #DCDCDC;
+    border: 1px solid #FFFFFF;
+    box-sizing: border-box;
+}
+
+/* The scan code: a round mark and a run of bars, which is the one part of
+   this poster nothing else in the catalog has. */
+.mock-doc.poster.tune .mk-sp-code {
+    position: absolute;
+    left: 25.46%;
+    top: 63.95%;
+    width: 49.07%;
+    height: 8.67%;
+    display: flex;
+    align-items: center;
+    gap: 6%;
+}
+
+.mock-doc.poster.tune .mk-sp-code em {
+    display: block;
+    flex: 0 0 auto;
+    width: 22%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-color: #1A1A1A;
+}
+
+.mock-doc.poster.tune .mk-sp-code span {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.mock-doc.poster.tune .mk-sp-code i {
+    display: block;
+    width: 1.5px;
+    height: 45%;
+    background-color: #1A1A1A;
+}
+
+/* Every third bar taller, so the run reads as a code rather than as a comb. */
+.mock-doc.poster.tune .mk-sp-code i:nth-child(3n) { height: 80%; }
+.mock-doc.poster.tune .mk-sp-code i:nth-child(4n) { height: 28%; }
+
+.mock-doc.poster.tune .mk-sp-title {
+    position: absolute;
+    left: 22.86%;
+    width: 22%;
+    top: 74.66%;
+    height: 3.2%;
+    background-color: #1A1A1A;
+}
+
+.mock-doc.poster.tune .mk-sp-bar {
+    position: absolute;
+    left: 22.86%;
+    width: 54.28%;
+    top: 83.15%;
+    height: 1.5px;
+    background-color: #C8C8C8;
+}
+
+/* The knob, at the fraction the poster's own default leaves it. */
+.mock-doc.poster.tune .mk-sp-bar u {
+    position: absolute;
+    left: 22%;
+    top: 50%;
+    width: 3px;
+    height: 3px;
+    margin: -1.5px 0 0 -1.5px;
+    border-radius: 50%;
+    background-color: #1A1A1A;
+}
+
+.mock-doc.poster.tune .mk-sp-row {
+    position: absolute;
+    left: 22.86%;
+    width: 54.28%;
+    top: 92.33%;
+    height: 4%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mock-doc.poster.tune .mk-sp-row s {
+    display: block;
+    width: 3px;
+    height: 3px;
+    background-color: #1A1A1A;
+    text-decoration: none;
+}
+
+.mock-doc.poster.tune .mk-sp-row s.disc {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.mock-doc.poster.couple {
+    position: relative;
+    background-color: #FBF9F5;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.poster.couple .mk-cp-grid {
+    position: absolute;
+    left: 8.087%;
+    right: 8.087%;
+    top: 13.066%;
+    bottom: 27.664%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 2.806%;
+}
+
+.mock-doc.poster.couple .mk-cp-grid b {
+    display: block;
+    background-color: #DFDAD2;
+}
+
+/* The headword, as a block rather than as type: at this size a real word is
+   four illegible marks, and the block is what the eye reads as "heavy serif". */
+.mock-doc.poster.couple .mk-cp-word {
+    position: absolute;
+    left: 8.087%;
+    top: 73.53%;
+    width: 24%;
+    height: 5.7%;
+    background-color: #161514;
+}
+
+.mock-doc.poster.couple .mk-cp-brk {
+    position: absolute;
+    left: 34.5%;
+    top: 78.1%;
+    width: 7.5%;
+    height: 1.6%;
+    background-color: #5F5A55;
+}
+
+.mock-doc.poster.couple .mk-cp-def {
+    position: absolute;
+    left: 8.087%;
+    right: 8.087%;
+    top: 81.36%;
+}
+
+.mock-doc.poster.couple .mk-cp-def span {
+    display: block;
+    height: 1.5px;
+    background-color: #161514;
+    opacity: 0.85;
+}
+
+/* 7.5px on a 1.5px rule is a 9px pitch, which is the poster's 21.5-point
+   leading at the size this tile actually renders. In px like every other rule
+   in this set, rather than as a percentage: a percentage margin resolves
+   against the container's WIDTH even when it is a vertical one, which is a
+   trap rather than a scaling. */
+.mock-doc.poster.couple .mk-cp-def span + span {
+    margin-top: 7.5px;
+}
+
+/* Ragged right, which is what makes four rules read as a paragraph rather
+   than as a table. */
+.mock-doc.poster.couple .mk-cp-def span:nth-child(3) { width: 92%; }
+.mock-doc.poster.couple .mk-cp-def span:nth-child(4) { width: 38%; }
+
+.mock-doc.poster.couple .mk-cp-close {
+    position: absolute;
+    left: 8.087%;
+    top: 92.77%;
+    width: 46%;
+    height: 2px;
+    background-color: #5F5A55;
+}
+
+.mock-doc.poster.love {
+    position: relative;
+    background-color: #231F20;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mock-doc.poster.love .mk-lv-boxes b {
+    position: absolute;
+    display: block;
+    background-color: #FFFFFF;
+    box-sizing: border-box;
+}
+
+/* The three boxes the artwork mounts: a page-coloured border is exactly what
+   the outer rectangle is doing on the poster, so the tile draws it the same
+   way rather than as a second element. */
+.mock-doc.poster.love .mk-lv-boxes b.mount {
+    border: 2px solid #231F20;
+}
+
+/* A ring, not a disc: the portrait sits inside it and the ring is what reads
+   at this size. */
+.mock-doc.poster.love .mk-lv-ring {
+    position: absolute;
+    left: 5.161%;
+    top: 9.207%;
+    width: 38.167%;
+    height: 27.355%;
+    border: 2px solid #FFFFFF;
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.mock-doc.poster.love .mk-lv-toprule {
+    position: absolute;
+    left: 53.907%;
+    top: 2.870%;
+    width: 41.093%;
+    height: 1px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-month {
+    position: absolute;
+    left: 57.479%;
+    top: 3.563%;
+    width: 34.920%;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 0.34rem;
+    line-height: 1;
+    text-align: center;
+    color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-cal {
+    position: absolute;
+    left: 57.479%;
+    top: 8.552%;
+    width: 34.920%;
+    height: 17.104%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mock-doc.poster.love .mk-lv-head {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-serif);
+    font-size: 0.26rem;
+    line-height: 1.1;
+    color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-rule {
+    height: 1px;
+    margin-top: 1px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-grid {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 8% 0 2%;
+}
+
+.mock-doc.poster.love .mk-lv-grid span {
+    display: block;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.55);
+}
+
+/* September opens on a Monday in the artwork's own grid and ends on a
+   Saturday, which is what the two short rules at the ends are saying. */
+.mock-doc.poster.love .mk-lv-grid span:first-child { width: 86%; margin-left: auto; }
+.mock-doc.poster.love .mk-lv-grid span:last-child { width: 43%; }
+
+/* The cradle under the grid, as the bar and two turned-up ends it reads as. */
+.mock-doc.poster.love .mk-lv-tray {
+    position: absolute;
+    left: 54.786%;
+    top: 24.0%;
+    width: 40.248%;
+    height: 4.2%;
+    border: 2px solid #FFFFFF;
+    border-top: 0;
+    border-radius: 0 0 30% 30%;
+    box-sizing: border-box;
+}
+
+.mock-doc.poster.love .mk-lv-msg {
+    position: absolute;
+    left: 57.874%;
+    top: 32.308%;
+    width: 34.525%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.16rem;
+}
+
+.mock-doc.poster.love .mk-lv-msg span {
+    display: block;
+    height: 1.5px;
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+.mock-doc.poster.love .mk-lv-msg span:last-child { width: 72%; }
+
+/* The last line of the first paragraph, with the pair of pink hearts on the
+   END of it -- which is where the poster puts them. On its own row they read
+   as a seventh line of a message that has six. */
+.mock-doc.poster.love .mk-lv-msg em {
+    display: flex;
+    align-items: center;
+    gap: 4%;
+}
+
+.mock-doc.poster.love .mk-lv-msg em span { flex: 0 0 58%; }
+
+.mock-doc.poster.love .mk-lv-msg i {
+    display: block;
+    flex: 0 0 14%;
+    height: 2.5px;
+    background-color: #EF5692;
+}
+
+.mock-doc.poster.love .mk-lv-title {
+    position: absolute;
+    left: 62%;
+    width: 26%;
+    top: 60.578%;
+    height: 2.5px;
+    background-color: #FFFFFF;
+}
+
+.mock-doc.poster.love .mk-lv-div {
+    position: absolute;
+    left: 59.775%;
+    width: 30.455%;
+    top: 64.304%;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.7);
+}
+
+.mock-doc.poster.love .mk-lv-div.low { top: 71.851%; }
+
+.mock-doc.poster.love .mk-lv-names {
+    position: absolute;
+    left: 60.5%;
+    width: 29%;
+    top: 67.705%;
+    height: 3px;
+    background-color: #FFFFFF;
 }

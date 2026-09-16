@@ -13,12 +13,14 @@
     <meta property="og:title" content="Custom Poster and Canvas Maker | TemplateBox">
     <meta property="og:description" content="Create framed photo posters with captions and download high-resolution PNG files free.">
     <meta property="og:url" content="https://templatebox.win/poster.html">
-    <meta property="og:image" content="https://templatebox.win/assets/logo.png">
+    <meta property="og:image" content="https://templatebox.win/assets/og-poster.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <!-- Twitter Card: without these every share renders as a bare link -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Custom Poster and Canvas Maker | TemplateBox">
     <meta name="twitter:description" content="Create framed photo posters with captions and download high-resolution PNG files free.">
-    <meta name="twitter:image" content="https://templatebox.win/assets/logo.png">
+    <meta name="twitter:image" content="https://templatebox.win/assets/og-poster.png">
 
     <script type="application/ld+json">
     {
@@ -63,9 +65,29 @@
     <!-- Fonts loaded without blocking render: the print-media swap defers
          application until the sheet has arrived, and font-display:swap in
          the served CSS paints text immediately in the fallback face. -->
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"></noscript>
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Petit+Formal+Script&family=Inter:wght@400;500;600&display=swap">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Petit+Formal+Script&family=Inter:wght@400;500;600&display=swap"></noscript>
     <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
+    <!-- Installed app (Tier 0 PWA). The manifest is what makes Chrome offer
+         "Install"; iOS ignores its icons array entirely and reads the
+         apple-touch-icon link below, so both are needed. js/app.js registers
+         sw.js on window load, deliberately after the ad scripts.
+         Reference: docs/implementation/PWA_INSTALLABLE_APP.md -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="assets/icon-180.png">
+    <meta name="apple-mobile-web-app-title" content="TemplateBox">
+    <!-- Both spellings on purpose: mobile-web-app-capable is the standard,
+         and the apple- prefixed original is still the only one iOS before 18
+         understands. Dropping it puts Safari chrome back over a home-screen
+         launch on those devices. -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- Status bar and task-switcher tint; visible only once installed.
+         js/app.js rewrites both once it knows whether the visitor chose a
+         theme explicitly rather than inheriting the system one -- see
+         syncThemeColor() there. -->
+    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">
     <!-- Theme, applied before first paint so a returning visitor never sees a
          flash of the wrong one. Deliberately inline and synchronous: an
          external file would load after the first paint and the flash is
@@ -98,34 +120,28 @@
          Replacing the ELEMENT would have broken that contract; replacing its
          CONTENTS is what "a minimal editor bar" actually needs.
 
-         The wordmark is replaced by a home button per the reference layout, and
-         the Templates/Guides/About links are gone -- but the "More" mega-menu
-         below is kept, because it is the only route from an editor to the privacy
-         policy and terms (the editors carry no footer, a gap PROJECT_STATUS.md
-         already flags as worth revisiting rather than widening). -->
+         The bar carries the mark, the document name and the actions, and
+         nothing else. The inline Templates and Guides links and the header
+         search -- field and narrow-width link both -- were removed on
+         September 9, 2026: this is a workspace, and a link out of it competes
+         with the work rather than supporting it. Search is still reachable
+         from the mega-menu below.
+
+         That menu stays, because it is the only route from an editor to the
+         privacy policy and terms (the editors carry no footer, a gap
+         PROJECT_STATUS.md already flags as worth revisiting rather than
+         widening). -->
     <header class="site-header editor-bar">
-        <a class="editor-home" href="index.html" title="All templates" aria-label="All templates"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></a>
-        <!-- Two left-hand identities, one visible at a time: the icon below
-             75rem, the wordmark above it, where there is room for a word.
-             Both link home. Matches mockup.html, which established this. -->
-        <a class="editor-brand" href="index.html"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg><span>TemplateBox</span></a>
+        <!-- The mark alone, ungated: no wordmark beside it, and no viewport
+             gate handing the narrow band to a second identity. `order: -1` is
+             what puts it before the document name, which carries no order of
+             its own -- see the .editor-mark comment in css/style.css, and
+             docs.html, which established this. -->
+        <a class="editor-mark" href="index.html" title="TemplateBox home" aria-label="TemplateBox home, all templates"><svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="miter"><path d="M32 3 L60 19 L60 53 L32 69 L4 53 L4 19 Z"/><path d="M32 3 L32 36"/><path d="M32 36 L4 19"/><path d="M32 36 L60 53"/></g></svg></a>
 
         <!-- Collapses the links below 75rem. Same control, same class and the
              same js/app.js handler as every other page. -->
         <button type="button" class="nav-toggle" data-nav-toggle aria-expanded="false" aria-controls="site-nav" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-
-        <!-- Search as a link below 75rem, where the field is hidden. -->
-        <a class="search-toggle" href="search.html" aria-label="Search templates and guides"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg></a>
-
-        <!-- A real GET form, so it needs no JavaScript: there is nothing on
-             this page to filter, so navigating is the only correct answer and
-             the browser does that itself. -->
-        <form class="editor-search" role="search" action="search.html" method="get">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg>
-            <label class="sr-only" for="editor-search-input">Search templates and guides</label>
-            <input type="search" id="editor-search-input" name="q" placeholder="Search posters and templates"
-                   autocomplete="off" spellcheck="false" maxlength="80">
-        </form>
 
         <label class="sr-only" for="doc-name">Poster name</label>
         <input type="text" class="doc-name" id="doc-name" title="Names the file you download" maxlength="80" value="Untitled poster" aria-label="Poster name">
@@ -145,12 +161,15 @@
             </span>
 
             <div class="dl" data-download>
-                <button type="button" class="btn dl-toggle" id="dl-toggle" aria-expanded="false" aria-controls="dl-panel">
+                <!-- aria-label added with .bar-label below it, and the two go
+                     together: `.editor-bar .bar-label` is display:none under
+                     48rem, and without a label here the word going would take
+                     the button's accessible name with it, leaving an unnamed
+                     control. docs.html's three bar buttons carry theirs for
+                     exactly this reason. -->
+                <button type="button" class="btn dl-toggle" id="dl-toggle" aria-expanded="false" aria-controls="dl-panel" aria-label="Download">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>
-                    <!-- Wrapped so the phone rule can hide the word without
-                         hiding the accessible name: this button has no
-                         aria-label, so the text IS the name. -->
-                    <span>Download</span>
+                    <span class="bar-label">Download</span>
                 </button>
 
                 <div class="dl-panel" id="dl-panel" hidden>
@@ -260,8 +279,6 @@
                     </div>
                 </div>
             </div>
-            <a href="index.html">Templates</a>
-            <a href="blog.html">Guides</a>
         </nav>
     </header>
 
@@ -365,11 +382,436 @@
             <section class="editor-pane" aria-label="Poster controls">
                 <h2>Poster Controls</h2>
                 <form id="poster-form">
-                    <div class="field">
+                    <!-- Hidden for the search-screen layout, which has its own
+                         upload below: that one fills six cards, and leaving this
+                         one visible beside it would give the grid a second way
+                         in that only ever fills card 1. js/poster.js swaps
+                         them. -->
+                    <div class="field" id="p-photo-fields">
                         <label for="p-image">Photo Upload</label>
                         <input type="file" id="p-image" accept="image/*">
                         <p class="upload-hint">JPG, PNG, or WebP. Validated client-side before drawing.</p>
                         <p class="form-error" id="p-image-error" role="alert"></p>
+                    </div>
+
+                    <!-- The search screen's six cards. One input for all of
+                         them, because "choose six photos" is one gesture on
+                         every phone's picker; the select is what the size
+                         slider and the remove button point at, and it doubles
+                         as the way in for anyone not using the preview. -->
+                    <!-- The batch photo input, on its own.
+
+                         It used to live inside #p-grid-fields, which the three
+                         collage posters also show because they fill from the
+                         same multi-file control. That dragged the SEARCH
+                         SCREEN'S other four controls onto every collage: a
+                         Profile Photo slot the layout has no circle for, a
+                         Selected Photo menu built from the search screen's own
+                         seven slots, a Search Text field with no search bar to
+                         type into, and a Screen Mode select that changed a
+                         colourway the poster on screen does not use.
+
+                         That last one is the reason this moved. Every one of
+                         those posters has a Screen Mode of its own further
+                         down the panel, so the visitor met TWO controls with
+                         the same name, reached the first, and watched it do
+                         nothing. -->
+                    <div id="p-batch-fields" hidden>
+                        <div class="field">
+                            <label for="p-image-grid">Photos</label>
+                            <input type="file" id="p-image-grid" accept="image/*" multiple>
+                            <p class="upload-hint">Choose several at once. Each one fills the next empty box on the preview.</p>
+                            <p class="form-error" id="p-image-grid-error" role="alert"></p>
+                        </div>
+                    </div>
+
+                    <div id="p-grid-fields" hidden>
+                        <!-- The account circle above the search bar is a photo
+                             slot in its own right, with its own input: a batch
+                             of six chosen for the masonry must never silently
+                             land in it. -->
+                        <div class="field">
+                            <label for="p-image-avatar">Profile Photo</label>
+                            <input type="file" id="p-image-avatar" accept="image/*">
+                            <p class="upload-hint">Fills the circle above the search bar. Optional.</p>
+                            <p class="form-error" id="p-image-avatar-error" role="alert"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-card-pick">Selected Photo</label>
+                            <select id="p-card-pick"></select>
+                            <p class="upload-hint">Clicking a card or the circle on the preview selects it too. <button type="button" class="btn btn-secondary btn-small" id="p-card-clear">Remove photo</button></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-query">Search Text</label>
+                            <input type="text" id="p-query" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Type straight into the search bar on the preview, or here. Same words either way.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-screen-theme">Screen Mode</label>
+                            <select id="p-screen-theme"></select>
+                            <p class="upload-hint">The same screen by day or by night. Only the colours change, never the layout.</p>
+                        </div>
+                    </div>
+
+                    <!-- The music player's own fields. Hidden for every
+                         other style, the way the card and grid fields are:
+                         a control that is visible but inert reads as broken. -->
+                    <!-- The music block is drawn by TWO layouts: the music
+                         poster and the song poster. These are the controls
+                         both of them have, and they are a block of their own
+                         rather than a widened #p-player-fields -- which is one
+                         line and would put that block's Screen Mode, artist
+                         line and album-specific code position on a poster that
+                         has none of them. Widening #p-grid-fields for the
+                         collages did exactly that once. -->
+                    <div id="p-music-fields" hidden>
+                        <div class="field">
+                            <label for="p-song">Song Title</label>
+                            <input type="text" id="p-song" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field field-row">
+                            <div>
+                                <label for="p-elapsed">Time Played</label>
+                                <input type="text" id="p-elapsed" maxlength="8" autocomplete="off">
+                            </div>
+                            <div>
+                                <label for="p-total">Track Length</label>
+                                <input type="text" id="p-total" maxlength="8" autocomplete="off">
+                            </div>
+                        </div>
+                        <p class="upload-hint">The dot on the progress bar follows these two. Anything that is not a time leaves it where the artwork put it.</p>
+                        <p class="upload-hint">Every line on this poster can also be typed on the preview itself: double-click it there.</p>
+
+                        <!-- The same control the mockup editor uses for a
+                             product colour, from the same factory in
+                             js/color-picker.js. Not a lookalike: one picker,
+                             two editors. -->
+                        <div class="field">
+                            <label for="p-heart-trigger">Heart Colour</label>
+
+                            <div class="color-control">
+                                <button type="button" class="color-trigger" id="p-heart-trigger" aria-haspopup="dialog" aria-expanded="false">
+                                    <span class="color-trigger-dot" id="p-heart-dot"></span>
+                                    <span class="color-trigger-hex" id="p-heart-hex">#E93625</span>
+                                    <svg class="color-trigger-caret" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 10 5 5 5-5"/></svg>
+                                    <span class="sr-only">Open the colour picker</span>
+                                </button>
+
+                                <div class="color-popover" id="p-heart-popover" role="dialog" aria-label="Choose the heart colour" hidden>
+                                    <!-- Pointer-only and hidden from assistive
+                                         tech, as the mockup editor's are: the
+                                         Hex/R/G/B fields below set the same
+                                         value and are keyboard-operable, so
+                                         exposing the gradients too would
+                                         announce one control twice. -->
+                                    <div class="color-sv" id="p-heart-sv" aria-hidden="true">
+                                        <span class="color-sv-thumb" id="p-heart-sv-thumb"></span>
+                                    </div>
+
+                                    <div class="color-hue" id="p-heart-hue" aria-hidden="true">
+                                        <span class="color-hue-thumb" id="p-heart-hue-thumb"></span>
+                                    </div>
+
+                                    <div class="color-inputs">
+                                        <p class="color-input-cell">
+                                            <input type="text" id="p-heart-in-hex" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex value">
+                                            <span class="color-input-tag">Hex</span>
+                                        </p>
+                                        <p class="color-input-cell">
+                                            <input type="number" id="p-heart-in-r" min="0" max="255" step="1" aria-label="Red">
+                                            <span class="color-input-tag">R</span>
+                                        </p>
+                                        <p class="color-input-cell">
+                                            <input type="number" id="p-heart-in-g" min="0" max="255" step="1" aria-label="Green">
+                                            <span class="color-input-tag">G</span>
+                                        </p>
+                                        <p class="color-input-cell">
+                                            <input type="number" id="p-heart-in-b" min="0" max="255" step="1" aria-label="Blue">
+                                            <span class="color-input-tag">B</span>
+                                        </p>
+                                    </div>
+
+                                    <div class="color-presets" id="p-heart-presets" role="group" aria-label="Preset colours"></div>
+                                </div>
+                            </div>
+
+                            <!-- The popover's hue track's twin: same class,
+                                 same picker instance, so dragging here and
+                                 dragging inside the popover move one value. -->
+                            <div class="color-hue color-hue-inline" id="p-heart-strip" aria-hidden="true">
+                                <span class="color-hue-thumb" id="p-heart-strip-thumb"></span>
+                            </div>
+
+                            <p class="upload-hint">Only the heart changes. It keeps your colour when you switch between the dark and light screen.</p>
+                        </div>
+                    </div>
+
+                    <!-- The music poster's own: an artist line, its colourway,
+                         where its scan code sits, and its two caption lines.
+                         None of these belong to the song poster -- it prints no
+                         artist, has its own colourway, and puts the code where
+                         its design puts it. -->
+                    <div id="p-player-fields" hidden>
+                        <div class="field">
+                            <label for="p-artist">Artist Name</label>
+                            <input type="text" id="p-artist" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field">
+                            <label for="p-player-theme">Screen Mode</label>
+                            <select id="p-player-theme"></select>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-code-pos">Scan Code Position</label>
+                            <select id="p-code-pos"></select>
+                            <p class="upload-hint">Below the buttons is where the artwork puts it. Above the song title makes room by drawing the album a little smaller, so the picture keeps its shape rather than being squashed.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-caption-head">Caption Heading</label>
+                            <input type="text" id="p-caption-head" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field">
+                            <label for="p-caption-body">Caption Line</label>
+                            <input type="text" id="p-caption-body" maxlength="80" autocomplete="off">
+                            <p class="upload-hint">Two lines under the buttons, for a lyric or a note. Leave them empty and nothing is drawn. If the scan code is also below the buttons it tucks in underneath, smaller, so the two never overlap.</p>
+                        </div>
+                    </div>
+
+                    <div id="p-tune-fields" hidden>
+                        <div class="field">
+                            <label for="p-tune-greeting">Greeting</label>
+                            <input type="text" id="p-tune-greeting" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">One line in the script face, centred at the top, with the small hearts hanging off either end of it. They travel with the words rather than sitting at fixed places, so a longer greeting does not run into them.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-tune-theme">Screen Mode</label>
+                            <select id="p-tune-theme"></select>
+                            <p class="upload-hint">The same poster on paper or on a dark ground. The photo tiles keep their white borders on both, because a print laid on a dark surface still has one.</p>
+                        </div>
+
+                        <p class="upload-hint">This poster prints the track length only. Time played is still half of what puts the dot on the bar.</p>
+                    </div>
+
+                    <!-- The anniversary poster: two names, the line beneath the
+                         collage, and the month it is built around. -->
+                    <!-- Shared by both calendar posters. One set of controls
+                         because there is one set of arithmetic: annivMonth()
+                         and annivCell() serve both layouts, and a second copy
+                         of either would be a second calendar to be wrong. -->
+                    <div id="p-calendar-fields" hidden>
+                        <div class="field field-row">
+                            <div>
+                                <label for="p-month">Month</label>
+                                <select id="p-month"></select>
+                            </div>
+                            <div>
+                                <label for="p-year">Year</label>
+                                <input type="number" id="p-year" min="1900" max="2999" step="1" autocomplete="off">
+                            </div>
+                        </div>
+                        <p class="upload-hint" id="p-year-hint">The year sets which weekday the month opens on.</p>
+
+                        <div class="field">
+                            <label for="p-day">Day to Mark</label>
+                            <input type="number" id="p-day" min="1" max="31" step="1" autocomplete="off">
+                            <p class="upload-hint">The heart goes behind this date. A month that has no such day simply leaves it unmarked.</p>
+                        </div>
+                    </div>
+
+                    <!-- The two names are shared: the anniversary calendar and
+                         the love story calendar both print a pair with a heart
+                         between them, and neither wants the other's remaining
+                         controls. Their own block, with its own gate, for the
+                         reason #p-batch-fields has one. -->
+                    <div id="p-names-fields" hidden>
+                        <div class="field field-row">
+                            <div>
+                                <label for="p-name-a">First Name</label>
+                                <input type="text" id="p-name-a" maxlength="40" autocomplete="off">
+                            </div>
+                            <div>
+                                <label for="p-name-b">Second Name</label>
+                                <input type="text" id="p-name-b" maxlength="40" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="p-anniv-fields" hidden>
+                        <div class="field">
+                            <label for="p-tagline">Line Along the Foot</label>
+                            <input type="text" id="p-tagline" maxlength="40" autocomplete="off">
+                        </div>
+
+                        <div class="field">
+                            <label for="p-anniv-swap">Move the Selected Photo</label>
+                            <select id="p-anniv-swap"></select>
+                            <p class="upload-hint">Click a box on the preview to choose it, then pick where it should go. The two photographs trade places, keeping the framing you gave each one. The boxes themselves do not move: their arrangement is what makes the heart.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-anniv-theme">Screen Mode</label>
+                            <select id="p-anniv-theme"></select>
+                            <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. On the light one the empty photo boxes are outlined rather than filled, because a white box on white paper is not a box.</p>
+                        </div>
+
+                    </div>
+
+                    <div id="p-trib-fields" hidden>
+                        <div class="field">
+                            <label for="p-heading">Heading</label>
+                            <input type="text" id="p-heading" maxlength="60" autocomplete="off">
+                            <p class="upload-hint">Two spaces in a row mark where the heart goes, and it stands in for the letters you leave out. Write TO as T, two spaces, and the heart becomes the O.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-message">Message</label>
+                            <textarea id="p-message" maxlength="220" rows="3" autocomplete="off"></textarea>
+                            <p class="upload-hint">Sits under the heading and wraps to the space left of the photographs.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-title">Line Along the Foot</label>
+                            <input type="text" id="p-title" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Centred with its heart, the two together, so the words stay on the page's middle.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-trib-theme">Screen Mode</label>
+                            <select id="p-trib-theme"></select>
+                            <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. The photo boxes stay red in both, because on this artwork the red IS the empty state; what changes is the keyline, which cannot be white on white paper.</p>
+                        </div>
+                    </div>
+
+                    <div id="p-love-fields" hidden>
+                        <div class="field">
+                            <label for="p-love-message">Message</label>
+                            <textarea id="p-love-message" maxlength="220" rows="5" autocomplete="off"></textarea>
+                            <p class="upload-hint">Sits under the calendar and wraps to the column. A blank line starts a second paragraph, which is set a little further down than a new line would be, and the two small hearts follow the end of the first one.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-love-title">Greeting</label>
+                            <input type="text" id="p-love-title" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Centred on the column, above the names.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-love-theme">Screen Mode</label>
+                            <select id="p-love-theme"></select>
+                            <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. The empty photo boxes take the ink rather than the page, so they stay visible on both.</p>
+                        </div>
+                    </div>
+
+                    <div id="p-couple-fields" hidden>
+                        <div class="field">
+                            <label for="p-couple-word">Word</label>
+                            <input type="text" id="p-couple-word" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">The headword, set large in the serif. It shrinks to fit the column with the bracket beside it, so a long word is set smaller rather than cut off.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-couple-bracket">Initials</label>
+                            <input type="text" id="p-couple-bracket" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Sits on the word's own baseline, in the sans. The square brackets are drawn by the template, so type only what goes between them. Leave it empty and the bracket is not drawn at all.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-couple-def">Definition</label>
+                            <textarea id="p-couple-def" maxlength="220" rows="4" autocomplete="off"></textarea>
+                            <p class="upload-hint">Wraps to the grid's width, up to five lines. Line breaks you type are kept, and the closing line moves down to follow.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-couple-closing">Closing Line</label>
+                            <input type="text" id="p-couple-closing" maxlength="40" autocomplete="off">
+                            <p class="upload-hint">Follows the definition, and switches back to the serif. It moves down as the definition grows.</p>
+                        </div>
+
+                        <div class="field">
+                            <label class="radio-option">
+                                <input type="checkbox" id="p-couple-grey">
+                                Black and white photographs
+                            </label>
+                            <p class="upload-hint">On by default, because the nine photographs being greyscale is part of this design rather than a property of the pictures. Turn it off to keep your own colour. It applies to the preview, the PNG and the SVG alike.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-couple-theme">Screen Mode</label>
+                            <select id="p-couple-theme"></select>
+                            <p class="upload-hint">The same poster on paper or on a dark ground. Only the colours change, never the layout. An empty cell takes a tone of its own so the grid still reads before any photograph is in it.</p>
+                        </div>
+                    </div>
+
+                    <div id="p-hbd-fields" hidden>
+                        <div class="field">
+                            <label for="p-quote">Quote</label>
+                            <textarea id="p-quote" maxlength="220" rows="4" autocomplete="off"></textarea>
+                            <p class="upload-hint">Sits to the left of the photographs and wraps to fit. Line breaks are kept; runs of spaces are not.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-closing">Closing Line</label>
+                            <textarea id="p-closing" maxlength="220" rows="2" autocomplete="off"></textarea>
+                            <p class="upload-hint">Runs along the foot, with a heart after the last word.</p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-hbd-theme">Screen Mode</label>
+                            <select id="p-hbd-theme"></select>
+                            <p class="upload-hint">The same poster on a dark or a light ground. Only the colours change, never the layout. On the light one the empty photo boxes are outlined rather than filled, because a white box on white paper is not a box.</p>
+                        </div>
+                    </div>
+
+                    <!-- Shared by the music poster and the anniversary poster:
+                         both carry a scannable code and neither fetches one. -->
+                    <div id="p-code-fields" hidden>
+                        <div class="field">
+                            <label for="p-image-code">Scan Code</label>
+                            <input type="file" id="p-image-code" accept="image/*">
+                            <p class="upload-hint">Optional. Save the code image from your music app's share menu, then upload it here. Nothing is fetched for you: this editor never talks to another service.</p>
+                            <p class="form-error" id="p-image-code-error" role="alert"></p>
+                            <p class="upload-hint">Clicking the code on the preview opens this too. <button type="button" class="btn btn-secondary btn-small" id="p-code-clear">Remove scan code</button></p>
+                        </div>
+
+                    </div>
+
+                    <!-- Framing. The slider is the accessible route to what
+                         dragging on the preview does by hand, and the reset is
+                         the only way back to the plain cover fit once a photo
+                         has been moved -- the slider alone cannot undo a pan.
+                         Its label is rewritten to name the selected card on the
+                         search screen, where one slider serves six. -->
+                    <div class="field" id="p-frame-fields" hidden>
+                        <label for="p-zoom" id="p-zoom-label">Photo Size</label>
+                        <input type="range" id="p-zoom" min="100" max="400" step="5" value="100">
+                        <p class="upload-hint">Drag the photo on the preview to move it. <button type="button" class="btn btn-secondary btn-small" id="p-zoom-reset">Reset framing</button></p>
+                    </div>
+
+                    <!-- Only the split layout has a second half to fill, so
+                         this is hidden for every other style rather than shown
+                         inert -- the same argument the rank fields below are
+                         built on. js/poster.js toggles the wrapper. -->
+                    <div id="p-split-fields" hidden>
+                        <div class="field">
+                            <label for="p-image-b">Second Photo</label>
+                            <input type="file" id="p-image-b" accept="image/*">
+                            <p class="upload-hint">Fills the lower half, turned upside down as a playing card's second half is.</p>
+                            <p class="form-error" id="p-image-b-error" role="alert"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="p-zoom-b">Second Photo Size</label>
+                            <input type="range" id="p-zoom-b" min="100" max="400" step="5" value="100">
+                            <p class="upload-hint">Drag the lower half on the preview to move it. <button type="button" class="btn btn-secondary btn-small" id="p-zoom-b-reset">Reset framing</button></p>
+                        </div>
                     </div>
 
                     <div class="field">
@@ -384,7 +826,7 @@
                         <div class="emoji-panel" id="emoji-panel" hidden>
                             <div class="emoji-grid" id="emoji-grid"></div>
                         </div>
-                        <p class="upload-hint">Click text on the canvas to select it, then drag to reposition.</p>
+                        <p class="upload-hint">Click text on the canvas to select it, then drag to reposition. Double-click it to type on the poster itself.</p>
                     </div>
 
                     <div class="field field-row">
@@ -402,6 +844,34 @@
                         <label for="p-frame">Frame Style</label>
                         <select id="p-frame"></select>
                     </div>
+
+                    <!-- Only the card layout has corner indices, so these are
+                         hidden for the four frame styles rather than shown
+                         inert: a control that is always visible but usually
+                         does nothing reads as broken, which is the same
+                         argument the text toolbar above is built on.
+                         js/poster.js toggles the wrapper. -->
+                    <div id="p-card-fields" hidden>
+                        <!-- Text fields with a suggestion list rather than a
+                             fixed menu: A, J, Q and K stay one click, and a
+                             visitor who wants their own initials can just type
+                             them. Two characters is the cap the paper margin
+                             allows -- see RANK_MAX_W in js/poster.js, which
+                             scales anything wider down rather than letting it
+                             run into the photo. -->
+                        <div class="field">
+                            <label for="p-rank-head">Top-Left Letter</label>
+                            <input type="text" id="p-rank-head" list="p-rank-options" maxlength="2" autocomplete="off" spellcheck="false">
+                        </div>
+
+                        <div class="field">
+                            <label for="p-rank-foot">Bottom-Right Letter</label>
+                            <input type="text" id="p-rank-foot" list="p-rank-options" maxlength="2" autocomplete="off" spellcheck="false">
+                            <p class="upload-hint">Pick a card letter or type your own, an initial included. Clicking a letter on the poster jumps to its field.</p>
+                        </div>
+
+                        <datalist id="p-rank-options"></datalist>
+                    </div>
                 </form>
                 <div class="preview-actions">
                     <p class="upload-hint">Use the Download button in the toolbar to export as PNG, JPG, PDF, SVG or PPTX. Nothing leaves your device.</p>
@@ -414,7 +884,52 @@
                 <div class="poster-stage">
                     <!-- Fixed internal resolution keeps exports high-quality;
                          CSS scales the visible element responsively -->
-                    <canvas id="poster-canvas" width="1200" height="1500"></canvas>
+                    <div class="poster-frame">
+                        <canvas id="poster-canvas" width="1200" height="1500"></canvas>
+
+                        <!-- Typing on the search bar itself, on the search-screen
+                             layout only. A real input rather than a caret drawn
+                             into the canvas: that would mean writing a caret, a
+                             selection model and IME handling by hand, and this
+                             gets all three from the browser.
+
+                             Its text is TRANSPARENT and the canvas underneath
+                             draws the words. That keeps one renderer -- what you
+                             see is what downloads, because it is literally the
+                             thing that downloads -- and avoids two copies of the
+                             same string sitting a fraction of a pixel apart. The
+                             caret and the selection are the input's own.
+
+                             js/poster.js positions it over the pill and hides it
+                             for every other style. It is never part of an
+                             export: exports render from the canvas. -->
+                        <input type="text" id="p-query-live" class="query-live"
+                               maxlength="40" autocomplete="off" spellcheck="false"
+                               aria-label="Search text on the poster" hidden>
+
+                        <!-- Type on the poster itself. Double-click any text
+                             element on the canvas and this sits exactly over
+                             it, wearing its font, size, colour and alignment.
+
+                             Unlike #p-query-live above, this one is OPAQUE and
+                             the canvas stops drawing the element underneath
+                             while it is open. The search bar is one short line
+                             with no wrapping, so a transparent input can sit
+                             over the drawn glyphs and contribute only a caret.
+                             A text element wraps, can be centred or
+                             right-aligned and carries letter-spacing, and two
+                             wrap engines agreeing to the pixel is not
+                             something to rely on -- a few pixels out and the
+                             visitor sees every character twice. One renderer
+                             at a time is the honest way round.
+
+                             Never exported: exports render from the canvas,
+                             which draws the element again the moment editing
+                             ends. -->
+                        <textarea id="p-text-live" class="text-live" maxlength="240"
+                                  autocomplete="off" spellcheck="false" wrap="soft"
+                                  aria-label="Edit this text on the poster" hidden></textarea>
+                    </div>
                 </div>
             </section>
 
@@ -445,10 +960,11 @@
          picture of words. html2pdf.js is deliberately not used anywhere on this
          site -- see docs/error-fixes/RESUME_PDF_RASTERIZED_TEXT_FIX.md. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
-        integrity="sha512-yBpuTHfsMK8bcvfF6zAsIO4Nmls5rncLnPGgHb1FnnQyzhomsanid1QzjZvZgeC2spPTdDaKlUJIMSPNMh3wxw=="
+        integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"
         crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
     <script src="js/ads.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/color-picker.js"></script>
     <script src="js/poster.js" defer></script>
 </body>
 </html>

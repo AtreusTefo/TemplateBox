@@ -47,7 +47,7 @@ site/                   THE PUBLISH DIRECTORY -- everything below is public
   css/style.css         Unified global stylesheet
   js/app.js             Shared logic (sanitization, filtering, countdown, editor routing)
   js/resume.js          CV builder core logic (localStorage, jsPDF)
-  js/docs.js            Business document core logic (six documents, jsPDF primitives)
+  js/docs.js            Business document core logic (seven documents, jsPDF primitives)
   js/poster.js          Poster creator core logic (HTML5 Canvas)
   js/mockup.js          Mockup generator core logic (HTML5 Canvas)
   js/blog.js            Shared blog library (content model, XSS-safe rendering, ad zone registry)

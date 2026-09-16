@@ -1,0 +1,360 @@
+/* ==========================================================================
+   TemplateBox - Admin Stylesheet
+   Loaded by admin.html and tools/og-image.html ONLY, after css/style.css.
+
+   Why this file exists (September 1, 2026): both pages are private operator
+   tools -- admin.html is the blog and catalog-thumbnail workspace, and
+   tools/og-image.html is the Open Graph card generator, kept out of the index
+   by netlify.toml. Their styles were shipping to every public page, which is
+   weight no visitor can ever use.
+
+   Rules for editing this file:
+
+   - It carries NO tokens, reset, buttons, header or form styling of its own.
+     Everything it needs comes from css/style.css, which both pages load
+     first. Adding a copy of a shared rule here is the drift this split was
+     careful to avoid -- change the global sheet instead.
+   - It is loaded AFTER the global sheet, so anything here wins on order at
+     equal specificity. .admin-thumb-preview depends on that: it overrides
+     .catalog-grid's column ladder, and media queries carry no specificity, so
+     being declared later is the whole mechanism.
+   - A class used by ANY public page does not belong here. Two rules that look
+     like they should have moved deliberately did not -- .btn-small (applied
+     by js/docs.js and js/resume.js) and .radio-option (in docs.html's
+     markup) -- and they are commented as such where they now live in
+     css/style.css.
+
+   See docs/implementation/STYLESHEET_STRUCTURE.md.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Blog admin panel (admin.html)
+   -------------------------------------------------------------------------- */
+
+.admin-main {
+    max-width: 56rem;
+}
+
+.admin-intro {
+    margin-bottom: 2rem;
+}
+
+.admin-intro h1 {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+}
+
+.admin-intro p {
+    color: var(--color-muted);
+    max-width: 44rem;
+}
+
+.admin-panel {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.admin-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.admin-panel-head h2 {
+    font-size: 1.25rem;
+}
+
+.admin-sync {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+}
+
+.admin-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.admin-status {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    margin-top: 0.75rem;
+    min-height: 1.25rem;
+}
+
+.admin-help {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+}
+
+.admin-help summary {
+    cursor: pointer;
+    font-weight: 600;
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+}
+
+.admin-help ol,
+.admin-help ul {
+    padding-left: 1.375rem;
+    margin: 0.5rem 0;
+}
+
+.admin-help li {
+    margin-bottom: 0.375rem;
+}
+
+.admin-empty {
+    color: var(--color-muted);
+    font-size: 0.9375rem;
+    padding: 1rem 0;
+}
+
+.admin-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border: 1px solid var(--color-border);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.admin-row-title {
+    font-weight: 600;
+}
+
+.admin-row-meta {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+}
+
+.admin-row-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.radio-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.admin-cover-preview {
+    margin-top: 0.5rem;
+}
+
+.admin-cover-preview img {
+    max-width: 18rem;
+    border: 1px solid var(--color-border);
+    margin-bottom: 0.75rem;
+}
+
+.admin-preview {
+    max-width: none;
+}
+
+.mono {
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 0.875em;
+    background-color: var(--color-bg);
+    padding: 0.125rem 0.375rem;
+    border: 1px solid var(--color-border);
+}
+
+/* --------------------------------------------------------------------------
+   Catalog thumbnail workspace (admin.html)
+
+   The preview is the homepage's own markup -- .catalog-grid > .template-card
+   > .card-preview.photo -- so the 4:5 window, the hover crossfade and the
+   card chrome are inherited rather than reimplemented. Only two things are
+   admin-specific: the grid is capped to one card's width, and the hover image
+   needs a real hide.
+   -------------------------------------------------------------------------- */
+
+/* One card, at roughly the width the homepage gives a card on a laptop. The
+   column override has to sit here rather than beside .catalog-grid: media
+   queries carry no specificity, so it beats the grid's 2/3/4-column ladder
+   only by being declared after it. */
+.admin-thumb-preview {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 15rem;
+    margin-top: 0.5rem;
+}
+
+/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`.
+   Both of these carry one: .catalog-grid sets display: grid on the wrapper,
+   and .card-preview.photo .card-thumb sets display: block on the images.
+   Without the second rule the hover slot would paint over the default image
+   whenever an item has no hover thumbnail -- which is the optional case, so
+   it is the common one. */
+.admin-thumb-preview[hidden] {
+    display: none;
+}
+
+.admin-thumb-preview .card-thumb[hidden] {
+    display: none;
+}
+
+.admin-thumb-paths {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    word-break: break-all;
+}
+
+/* --------------------------------------------------------------------------
+   Template Studio.
+
+   A list of what is in the registry beside the thing being edited, and the
+   live sheet under it. The sheet is drawn by the real resume engine at 595pt
+   wide and scaled down here, so what the panel shows is the geometry that
+   will be published rather than an impression of it.
+   -------------------------------------------------------------------------- */
+
+.studio-grid {
+    display: grid;
+    grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+@media (max-width: 60rem) {
+    .studio-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.studio-h {
+    margin: 0 0 0.5rem;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.studio-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    max-height: 26rem;
+    overflow-y: auto;
+}
+
+.studio-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    cursor: pointer;
+}
+
+.studio-row:hover { border-color: var(--color-border-strong); }
+
+.studio-row.is-open {
+    border-color: var(--color-text);
+    box-shadow: inset 0 0 0 1px var(--color-text);
+}
+
+.studio-row strong { font-size: 0.875rem; }
+
+.studio-row span {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.studio-main textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+}
+
+/* Problems are a list rather than one sentence: a descriptor usually has
+   several at once, and a panel that reports only the first turns fixing it
+   into a guessing game. */
+.studio-problems {
+    margin: 0 0 1rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--color-border-strong);
+    border-left-width: 3px;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+}
+
+.studio-problems ul {
+    margin: 0;
+    padding-left: 1.125rem;
+}
+
+.studio-problems li + li { margin-top: 0.25rem; }
+
+/* The sheet. Scaled rather than resized: the engine draws at the page's own
+   point size and anything else would show a layout nobody is going to get. */
+.studio-preview {
+    width: 100%;
+    overflow: auto;
+    background: var(--color-border);
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+}
+
+.studio-preview svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 34rem;
+    margin: 0 auto 0.75rem;
+    background: #FFFFFF;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
+}
+
+/* The generated catalog tile a published template arrives with. Plain on
+   purpose, and the panel says so: it is a placeholder for a real one, not an
+   attempt at design this tool cannot do. */
+.mock-doc.studio {
+    gap: 0.5rem;
+    padding: 0.6rem 0.5rem;
+}
+
+.mock-doc.studio .mk-name {
+    margin: 0 0 0.2rem;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 0.5rem;
+    line-height: 1.1;
+    text-transform: uppercase;
+    color: var(--mk-accent);
+}
+
+.mock-doc.studio .mk-st-band {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding-top: 0.28rem;
+    border-top: 1px solid var(--mk-accent);
+}
+
+.mock-doc.studio .mk-st-band span {
+    display: block;
+    height: 1px;
+    background-color: currentColor;
+    opacity: 0.5;
+}
+
+.mock-doc.studio .mk-st-band span:last-child { width: 64%; }
