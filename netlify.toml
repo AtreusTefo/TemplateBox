@@ -77,25 +77,47 @@
 
 # The service worker script.
 #
-# `no-cache` rather than `public, max-age=0, must-revalidate`, which is what
-# this said first and which DID NOT TAKE. Measured on the live site after the
-# September 16, 2026 deploy: /sw.js came back `public, max-age=14400,
-# must-revalidate`, byte-identical to /js/app.js and /css/style.css, which
-# carry no rule at all -- so the value was not being applied, while the
-# X-Robots-Tag and Content-Type rules added in the same commit were. The
-# config said one thing and the CDN served another.
+# THIS RULE WORKS. CLOUDFLARE OVERRIDES IT ANYWAY, AND THAT IS NOT A NETLIFY
+# PROBLEM. Measured September 16, 2026:
 #
-# If this one does not take either, ANNOTATE IT RATHER THAN LEAVING IT: a
-# declaration that does nothing while claiming to is the same defect as the
-# inert z-index removed from the mega-menu panel on the same day, and it reads
-# to the next person as a case already handled.
+#   https://templatebox.netlify.app/sw.js  ->  Cache-Control: no-cache
+#   https://templatebox.win/sw.js          ->  Cache-Control: max-age=14400
 #
-# What makes the failure survivable either way: browsers deliberately bypass
-# the HTTP cache when checking a worker script for an update, so a new sw.js
-# reaches installed visitors regardless of what this says. That is why this is
-# belt and braces rather than the mechanism -- but the bug it guards against
-# is a worker that cannot be replaced, which has no recovery path short of
-# asking every installed visitor to clear their site data.
+# templatebox.win runs on Cloudflare nameservers and every response carries a
+# cf-cache-status, so Cloudflare proxies the origin and its Browser Cache TTL
+# (4 hours) replaces whatever Cache-Control Netlify sends on anything it
+# caches. Fixing it means a Cloudflare Cache Rule for /sw.js set to respect
+# the origin TTL, or to bypass cache. NOTHING IN THIS FILE CAN DO IT.
+#
+# Two traps this took, both worth not repeating:
+#
+# The first value here was `public, max-age=0, must-revalidate`, which is
+# EXACTLY Netlify's own default for uncached types -- so at the origin it was
+# indistinguishable from having no rule at all, and the conclusion drawn from
+# that ("the rule is not applying") was wrong. `no-cache` is distinguishable,
+# which is the only reason the origin could be proved correct. Prefer a value
+# you can tell apart from the default when the whole point is to verify it.
+#
+# And the comparison that produced the wrong conclusion was made on the PUBLIC
+# domain, where /sw.js and /js/app.js both read max-age=14400 and so looked
+# identical. At the origin they differ. Comparing two things downstream of the
+# same rewriter shows you the rewriter, not the things.
+#
+# Why this is survivable regardless: browsers deliberately bypass the HTTP
+# cache when checking a worker script for an update, so a new sw.js reaches
+# installed visitors whatever the header says. The bug it guards is a worker
+# that cannot be replaced at all, which has no recovery path short of asking
+# every installed visitor to clear their site data.
+#
+# SEPARATE AND LARGER: the same Cloudflare override applies to /js/app.js and
+# /css/style.css, which leave the origin as `public,max-age=0,must-revalidate`
+# and reach visitors as `max-age=14400`. So the site's scripts and stylesheet
+# are held for up to four hours WITHOUT revalidating. sw.js's own header and
+# CLAUDE.md both argue against precaching on the grounds that "Netlify's
+# validators already revalidate" -- which is true of the origin and not true
+# of what visitors get. That does not change the decision (four hours is
+# bounded; a service-worker cache is not), but the stated reason is only half
+# right, and a deploy can be up to four hours stale for a returning visitor.
 [[headers]]
   for = "/sw.js"
   [headers.values]
