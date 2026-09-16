@@ -75,15 +75,31 @@
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
 
-# The service worker script. Browsers already bypass the HTTP cache when
-# checking a worker for updates, so this is belt and braces rather than the
-# mechanism -- but the failure it guards against is a worker that cannot be
-# replaced, which is the one bug in this area with no recovery path short of
+# The service worker script.
+#
+# `no-cache` rather than `public, max-age=0, must-revalidate`, which is what
+# this said first and which DID NOT TAKE. Measured on the live site after the
+# September 16, 2026 deploy: /sw.js came back `public, max-age=14400,
+# must-revalidate`, byte-identical to /js/app.js and /css/style.css, which
+# carry no rule at all -- so the value was not being applied, while the
+# X-Robots-Tag and Content-Type rules added in the same commit were. The
+# config said one thing and the CDN served another.
+#
+# If this one does not take either, ANNOTATE IT RATHER THAN LEAVING IT: a
+# declaration that does nothing while claiming to is the same defect as the
+# inert z-index removed from the mega-menu panel on the same day, and it reads
+# to the next person as a case already handled.
+#
+# What makes the failure survivable either way: browsers deliberately bypass
+# the HTTP cache when checking a worker script for an update, so a new sw.js
+# reaches installed visitors regardless of what this says. That is why this is
+# belt and braces rather than the mechanism -- but the bug it guards against
+# is a worker that cannot be replaced, which has no recovery path short of
 # asking every installed visitor to clear their site data.
 [[headers]]
   for = "/sw.js"
   [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
+    Cache-Control = "no-cache"
 
 # Declared explicitly because the correct type for .webmanifest is not
 # universally configured, and a manifest served as text/plain is ignored
