@@ -64,6 +64,36 @@
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
 
+# The offline notice sw.js serves in place of a navigation that could not
+# reach the network. Not a page of the site in any meaningful sense: it has no
+# canonical, no content and nothing to rank, and an indexed "You are offline"
+# result would be actively misleading. Same header-not-Disallow reasoning as
+# every exclusion above -- a Disallow would stop the crawler reading the page's
+# own noindex meta tag.
+[[headers]]
+  for = "/offline.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+# The service worker script. Browsers already bypass the HTTP cache when
+# checking a worker for updates, so this is belt and braces rather than the
+# mechanism -- but the failure it guards against is a worker that cannot be
+# replaced, which is the one bug in this area with no recovery path short of
+# asking every installed visitor to clear their site data.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Declared explicitly because the correct type for .webmanifest is not
+# universally configured, and a manifest served as text/plain is ignored
+# silently: the page stays installable-looking in DevTools while the install
+# prompt never appears, which is a long afternoon to diagnose.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
+
 # Search results. noindex but FOLLOW, unlike the two above: every template
 # this page can list is already on index.html, so an indexable copy is a thin
 # duplicate of the most-indexed page on the site and a ?q= URL is exactly the

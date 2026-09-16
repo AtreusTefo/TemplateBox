@@ -806,6 +806,39 @@ const TB = (() => {
        ---------------------------------------------------------------------- */
     const THEME_KEY = "tb_theme";
 
+    /* ----------------------------------------------------------------------
+       Browser/app chrome colour.
+
+       Only visible once installed: it tints the Android status bar, the task
+       switcher card and the desktop PWA title bar. In a tab it does nothing,
+       which is why it has never been here before.
+
+       The markup ships two media-scoped <meta name="theme-color"> tags so the
+       colour is right before any script runs, for the visitor who has not
+       overridden their system theme -- which is most of them. This function
+       exists for the one who has: data-theme is the truth, prefers-color-
+       scheme is only a default, and a visitor reading light on a dark machine
+       would otherwise get a near-black status bar over a cream page.
+
+       It writes the same value into EVERY theme-color tag rather than
+       removing the media attributes. A browser picks the first tag whose
+       media query matches, so making them all agree is correct whichever one
+       that turns out to be, and does not depend on their order.
+       ---------------------------------------------------------------------- */
+    const THEME_COLORS = { light: "#F4F3EF", dark: "#14130F" };
+
+    function syncThemeColor() {
+        const dark = document.documentElement.getAttribute("data-theme") === "dark";
+        const color = dark ? THEME_COLORS.dark : THEME_COLORS.light;
+        document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+            meta.setAttribute("content", color);
+        });
+    }
+
+    function initThemeColor() {
+        syncThemeColor();
+    }
+
     function initThemeToggle() {
         const button = document.querySelector("[data-theme-toggle]");
         if (!button) {
@@ -837,6 +870,10 @@ const TB = (() => {
                 /* Storage unavailable: the choice holds for this page only. */
             }
             label();
+            /* After the attribute is set, not before: syncThemeColor reads
+               data-theme rather than being told what to use, so there is one
+               source of truth for which theme is active. */
+            syncThemeColor();
         });
     }
 
@@ -1306,6 +1343,125 @@ const TB = (() => {
     }
 
     /* ----------------------------------------------------------------------
+       Installed-app support (Tier 0 PWA).
+
+       Two unrelated jobs that happen to share a trigger, kept in one
+       initializer because both must wait for the same moment:
+
+         1. Register sw.js. The worker is a pass-through that caches one file
+            (see its own header for why it must stay that way). Registering it
+            is what makes Chrome offer "Install"; without it the manifest
+            alone produces a bookmark with an icon.
+
+         2. Ask the browser to stop evicting our storage. Every document on
+            this site lives in localStorage and nowhere else, in a bucket the
+            browser is free to clear under space pressure. There is no server
+            copy to restore from -- losing it is losing the document.
+
+       Full reasoning: docs/implementation/PWA_INSTALLABLE_APP.md
+       ---------------------------------------------------------------------- */
+
+    /* True when the page is running as an installed app rather than in a
+       browser tab. Both spellings are needed: display-mode is the standard
+       and covers Android and desktop, navigator.standalone is the only signal
+       iOS gives for a home-screen launch. */
+    function isInstalledApp() {
+        try {
+            if (window.matchMedia("(display-mode: standalone)").matches) {
+                return true;
+            }
+        } catch (err) {
+            /* matchMedia unavailable: fall through to the iOS check. */
+        }
+        return window.navigator.standalone === true;
+    }
+
+    /* Asks for persistent storage, but NOT on every visit.
+
+       Firefox shows a permission prompt for this. Putting a storage
+       permission dialog in front of a first-time visitor who has not typed
+       anything yet is the worst possible moment to ask: there is nothing to
+       protect, so the request is unexplained, and a "no" is remembered.
+
+       So it is asked only when the answer has a reason the visitor could
+       infer -- they have saved work on this device, or they have installed
+       the app and eviction is now the difference between their documents
+       being there and not. Chrome grants or refuses silently on its own
+       heuristics, where an installed app is already the strongest signal. */
+    function requestPersistentStorage() {
+        const storage = window.navigator.storage;
+        if (!storage || typeof storage.persist !== "function") {
+            return;
+        }
+
+        let worthAsking = isInstalledApp();
+        if (!worthAsking) {
+            try {
+                worthAsking = describeSavedWork().length > 0;
+            } catch (err) {
+                worthAsking = false;
+            }
+        }
+        if (!worthAsking) {
+            return;
+        }
+
+        /* persisted() first: re-requesting an already-granted permission is a
+           no-op on Chrome but re-prompts on some builds, and there is nothing
+           to gain from asking twice. */
+        Promise.resolve(storage.persisted())
+            .then((already) => (already ? null : storage.persist()))
+            .catch(() => {
+                /* Refused, unsupported, or a private window. Storage still
+                   works exactly as it did before; it is simply evictable,
+                   which is the status quo this tries to improve on and not a
+                   regression if it fails. */
+            });
+    }
+
+    function initInstallSupport() {
+        /* file:// has an opaque origin and cannot register a worker at all.
+           Excluded by protocol rather than by catching the rejection, because
+           site/tools/ pages are opened from disk deliberately (see
+           tools/make-og-cards.js) and should not log a failure every run. */
+        if (!/^https?:$/.test(window.location.protocol)) {
+            return;
+        }
+        if (!("serviceWorker" in window.navigator)) {
+            requestPersistentStorage();
+            return;
+        }
+
+        /* Deferred past load, and this is the part that matters on an
+           ad-funded site: registration competes for the same connection as
+           js/ads.js and the ad network's own scripts. The worker has nothing
+           to contribute to the first paint -- it cannot serve this page, and
+           it is not needed until the NEXT navigation -- so there is no reason
+           for it to be in the way of an impression. */
+        const start = () => {
+            /* Root-absolute, not relative. A worker's scope cannot rise above
+               its own path, so a relative "sw.js" resolved from
+               /blog/<slug>.html would look for /blog/sw.js and, even if it
+               existed, could only control /blog/. One worker at the root
+               controls the whole site, which is what the manifest's scope
+               claims. */
+            window.navigator.serviceWorker.register("/sw.js", { scope: "/" })
+                .catch(() => {
+                    /* Blocked by policy, an unsupported build, or a private
+                       window. The site is unchanged without it: no offline
+                       page and no install prompt, but nothing breaks. */
+                });
+            requestPersistentStorage();
+        };
+
+        if (document.readyState === "complete") {
+            start();
+        } else {
+            window.addEventListener("load", start, { once: true });
+        }
+    }
+
+    /* ----------------------------------------------------------------------
        Boot
        ---------------------------------------------------------------------- */
     /* Each initializer is isolated so a failure in one (for example a DOM
@@ -1328,7 +1484,14 @@ const TB = (() => {
                so it should be published before anything can hide the header. */
             initHeaderHeight,
             initScrollDirection,
-            initThemeToggle
+            initThemeToggle,
+            /* After initThemeToggle only for readability; it reads the
+               attribute the inline <head> script already set, so it does not
+               depend on the toggle having been wired. */
+            initThemeColor,
+            /* Last: it does nothing before window load anyway, and anything
+               that can be deferred past the ad scripts should be. */
+            initInstallSupport
         ].forEach((init) => {
             try {
                 init();

@@ -441,6 +441,26 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n' +
 '    <link rel="stylesheet" media="print" onload="this.media=\'all\'" href="' + fonts + '">\n' +
 '    <noscript><link rel="stylesheet" href="' + fonts + '"></noscript>\n' +
+'    <link rel="icon" type="image/svg+xml" href="../assets/logo-mark.svg">\n\n' +
+
+/* Installed-app head block. This is the same block every hand-written page
+   carries, with ../ paths because an exported post lands in blog/.
+
+   It is here for the reason MEGA_MENU is: a post exported from admin.html is
+   a real page of this site, and anything the other pages have in <head> that
+   it does not is drift that only shows up months later on one URL. A post
+   opened as the app's entry point without a manifest link is not installable
+   from there, and on iOS shows a screenshot of the page instead of the mark.
+
+   Reference: docs/implementation/PWA_INSTALLABLE_APP.md */
+'    <link rel="manifest" href="../manifest.webmanifest">\n' +
+'    <link rel="apple-touch-icon" href="../assets/icon-180.png">\n' +
+'    <meta name="apple-mobile-web-app-title" content="TemplateBox">\n' +
+'    <meta name="mobile-web-app-capable" content="yes">\n' +
+'    <meta name="apple-mobile-web-app-capable" content="yes">\n' +
+'    <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)">\n' +
+'    <meta name="theme-color" content="#14130F" media="(prefers-color-scheme: dark)">\n\n' +
+
 '    <link rel="stylesheet" href="../css/style.css">\n' +
 '</head>\n' +
 '<body>\n\n' +

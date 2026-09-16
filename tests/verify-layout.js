@@ -778,6 +778,248 @@ function staticChecks() {
         stated !== null && Number(stated[1]) === cards.length,
         stated ? `message says ${stated[1]}, index.html has ${cards.length} cards`
             : "no \"see all N\" count found in the catalog-empty message");
+
+    /* 1n. Installed-app surface (Tier 0 PWA).
+
+           Everything here fails silently on the web and only shows up on a
+           device somebody has installed, which is the worst place to find
+           out. None of it is exercised by loading a page in a browser tab.
+
+           Reference: docs/implementation/PWA_INSTALLABLE_APP.md */
+    pwaChecks(pages);
+}
+
+function pwaChecks(pages) {
+    const manifestPath = path.join(SITE, "manifest.webmanifest");
+    if (!fs.existsSync(manifestPath)) {
+        check("manifest.webmanifest exists", false, "site/manifest.webmanifest not found");
+        return;
+    }
+
+    let manifest = null;
+    try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    } catch (err) {
+        check("manifest.webmanifest is valid JSON", false, err.message);
+        return;
+    }
+    check("manifest.webmanifest is valid JSON", true);
+
+    /* Reads a PNG's real dimensions from its IHDR, the same way the social
+       card check does. A manifest declaring 512x512 over a 192x192 payload
+       installs happily and is simply blurry on the device. */
+    const pngSize = (file) => {
+        if (!fs.existsSync(file)) { return null; }
+        const buf = fs.readFileSync(file);
+        if (buf.length < 24 || buf.toString("latin1", 12, 16) !== "IHDR") { return null; }
+        return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+    };
+
+    /* --- Icons exist, and are the size they claim to be. */
+    const badIcons = [];
+    (manifest.icons || []).forEach((icon) => {
+        const file = path.join(SITE, icon.src);
+        const size = pngSize(file);
+        if (!size) { badIcons.push(`${icon.src}: missing or not a PNG`); return; }
+        const [w, h] = icon.sizes.split("x").map(Number);
+        if (size.w !== w || size.h !== h) {
+            badIcons.push(`${icon.src}: declared ${icon.sizes}, file is ${size.w}x${size.h}`);
+        }
+    });
+    check(`every manifest icon exists at its declared size (${(manifest.icons || []).length} icons)`,
+        badIcons.length === 0, badIcons.join("\n      "));
+
+    /* A maskable icon is a SEPARATE file with more padding, not a purpose
+       string added to the plain one. Declaring purpose:"maskable" on artwork
+       drawn edge to edge is the single most common PWA icon mistake: the
+       launcher crops it to a circle and clips the mark. */
+    const maskable = (manifest.icons || []).filter((i) => /\bmaskable\b/.test(i.purpose || ""));
+    const plain = (manifest.icons || []).filter((i) => !/\bmaskable\b/.test(i.purpose || ""));
+    check("the manifest declares a maskable icon", maskable.length > 0,
+        "no icon with purpose: maskable");
+    check("the maskable icon is its own file, not a plain icon relabelled",
+        maskable.every((m) => !plain.some((p) => p.src === m.src)),
+        maskable.map((m) => m.src).join(", "));
+
+    /* --- apple-touch-icon. iOS ignores the manifest's icons array entirely,
+           so nothing above covers it and a missing file means a screenshot of
+           the page on the home screen instead of the mark. */
+    const appleIcon = pngSize(path.join(SITE, "assets", "icon-180.png"));
+    check("assets/icon-180.png exists at 180x180 for apple-touch-icon",
+        appleIcon !== null && appleIcon.w === 180 && appleIcon.h === 180,
+        appleIcon ? `${appleIcon.w}x${appleIcon.h}` : "missing or not a PNG");
+
+    /* --- THE REVENUE ONE. Manifest shortcuts are the long-press menu on an
+           installed icon, and they are ordinary URLs: a shortcut pointing
+           straight at resume.html would send every installed visitor into the
+           editor without passing loading.html, silently removing the
+           interstitial from the launch path that installed users are most
+           likely to take. Nothing about that is visible on the web. */
+    const appJsSrc = fs.readFileSync(path.join(SITE, "js", "app.js"), "utf8");
+    const routeKeys = new Set(
+        [...(appJsSrc.match(/EDITOR_ROUTES = \{[\s\S]*?\};/) || [""])[0]
+            .matchAll(/(\w+):\s*"/g)].map(([, k]) => k));
+
+    const shortcuts = manifest.shortcuts || [];
+    check("the manifest declares shortcuts", shortcuts.length > 0, "none declared");
+
+    const bypassing = shortcuts.filter((s) => !/^\/loading\.html\?target=/.test(s.url || ""));
+    check(`every manifest shortcut routes through loading.html (${shortcuts.length} shortcuts)`,
+        bypassing.length === 0,
+        bypassing.map((s) => `${s.name}: ${s.url}`).join(", "));
+
+    const unknownTarget = shortcuts
+        .map((s) => (String(s.url).match(/target=([^&]+)/) || [])[1])
+        .filter((t) => t && !routeKeys.has(t));
+    check("every manifest shortcut names a real editor target",
+        unknownTarget.length === 0,
+        `not in EDITOR_ROUTES: ${unknownTarget.join(", ")} ` +
+        `(known: ${[...routeKeys].join(", ")})`);
+
+    /* --- The install head block, on every page that should have it.
+           admin.html is the private authoring tool and offline.html must
+           reference nothing; everything else a visitor can reach needs the
+           manifest link or it is not installable FROM that page. */
+    const exempt = new Set(["admin.html", "offline.html"]);
+    const missingBlock = [];
+    pages.forEach((file) => {
+        const name = path.basename(file);
+        const rel = path.relative(SITE, file).replace(/\\/g, "/");
+        if (exempt.has(name) || rel.startsWith("tools/")) { return; }
+        const html = fs.readFileSync(file, "utf8");
+        const gaps = [];
+        if (!/<link\s+rel="manifest"/.test(html)) { gaps.push("manifest"); }
+        if (!/<link\s+rel="apple-touch-icon"/.test(html)) { gaps.push("apple-touch-icon"); }
+        if (!/<meta\s+name="theme-color"/.test(html)) { gaps.push("theme-color"); }
+        if (gaps.length) { missingBlock.push(`${rel}: no ${gaps.join(", ")}`); }
+    });
+    check(`every public page carries the installed-app head block (${pages.length} pages scanned)`,
+        missingBlock.length === 0, missingBlock.join("\n      "));
+
+    /* --- offline.html's whole contract, and the one most likely to be broken
+           by a well-meaning tidy-up. sw.js serves it when the network is
+           unreachable, so a <link> to css/style.css or a Google Fonts sheet
+           renders it as unstyled black-on-white -- which looks MORE broken
+           than the browser's own error page and so defeats the point. You
+           cannot see this by loading the page; you have to be offline. */
+    const offlinePath = path.join(SITE, "offline.html");
+    if (fs.existsSync(offlinePath)) {
+        const offlineHtml = fs.readFileSync(offlinePath, "utf8").replace(/<!--[\s\S]*?-->/g, "");
+        const refs = [
+            ...[...offlineHtml.matchAll(/<link\b[^>]*\shref="([^"]+)"/g)].map(([, v]) => v),
+            ...[...offlineHtml.matchAll(/<script\b[^>]*\ssrc="([^"]+)"/g)].map(([, v]) => v),
+            ...[...offlineHtml.matchAll(/<img\b[^>]*\ssrc="([^"]+)"/g)].map(([, v]) => v)
+        ];
+        check("offline.html references no external file at all",
+            refs.length === 0, refs.join(", "));
+        check("offline.html carries its styling inline",
+            /<style>/.test(offlineHtml), "no inline <style> block");
+        check("offline.html draws the mark inline rather than linking it",
+            /<svg\b/.test(offlineHtml), "no inline <svg>");
+    } else {
+        check("offline.html exists", false, "site/offline.html not found");
+    }
+
+    /* --- sw.js must stay a pass-through. This project has no build step, so
+           nothing would bump a cache version on deploy: a precached
+           css/style.css or js/poster.js goes stale the moment it is fixed and
+           stays stale, and a precached js/ads.js makes a dead ad zone and a
+           stale copy indistinguishable. Both are silent. */
+    const swPath = path.join(SITE, "sw.js");
+    if (fs.existsSync(swPath)) {
+        /* Comments stripped first: this file's own header NAMES ads.js and
+           style.css in the course of explaining why they must never be cached,
+           and a check that cannot tell an explanation from an instruction
+           would fail on the documentation. */
+        const swSrc = fs.readFileSync(swPath, "utf8")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/^\s*\/\/.*$/gm, "");
+
+        const quoted = [...swSrc.matchAll(/["'`]([^"'`]*\.(?:html|js|css|png|svg|json))["'`]/g)]
+            .map(([, v]) => v);
+        const unexpected = quoted.filter((v) => !/(^|\/)offline\.html$/.test(v));
+        check("sw.js caches nothing but offline.html",
+            unexpected.length === 0,
+            `also names: ${unexpected.join(", ")}`);
+
+        check("sw.js leaves non-navigation requests to the browser",
+            /request\.mode\s*!==\s*["']navigate["']/.test(swSrc),
+            "no early return for non-navigate requests -- every subresource " +
+            "on the site would be routed through the worker");
+
+        /* The fallback must be reached only when fetch() THROWS. Serving it
+           for a 404 would tell a visitor with a working connection that they
+           are offline, and 404.html is a real page of this site. */
+        check("sw.js returns the network response untouched, including errors",
+            /return await fetch\(request\)/.test(swSrc) &&
+            /catch\s*\(/.test(swSrc),
+            "the offline page must be a catch-branch fallback, not a status check");
+    } else {
+        check("sw.js exists", false, "site/sw.js not found");
+    }
+
+    /* --- theme-color is the installed app's status bar. It is hardcoded in
+           28 page heads and once more in app.js, none of which move when the
+           palette does, so it drifts exactly the way the two dark-theme
+           blocks would without their own check above. */
+    const css = fs.readFileSync(path.join(SITE, "css", "style.css"), "utf8");
+    const token = (name) => {
+        const m = css.match(new RegExp("--" + name + ":\\s*(#[0-9A-Fa-f]{6})"));
+        return m ? m[1].toUpperCase() : null;
+    };
+    const lightBg = token("l-bg");
+    const darkBg = token("d-bg");
+
+    const appColors = appJsSrc.match(
+        /THEME_COLORS = \{\s*light:\s*"(#[0-9A-Fa-f]{6})",\s*dark:\s*"(#[0-9A-Fa-f]{6})"/);
+    check("js/app.js's THEME_COLORS match the stylesheet's --l-bg and --d-bg",
+        appColors !== null &&
+        appColors[1].toUpperCase() === lightBg &&
+        appColors[2].toUpperCase() === darkBg,
+        appColors
+            ? `app.js: ${appColors[1]}/${appColors[2]} | style.css: ${lightBg}/${darkBg}`
+            : "THEME_COLORS not found in js/app.js");
+
+    check("the manifest's background and theme colours match --l-bg",
+        String(manifest.background_color).toUpperCase() === lightBg &&
+        String(manifest.theme_color).toUpperCase() === lightBg,
+        `manifest: ${manifest.background_color}/${manifest.theme_color} | --l-bg: ${lightBg}`);
+
+    const wrongMeta = [];
+    pages.forEach((file) => {
+        const rel = path.relative(SITE, file).replace(/\\/g, "/");
+        const html = fs.readFileSync(file, "utf8");
+        [...html.matchAll(
+            /<meta\s+name="theme-color"\s+content="(#[0-9A-Fa-f]{6})"\s+media="\(prefers-color-scheme:\s*(\w+)\)">/g
+        )].forEach(([, hex, scheme]) => {
+            const want = scheme === "dark" ? darkBg : lightBg;
+            if (hex.toUpperCase() !== want) {
+                wrongMeta.push(`${rel}: ${scheme} declares ${hex}, --${scheme === "dark" ? "d" : "l"}-bg is ${want}`);
+            }
+        });
+    });
+    check("every page's theme-color meta tags match the stylesheet palette",
+        wrongMeta.length === 0, wrongMeta.join("\n      "));
+
+    /* --- admin.html generates blog post pages from its own head template, so
+           a block added to the 28 hand-written pages does not reach an
+           exported post. Same failure shape as MEGA_MENU, which is documented
+           in CLAUDE.md precisely because it has drifted before. */
+    const adminJs = fs.readFileSync(path.join(SITE, "js", "admin.js"), "utf8");
+    const generatedGaps = [];
+    if (!/rel="manifest" href="\.\.\/manifest\.webmanifest"/.test(adminJs)) {
+        generatedGaps.push("manifest link");
+    }
+    if (!/rel="apple-touch-icon" href="\.\.\/assets\/icon-180\.png"/.test(adminJs)) {
+        generatedGaps.push("apple-touch-icon");
+    }
+    if (!/name="theme-color"/.test(adminJs)) {
+        generatedGaps.push("theme-color");
+    }
+    check("admin.html's generated post pages carry the installed-app head block",
+        generatedGaps.length === 0,
+        `buildPostPage() emits no ${generatedGaps.join(", ")} -- an exported ` +
+        "post would be the one page of the site that is not installable");
 }
 
 /* ==========================================================================
