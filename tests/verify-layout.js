@@ -779,6 +779,59 @@ function staticChecks() {
         stated ? `message says ${stated[1]}, index.html has ${cards.length} cards`
             : "no \"see all N\" count found in the catalog-empty message");
 
+    /* 1p. The two readiness signals this suite gates navigation on.
+
+           Both are POSITIVE signals, because stillness cannot tell "has not
+           started" from "has finished" -- see the mockupReady and searchReady
+           comments in the navigation poll.
+
+           They fail SILENTLY and in the worst direction. `getAttribute`
+           returns null for an attribute that no longer exists, and null is
+           not 'loading', so a renamed attribute makes the gate pass
+           immediately, every time, on every page. The suite would go back to
+           measuring half-built pages and reporting it as a layout difference
+           -- which is exactly the search.html symptom this pairing was
+           written to end, and it would look like a fresh mystery rather than
+           a regression. */
+    /* Scoped to the readiness EXPRESSION, not to this file.
+
+       The first version of this check searched all of __filename, which
+       includes the table below -- so it could match its own literals and pass
+       while the gate it was checking read a different attribute entirely. It
+       did: renaming the attribute inside mockupReady was the one breakage of
+       four that went uncaught. A check that can satisfy itself by reading its
+       own source is worse than no check, because it reports green.
+
+       Slicing to the poll's own object literal is what makes it read the gate
+       and nothing else. */
+    /* READINESS is the string the navigation poll evaluates, read directly.
+
+       It used to be sliced out of __filename, and that was wrong three times
+       running, each time the same way: the check matched ITSELF. Hoisting the
+       expression to a constant is what removed the whole class -- there is
+       nothing to parse, and no anchor that can accidentally land on this
+       table. See the comment on READINESS. */
+    const readiness = READINESS(false);
+
+    [
+        ["js/search.js", "data-search-state", "searchReady"],
+        ["js/mockup.js", "data-mockup-state", "mockupReady"]
+    ].forEach(([file, attr, gate]) => {
+        const sets = fs.readFileSync(path.join(SITE, file), "utf8").includes(`"${attr}"`);
+        /* getAttribute('<attr>') specifically, not "the name appears near the
+           gate". Proximity was the first form and it was too loose: the
+           mockupReady gate names the attribute TWICE -- once in its
+           querySelector and once in its getAttribute -- so renaming only the
+           read left the selector's copy behind and the check still matched.
+           That was the fourth deliberate breakage, and it passed. The gate is
+           only correct if it READS this attribute; that is what to assert. */
+        const reads = readiness.includes(`getAttribute('${attr}')`);
+        check(`${file} sets ${attr}, and the ${gate} gate reads it`,
+            sets && reads,
+            `${file} ${sets ? "sets" : "DOES NOT SET"} ${attr}; ` +
+            `the ${gate} gate ${reads ? "reads" : "DOES NOT READ"} it`);
+    });
+
     /* 1o. Backup and restore.
 
            The defect this section exists for is not a crash. A backup that
@@ -1410,6 +1463,127 @@ const QUIESCE = `(() => {
   ].join('|');
 })()`;
 
+/* The navigation readiness expression, hoisted to a module constant beside
+   QUIESCE and PARITY_SNAPSHOT -- and NOT only for tidiness.
+
+   Section 1p asserts that each page-state attribute a shipped file sets is
+   the one this poll reads, because a renamed attribute makes getAttribute
+   return null, null is not 'loading', and the gate then passes instantly on
+   every page. To assert that, the check has to see this expression.
+
+   It first tried to see it by slicing __filename, and that was wrong three
+   times running, each time the same way: THE CHECK KEPT MATCHING ITSELF.
+   Its lookup table matched before the gate did; then its slice anchor
+   appeared in its own code above the poll; then the comment explaining the
+   anchor quoted the anchor. A check that reads its own source can satisfy
+   itself, and it reports green when it does.
+
+   As a constant there is nothing to parse and nothing to match by accident:
+   the check reads the same value the poll evaluates. It takes adsBlocked
+   because section 4 blocks js/ads.js and must not wait for a TBAds that is
+   never coming. */
+const READINESS = (adsBlocked) => `(() => ({
+      path: location.pathname,
+      ready: document.readyState,
+      /* DOMContentLoaded has FIRED, asked retroactively.
+
+         readyState is not this signal and the difference is not
+         academic. Per the HTML spec's "stop parsing" steps the
+         state is set to "interactive" BEFORE the deferred
+         scripts run, and DOMContentLoaded is fired after them --
+         so "interactive" means the parser finished, not that the
+         document is ready. resume.html defers jsPDF from a CDN,
+         and js/ads.js mounts every band from its
+         DOMContentLoaded listener, so on a slow network the poll
+         released while the deferred script was still downloading
+         and the snapshot found no ad band at all. Measured on a
+         degraded connection here: jsPDF took 6.7s, and every
+         width of resume.html reported "got 0 -- rail=false
+         leaderboard=false anchor=false" on a page whose markup
+         and script tag were correct and untouched.
+
+         domContentLoadedEventEnd stays 0 until the event's
+         handlers have finished, and it is readable at any time
+         afterwards, which is what makes it usable from a poll
+         that may arrive late. It does NOT wait for the load
+         event, so the ad-iframe cost that this whole change
+         exists to avoid is still avoided. */
+      domReady: (() => {
+          const nav = performance.getEntriesByType('navigation')[0];
+          return !!(nav && nav.domContentLoadedEventEnd > 0);
+      })(),
+      adsReady: ${adsBlocked} ||
+                !document.querySelector('script[src*="js/ads.js"]') ||
+                typeof TBAds !== 'undefined',
+      /* The mockup template's base photograph has been painted.
+
+         This is a POSITIVE signal, and it has to be, because the
+         stillness poll below cannot supply one. While the base
+         PNG is in flight the canvas is a flat 1000x1000
+         placeholder fill -- so the page is not merely still, it
+         is stably WRONG, and three identical fingerprints mean
+         "nothing is happening", never "everything has happened".
+
+         Measured, by deleting the default template's base PNG and
+         serving the tree beside an intact one: the placeholder
+         settled in 381ms with the preview pane at 640 and the
+         fabric pixel at 244,243,239, against 788 and 244,244,249
+         on the healthy tree. Those are exactly the numbers that
+         had been appearing intermittently in section 4 and in
+         section 5's colourway check on a clean tree -- one cause,
+         two symptoms, depending on which section got there first.
+
+         Testing for "not loading" rather than for "ready" is
+         deliberate. An ERROR is a real defect, and it must reach
+         the check that can name it rather than expiring here as a
+         20-second navigation timeout on every mockup page in the
+         run. Section 5 asserts the ready state outright.
+
+         NOTE FOR ANYONE EDITING THIS STRING: it is the inside of
+         a template literal, so a backtick here does not comment
+         anything out -- it ENDS the literal. Two pairs of them in
+         this comment turned the whole expression into a chain of
+         string comparisons, which is valid JavaScript that
+         evaluates to false -- so a syntax check passed and every
+         navigation in the suite timed out at 20 seconds instead. */
+      mockupReady: (() => {
+          const wrap = document.querySelector('[data-mockup-state]');
+          return !wrap || wrap.getAttribute('data-mockup-state') !== 'loading';
+      })(),
+
+      /* search.html's catalog has arrived. The same POSITIVE
+         signal as mockupReady above, for the same reason, and
+         this page is the second proof that stillness alone is
+         not enough.
+
+         js/search.js fetches the whole of index.html (118KB),
+         parses it and imports 53 cards, so the page sits EMPTY
+         for a while after it is interactive -- measured here at
+         117-147ms warm and 510ms on a cold server. QUIESCE
+         needs 300ms of stillness and settled() needs 200ms, so
+         the empty page can satisfy both and be measured as
+         finished.
+
+         That is what produced section 4's intermittent
+         search.html difference, and the asymmetry was not
+         random: section 4 starts a FRESH server for the
+         baseline, so the HEAD side is cold (510ms, measured
+         empty) while the working-tree side has been serving all
+         run and is warm (~120ms, measured populated). One tree
+         reported main at 201px, the other at 2179px, on a file
+         neither had touched.
+
+         Not-loading rather than ready, exactly as mockupReady
+         explains: a search page whose catalog fetch genuinely
+         failed must reach the checks that can name it, not
+         expire as a 20-second navigation timeout. */
+      searchReady: (() => {
+          const page = document.querySelector('[data-search-page]');
+          return !page ||
+              page.getAttribute('data-search-state') !== 'loading';
+      })()
+}))()`;
+
 async function connect(browserPath, cdpPort, options) {
     const adsBlocked = !!(options && options.adsBlocked);
     const userDir = tempDir("tb-verify-");
@@ -1622,75 +1796,7 @@ async function connect(browserPath, cdpPort, options) {
             await new Promise((r) => setTimeout(r, 100));
             let state = null;
             try {
-                state = await evaluate(`(() => ({
-                    path: location.pathname,
-                    ready: document.readyState,
-                    /* DOMContentLoaded has FIRED, asked retroactively.
-
-                       readyState is not this signal and the difference is not
-                       academic. Per the HTML spec's "stop parsing" steps the
-                       state is set to "interactive" BEFORE the deferred
-                       scripts run, and DOMContentLoaded is fired after them --
-                       so "interactive" means the parser finished, not that the
-                       document is ready. resume.html defers jsPDF from a CDN,
-                       and js/ads.js mounts every band from its
-                       DOMContentLoaded listener, so on a slow network the poll
-                       released while the deferred script was still downloading
-                       and the snapshot found no ad band at all. Measured on a
-                       degraded connection here: jsPDF took 6.7s, and every
-                       width of resume.html reported "got 0 -- rail=false
-                       leaderboard=false anchor=false" on a page whose markup
-                       and script tag were correct and untouched.
-
-                       domContentLoadedEventEnd stays 0 until the event's
-                       handlers have finished, and it is readable at any time
-                       afterwards, which is what makes it usable from a poll
-                       that may arrive late. It does NOT wait for the load
-                       event, so the ad-iframe cost that this whole change
-                       exists to avoid is still avoided. */
-                    domReady: (() => {
-                        const nav = performance.getEntriesByType('navigation')[0];
-                        return !!(nav && nav.domContentLoadedEventEnd > 0);
-                    })(),
-                    adsReady: ${adsBlocked} ||
-                              !document.querySelector('script[src*="js/ads.js"]') ||
-                              typeof TBAds !== 'undefined',
-                    /* The mockup template's base photograph has been painted.
-
-                       This is a POSITIVE signal, and it has to be, because the
-                       stillness poll below cannot supply one. While the base
-                       PNG is in flight the canvas is a flat 1000x1000
-                       placeholder fill -- so the page is not merely still, it
-                       is stably WRONG, and three identical fingerprints mean
-                       "nothing is happening", never "everything has happened".
-
-                       Measured, by deleting the default template's base PNG and
-                       serving the tree beside an intact one: the placeholder
-                       settled in 381ms with the preview pane at 640 and the
-                       fabric pixel at 244,243,239, against 788 and 244,244,249
-                       on the healthy tree. Those are exactly the numbers that
-                       had been appearing intermittently in section 4 and in
-                       section 5's colourway check on a clean tree -- one cause,
-                       two symptoms, depending on which section got there first.
-
-                       Testing for "not loading" rather than for "ready" is
-                       deliberate. An ERROR is a real defect, and it must reach
-                       the check that can name it rather than expiring here as a
-                       20-second navigation timeout on every mockup page in the
-                       run. Section 5 asserts the ready state outright.
-
-                       NOTE FOR ANYONE EDITING THIS STRING: it is the inside of
-                       a template literal, so a backtick here does not comment
-                       anything out -- it ENDS the literal. Two pairs of them in
-                       this comment turned the whole expression into a chain of
-                       string comparisons, which is valid JavaScript that
-                       evaluates to false -- so a syntax check passed and every
-                       navigation in the suite timed out at 20 seconds instead. */
-                    mockupReady: (() => {
-                        const wrap = document.querySelector('[data-mockup-state]');
-                        return !wrap || wrap.getAttribute('data-mockup-state') !== 'loading';
-                    })()
-                }))()`);
+                state = await evaluate(READINESS(adsBlocked));
             } catch (e) { continue; }
             /* A malformed readiness expression, named rather than waited out.
 
@@ -1710,7 +1816,8 @@ async function connect(browserPath, cdpPort, options) {
                     "inside the evaluated template literal");
             }
             if (!state || state.path !== expected || state.ready === "loading" ||
-                    !state.domReady || !state.adsReady || !state.mockupReady) {
+                    !state.domReady || !state.adsReady || !state.mockupReady ||
+                    !state.searchReady) {
                 continue;
             }
             return await quiesce(url, width);

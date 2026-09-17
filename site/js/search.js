@@ -317,6 +317,10 @@
     }
 
     function fail(err) {
+        /* Not "loading" any more, and deliberately not "ready" either: the
+           suite waits for not-loading so this reaches the checks that can
+           name it, rather than timing out every navigation to this page. */
+        setState("error");
         if (el.error) {
             el.error.hidden = false;
         }
@@ -327,7 +331,30 @@
         }
     }
 
+    /* Machine-readable state, for anything that needs to know this page has
+       FINISHED rather than merely stopped moving.
+
+       This page is empty for its first 120-510ms: loadCatalog() fetches the
+       whole of index.html (118KB), parses it, and imports 53 cards. Until
+       that lands, the document is not busy and not broken -- it is stably,
+       convincingly wrong, which no stillness poll can distinguish from being
+       done. tests/verify-layout.js section 4 settled on the empty page and
+       reported main at 201px against a populated 2179px on a file nobody had
+       touched.
+
+       Same shape and same reasoning as js/mockup.js's data-mockup-state, and
+       the suite reads both the same way: it waits for NOT-loading rather than
+       for ready, so a genuine failure surfaces as an error the checks can name
+       instead of expiring as a 20-second navigation timeout. */
+    function setState(state) {
+        if (el.page) {
+            el.page.setAttribute("data-search-state", state);
+        }
+    }
+
     async function init() {
+        setState("loading");
+
         const startingQuery = queryFromUrl();
         if (startingQuery) {
             el.input.value = startingQuery;
@@ -402,6 +429,11 @@
                 el.input.focus();
             }
         }
+
+        /* Last line of init, AFTER apply() has rendered. Set any earlier and
+           the signal would fire on a page that is still empty, which is the
+           exact failure it exists to prevent. */
+        setState("ready");
     }
 
     if (document.readyState === "loading") {
