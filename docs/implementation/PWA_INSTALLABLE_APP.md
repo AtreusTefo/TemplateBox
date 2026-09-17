@@ -38,7 +38,7 @@ is answered yet; neither has to be for this tier.
 | File | Role |
 | --- | --- |
 | `site/manifest.webmanifest` | Name, icons, colours, scope, shortcuts. This is what makes the site installable. |
-| `site/sw.js` | Pass-through service worker. Unlocks the install prompt; serves `offline.html` when a navigation cannot reach the network. |
+| `site/sw.js` | Pass-through service worker. Without it Chrome will not offer the install at all; serves `offline.html` when a navigation cannot reach the network. |
 | `site/offline.html` | Self-contained offline notice. References no other file, by contract. |
 | `site/assets/icon-{192,512,180}.png`, `icon-maskable-512.png` | Rendered from `assets/logo-mark.svg` by `tools/make-app-icons.js`. |
 | `tools/make-app-icons.js` | Renders the four icons from the one SVG. Run from the repository root. |
@@ -57,10 +57,12 @@ images, ad iframes, fonts, XHR -- is passed back to the browser by not calling
 
 Two reasons it exists:
 
-1. **Chrome will not offer the install prompt** for a site whose worker has no
+1. **Chrome will not offer the install at all** for a site whose worker has no
    fetch handler. Without it the manifest produces a bookmark with an icon and
    nothing more. (iOS ignores service workers for Add to Home Screen, so this
-   file is not what makes it work there.)
+   file is not what makes it work there.) "Offer" means a MENU ENTRY, not a
+   popup -- current Chrome shows no automatic banner. Read the install section
+   under Verification before chasing a prompt that was never going to appear.
 2. **A navigation that cannot reach the network should land on `offline.html`**
    rather than the browser's error screen, so an installed app with no signal
    reads as "no connection" rather than "this app crashed and took my
@@ -258,6 +260,40 @@ What was confirmed by hand: the notice renders correctly in both themes at
 retries their destination rather than the homepage), a 404 still returns
 `404.html` rather than the offline notice, and the cache holds exactly one
 entry.
+
+### Installed on real hardware, and THERE IS NO PROMPT TO WAIT FOR
+
+Confirmed September 17, 2026 on a Samsung Galaxy A16, Chrome for Android,
+installed from the browser menu. That closes the one item this document
+previously listed as unverifiable without a device.
+
+**Current Chrome does not show an automatic install banner**, and expecting one
+sends you looking for a symptom that does not exist. Installing is a menu
+action:
+
+| Browser | Where |
+| --- | --- |
+| Chrome (Android) | the browser menu, "Install app" or "Add to Home screen" |
+| Samsung Internet | menu, "Add page to" then "Home screen" -- never prompts |
+| Chrome (desktop) | install icon at the right of the address bar |
+| Safari (iOS) | Share, then "Add to Home Screen" -- Apple has never supported prompts |
+
+This matters because the A16, like every Samsung handset, ships with **Samsung
+Internet as the default browser**, so the first browser a tester reaches for is
+the one that definitely never prompts.
+
+Worth recording that the sentence this replaces called it "the install prompt"
+and listed it as the last unverified item. Both halves were misleading: the
+absence of a prompt is normal, and the feature was working the whole time.
+
+Do NOT treat `beforeinstallprompt` not firing as evidence of anything. It was
+tested here and did not fire, on a site that installs correctly -- automated
+browsers suppress it, and it fires early enough that a listener attached after
+load misses it. What IS worth checking, because these genuinely block an offer:
+`prefer_related_applications`, `related_applications`, a `start_url` outside
+`scope`, an icon that 404s or decodes at a size other than the one declared,
+and a worker with no fetch handler. All five were checked against production
+and are clean.
 
 ## Not included, deliberately
 
