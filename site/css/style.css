@@ -8142,8 +8142,9 @@ main:has(.mockup-layout) .editor-head {
    that class and only override its `display`.
    -------------------------------------------------------------------------- */
 
-/* Pinned under the site header, the way the reference mobile surface pins
-   its field: on a long results list the field never scrolls away.
+/* Pinned under the site header on a desktop, and at the very top of the
+   viewport below 75rem where this page's header is hidden (see the gate
+   further down): on a long results list the field never scrolls away.
 
    --header-h is the header's REAL rendered height, published onto <html> by
    initHeaderHeight() in js/app.js and kept current by a ResizeObserver. A
@@ -8161,12 +8162,96 @@ main:has(.mockup-layout) .editor-head {
     position: sticky;
     top: var(--header-h, 5.25rem);
     z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
     /* Bleeds to the padding edges of main, so the rule under it spans the
        full column rather than floating inside the gutters. */
     margin: 0 calc(var(--space-lg) * -1) var(--space-lg);
     padding: var(--space-sm) var(--space-lg);
     background-color: var(--color-bg);
     border-bottom: 1px solid var(--color-border);
+}
+
+/* min-width: 0 because a flex child defaults to min-width: auto and so
+   refuses to shrink below its content's minimum -- the same default that
+   pushed the invoice table out of its grid track and scrolled the whole page
+   sideways at 320px. The field inside carries a 44rem max-width, so without
+   this the form wins the row and the back control is squeezed instead. */
+.search-page-form {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Back, shown only where the header is hidden. 2.75rem is the site's touch
+   target, the same figure .footer-links a and the nav controls use. */
+.search-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-left: calc(var(--space-xs) * -1);
+    border-radius: 50%;
+    color: var(--color-text);
+}
+
+.search-back svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.search-back:hover,
+.search-back:focus-visible {
+    background-color: var(--color-card);
+}
+
+/* The search page drops its header below the ad rail's 75rem floor -- this
+   project's own definition of "not a desktop", the seam the site anchor and
+   the rail already meet at and the same one .site-nav collapses to a burger
+   on. The field is this page's entire purpose, so on a phone or a tablet it
+   owns the top of the viewport rather than sitting under a bar whose links
+   are all reachable one tap away through Back.
+
+   The header is hidden, NOT removed from search.html: it carries
+   [data-nav-more-panel], which js/app.js mounts the backup and restore
+   controls into and which section 1o of the suite requires every public page
+   to be able to host.
+
+   top: 0 is explicit and cannot be left to --header-h resolving to zero.
+   initHeaderHeight() guards its write with `if (h > 0)`, so a display:none
+   header never publishes at all and the property stays UNSET -- the bar would
+   then fall back to the 5.25rem desktop literal and pin itself 84px down the
+   page with nothing above it. The padding-top goes with it for the same
+   reason: main's own 2.5rem would otherwise sit above the bar. */
+@media (max-width: 74.9375rem) {
+    body:has(.search-page) .site-header {
+        display: none;
+    }
+
+    .search-page {
+        padding-top: 0;
+    }
+
+    .search-page-bar {
+        top: 0;
+    }
+}
+
+/* Above the gate the header is back, and a back arrow beside a full
+   navigation bar is a second way to do what the wordmark and the Templates
+   link already do. Declared after .search-back's own display, because a
+   media query carries no specificity and would otherwise lose to it. */
+@media (min-width: 75rem) {
+    .search-back {
+        display: none;
+    }
 }
 
 .search-page-field {

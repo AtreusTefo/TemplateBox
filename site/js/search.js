@@ -63,7 +63,8 @@
         guideCount: document.querySelector("[data-search-page-guide-count]"),
         empty: document.querySelector("[data-search-page-empty]"),
         browse: document.querySelector("[data-search-page-browse]"),
-        error: document.querySelector("[data-search-page-error]")
+        error: document.querySelector("[data-search-page-error]"),
+        back: document.querySelector("[data-search-back]")
     };
 
     if (!el.page || !el.input || !el.results || !el.browse) {
@@ -414,6 +415,47 @@
                 el.input.value = "";
                 apply("");
                 el.input.focus();
+            });
+        }
+
+        /* Back. The control is a real <a href="index.html">, so everything
+           below is an UPGRADE of a working link and every path out of here
+           ends on that href.
+
+           history.back() only where there is genuinely somewhere on this site
+           to go back TO. The referrer is the signal: a visitor who tapped
+           search on the homepage has a same-origin one and expects to land
+           back where they were, mid-scroll, while a bookmarked or shared ?q=
+           URL has none -- and one arriving from a search engine has a
+           referrer that is not ours, where back would leave the site
+           altogether. Both of those follow the href instead.
+
+           Modified and non-left clicks are left completely alone, so
+           ctrl/cmd/middle-click still opens the homepage in a new tab. Same
+           rule the catalog's own launch handler follows.
+
+           Safe against the address bar only because syncUrl() uses
+           replaceState: with pushState this would walk the query back one
+           keystroke at a time instead of leaving. */
+        if (el.back) {
+            el.back.addEventListener("click", (event) => {
+                if (event.button !== 0 || event.ctrlKey || event.metaKey ||
+                        event.shiftKey || event.altKey) {
+                    return;
+                }
+
+                let sameSite = false;
+                try {
+                    sameSite = !!document.referrer &&
+                        new URL(document.referrer).origin === window.location.origin;
+                } catch (err) {
+                    sameSite = false;
+                }
+
+                if (sameSite && window.history && window.history.length > 1) {
+                    event.preventDefault();
+                    window.history.back();
+                }
             });
         }
 

@@ -209,22 +209,55 @@
              requires. -->
         <h1 class="sr-only">Search templates and guides</h1>
 
-        <!-- A real GET form pointed at this same page, so pressing Enter
-             works before js/search.js has bound anything and a shared or
-             bookmarked ?q= URL is a first-class thing rather than a side
-             effect. Once the script is running it intercepts the submit and
-             filters in place; the form is the fallback, not the mechanism. -->
-        <form class="search-page-bar" role="search" action="search.html" method="get">
-            <div class="search-page-field">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/>
-                </svg>
-                <label class="sr-only" for="search-page-input">Search templates and guides</label>
-                <input type="search" id="search-page-input" name="q" placeholder="Search templates and guides"
-                       autocomplete="off" spellcheck="false" maxlength="80" data-search-page-input>
-                <button type="button" data-search-page-clear aria-label="Clear search">&times;</button>
-            </div>
-        </form>
+        <!-- The bar that owns the top of this page: a back control and the
+             field, sticky together so neither scrolls away on a long results
+             list. -->
+        <div class="search-page-bar">
+            <!-- Back. Shown only below 75rem, where css/style.css hides this
+                 page's site header so the field owns the top of the viewport;
+                 above that the header is present as on every other page and
+                 this control is hidden, because a back arrow beside a full
+                 navigation bar is a second way to do what the wordmark and
+                 the Templates link already do.
+
+                 The header is HIDDEN, not removed from the markup. It carries
+                 [data-nav-more-panel], which js/app.js mounts the backup and
+                 restore controls into and which the suite requires every
+                 public page to be able to host -- deleting it would make this
+                 the one reachable page that offers no backup at all.
+
+                 A real <a href> rather than a scripted button, so it survives
+                 a modified click and still works with no JavaScript.
+                 js/search.js upgrades an ordinary left click to history.back()
+                 when the visitor genuinely arrived from somewhere on this
+                 site; a bookmarked or shared ?q= URL has not, and those land
+                 on the href instead of on a control that would do nothing.
+
+                 Going back is safe here specifically because syncUrl() uses
+                 replaceState rather than pushState -- otherwise this would
+                 walk the query letter by letter instead of leaving the
+                 page. -->
+            <a class="search-back" href="index.html" data-search-back aria-label="Back">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg>
+            </a>
+            <!-- A real GET form pointed at this same page, so pressing Enter
+                 works before js/search.js has bound anything and a shared or
+                 bookmarked ?q= URL is a first-class thing rather than a side
+                 effect. Once the script is running it intercepts the submit
+                 and filters in place; the form is the fallback, not the
+                 mechanism. -->
+            <form class="search-page-form" role="search" action="search.html" method="get">
+                <div class="search-page-field">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/>
+                    </svg>
+                    <label class="sr-only" for="search-page-input">Search templates and guides</label>
+                    <input type="search" id="search-page-input" name="q" placeholder="Search templates and guides"
+                           autocomplete="off" spellcheck="false" maxlength="80" data-search-page-input>
+                    <button type="button" data-search-page-clear aria-label="Clear search">&times;</button>
+                </div>
+            </form>
+        </div>
 
         <!-- Results. Hidden until there is a query; js/search.js swaps
              between this and the browse rows below, never showing both. -->
