@@ -243,8 +243,16 @@ this was considered done:
 - `js/app.js`'s `THEME_COLORS` drifting from the stylesheet
 - `admin.html`'s generated post head losing the block
 
-The offline path itself is **not** covered by the suite and was verified
-separately by driving headless Chrome with `Network.emulateNetworkConditions`,
+The offline path itself is **not** covered by the suite. It was verified twice,
+and the second time is the one that counts: **on a Samsung Galaxy A16 with
+airplane mode on, September 17, 2026** -- the installed app opened to the
+offline card rather than to Chrome's error page. A radio that is actually off
+is not something emulation can stand in for, and given that the first emulated
+attempt passed while proving nothing (see the CDP trap below), a real device
+was the only way to retire the doubt.
+
+Before that it was verified by driving headless Chrome with
+`Network.emulateNetworkConditions`,
 including a negative control (with the worker unregistered, the same navigation
 must produce the browser's own error page, or the test proves nothing).
 
@@ -281,6 +289,19 @@ action:
 This matters because the A16, like every Samsung handset, ships with **Samsung
 Internet as the default browser**, so the first browser a tester reaches for is
 the one that definitely never prompts.
+
+Confirmed on the same device once installed: the icon is the box mark rather
+than a screenshot of the page, the app opens full screen with no address bar,
+and **the long-press shortcuts land on `loading.html` rather than jumping
+straight into an editor.**
+
+That last one deserves its own line, because **no amount of suite coverage
+could have caught it.** Manifest shortcuts do not exist until the app is
+installed, so they cannot be exercised by a browser driven against the served
+site -- section 1n can only assert that the shortcut URLs in the manifest point
+at `loading.html`, never that the launcher honours them. It is the one decision
+in this whole feature with revenue attached and the one that had to be checked
+by a person long-pressing an icon.
 
 Worth recording that the sentence this replaces called it "the install prompt"
 and listed it as the last unverified item. Both halves were misleading: the
