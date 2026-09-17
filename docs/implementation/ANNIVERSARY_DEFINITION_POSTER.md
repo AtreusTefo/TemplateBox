@@ -322,3 +322,19 @@ Driven by hand as well, and three of these found something:
 - `site/js/admin.js` -- the catalog entry
 - `site/css/style.css` -- the `.mock-doc.poster.couple` tile
 - `tests/verify-layout.js` -- section 15
+
+## A third colourway: Black (September 16, 2026)
+
+Screen Mode offers a pure `#000000` ground beside this poster's own near-black.
+The near-black remains the default; the option exists because the two are
+indistinguishable on a screen and are not the same thing on paper, and which
+one is wanted depends on where the poster is going -- a true black is
+off-pixels on an OLED phone, and a near-black lays down ink in all channels in
+print where `#000000` usually converts to K-only and comes out flatter.
+
+Derived by `trueBlack()` in `site/js/poster.js` rather than written out, so a
+change to the dark colourway cannot leave its twin behind. The same option is
+on the music poster, the birthday calendar, the birthday tribute and the love
+story calendar; it is deliberately NOT on the anniversary calendar, whose
+ground is already `#050606` and would offer two indistinguishable choices. Full
+reasoning: `docs/implementation/MUSIC_PLAYER_POSTER.md`, "The page ground".

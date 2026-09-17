@@ -54,16 +54,37 @@ had not.
 
 Two optional lines under the transport row, at the song title's left edge.
 A two-line caption needs about 52 points plus a gap, and there are none spare,
-so they come out of the code: `codeCompact`, 192 by 48, keeping the artwork's
-4:1 because the box crops what is dropped into it and a code cropped out of
-proportion does not scan. That 48 is also what the reference itself draws --
-its code band is about a twentieth of the page where ours is an eighth.
+so they come out of the code: `codeCompact`, keeping the artwork's 4:1 because
+the box crops what is dropped into it and a code cropped out of proportion does
+not scan.
+
+**It was 192 by 48 and is 232 by 58 (September 16, 2026.)** Reported as too
+small once a caption appeared, and it was: 192 against the full box's 460.8 is
+42 per cent, on the one element of this poster that has to be SCANNABLE, where
+everything else only has to be legible. 232 is 50 per cent and is as large as
+the page allows.
+
+The limit is the OTHER position, which is the part worth knowing. Above the
+song title the code's height feeds `playerFlow()`'s `shift`, so everything
+below it moves down and a taller box walks the caption's second line towards
+the foot. Measured across candidate heights:
+
+| Height | Foot: clear under the code | Top: clear after the body's descender |
+| --- | --- | --- |
+| 48 (was) | 18.6 | 15.3 |
+| 56 | 10.6 | 7.3 |
+| **58** | **8.6** | **5.3** |
+| 62 | 4.6 | 1.3 |
+
+58 leaves more room under the code at the foot than the full-size box leaves
+with no caption at all (7.47), and 5.3 points at the top. Confirmed by scanning
+the rendered canvas for its lowest inked row rather than by trusting the
+arithmetic: 832.9 at the foot and 835.9 at the top, against a page of 841.89.
+
+Re-centred with it -- 182.73 + 232/2 is 298.73 against the page's own 298.725.
 
 The compact size is used in BOTH positions, so switching position with a
-caption present still resizes nothing:
-
-    top,  caption      album 415.80 x 422.75   code 191.91 x 47.51  at y 479.88
-    foot, caption      album 415.80 x 422.75   code 191.91 x 48.11  at y 775.14
+caption present still resizes nothing.
 
 The code is the only element that gives way, because it is the only optional
 one whose size carries no information.
