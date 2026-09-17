@@ -450,20 +450,56 @@
         dots: { cx: 493.96, r: 2.07, y: [22.42, 29.72, 37.02] },
         title: { x: 93.97, baseline: 521.12, size: 32, right: 462 },
         artist: { x: 93.96, baseline: 549.97, size: 21, right: 462 },
-        track: { x1: 92.2, x2: 507.52, y: 589.14, width: 5, dim: 0.74 },
+        track: { x1: 92.2, x2: 507.52, y: 579, width: 5, dim: 0.74 },
         knob: { r: 9.72 },
         /* Both times on the first baseline; `squeeze` is the artwork's own
            scale(0.87 1), a horizontal condense rather than a narrower face. */
-        time: { baseline: 612.6, size: 19.75, squeeze: 0.87, leftX: 92.2, rightX: 472.31 },
+        time: { baseline: 602.46, size: 19.75, squeeze: 0.87, leftX: 92.2, rightX: 472.31 },
         play: { cx: 299.62, cy: 667.67, r: 35.88 },
+        /* How far the transport row is lifted off the artwork's own position.
+
+           Three things make up that row and they have to move TOGETHER: the
+           disc comes from `play` above, while the five glyphs and the play
+           triangle are paths in PAGE coordinates, so they move by shifting
+           their transform and have no number of their own to edit. Lift the
+           disc alone and the triangle slides off it. paintPlayer() and
+           playerSVG() each compute one `rowDy` and hand it to all three. */
+        rowLift: 14.17,
+        /* `y` is the artwork's own position for the code at the foot and is
+           kept as the record. It is no longer where the code is DRAWN: with
+           the transport row lifted, a fixed y would have opened a 29.8-point
+           hole above it where the artwork leaves 15.67, so playerFlow()
+           derives the foot position from the controls now. */
         code: { x: 68.6, y: 719.22, w: 460.8, h: 115.2 },
 
-        /* The two gaps the artwork itself sets, named because moving the code
-           re-uses them rather than inventing new ones. This page has NO slack:
-           57.28 + 182.43 + 15.67 + 115.2 + 7.47 is exactly the 378.05 points
-           below the album. Every number here is spent. */
+        /* The artwork's own gap above the code at the foot, reused as the
+           gap under the ALBUM when the code moves up there.
+
+           The page USED to have no slack at all -- 57.28 + 182.43 + 15.67 +
+           115.2 + 7.47 was exactly the 378.05 points below the album, every
+           number spent. That is no longer true and the arithmetic above is
+           kept only as the artwork's record: the bar, the times and the
+           transport row were pulled up and the gap under the code tightened,
+           so a no-caption page now ends 22 to 36 points short of where it
+           used to. See PLAYER.rowLift. */
         codeGap: 15.67,        /* what sits above the code at the foot */
-        albumToTitle: 57.28,   /* album bottom to the song title's baseline */
+        /* The gap from the CODE's bottom to the title's baseline, whenever
+           the code sits above the title.
+
+           The artwork's own gap there is 57.28, which is what it sets under
+           its ALBUM -- and under a code, full size or compact, that leaves 34
+           points of visible white. Reported twice as a lot of space, and it
+           is. 43.3 leaves 20, which still reads as a separation.
+
+           It applied only to the compact case at first, to keep an exact
+           swap: with the full-size code above the title the controls came to
+           rest at 834.42, precisely where the code's own bottom sits in the
+           other position. That was pretty and it was bought with the 34
+           points. Asked for the no-caption case too, the gap wins and the
+           coincidence goes. `albumToTitle` went with it: the title's own
+           baseline is fixed at 521.12 in the foot position, so once the shift
+           stopped reading that constant it had no reader left. */
+        codeToTitle: 43.3,
 
         /* The code when a CAPTION shares the page with it. Nothing is resized
            by moving the code -- a swap is a swap -- but a caption is a new
@@ -473,9 +509,33 @@
            is kept, because the box crops what is dropped into it and a code
            cropped out of proportion does not scan.
 
-           ONE compact size, used in both positions, so that switching the
-           position while a caption is present still resizes nothing. */
-        codeCompact: { x: 202.73, w: 192, h: 48 },
+           TWO compact sizes now, one per position, and that REVERSES the
+           rule this comment used to carry -- it said one size for both, so
+           that moving the code with a caption present resized nothing. The
+           two positions do not have the same room and pretending they do cost
+           the top one a third of its code:
+
+           - At the FOOT the code is the last thing on the page, so its ceiling
+             is the paper. It starts at 775.27 and the artwork leaves 7.47
+             under the full-size box, which puts the limit at 59.
+           - At the TOP everything below the code moves down with it through
+             `shift`, so the ceiling is the caption's second line -- and with
+             `codeToTitle` reclaiming 14 points from the gap above the title,
+             that limit is 74.
+
+           So the foot gets 236 wide and the top 288, against a full box of
+           460.8: 51 and 63 per cent, where a single shared size would hold
+           both to 51. Switching position with a caption present now resizes
+           the code, which is the honest answer when the two places really are
+           different sizes -- and it stays scannable in both, which is the only
+           thing this box has to be.
+
+           The artwork's 4:1 is kept in both, because the box crops what is
+           dropped into it and a code cropped out of proportion does not scan.
+           Both are centred: 180.73 + 236/2 and 154.73 + 288/2 are both 298.73,
+           against the page's own 298.725. */
+        codeCompact: { x: 154.73, w: 288, h: 72 },
+        codeCompactTop: { x: 130.73, w: 336, h: 84 },
 
         /* Two optional lines under the transport row. Measured DOWN FROM the
            transport row rather than pinned to the page, because that row moves
@@ -490,6 +550,35 @@
            knob position, (198.63 - 92.2) / (507.52 - 92.2). */
         fallbackPlayed: 0.2563
     };
+
+    /* The same colourway on a PURE BLACK ground.
+
+       Four posters carry a near-black that came from their artwork's master
+       SVG -- #231F20, kept over the designer's own exported PNG, which samples
+       #000000 at the same point. That decision stands and is still the
+       default; this is the third option beside it, because the two are
+       indistinguishable on a screen and are not the same thing on paper, and
+       which one somebody wants depends on where the poster is going.
+
+       DERIVED from the dark table rather than written out a second time. Each
+       dark colourway is a dozen colours and four hand-copied twins would be
+       four places to forget a change -- and these tables are exactly the sort
+       of thing somebody edits one line of.
+
+       The rule is "every value that IS the page becomes black", which is what
+       catches the ones not called `page`: the love poster's `circleFill` is the
+       ground punched out of its white ring, so a twin that changed only `page`
+       would leave a dark disc sitting on a black poster. Checked against all
+       four tables -- nothing else in a dark colourway happens to hold the
+       page's own value, and the light ones are never passed in. */
+    function trueBlack(dark) {
+        const out = Object.assign({}, dark);
+        Object.keys(out).forEach((k) => {
+            if (out[k] === dark.page) { out[k] = "#000000"; }
+        });
+        out.label = "Black";
+        return out;
+    }
 
     const PLAYER_THEMES = {
         dark: {
@@ -518,6 +607,8 @@
             albumStroke: "#231F20"
         }
     };
+
+    PLAYER_THEMES.black = trueBlack(PLAYER_THEMES.dark);
 
     const DEFAULT_PLAYER_THEME = "dark";
 
@@ -852,6 +943,8 @@
         }
     };
 
+    HBD_THEMES.black = trueBlack(HBD_THEMES.night);
+
     const DEFAULT_HBD_THEME = "night";
 
     function hbdTheme() {
@@ -1103,6 +1196,8 @@
             sparkleTip: "#F3E3B0"
         }
     };
+
+    TRIB_THEMES.black = trueBlack(TRIB_THEMES.night);
 
     const DEFAULT_TRIB_THEME = "night";
 
@@ -1511,6 +1606,8 @@
         }
     };
 
+    LOVE_THEMES.black = trueBlack(LOVE_THEMES.night);
+
     const DEFAULT_LOVE_THEME = "night";
 
     function loveTheme() {
@@ -1728,6 +1825,8 @@
             empty: "#38352F"
         }
     };
+
+    COUPLE_THEMES.black = trueBlack(COUPLE_THEMES.night);
 
     const DEFAULT_COUPLE_THEME = "day";
 
@@ -2082,6 +2181,8 @@
             shadow: 0.55
         }
     };
+
+    TUNE_THEMES.black = trueBlack(TUNE_THEMES.night);
 
     const DEFAULT_TUNE_THEME = "day";
     const DEFAULT_TUNE_GREETING = "Happy Birthday";
@@ -3880,38 +3981,48 @@
        everything from the title down slides by one distance and keeps every
        gap the artwork set. The numbers fall out exactly -- put the code under
        the album with the same 15.67 gap it has above it at the foot, leave the
-       artwork's own 57.28 between the code and the title, and the controls
-       come to rest at 834.42, which is precisely where the code's bottom used
-       to be. The page margin stays 7.47. Nothing changes size.
+       `codeToTitle` between the code and the title, which is tighter than
+       the 57.28 the artwork sets under its album. Nothing changes size.
 
-       A caption is the one thing that does cost something, because this page
-       has no slack at all. See PLAYER.codeCompact. */
+       That used to read differently, and the difference is worth knowing. The
+       code took the album's own 57.28 and the controls then came to rest at
+       834.42 -- precisely where the code's bottom sits in the other position,
+       an exact swap. It was bought with 34 points of visible white under the
+       code, which was reported twice as too much space, so the gap won and the
+       coincidence went.
+
+       A caption still costs something, but less than it did: the row lift
+       above frees about 14 points, and in the caption cases that goes into the
+       code rather than into the margin. See PLAYER.codeCompact. */
     function playerFlow() {
         const P = PLAYER;
         const top = codePos() === "top";
         const caption = hasCaption();
-        /* Compact ONLY when a caption is present. Moving the code must not
-           resize it: with nothing else competing for the page the full box
-           fits in either position, and the swap is exact -- the controls come
-           to rest at 834.42, where the code's own bottom used to be. */
-        const box = caption ? P.codeCompact : P.code;
+        /* Compact ONLY when a caption is present: with nothing else
+           competing for the page the full box fits in either position. */
+        const box = caption ? (top ? P.codeCompactTop : P.codeCompact) : P.code;
         const albumBottom = P.album.y + P.album.h;
 
-        let codeY = P.code.y;
+        let codeY = 0;
         let shift = 0;
         if (top) {
             codeY = albumBottom + P.codeGap;
-            shift = (codeY + box.h + P.albumToTitle) - P.title.baseline;
+            shift = (codeY + box.h + P.codeToTitle) - P.title.baseline;
         }
 
-        const controlsBottom = P.play.cy + P.play.r + shift;
+        const controlsBottom = P.play.cy + P.play.r - P.rowLift + shift;
         const headBaseline = controlsBottom + P.caption.drop;
         const bodyBaseline = headBaseline + P.caption.leading;
-        if (!top && caption) {
-            /* The code follows the caption down rather than the caption
-               squeezing in above it: text under the buttons is what was
-               asked for, and the code is what gives way. */
-            codeY = bodyBaseline + P.caption.tail;
+        if (!top) {
+            /* With a caption the code follows it DOWN rather than the caption
+               squeezing in above: text under the buttons is what was asked
+               for, and the code is what gives way. Without one it hangs off
+               the controls at the artwork's own 15.67 -- derived rather than
+               fixed, because the transport row is lifted now and a fixed y
+               would leave a hole above the code instead of a gap. */
+            codeY = caption
+                ? bodyBaseline + P.caption.tail
+                : controlsBottom + P.codeGap;
         }
 
         return {
@@ -4004,7 +4115,11 @@
            what carries the shift. The chevron and the dots sit at the top of
            the screen and never move; everything else does. */
         drawArt(c, PLAYER_ART.chevron, 0, 0, W, H, ink);
-        drawArt(c, PLAYER_ART.transport, 0, dy, W, H, ink);
+        /* The transport row rides `rowDy`, not `dy`: the disc, the glyphs and
+           the triangle are one row and one of the three is a shape rather than
+           a path. See PLAYER.rowLift. */
+        const rowDy = dy - P.rowLift * s.fy;
+        drawArt(c, PLAYER_ART.transport, 0, rowDy, W, H, ink);
 
         c.fillStyle = ink.ink;
         P.dots.y.forEach((cy) => {
@@ -4014,9 +4129,9 @@
         });
 
         c.beginPath();
-        c.arc(P.play.cx * s.fx, P.play.cy * s.fy + dy, P.play.r * s.fx, 0, Math.PI * 2);
+        c.arc(P.play.cx * s.fx, P.play.cy * s.fy + rowDy, P.play.r * s.fx, 0, Math.PI * 2);
         c.fill();
-        drawArt(c, PLAYER_ART.playIcon, 0, dy, W, H, ink);
+        drawArt(c, PLAYER_ART.playIcon, 0, rowDy, W, H, ink);
 
         drawArt(c, PLAYER_ART.heart, 0, dy, W, H, ink);
 
@@ -9392,7 +9507,8 @@
         }
 
         out += artSVG(PLAYER_ART.chevron, 0, 0, W, H, ink);
-        out += artSVG(PLAYER_ART.transport, 0, dy, W, H, ink);
+        const rowDy = dy - P.rowLift * s.fy;
+        out += artSVG(PLAYER_ART.transport, 0, rowDy, W, H, ink);
 
         P.dots.y.forEach((cy) => {
             out += '<circle cx="' + (P.dots.cx * s.fx) + '" cy="' + (cy * s.fy) +
@@ -9400,9 +9516,9 @@
         });
 
         out += '<circle cx="' + (P.play.cx * s.fx) + '" cy="' +
-            (P.play.cy * s.fy + dy) + '" r="' + (P.play.r * s.fx) +
+            (P.play.cy * s.fy + rowDy) + '" r="' + (P.play.r * s.fx) +
             '" fill="' + ink.ink + '"/>';
-        out += artSVG(PLAYER_ART.playIcon, 0, dy, W, H, ink);
+        out += artSVG(PLAYER_ART.playIcon, 0, rowDy, W, H, ink);
         out += artSVG(PLAYER_ART.heart, 0, dy, W, H, ink);
 
         /* Measured on the live canvas context, because there is nothing in an

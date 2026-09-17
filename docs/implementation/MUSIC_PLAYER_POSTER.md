@@ -103,10 +103,45 @@ Measured with `1:07` of `3:48`: the knob's centre lands at 213.6pt against the
   track and the title. Those are KEPT. They are what the artwork looks like, the
   differences are under a millimetre on A4, and squaring them up would be
   redrawing somebody's poster rather than tracing it.
+- **The rhythm below the album is no longer the artwork's** (September 16,
+  2026). The progress bar, the times and the transport row were pulled up and
+  the gap under the code tightened, on the report that the poster was too
+  spread out. The album, the title and the artist keep their traced positions.
+  Details, and the trap in moving a row whose glyphs are page-coordinate paths:
+  `docs/implementation/MUSIC_PLAYER_CAPTION_AND_CODE_POSITION.md`.
+
 - **The page ground.** The SVG says `#231F20` and the designer's own exported PNG
   samples `#000000` at the same point. The SVG wins: it is the editable master
   and that value is what was typed. Invisible on screen, a rich black against a
   flat one in print.
+
+  **Both are offered now (September 16, 2026).** Asked whether the dark screen
+  really is as dark as the reference render, the honest answer was no -- the
+  ground is `#231F20`, 13.7 per cent up the range from black, measured off the
+  canvas rather than read off the constant. The decision above still stands and
+  is still the DEFAULT; what changed is that the other reading of the same
+  artwork is a third option beside it rather than a value nobody can reach.
+  Which one somebody wants depends on where the poster is going: on an OLED
+  phone a true black is off-pixels where a near-black reads as a faintly lifted
+  rectangle, and on paper a composite near-black lays down ink in all channels
+  where `#000000` usually converts to K-only and prints flatter. Neither is
+  correct in the abstract, which is the argument for not choosing on the
+  visitor's behalf.
+
+  The same option is on every other poster with a Screen Mode: the three that
+  share this exact ground -- the birthday calendar, the birthday tribute and
+  the love story calendar -- and then the anniversary definition and song
+  posters, whose darks are `#1A1918` and `#17171A` and were chosen here rather
+  than taken from an artwork. It was NOT added to the anniversary calendar,
+  whose ground is already `#050606`: two per cent off black, so a second option
+  would be indistinguishable from the first.
+
+  It is DERIVED rather than written out four times. `trueBlack()` copies the
+  dark colourway and swaps every value that IS the page, which is what catches
+  the ones not called `page` -- the love poster's `circleFill` is the ground
+  punched out of its white ring, and a twin that changed only `page` would have
+  left a dark disc on a black poster. Verified: that circle samples `#000000`
+  on the new colourway.
 
 ## What was not shipped
 

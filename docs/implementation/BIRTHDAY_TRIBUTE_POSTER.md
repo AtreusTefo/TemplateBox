@@ -213,3 +213,16 @@ draws fourteen red boxes and four red hearts, all in the marker's own colour.
   nothing reads them from the visitor.
 - **The boxes cannot be rearranged.** The anniversary poster can move a
   photograph between boxes; this one cannot yet.
+
+## A third colourway: Black (September 16, 2026)
+
+This poster's dark ground is `#231F20`, which came from its artwork's master
+SVG rather than from the designer's exported PNG -- the two disagree, and the
+master won. A pure `#000000` option now sits beside it, because the two are
+indistinguishable on a screen and are not the same thing on paper, and which
+one is wanted depends on where the poster is going.
+
+`#231F20` remains the default. The variant is derived by `trueBlack()` in
+`site/js/poster.js` rather than written out, so a change to this colourway
+cannot leave its twin behind. Full reasoning:
+`docs/implementation/MUSIC_PLAYER_POSTER.md`, "The page ground".
