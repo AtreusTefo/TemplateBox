@@ -287,11 +287,15 @@
                              other template has anywhere to put them -- and
                              still collected while hidden, so switching away
                              and back does not lose them. -->
-                        <div class="field" data-templates="boxed-biodata">
+                        <div class="field" data-templates="boxed-biodata blue-banner">
                             <label for="f-father-name">Father's Name</label>
                             <input type="text" id="f-father-name" data-bind="fatherName" maxlength="60">
                         </div>
-                        <div class="field" data-templates="boxed-biodata peach-portrait">
+                        <div class="field" data-templates="blue-banner">
+                            <label for="f-mother-name">Mother's Name</label>
+                            <input type="text" id="f-mother-name" data-bind="motherName" maxlength="60">
+                        </div>
+                        <div class="field" data-templates="boxed-biodata peach-portrait serif-timeline">
                             <label for="f-dob">Date of Birth</label>
                             <input type="text" id="f-dob" data-bind="dateOfBirth" maxlength="40" placeholder="12 January 2004">
                         </div>
@@ -314,7 +318,15 @@
                             <label for="f-marital">Marital Status</label>
                             <input type="text" id="f-marital" data-bind="maritalStatus" maxlength="30">
                         </div>
-                        <div class="field" data-templates="peach-portrait">
+                        <div class="field" data-templates="serif-timeline">
+                            <label for="f-age">Age</label>
+                            <!-- Shown verbatim rather than composed with a
+                                 word, so "39" and "39 Years Old" both come out
+                                 as typed. Composing it would turn the second
+                                 into "39 Years Old Years Old". -->
+                            <input type="text" id="f-age" data-bind="age" maxlength="30" placeholder="39 Years Old">
+                        </div>
+                        <div class="field" data-templates="peach-portrait serif-timeline">
                             <label for="f-nationality">Nationality</label>
                             <input type="text" id="f-nationality" data-bind="nationality" maxlength="40">
                         </div>
@@ -333,6 +345,14 @@
                         <div class="field">
                             <label for="f-email">Email</label>
                             <input type="email" id="f-email" data-bind="email" maxlength="100">
+                        </div>
+                        <div class="field" data-templates="badge-column">
+                            <label for="f-linkedin">LinkedIn</label>
+                            <input type="text" id="f-linkedin" data-bind="linkedin" maxlength="80" placeholder="linkedin.com/in/yourname">
+                        </div>
+                        <div class="field" data-templates="badge-column">
+                            <label for="f-website">Website</label>
+                            <input type="text" id="f-website" data-bind="website" maxlength="80" placeholder="yourname.com">
                         </div>
                         <div class="field">
                             <label for="f-phone">Phone</label>
@@ -354,12 +374,23 @@
                              sidebar does. A gate that lists only one of the
                              two would render a field the form gives no way to
                              fill, which is the fault this file has shipped
-                             twice already. -->
-                        <div class="field" data-templates="grey-rail boxed-biodata">
+                             twice already.
+
+                             THREE times: peach-portrait was missing from this
+                             gate and from the city one below, although its
+                             contact block has composed address with city since
+                             it shipped. Collection is unaffected, so the sheet
+                             always drew the sample's address -- what a visitor
+                             on that template could not do was SEE the inputs to
+                             change it, which is the whole point of the gate.
+                             Added here with serif-timeline, which reads the
+                             same pair. Check the DESCRIPTORS, not this list,
+                             when adding a template. -->
+                        <div class="field" data-templates="grey-rail boxed-biodata peach-portrait serif-timeline blue-banner">
                             <label for="f-address">Street Address</label>
                             <input type="text" id="f-address" data-bind="address" maxlength="80">
                         </div>
-                        <div class="field" data-templates="grey-rail boxed-biodata">
+                        <div class="field" data-templates="grey-rail boxed-biodata peach-portrait serif-timeline blue-banner">
                             <label for="f-city">City</label>
                             <input type="text" id="f-city" data-bind="city" maxlength="60">
                         </div>
@@ -432,6 +463,22 @@
                         <button type="button" class="btn btn-secondary btn-block" id="add-language">Add Language</button>
                     </fieldset>
 
+                    <fieldset data-templates="blue-banner">
+                        <legend>Interests</legend>
+                        <div class="field">
+                            <label for="f-interests">Interests (one per line)</label>
+                            <textarea id="f-interests" data-bind="interests" maxlength="400" rows="3"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-templates="serif-timeline">
+                        <legend>Characteristics</legend>
+                        <div class="field">
+                            <label for="f-characteristics">Characteristics (one per line)</label>
+                            <textarea id="f-characteristics" data-bind="characteristics" maxlength="600" rows="4"></textarea>
+                        </div>
+                    </fieldset>
+
                     <fieldset data-templates="ruled-serif photo-rail">
                         <legend>Accomplishments</legend>
                         <div class="field">
@@ -445,7 +492,7 @@
                          but one, above the date and signature blanks -- which
                          are drawn furniture, not fields: they exist to be
                          written on after printing. -->
-                    <fieldset data-templates="boxed-biodata">
+                    <fieldset data-templates="boxed-biodata blue-banner">
                         <legend>Declaration</legend>
                         <div class="field">
                             <label for="f-declaration">Declaration</label>
@@ -605,6 +652,16 @@
             <!-- The marks column of the biodata sheet's education table. Free
                  text rather than a number: a percentage, a CGPA and a grade
                  letter are all valid answers and only one of them is numeric. -->
+            <!-- The course or strand. grey-rail has composed this into its
+                 education head since it shipped and there has never been an
+                 input for it, so that template drew "MBA, 2012 - 2014" where it
+                 was written to draw "MBA, Operations Management, 2012 - 2014".
+                 It is collected now, and the Serif Timeline CV sets it on its
+                 own line. -->
+            <div class="field" data-templates="grey-rail serif-timeline">
+                <label>Course or Field of Study</label>
+                <input type="text" data-entry-field="field" maxlength="70" placeholder="General Academic Strand">
+            </div>
             <div class="field" data-templates="boxed-biodata">
                 <label>Percentage or Grade</label>
                 <input type="text" data-entry-field="score" maxlength="20" placeholder="72%">

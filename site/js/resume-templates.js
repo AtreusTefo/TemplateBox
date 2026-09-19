@@ -33,6 +33,744 @@
 
 window.TB_RESUME_TEMPLATES = [
     {
+        /* Traced from a supplied design and MEASURED off the raster. A clean
+           two-column CV, dark ink and one blue, with a filled disc carrying a
+           glyph beside every section heading. Built September 19, 2026.
+
+           THE REFERENCE IS A MOCKUP, not a bare artwork: the sheet is placed
+           on a beige ground with a drop shadow. Measuring the raster would
+           fold the mockup padding into every number, so the sheet was found
+           first -- x 54..685, y 75..1022 of a 736x1104 image -- and everything
+           below is measured from that crop. The sheet is 632x948, aspect
+           0.6667, a clean 2:3 and the FOURTH reference in a row to be one; A4
+           is 0.7067. Scaling by width would overrun the page, so the scale is
+           k = 842/948 = 0.88819 on BOTH axes, which is uniform and costs only
+           margins.
+
+           The masthead centres on the page at 297.5 and the two columns centre
+           on 285.5 in the raster -- a 12pt disagreement that is treated as
+           mockup crop rather than design, so both are centred here. Anything
+           else would reproduce a perspective artefact as a layout decision.
+
+           Sizes come from measured WIDTHS through jsPDF's HELVETICA metrics.
+           Three long summary lines put the body at 10.64, 10.64 and 10.70;
+           two headings at 12.71 and 12.35, and their cap height independently
+           implies 12.38, which is how you know the headings are NOT tracked.
+
+           THE CAPS IN THE REFERENCE ARE PLACEHOLDERS, NOT CONTENT. "SKILL
+           ONE" and "LOCATION" measure as letter-spaced, and they are not
+           tracked here: a visitor's real skills are not capitals, so tracking
+           them would be fitting the mockup rather than the design. The two
+           masthead lines ARE tracked, because those are the design.
+           See docs/implementation/BADGE_COLUMN_CV_TEMPLATE.md. */
+        id: "badge-column",
+        title: "Badge Column CV",
+        catalog: true,
+
+        /* One blue throughout -- discs, rules and the divider -- so the swatch
+           row moves the whole identity together. The reference's blue is not
+           on the row; the row's navy is the nearest, and `applyAccent` matches
+           the hex exactly, so anything else would open the editor with no
+           swatch selected. */
+        defaultAccent: "#1F4E79",
+
+        page: { width: 595, height: 842 },
+
+        /* ONE column, split into two for the body. The masthead is centred on
+           the PAGE, which a sidebar layout cannot do -- its columns own their
+           own halves and `anchorX` would centre the name in whichever half it
+           was declared in. So the sheet is single-column down to the masthead
+           and `split` opens the two columns under it.
+
+           The consequence to know: the two halves do NOT paginate, the same
+           rule the sidebar follows, because a column that breaks mid-list
+           reads as a rendering fault. `rejoin` pushes the deeper half into the
+           main cursor, so an overrun is reported rather than lost. */
+        layout: {
+            main: { left: 59, right: 59, firstBaseline: 80, bottom: 815 }
+        },
+
+        palette: {
+            blue:    "accent",
+            ink:     "#2F333C",
+            rule:    "#D8DCE3",
+            divider: "#A3AFCB",
+            paper:   "#FFFFFF"
+        },
+
+        type: {
+            displayName:{ family: "sans", weight: "bold", size: 42,
+                          tracking: 1.9, color: "ink", align: "center" },
+            title:      { family: "sans", weight: "normal", size: 11,
+                          tracking: 3.5, color: "ink", align: "center" },
+
+            /* Two heading roles, because the rule under a heading is 22.2pt on
+               BOTH sides and `emitRule` takes its length as a fraction of the
+               column -- 0.166 of the narrow one and 0.078 of the wide one is
+               the same 22.2pt. The badge geometry is identical in both. */
+            headLeft:   { family: "sans", weight: "bold", size: 12.5,
+                          color: "ink", uppercase: true,
+                          gapBefore: 38, gapAfter: 16.9,
+                          badge: { r: 11.1, color: "blue", glyph: "paper",
+                                   gap: 15.1, dy: 4.45 },
+                          rule: { color: "blue", width: 1.8, offset: 11.55,
+                                  length: 0.1657 } },
+            headRight:  { family: "sans", weight: "bold", size: 12.5,
+                          color: "ink", uppercase: true,
+                          gapBefore: 38, gapAfter: 16.9,
+                          badge: { r: 11.1, color: "blue", glyph: "paper",
+                                   gap: 15.1, dy: 4.45 },
+                          rule: { color: "blue", width: 1.8, offset: 11.55,
+                                  length: 0.0779 } },
+
+            body:       { family: "sans", weight: "normal", size: 10.65,
+                          lineHeight: 15.99, color: "ink" },
+            contact:    { family: "sans", weight: "normal", size: 10.65,
+                          lineHeight: 15.99, color: "ink", rowGap: 12 },
+            entryHead:  { family: "sans", weight: "bold", size: 10.65,
+                          lineHeight: 15.99, color: "ink" },
+            entrySub:   { family: "sans", weight: "normal", size: 10.65,
+                          lineHeight: 15.99, color: "ink" },
+            meta:       { family: "sans", weight: "normal", size: 10.65,
+                          lineHeight: 15.99, color: "ink" },
+            bullet:     { family: "sans", weight: "normal", size: 10.65,
+                          lineHeight: 15.99, color: "ink",
+                          marker: "\u2022", indent: 11, itemGap: 15.99 }
+        },
+
+        blocks: [
+            /* ---------------- masthead, centred on the page --------------- */
+            /* The reference opens with a small tracked "CV TEMPLATE" over a
+               short rule. Removed at the owner's instruction, and the name is
+               the first block now.
+
+               `firstBaseline` moved from 43.52 to 80 rather than leaving the
+               name where the kicker had pushed it: the kicker's own top margin
+               was 36pt of white above a 10pt line, and inheriting that under a
+               42pt name would have left 116pt -- 41mm -- of empty sheet above
+               it. 80 puts the name's cap top at the same 50pt the rest of the
+               masthead was drawn against.
+
+               Everything below follows the cursor, so the sheet gains the
+               36.5pt the kicker occupied. That is a real benefit rather than
+               incidental: this template was at 785.4 of an 815 boundary and
+               had no room for a visitor's sixth skill. */
+            { column: "main", kind: "display", field: "name",
+              type: "displayName", uppercase: true, fallback: "Your Name",
+              gapAfter: 26.65 },
+
+            { column: "main", kind: "display", field: "title", type: "title",
+              uppercase: true, gapAfter: 47.27 },
+            { column: "main", kind: "rule", float: true, dy: -29.51,
+              dx: 209.6, length: 0.1638, color: "blue", width: 1.8 },
+
+            /* ---------------- the two columns ---------------------------- */
+            /* The divider runs 20pt past the deeper column so it meets the
+               rule across the foot, which is what the reference draws. */
+            { column: "main", kind: "split", x: 218.83,
+              gapLeft: 25.83, gapRight: 32.07,
+              rule: { color: "divider", width: 1, inset: -12, extend: 8 } },
+
+            /* -- left -- */
+            { column: "bandLeft", kind: "section", label: "Contact",
+              headingType: "headLeft", icon: "person", gapBefore: 30,
+              gapAfter: 24,
+              body: { kind: "contact", type: "contact",
+                      iconSize: 15, textOffset: 27,
+                      glyph: "blue", knockout: "paper",
+                      rows: [
+                          { icon: "envelope", fields: ["email"] },
+                          { icon: "phone",    fields: ["phone"] },
+                          { icon: "pin",      fields: ["location"] },
+                          { icon: "link",     fields: ["linkedin"] },
+                          { icon: "globe",    fields: ["website"] }
+                      ] } },
+
+            { column: "bandLeft", kind: "rule", gapBefore: 26,
+              color: "rule", width: 1 },
+
+            { column: "bandLeft", kind: "section", label: "Skills",
+              headingType: "headLeft", icon: "star", gapBefore: 43.5,
+              body: { kind: "list", field: "skills", split: "," } },
+
+            { column: "bandLeft", kind: "rule", gapBefore: 26,
+              color: "rule", width: 1 },
+
+            { column: "bandLeft", kind: "section", label: "Education",
+              headingType: "headLeft", icon: "cap", gapBefore: 45.3,
+              body: { kind: "entries", source: "education",
+                      head: { runs: [{ field: "degree", type: "entryHead" }] },
+                      sub: [
+                          { runs: [{ field: "school", type: "entrySub" }],
+                            gapBefore: 15.1 },
+                          { runs: [{ field: "dates", type: "meta" }],
+                            gapBefore: 16.9 }
+                      ],
+                      divider: { color: "rule", width: 1 },
+                      entryGap: 28 } },
+
+            /* -- right -- */
+            { column: "bandRight", kind: "section", label: "Professional Summary",
+              headingType: "headRight", icon: "person", gapBefore: 30,
+              gapAfter: 21.3,
+              body: { kind: "paragraph", field: "summary", type: "body" } },
+
+            { column: "bandRight", kind: "rule", gapBefore: 23.1,
+              color: "rule", width: 1 },
+
+            /* The years sit FLUSH RIGHT on the job title's own baseline, which
+               is what `aside` is for -- laid out before the cursor moves. */
+            { column: "bandRight", kind: "section", label: "Experience",
+              headingType: "headRight", icon: "briefcase", gapBefore: 44.4,
+              body: { kind: "entries", source: "experience",
+                      head: { runs: [{ field: "role", type: "entryHead" }] },
+                      aside: { runs: [{ field: "dates", type: "meta" }] },
+                      sub: [
+                          { runs: [
+                              { field: "company", type: "entrySub" },
+                              { literal: "  |  ", type: "entrySub" },
+                              { field: "place",   type: "entrySub" }
+                            ], gapBefore: 19.54 }
+                      ],
+                      bullets: { field: "description", split: "\n",
+                                 gapBefore: 19.54 },
+                      divider: { color: "rule", width: 1 },
+                      entryGap: 46 } },
+
+            { column: "main", kind: "rejoin", gapAfter: 20 },
+
+            /* The rule across the foot, which the column divider runs down to
+               meet. */
+            { column: "main", kind: "rule", gapBefore: 0,
+              color: "blue", width: 1.8 }
+        ]
+    },
+
+    {
+        /* Traced from a supplied design and MEASURED off the raster: a blue
+           and white CV whose sections are introduced by a solid tab bleeding
+           off the left edge, with a pale band behind it. Built September 19,
+           2026.
+
+           IT SHIPS DESIGN-LED. Photo-led, and two-column for part of its
+           height, so it fails two of the three conditions the site's
+           unqualified ATS claim needs. grey-rail, peach-portrait and
+           serif-timeline set the precedent. It keeps the third: blocks are
+           declared so the content stream reads the header, then each section
+           whole, and within the band the whole left column before the whole
+           right one.
+
+           THE REFERENCE IS 736x1104 -- aspect 0.6667, a clean 2:3, which is a
+           screen export ratio rather than a paper one, and the same shape as
+           the Serif Timeline CV's reference. The scale is taken off the
+           HEIGHT, k = 842/1104 = 0.76268, applied to BOTH axes: scaling by
+           width maps the sheet to 892.5pt and overruns A4 by 19.8pt, which
+           would then have to come out of the vertical rhythm. Uniform scaling
+           costs only margins. The 736px block maps to 561.3pt and is centred,
+           so content sits between 16.83 and 578.17 -- and furniture that
+           BLEEDS goes to the real page edges instead, which is what the tabs
+           and their wash do.
+
+           Sizes are derived from measured WIDTHS through jsPDF's HELVETICA
+           metrics -- this design is a sans. Eight tab labels put the heading
+           size between 10.49 and 11.88, mean 10.99, and the cap height
+           independently implies 10.64, so there is no letter-spacing. Body
+           text from six strings: 11.0 to 11.4.
+           See docs/implementation/BLUE_BANNER_CV_TEMPLATE.md. */
+        id: "blue-banner",
+        title: "Blue Banner CV",
+        catalog: true,
+
+        /* The reference's blue is #21619F, which is NOT on the swatch row.
+           applyAccent matches the hex exactly, so a value that is not a swatch
+           opens the editor with nothing selected -- the defect grey-rail
+           shipped with. The row's navy is the nearest, and the sheet is one
+           blue throughout, so the swatch moves the name, every tab and every
+           rule together. */
+        defaultAccent: "#1F4E79",
+
+        page: { width: 595, height: 842 },
+
+        /* Single column. The two-column band in the middle is LOCAL and is
+           opened by a `split` block, because it starts and stops mid-sheet --
+           the engine's two-column layout is a property of the page and cannot
+           express that.
+
+           The right inset is 80, putting the measure at 515. That is derived
+           from where the objective wraps: its first line ends at 504.95 and
+           the next word would take it past 525, so the measure is bounded
+           between those rather than pinned. The signature rule reaches 536 in
+           the reference and stops at the measure here, which is a 21pt
+           shortening of one decorative line. */
+        layout: {
+            main: { left: 52.68, right: 80, firstBaseline: 83.13, bottom: 815 }
+        },
+
+        palette: {
+            blue:   "accent",
+            wash:   "#E8EFF9",   /* the band behind each tab, flattened */
+            ink:    "#333333",
+            paper:  "#FFFFFF",
+            onBlue: "#FFFFFF"
+        },
+
+        type: {
+            displayName: { family: "sans", weight: "bold", size: 38,
+                           color: "blue" },
+
+            /* Italic, which the SVG painter only learned to draw on September
+               19, 2026 -- before that a role saying "italic" slanted in the
+               PDF and stood upright in the preview. */
+            subtitle:    { family: "serif", weight: "italic", size: 18.5,
+                           color: "blue", align: "center" },
+
+            /* The tab. It bleeds 52.68 to the left so it runs off the page
+               edge, keeps no pad before its label and 30 after it, and slants
+               6.9 off its bottom-right corner. */
+            tab:         { family: "sans", weight: "bold", size: 11,
+                           color: "onBlue", uppercase: true,
+                           gapBefore: 30, gapAfter: 26,
+                           box: { color: "blue", bleedLeft: 52.68,
+                                  padX: 0, padRight: 30, slant: 6.9,
+                                  above: 13, below: 6,
+                                  wash: { color: "wash", bleed: "page" } } },
+
+            /* The band's right half. Same tab, but it starts at its own column
+               rather than off the page, so it pads before the label instead of
+               bleeding. */
+            tabRight:    { family: "sans", weight: "bold", size: 11,
+                           color: "onBlue", uppercase: true,
+                           gapBefore: 30, gapAfter: 26,
+                           box: { color: "blue", padX: 16.8, padRight: 25,
+                                  slant: 6.9, above: 13, below: 6 } },
+
+            contact:     { family: "sans", weight: "normal", size: 11.3,
+                           lineHeight: 14, color: "ink", rowGap: 9.2 },
+            body:        { family: "sans", weight: "normal", size: 11.3,
+                           lineHeight: 16, color: "ink" },
+            bodyItalic:  { family: "serif", weight: "italic", size: 11.8,
+                           lineHeight: 16, color: "ink" },
+            entryHead:   { family: "sans", weight: "bold", size: 11.3,
+                           lineHeight: 16, color: "blue" },
+            entryTail:   { family: "sans", weight: "normal", size: 11.3,
+                           lineHeight: 16, color: "ink" },
+            entrySub:    { family: "serif", weight: "italic", size: 11.3,
+                           lineHeight: 16, color: "ink" },
+            label:       { family: "sans", weight: "bold", size: 11.3,
+                           lineHeight: 16, color: "blue" },
+            bullet:      { family: "sans", weight: "normal", size: 11.3,
+                           lineHeight: 14.5, color: "ink",
+                           marker: "\u2022", indent: 12, itemGap: 17 }
+        },
+
+        blocks: [
+            /* ---------------- header -------------------------------------- */
+            /* Absolute, advancing no cursor. The reference's frame is 0.7547
+               and PHOTO_RATIO is fixed at 4:5 site-wide so no painter can
+               stretch a face, so the width is the reference's and the height
+               is 4:5's -- 9pt shorter than the artwork's. */
+            /* The header is a band too: the photograph occupies the left and
+               everything else is set beside it. No divider between them.
+
+               The photograph is declared INSIDE the band, in its left half,
+               and that placement is load-bearing rather than tidy. A filled
+               photo block advances its column cursor -- deliberately, so a
+               picture at the top of a single-column sheet pushes the text
+               below it -- while an empty slot does not. In the main column
+               that made this sheet one page with no portrait and TWO with
+               one, because the name started 95pt lower as soon as a visitor
+               uploaded anything. In the band the depth it adds is bandLeft's,
+               and `rejoin` takes the deeper of the two halves, which is the
+               answer for a photograph standing beside a header rather than
+               above it. */
+            { column: "main", kind: "split", x: 185, gapLeft: 6, gapRight: 8.78 },
+
+            { column: "bandLeft", kind: "photo", top: 22.88, width: 124.3 },
+
+            { column: "bandRight", kind: "display", field: "name",
+              type: "displayName", uppercase: true, fallback: "Your Name",
+              gapAfter: 22.9 },
+
+            /* A literal, carried as a fallback on a field no state has: this
+               line names the DOCUMENT rather than the person, so there is
+               nothing for a visitor to fill in. */
+            { column: "bandRight", kind: "display", field: "documentLabel",
+              fallback: "Curriculum Vitae", type: "subtitle", gapAfter: 32.8 },
+
+            /* Short rules either side of the subtitle, at its own mid-height.
+               They float: they are beside the line, not a step under it. */
+            { column: "bandRight", kind: "rule", float: true, dy: -27.5,
+              dx: 18.3, length: 0.128, color: "blue", width: 1 },
+            { column: "bandRight", kind: "rule", float: true, dy: -27.5,
+              dx: 194.5, length: 0.152, color: "blue", width: 1 },
+
+            { column: "bandRight", kind: "contact", type: "contact",
+              iconSize: 14, textOffset: 22.9,
+              glyph: "blue", knockout: "paper",
+              rows: [
+                  { icon: "pin",      fields: ["address", "city"],
+                    separator: ", " },
+                  { icon: "phone",    fields: ["phone"] },
+                  { icon: "envelope", fields: ["email"] }
+              ] },
+
+            { column: "main", kind: "rejoin", gapAfter: 35.1 },
+
+            /* ---------------- full-width sections ------------------------- */
+            { column: "main", kind: "section", label: "Career Objective",
+              headingType: "tab", gapAfter: 25,
+              body: { kind: "paragraph", field: "summary", type: "body" } },
+
+            { column: "main", kind: "section", label: "Education",
+              headingType: "tab",
+              body: { kind: "entries", source: "education",
+                      head: { runs: [
+                          { field: "degree", type: "entryHead" },
+                          { literal: " - ", type: "entryTail" },
+                          { field: "dates",  type: "entryTail" }
+                      ]},
+                      sub: [
+                          { runs: [{ field: "school", type: "entrySub" }],
+                            gapBefore: 16 }
+                      ],
+                      entryGap: 27 } },
+
+            /* ---------------- the local two-column band ------------------- */
+            /* The divider measures x=360 in the raster, 291.4pt here. The
+               reference's own rule stops short at both ends; this one spans
+               the band inset by 10, which reads as the same feature and does
+               not need re-measuring when the content grows. */
+            { column: "main", kind: "split", x: 291.4,
+              gapLeft: 6.4, gapRight: 0.8,
+              rule: { color: "blue", width: 0.8, inset: 10 } },
+
+            { column: "bandLeft", kind: "section", label: "Skills",
+              headingType: "tab", gapAfter: 25,
+              body: { kind: "list", field: "skills", split: "," } },
+
+            { column: "bandLeft", kind: "section", label: "Experience",
+              headingType: "tab",
+              body: { kind: "entries", source: "experience",
+                      /* Employer and dates on ONE line. The reference's own
+                         experience is a single "Fresher" line, so it never had
+                         to answer this -- but the editor's sample carries two
+                         real posts, and a line each put the sheet on a second
+                         page. Composed, so an entry with no dates drops the
+                         separator with them. */
+                      head: { runs: [{ field: "role", type: "entryHead" }] },
+                      sub: [
+                          { runs: [
+                              { field: "company", type: "entryTail" },
+                              { literal: " - ",   type: "entryTail" },
+                              { field: "dates",   type: "entryTail" }
+                            ], gapBefore: 16 }
+                      ],
+                      entryGap: 27 } },
+
+            /* Deliberately lower than SKILLS beside it. The reference staggers
+               the two tabs by 31.3pt rather than aligning them, which stops
+               the pair reading as one banner across the sheet. */
+            { column: "bandRight", kind: "section", label: "Parents Information",
+              headingType: "tabRight", gapBefore: 52, gapAfter: 24,
+              body: { kind: "fields", type: "body", labelType: "label",
+                      labelWidth: "auto", separator: "  ", rowGap: 0.8,
+                      rows: [
+                          { label: "Father:", field: "fatherName" },
+                          { label: "Mother:", field: "motherName" }
+                      ] } },
+
+            { column: "bandRight", kind: "section", label: "Languages",
+              headingType: "tabRight", gapAfter: 24,
+              body: { kind: "list", field: "languages", split: "\n" } },
+
+            { column: "main", kind: "rejoin", gapAfter: 30 },
+
+            /* ---------------- full width again ---------------------------- */
+            { column: "main", kind: "section", label: "Interests",
+              headingType: "tab",
+              body: { kind: "list", field: "interests", split: "\n" } },
+
+            { column: "main", kind: "section", label: "Declaration",
+              headingType: "tab", gapAfter: 26,
+              body: { kind: "paragraph", field: "declaration",
+                      type: "bodyItalic" } },
+
+            /* The reference closes with a handwritten signature in script.
+               None of the three families is a script and the engine will not
+               pretend otherwise, so this is the rule and the caption to sign
+               ABOVE by hand -- the same answer boxed-biodata gives. */
+            { column: "main", kind: "signoff", type: "body",
+              gapBefore: 32,
+              left: [],
+              rule: { color: "ink", width: 0.8 },
+              right: { label: "Signature" },
+              rightWidth: 129.7, rightInset: 0, rightOffset: 0, rightGap: 14.4 }
+        ]
+    },
+
+    {
+        /* Traced from a supplied design and MEASURED off the raster rather
+           than eyeballed: a serif CV on a grey sheet, with a full-width header
+           of photograph and name over two columns, and an education timeline.
+           Built September 19, 2026.
+
+           IT SHIPS DESIGN-LED, NOT ATS-UNQUALIFIED. The site grants the
+           unqualified claim to a sheet that is single column, carries no
+           photograph, and has deterministic extraction order. This is
+           two-column AND photo-led, so it fails two of the three by
+           construction, and removing either would be designing a different
+           sheet. grey-rail and peach-portrait set that precedent. What it
+           KEEPS is the third: the blocks below are declared sidebar-first, so
+           the content stream reads CONTACTS and EXPERIENCE whole and then the
+           main column whole, never interleaved across the gutter. The
+           timeline costs nothing at parse time -- a rule and three dots are
+           vector marks an extractor does not see, so each education entry
+           still extracts as a contiguous record.
+
+           THE REFERENCE IS NOT A4, AND THE SCALE IS TAKEN OFF ITS HEIGHT.
+           The raster is 736x1104 -- aspect 0.6667, a clean 2:3, which is a
+           screen export ratio rather than a paper one. A4 is 0.7067. Scaling
+           by WIDTH would map the sheet to 892.5pt tall, 50.5pt more than A4
+           has, and that deficit would have to come out of the vertical rhythm
+           -- compressing the design against itself by six percent. Scaling by
+           HEIGHT costs nothing: k = 842/1104 = 0.76268 applied to both axes
+           preserves every internal proportion exactly, lands the deepest ink
+           at 813pt with a 29pt foot margin, and leaves the content block
+           500.3pt wide, which is centred here with 47.34pt side margins. A
+           differently-proportioned design has to give somewhere; giving it to
+           the margins is the only option that does not distort the artwork.
+
+           The export is also shifted 6px LEFT of centre: its rules measure 656
+           wide on a 736 sheet, which is exactly symmetric 40px margins, but
+           they run x=34..689 rather than 40..695. That offset is corrected
+           here rather than reproduced.
+
+           Type sizes are derived from measured WIDTHS through jsPDF's TIMES
+           metrics -- times, not helvetica, because this is a serif design and
+           the two have different widths per em, so a size taken through the
+           wrong one breaks lines in the wrong places. Ten independent strings
+           put the body between 12.27 and 13.09, mean 12.49. The reference's
+           own face is NOT Times and has a taller cap for its width: its caps
+           imply 16.1pt where its widths imply 14.33 for the headings. Width
+           wins, because width is what decides where a line breaks.
+           See docs/implementation/SERIF_TIMELINE_CV_TEMPLATE.md. */
+        id: "serif-timeline",
+        title: "Serif Timeline CV",
+        catalog: true,
+
+        /* The design is monochrome: near-black on grey, with no second colour
+           anywhere. The accent therefore drives the DISPLAY ink -- the name,
+           the section headings and every rule -- while body text stays a fixed
+           near-black. At the default swatch the two are the same value, which
+           is the reference; pick another and the sheet gains one colour in the
+           places a two-tone design would have used it. */
+        defaultAccent: "#1A1A1A",
+
+        page: { width: 595, height: 842 },
+
+        layout: {
+            kind: "two-column",
+            /* The divider measures x=244 in the raster, 207.50pt here, so the
+               sidebar box is 207.50/595 = 0.34874 of the page. Left column
+               text runs 47.34..177.00 and main text 232.67..547.66, which are
+               the insets below.
+
+               The sidebar's firstBaseline is the PHOTOGRAPH's top edge and is
+               deliberately shallow: nothing flows in this column above the
+               header, and `crossRule` levels both columns underneath it, so
+               whatever is set here is replaced before the first section. */
+            sidebar: {
+                side: "left",
+                width: 0.34874,
+                /* The right inset is 5, not the 30.5 the heading rules would
+                   suggest. Those rules are a fixed decorative length rather
+                   than the column's width: the reference runs its email to
+                   201.4pt, 24pt PAST where its rules stop and hard against the
+                   divider, so the text measure is the gutter and the rule is
+                   shorter than it on purpose. Taking the rules for the measure
+                   made a 24-character address break mid-word. */
+                left: 47.34, right: 5,
+                firstBaseline: 47.3,
+                bottom: 815
+            },
+            main: {
+                left: 25.17, right: 47.34,
+                firstBaseline: 80.1,
+                bottom: 815
+            }
+        },
+
+        palette: {
+            paper:   "#EAEAEA",   /* the sheet, sampled at 234,234,234 */
+            ink:     "#1A1A1A",   /* body text                         */
+            display: "accent"     /* name, headings, every rule        */
+        },
+
+        background: "paper",
+
+        type: {
+            /* 32pt from the measured width of CALIPA AMINODEN, the longer and
+               therefore more reliable of the two name lines. Its cap height
+               implies 39 -- the reference's display face is a Didone with a
+               tall cap for its width -- and matching the cap would set a name
+               a fifth too wide for the column it has to fit. */
+            bannerName: { family: "serif", weight: "bold", size: 32,
+                          lineHeight: 47.3, color: "display" },
+
+            /* Five headings measured 14.75 to 15.79 at width-scale, mean
+               15.19, which is 14.33 here. The rule under each is part of the
+               heading rather than a block of its own, so a section that draws
+               no body draws neither. */
+            heading:    { family: "serif", weight: "bold", size: 14.3,
+                          color: "display", uppercase: true,
+                          gapBefore: 36, gapAfter: 24,
+                          rule: { color: "display", width: 1.2, offset: 12.6 } },
+
+            /* Identical but for the rule, which stops at 0.8335 of the column
+               -- 128.9pt, the reference's own -- because the sidebar's text
+               measure runs on past it to the divider. */
+            sideHeading:{ family: "serif", weight: "bold", size: 14.3,
+                          color: "display", uppercase: true,
+                          gapBefore: 36, gapAfter: 24,
+                          rule: { color: "display", width: 1.2, offset: 12.6,
+                                  length: 0.8335 } },
+
+            /* The header's icon rows. rowGap is the measured 28.09 row pitch
+               less the line height, so a row whose value wraps pushes the next
+               one down by a whole line rather than overlapping it. */
+            detail:     { family: "serif", weight: "normal", size: 12.5,
+                          lineHeight: 17.55, color: "ink", rowGap: 10.54 },
+
+            /* CONTACTS sets a label over its value: 16.77 between the two,
+               30.51 between rows, so rowGap is that pitch less the line. */
+            contact:    { family: "serif", weight: "normal", size: 12.5,
+                          lineHeight: 16.77, color: "ink", rowGap: 13.74 },
+
+            entryHead:  { family: "serif", weight: "bold", size: 12.5,
+                          lineHeight: 15.5, color: "ink" },
+            entrySub:   { family: "serif", weight: "normal", size: 12.5,
+                          lineHeight: 15.5, color: "ink" },
+
+            /* Two bullet roles, because the two lists are set differently in
+               the reference and the difference is structural rather than
+               incidental: CHARACTERISTICS runs to three-line sentences and
+               needs its items further apart than its lines, SKILLS is five
+               short phrases where an item gap wider than the line height would
+               read as five separate paragraphs. */
+            bullet:     { family: "serif", weight: "normal", size: 12.5,
+                          lineHeight: 16.4, color: "ink",
+                          marker: "\u2022", indent: 15.5, itemGap: 21.4 },
+            skill:      { family: "serif", weight: "normal", size: 12.5,
+                          lineHeight: 16.4, color: "ink",
+                          marker: "\u2022", indent: 15.5, itemGap: 16.4 }
+        },
+
+        blocks: [
+            /* ---------------- the header, spanning both columns ----------- */
+            /* The photograph is absolute and advances no cursor. Its width is
+               the reference's; its HEIGHT is not. PHOTO_RATIO is fixed at 4:5
+               site-wide so no painter can stretch a face, and the reference's
+               frame is 0.688 -- taller than 4:5. Keeping the width and taking
+               4:5's height ends the picture 33pt higher than the reference's
+               does. The alternatives were changing PHOTO_RATIO, which is
+               forbidden and would reach every other template, or letterboxing,
+               which puts grey bars inside a portrait. */
+            { column: "sidebar", kind: "photo", top: 47.3, width: 161.7 },
+
+            /* `split: "firstWord"` is the reference's own two-line treatment:
+               forename over surnames. The rule beneath belongs to the name
+               rather than to any heading. */
+            { column: "main", kind: "display", field: "name",
+              type: "bannerName", uppercase: true, split: "firstWord",
+              fallback: "Your Name",
+              rule: { color: "display", width: 1.2 },
+              gapAfterBaseline: 21.7, gapAfter: 29.4 },
+
+            { column: "main", kind: "contact", type: "detail",
+              iconSize: 13, textOffset: 33.6,
+              glyph: "display", knockout: "paper",
+              rows: [
+                  { icon: "person",   fields: ["age"] },
+                  { icon: "calendar", fields: ["dateOfBirth"] },
+                  { icon: "flag",     fields: ["nationality"] },
+                  { icon: "pin",      fields: ["address", "city"],
+                    separator: ", " }
+              ] },
+
+            /* Closes the header and starts both columns level beneath it. The
+               bleed carries the rule back across the gutter to the page's left
+               text margin, so one block draws what reads as one line. */
+            { column: "main", kind: "crossRule", bleedLeft: 185.33,
+              color: "display", width: 1.2,
+              gapBefore: 26.3, gapAfter: 35.1, minY: 262 },
+
+            /* The hairline between the columns. Absolute, and it stops short
+               of the foot exactly where the reference's does. */
+            { column: "main", kind: "vrule", x: 207.5, fromCursor: true,
+              y1: -15.3, y2: 813, color: "display", width: 0.8 },
+
+            /* ---------------- sidebar ------------------------------------ */
+            /* Declared before the main column's sections so the content
+               stream reads this column whole. */
+            { column: "sidebar", kind: "section", label: "Contacts",
+              headingType: "sideHeading", gapAfter: 28.6,
+              body: { kind: "contact", type: "contact",
+                      iconSize: 14.5, textOffset: 28.2, labelGap: 16.8,
+                      glyph: "display", knockout: "paper",
+                      rows: [
+                          { icon: "phone",    label: "Phone:", fields: ["phone"] },
+                          { icon: "envelope", label: "Email:", fields: ["email"] }
+                      ] } },
+
+            /* A marker per ENTRY rather than per line: one bullet for the job,
+               with its employer and place indented past it. */
+            { column: "sidebar", kind: "section", label: "Experience",
+              headingType: "sideHeading", gapAfter: 24,
+              body: { kind: "entries", source: "experience",
+                      indent: 16, marker: "\u2022", markerType: "entryHead",
+                      head: { runs: [{ field: "role", type: "entryHead" }] },
+                      sub: [
+                          { runs: [{ field: "company", type: "entrySub" }],
+                            gapBefore: 16.8 },
+                          { runs: [{ field: "place", type: "entrySub" }],
+                            gapBefore: 15.6 }
+                      ],
+                      entryGap: 26 } },
+
+            /* ---------------- main column -------------------------------- */
+            { column: "main", kind: "section", label: "Characteristics",
+              gapAfter: 24.4,
+              body: { kind: "list", field: "characteristics", split: "\n" } },
+
+            /* The timeline is driven from the entry list: a fourth row grows
+               the rule and gains a dot with nothing here changing. `indent`
+               moves the entries clear of it; the rule and the dots are drawn
+               against the column's own edge. */
+            { column: "main", kind: "section", label: "Education",
+              gapAfter: 27.1,
+              body: { kind: "entries", source: "education",
+                      indent: 27.5,
+                      timeline: { x: 4.2, width: 1.5, r: 3.8, dy: -6.5,
+                                  color: "display" },
+                      head: { runs: [{ field: "degree", type: "entryHead" }] },
+                      sub: [
+                          { runs: [{ field: "school", type: "entrySub" }],
+                            gapBefore: 15.5 },
+                          { runs: [{ field: "field", type: "entrySub" }],
+                            gapBefore: 13.2 },
+                          { runs: [{ field: "dates", type: "entrySub" }],
+                            gapBefore: 13.2 }
+                      ],
+                      entryGap: 29 } },
+
+            { column: "main", kind: "section", label: "Skills",
+              gapAfter: 16.8,
+              body: { kind: "list", type: "skill", field: "skills",
+                      split: "," } }
+        ]
+    },
+
+    {
         /* Traced from a supplied design, measured off the artwork rather than
            eyeballed: a two-column CV with a charcoal masthead, a circular
            portrait straddling it, and blush heading bands across both columns.

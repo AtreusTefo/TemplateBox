@@ -1453,6 +1453,9 @@ body + '\n' +
         { id: "label-rail", title: "Labelled Sections CV", category: "resumes", doc: "label-rail" },
         { id: "boxed-biodata", title: "Boxed Headings Biodata CV", category: "resumes", doc: "boxed-biodata" },
         { id: "peach-portrait", title: "Peach Portrait CV", category: "resumes", doc: "peach-portrait" },
+        { id: "serif-timeline", title: "Serif Timeline CV", category: "resumes", doc: "serif-timeline" },
+        { id: "blue-banner", title: "Blue Banner CV", category: "resumes", doc: "blue-banner" },
+        { id: "badge-column", title: "Badge Column CV", category: "resumes", doc: "badge-column" },
         /* These three carried a `framed: true` flag until August 23, 2026,
            when the wood-a4 hover composite was removed at the owner's
            request. They are ordinary photo cards now: two thumbnails, the

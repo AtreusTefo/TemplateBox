@@ -4078,7 +4078,7 @@ async function resumeTemplateChecks(page) {
             accent: '#1F4E79',
             fields: fields,
             experience: rows('experience-list', ['role', 'company', 'place', 'dates', 'description']),
-            education: rows('education-list', ['degree', 'school', 'place', 'dates', 'score']),
+            education: rows('education-list', ['degree', 'school', 'place', 'dates', 'score', 'field']),
             projects: rows('projects-list', ['name', 'role', 'dates', 'description']),
             /* refAddress and score were missing until September 15, 2026, and
                a key missing here is not a cosmetic omission: this block exists
