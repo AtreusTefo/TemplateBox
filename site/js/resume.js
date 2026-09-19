@@ -88,10 +88,21 @@
             nationality: "",
             height: "",
             weight: "",
-            religion: ""
+            religion: "",
+            age: "",
+            characteristics: "",
+            motherName: "",
+            interests: "",
+            linkedin: "",
+            website: ""
         },
         experience: [{ role: "", company: "", place: "", dates: "", description: "" }],
-        education: [{ degree: "", school: "", place: "", dates: "", score: "" }],
+        /* `field` is the course or strand, and it is read by TWO templates:
+           grey-rail has composed it into its education head since August 2026
+           with no input to fill it, and the Serif Timeline CV sets it on its
+           own line. It is collected now. It is deliberately NOT given a value
+           in the sample below -- see the note there. */
+        education: [{ degree: "", school: "", place: "", dates: "", score: "", field: "" }],
         projects: [{ name: "", role: "", dates: "", description: "" }],
         references: [{ name: "", title: "", company: "", email: "", phone: "", refAddress: "" }]
     };
@@ -161,6 +172,24 @@
             religion: "Christian",
             fatherName: "Chukwuemeka Nwosu",
             dateOfBirth: "4 March 1987",
+            /* Drawn by the Serif Timeline CV alone. Both are fields no other
+               template reads, so filling them cannot cost any other template a
+               line -- which matters, because the note above records that this
+               object is sized to one page and Labelled Sections has no margin
+               left. `age` is shown verbatim rather than composed with a word,
+               so a visitor may write "39" or "39 Years Old" and get what they
+               typed either way. */
+            /* Drawn by the Blue Banner CV alone, which pairs it with the
+               father's name the biodata sheet already carries. */
+            /* Drawn by the Badge Column CV alone. Bare hosts rather than
+               full URLs: the sheet sets them beside an icon that already says
+               what they are, and "https://www." in a 134pt column wraps. */
+            linkedin: "in/adaezenwosu",
+            website: "adaezenwosu.com",
+            motherName: "Ngozi Nwosu",
+            interests: "Banking and logistics automation\nMentoring new depot supervisors\nLong-distance running",
+            age: "39 Years Old",
+            characteristics: "Calm under pressure, and steady with a depot team through a peak season.\nWilling to take the assignment nobody has scoped yet, and to write the process down afterwards.",
             declaration: "I hereby declare that the information given above is true to the best of my knowledge and belief."
         },
         /* Descriptions are one achievement per LINE. Ruled Serif splits them

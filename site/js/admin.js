@@ -279,6 +279,7 @@ const newlineOf = (text) => (text.indexOf("\r\n") >= 0 ? "\r\n" : "\n");
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="frame-black-interior">Interior Framed Poster Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="bucket-hat-white">White Bucket Hat Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-cap-clay">T-Shirt and Cap Mockup</a></li>\n' +
+'                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-buckethat-clay">Hoodie and Bucket Hat Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="tshirt-hanger-white">T-Shirt Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="hoodie-hanger-white">Hoodie Mockup</a></li>\n' +
 '                            <li><a href="../mockup.html" data-target="mockup" data-doc="wood-a4">Framed Poster Mockup</a></li>\n' +
@@ -1452,6 +1453,9 @@ body + '\n' +
         { id: "label-rail", title: "Labelled Sections CV", category: "resumes", doc: "label-rail" },
         { id: "boxed-biodata", title: "Boxed Headings Biodata CV", category: "resumes", doc: "boxed-biodata" },
         { id: "peach-portrait", title: "Peach Portrait CV", category: "resumes", doc: "peach-portrait" },
+        { id: "serif-timeline", title: "Serif Timeline CV", category: "resumes", doc: "serif-timeline" },
+        { id: "blue-banner", title: "Blue Banner CV", category: "resumes", doc: "blue-banner" },
+        { id: "badge-column", title: "Badge Column CV", category: "resumes", doc: "badge-column" },
         /* These three carried a `framed: true` flag until August 23, 2026,
            when the wood-a4 hover composite was removed at the owner's
            request. They are ordinary photo cards now: two thumbnails, the
@@ -1558,6 +1562,10 @@ body + '\n' +
         {
             id: "tshirt-cap-clay", title: "T-Shirt and Cap Mockup", category: "mockups", doc: "tshirt-cap-clay",
             folder: "assets/thumbnails/product-mockups/apparel/sets/tshirt-cap-clay"
+        },
+        {
+            id: "hoodie-buckethat-clay", title: "Hoodie and Bucket Hat Mockup", category: "mockups", doc: "hoodie-buckethat-clay",
+            folder: "assets/thumbnails/product-mockups/apparel/sets/hoodie-buckethat-clay"
         },
         {
             id: "tshirt-model-white-back", title: "White T-Shirt Back Mockup", category: "mockups", doc: "tshirt-model-white-back",

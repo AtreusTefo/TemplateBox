@@ -340,7 +340,12 @@ window.TBResume = (() => {
         }
 
         template.blocks.forEach((block) => {
-            const key = (block.column === "sidebar" && cols.sidebar) ? "sidebar" : "main";
+            /* Any column the template has DECLARED, not the sidebar alone.
+               `split` creates columns at layout time, so the set is not known
+               when this loop starts and the lookup has to be live. Falls back
+               to main for a name that does not exist, which is what an
+               unmatched `column: "sidebar"` already did. */
+            const key = (block.column && cols[block.column]) ? block.column : "main";
             layoutBlock(ctx, block, key, cursor, started, pageOf);
         });
 
@@ -438,9 +443,13 @@ window.TBResume = (() => {
     function emitRule(ctx, page, col, spec, y) {
         const bleed = spec.bleedLeft || 0;
         const len = spec.length === undefined ? 1 : spec.length;
+        /* `dx` moves the whole rule right of the column's edge, so a short
+           rule can sit anywhere across the measure rather than only at its
+           start. Absent everywhere before this, so no existing rule moves. */
+        const dx = spec.dx || 0;
         ctx.ops.push({
-            op: "line", page: page, x1: col.x - bleed, y1: y,
-            x2: col.x - bleed + (col.width + bleed) * len, y2: y,
+            op: "line", page: page, x1: col.x - bleed + dx, y1: y,
+            x2: col.x - bleed + dx + (col.width + bleed) * len, y2: y,
             color: colorOf(spec.color, ctx.template, ctx.state),
             width: spec.width || 1
         });
@@ -638,6 +647,16 @@ window.TBResume = (() => {
            key on `display`, because it is page furniture in its own right and
            a template may want one anywhere. */
         if (block.kind === "rule") {
+            /* A FLOATING rule is drawn relative to the cursor and leaves it
+               alone -- the short rules flanking a centred subtitle, which sit
+               at the text's own mid-height and are not a step in the flow.
+               With `dx` and `length` it is the only way to put a rule beside
+               something rather than under it. */
+            if (block.float) {
+                emitRule(ctx, pageOf[key], col, block,
+                         cursor[key] + (block.dy || 0));
+                return;
+            }
             cursor[key] += block.gapBefore || 0;
             ensureRoom(ctx, key, cursor, pageOf, block.gapAfter || 0);
             emitRule(ctx, pageOf[key], col, block, cursor[key]);
@@ -804,13 +823,141 @@ window.TBResume = (() => {
             return;
         }
 
+        /* A LOCAL two-column band, opened here and closed by `rejoin`.
+
+           The engine's two-column layout is a property of the page: a sidebar
+           and a main column, both running top to bottom. This is the other
+           shape -- a single-column sheet that splits for a few sections and
+           then returns to full width, which is what a CV does when it puts
+           skills beside a languages list halfway down.
+
+           It creates two columns, seeds both cursors from the column it was
+           declared in, and remembers where the band began. Sections then name
+           `bandLeft` or `bandRight` like any other column. `rejoin` takes the
+           deepest of the two, draws the divider if one was declared, and hands
+           the flow back.
+
+           The two band columns do NOT paginate, for the same reason the
+           sidebar does not: a band split across pages reads as a rendering
+           fault. An overrun is still reported, because `rejoin` sets the main
+           cursor to the deepest of the two and the overflow check sees it. */
+        if (block.kind === "split") {
+            const col0 = ctx.cols[key];
+            const at = block.x;
+            ctx.cols.bandLeft = Object.assign({}, col0, {
+                x: col0.x, width: at - (block.gapLeft || 0) - col0.x
+            });
+            ctx.cols.bandRight = Object.assign({}, col0, {
+                x: at + (block.gapRight || 0),
+                width: col0.x + col0.width - at - (block.gapRight || 0)
+            });
+            cursor.bandLeft = cursor.bandRight = cursor[key];
+            /* STARTED, so the first section in each half takes its heading gap
+               -- the band opens under whatever came before it and needs the
+               same air a section anywhere else would. `rejoin` does the
+               opposite for the same reason `crossRule` does. */
+            started.bandLeft = started.bandRight = true;
+            pageOf.bandLeft = pageOf.bandRight = pageOf[key];
+            ctx.band = { x: at, top: cursor[key], from: key,
+                         rule: block.rule || null, page: pageOf[key] };
+            return;
+        }
+
+        if (block.kind === "rejoin") {
+            const b = ctx.band;
+            if (!b) return;
+            const deepest = Math.max(cursor.bandLeft, cursor.bandRight);
+            if (b.rule) {
+                const inset = b.rule.inset || 0;
+                /* `extend` runs the divider PAST the deepest column, which is
+                   what a design does when the rule has to meet a rule across
+                   the foot rather than stop where the words do. */
+                ctx.ops.push({
+                    op: "line", page: b.page,
+                    x1: b.x, y1: b.top + inset,
+                    x2: b.x, y2: deepest - inset + (b.rule.extend || 0),
+                    color: colorOf(b.rule.color, ctx.template, ctx.state),
+                    width: b.rule.width || 0.8
+                });
+            }
+            cursor[b.from] = deepest + (block.gapAfter || 0);
+            /* Cleared, so the first section BELOW the band draws at the cursor
+               with no heading gap -- this block's own `gapAfter` is the gap,
+               declared once, rather than a heading gap that would then have to
+               be suppressed for one section only. Same contract as
+               `crossRule`, and it matters for the same reason: otherwise the
+               spacing under a band depends on whether a photograph happens to
+               have marked the column started. */
+            started[b.from] = false;
+            delete ctx.cols.bandLeft; delete ctx.cols.bandRight;
+            delete cursor.bandLeft; delete cursor.bandRight;
+            delete started.bandLeft; delete started.bandRight;
+            delete pageOf.bandLeft; delete pageOf.bandRight;
+            ctx.band = null;
+            return;
+        }
+
+        /* A rule across BOTH columns that levels them underneath it.
+
+           This exists because a two-column sheet with a full-width header has
+           a problem no other block solves: the header's height depends on its
+           content -- an address that wraps to a third line makes it taller --
+           but a column's `firstBaseline` is a fixed number in the descriptor.
+           Fix the baselines and a grown header overruns them; set them for the
+           worst case and the common one carries dead space.
+
+           So this takes the DEEPEST cursor of any column, draws the rule below
+           it, and starts every column level beneath. The header can then be
+           laid out as ordinary flowing blocks and the columns below it follow
+           wherever it ended, in either direction.
+
+           It deliberately does NOT set `started`. A column whose first section
+           follows this should draw that heading at the cursor with no gap
+           before it, exactly as it would at `firstBaseline` -- the gap is this
+           block's own `gapAfter`, declared once, rather than a heading gap
+           that would then have to be suppressed for the first section only. */
+        if (block.kind === "crossRule") {
+            const keys = Object.keys(cursor);
+            let deepest = -Infinity;
+            keys.forEach((k) => { if (cursor[k] > deepest) { deepest = cursor[k]; } });
+            /* `minY` is a FLOOR, and it is what stops a header that has been
+               emptied from pulling the rule up through the furniture beside
+               it. A photograph is absolute and advances no cursor, so a sheet
+               whose header fields are all blank levels at the name alone and
+               would otherwise draw this line straight across the portrait. */
+            const y = Math.max(deepest + (block.gapBefore || 0), block.minY || 0);
+            emitRule(ctx, pageOf[key], col, block, y);
+            keys.forEach((k) => {
+                cursor[k] = y + (block.gapAfter || 0);
+                /* Every column begins again under this rule, so the first
+                   section in each must draw at the cursor with no heading gap
+                   -- exactly as it would at `firstBaseline`.
+
+                   Clearing the flag is what makes that true of BOTH columns
+                   rather than whichever happened to carry the header. It is
+                   also what makes it independent of the photograph: the filled
+                   photo path marks its column started and the empty slot does
+                   not, so without this a sheet's two columns began level until
+                   a portrait was uploaded and then silently stopped. */
+                started[k] = false;
+            });
+            return;
+        }
+
         /* A vertical rule: the divider between two columns. Absolute, and it
            advances nothing, because it is furniture spanning content rather
            than a step in the flow. */
         if (block.kind === "vrule") {
+            /* `fromCursor` measures the ends from wherever the column has got
+               to rather than from the top of the page. A divider between two
+               columns starts under whatever closes the header above it, and
+               that is content-dependent once a crossRule is levelling it --
+               an absolute y would poke above the rule as soon as an address
+               wrapped to one more line. */
+            const base = block.fromCursor ? cursor[key] : 0;
             ctx.ops.push({
                 op: "line", page: page,
-                x1: block.x, y1: block.y1, x2: block.x, y2: block.y2,
+                x1: block.x, y1: base + block.y1, x2: block.x, y2: block.y2,
                 color: colorOf(block.color, ctx.template, ctx.state),
                 width: block.width || 0.8
             });
@@ -1014,29 +1161,94 @@ window.TBResume = (() => {
                rectangle with ordinary text over it. It reads as a graphic and
                extracts as text, which is why a design this decorative costs
                nothing at parse time. */
+            /* A BADGE: a filled disc with a glyph in it, set to the LEFT of
+               the label, with the label and any rule inset past it.
+
+               It is not the heading `box` (a filled rectangle BEHIND the
+               label) and it is not a contact glyph (drawn inline with a row of
+               text). The disc's colour, the glyph's colour and the radius live
+               on the ROLE, because they are the same for every heading on a
+               sheet; WHICH glyph lives on the block, because that is the only
+               part that differs per section. A role with a badge and a block
+               with no icon draws nothing and insets nothing, so a section can
+               opt out. */
+            let badgeInset = 0;
+            if (t.badge && block.icon) {
+                const br = t.badge.r === undefined ? 11 : t.badge.r;
+                const disc = colorOf(t.badge.color, ctx.template, ctx.state);
+                drawIcon(ctx, pageOf[key], block.icon, col.x + br,
+                         cursor[key] - (t.badge.dy === undefined ? br * 0.4 : t.badge.dy),
+                         br, disc,
+                         colorOf(t.badge.glyph, ctx.template, ctx.state),
+                         colorOf(t.badge.knockout || t.badge.color, ctx.template, ctx.state));
+                badgeInset = br * 2 + (t.badge.gap === undefined ? 12 : t.badge.gap);
+            }
+
             let boxRight = 0;
             if (t.box) {
                 const padX = t.box.padX === undefined ? 7 : t.box.padX;
+                /* The pad AFTER the label may differ from the one before it.
+                   A tab whose label sits hard against the page edge has none
+                   on the left and a wide one on the right, and one `padX`
+                   cannot say that. Defaults to padX, so nothing moves. */
+                const padR = t.box.padRight === undefined ? padX : t.box.padRight;
                 const above = t.box.above === undefined ? t.size : t.box.above;
                 const below = t.box.below === undefined ? t.size * 0.35 : t.box.below;
                 /* `full` spans the column's BOX rather than its text measure,
                    and bleeds to the page edge where the box does. A band is
                    page furniture, so it follows the column it belongs to
-                   rather than the margin the text keeps inside it. */
-                const bx = t.box.full ? col.boxX : col.x;
-                const w = t.box.full
-                    ? col.boxW
-                    : ctx.measure(label, t) + padX * 2;
-                ctx.ops.push({
-                    op: "rect", page: pageOf[key], x: bx,
-                    y: cursor[key] - above, w: w, h: above + below,
-                    fill: colorOf(t.box.color, ctx.template, ctx.state)
-                });
+                   rather than the margin the text keeps inside it.
+
+                   `bleedLeft` is the other way round: the box keeps its
+                   label-sized width but starts further left, which is how a
+                   tab runs off the edge of the sheet while still ending where
+                   its own text does. */
+                const bleed = t.box.bleedLeft || 0;
+                const bx = (t.box.full ? col.boxX : col.x) - bleed;
+                const w = (t.box.full ? col.boxW : ctx.measure(label, t) + padX + padR)
+                    + bleed;
+                const top = cursor[key] - above;
+                const h = above + below;
+
+                /* A WASH behind the tab: a paler band of the same height,
+                   spanning further than the tab does. The reference fades it
+                   from the tab's edge to white; this draws it flat, because
+                   the display list has no gradient and preview and PDF are
+                   painted from the same list -- a fade one painter could do
+                   and the other could not is a divergence, not a nicety. */
+                if (t.box.wash) {
+                    const wx = t.box.wash.bleed === "page" ? 0 : bx;
+                    const ww = t.box.wash.bleed === "page"
+                        ? ctx.template.page.width : (col.x + col.width) - wx;
+                    ctx.ops.push({
+                        op: "rect", page: pageOf[key], x: wx, y: top, w: ww, h: h,
+                        fill: colorOf(t.box.wash.color, ctx.template, ctx.state)
+                    });
+                }
+
+                /* `slant` cuts the bottom-right corner back, so the tab is a
+                   trapezoid rather than a rectangle. It is the whole character
+                   of this kind of banner and it is invisible until you put the
+                   two shapes side by side. */
+                if (t.box.slant) {
+                    ctx.ops.push({
+                        op: "poly", page: pageOf[key],
+                        fill: colorOf(t.box.color, ctx.template, ctx.state),
+                        points: [[bx, top], [bx + w, top],
+                                 [bx + w - t.box.slant, top + h], [bx, top + h]]
+                    });
+                } else {
+                    ctx.ops.push({
+                        op: "rect", page: pageOf[key], x: bx, y: top, w: w, h: h,
+                        fill: colorOf(t.box.color, ctx.template, ctx.state)
+                    });
+                }
                 boxRight = bx + w;
-                text(ctx, pageOf[key], (t.box.full ? bx : col.x) + padX,
-                     cursor[key], label, t);
+                text(ctx, pageOf[key],
+                     (t.box.full ? col.boxX : col.x) + padX, cursor[key], label, t);
             } else {
-                text(ctx, pageOf[key], anchorX(col, t.align), cursor[key], label, t);
+                text(ctx, pageOf[key], anchorX(col, t.align) + badgeInset,
+                     cursor[key], label, t);
             }
 
             if (t.rule) {
@@ -1053,7 +1265,15 @@ window.TBResume = (() => {
                         width: t.rule.width || 1
                     });
                 } else {
-                    emitRule(ctx, pageOf[key], col, t.rule, ry);
+                    /* The rule starts where the LABEL starts, not where the
+                       column does, or a badged heading gets a rule running
+                       out from under its disc. */
+                    emitRule(ctx, pageOf[key], col,
+                             badgeInset
+                                 ? Object.assign({}, t.rule,
+                                     { dx: (t.rule.dx || 0) + badgeInset })
+                                 : t.rule,
+                             ry);
                 }
                 cursor[key] = ry;
             }
@@ -1517,16 +1737,65 @@ window.TBResume = (() => {
 
         if (body.kind === "entries") {
             const rows = ctx.state[body.source] || [];
+            /* An optional timeline: a vertical rule down the left of the
+               entries with a filled dot on each entry's first baseline. It is
+               driven from the ENTRY LIST rather than drawn to a fixed length,
+               so a fourth entry grows the rule and gains a dot with no
+               measurement in the descriptor changing.
+
+               The entries are laid into a narrowed column so their text clears
+               the rule. Nothing inside the loop reads the outer `col`, which
+               is what lets withColumn do this without the loop knowing. */
+            const tl = body.timeline;
+            /* The inset belongs to the BODY rather than to the timeline: a
+               bulleted entry list needs exactly the same thing with no
+               timeline in sight, and a marker drawn at the column's own edge
+               with its entry indented past it is the commonest form of it. */
+            const indent = body.indent || 0;
+            const outerX = col.x;
+            const marks = [];
             let emitted = 0;
-            rows.forEach((row, rowIndex) => {
+            const layoutRows = () => rows.forEach((row, rowIndex) => {
                 if (!entryHasContent(body, row)) return;
                 const entryRef = { list: body.source, index: rowIndex };
                 const headRuns = buildRuns(body.head || {}, row, ctx.template);
                 const bullets = body.bullets
                     ? splitList(row[body.bullets.field], body.bullets.split) : [];
 
-                if (emitted) cursor[key] += body.entryGap || 20;
+                if (emitted) {
+                    /* A rule BETWEEN entries, never after the last one: the
+                       gap is split around it, so the rule sits in the middle
+                       of the space rather than hard against the entry above.
+                       Drawn here rather than after each entry because "after
+                       each" leaves one trailing under the final row, which is
+                       the tell-tale of getting this wrong. */
+                    const half = (body.entryGap || 20) / 2;
+                    if (body.divider) {
+                        cursor[key] += half;
+                        emitRule(ctx, pageOf[key], col, body.divider, cursor[key]);
+                        cursor[key] += half;
+                    } else {
+                        cursor[key] += body.entryGap || 20;
+                    }
+                }
                 ensureRoom(ctx, key, cursor, pageOf, 40);
+                /* Recorded AFTER ensureRoom, so a dot follows its entry onto a
+                   second page instead of being left on the first. */
+                if (tl) marks.push({ y: cursor[key], page: pageOf[key] });
+                /* Drawn HERE rather than after the loop, at the column's own
+                   left edge -- `outerX`, captured before the entries were
+                   inset, because inside withColumn the column has moved.
+
+                   Emitting it with its entry is what keeps the content stream
+                   readable: markers collected afterwards land in a clump at
+                   the end of the column, so an extractor sees the whole
+                   section and then two loose bullets. They carry no
+                   information, which is exactly why they must not be the
+                   thing that breaks a contiguous record. */
+                if (body.marker) {
+                    text(ctx, pageOf[key], outerX, cursor[key], body.marker,
+                         T[body.markerType || "entryHead"]);
+                }
 
                 if (headRuns.length) layoutRuns(ctx, headRuns, key, cursor, pageOf, entryRef);
 
@@ -1576,7 +1845,47 @@ window.TBResume = (() => {
                 }
                 emitted += 1;
             });
+
+            if (indent) {
+                withColumn(ctx, key, insetOf(col, { left: indent }), layoutRows);
+            } else {
+                layoutRows();
+            }
+            if (tl) emitTimeline(ctx, col, tl, marks);
         }
+    }
+
+    /* The timeline's own marks, drawn after its entries because the rule's
+       extent is not known until the last dot has been placed. Grouped by page
+       so a list that paginates gets one rule per page rather than one rule
+       stretched between them. */
+    function emitTimeline(ctx, col, tl, marks) {
+        if (!marks.length) return;
+        const x = col.x + (tl.x || 0);
+        const r = tl.r === undefined ? 3.5 : tl.r;
+        const color = colorOf(tl.color, ctx.template, ctx.state);
+        const byPage = {};
+        marks.forEach((m) => {
+            (byPage[m.page] = byPage[m.page] || []).push(m.y + (tl.dy || 0));
+        });
+        Object.keys(byPage).forEach((p) => {
+            const page = Number(p);
+            const ys = byPage[p];
+            const top = Math.min.apply(null, ys) - r;
+            const bottom = Math.max.apply(null, ys) + r;
+            /* A single entry is a dot and no rule: a rule joining one mark to
+               itself is a stub the design never draws. */
+            if (bottom - top > r * 2 + 0.5) {
+                ctx.ops.push({
+                    op: "line", page: page, x1: x, y1: top, x2: x, y2: bottom,
+                    color: color, width: tl.width || 1
+                });
+            }
+            ys.forEach((y) => {
+                ctx.ops.push({ op: "circle", page: page, cx: x, cy: y, r: r,
+                               fill: color });
+            });
+        });
     }
 
     /* Several fonts sharing a baseline, WRAPPED to the column. Each run is
@@ -1808,10 +2117,26 @@ window.TBResume = (() => {
             if (emitted) cursor[key] += (t.lineHeight || t.size) + (t.rowGap || 14);
             emitted += 1;
 
-            const lines = ctx.wrap(value, t, col.width - (block.textOffset || 28));
             const cy = cursor[key] - t.size * 0.32;
             drawIcon(ctx, page, row.icon, col.x + r, cy, r, disc, glyph, knock);
 
+            /* An optional LABEL above the value -- "Phone:" over the number,
+               rather than beside it. The icon keeps the label's baseline,
+               which is what makes the pair read as one row rather than as a
+               caption that has drifted up from the line below.
+
+               The label is a role of its own, defaulting to the row's, so a
+               template that wants it bold does not have to restate the size.
+               Rows without a label are untouched: no existing descriptor sets
+               one, so this path is inert everywhere else. */
+            if (row.label) {
+                const lt = T[block.labelType || block.type || "sidebarContact"];
+                text(ctx, page, col.x + (block.textOffset || 28),
+                     cursor[key], row.label, lt);
+                cursor[key] += block.labelGap || (lt.lineHeight || lt.size);
+            }
+
+            const lines = ctx.wrap(value, t, col.width - (block.textOffset || 28));
             lines.forEach((line, i) => {
                 if (i) cursor[key] += t.lineHeight || t.size;
                 text(ctx, page, col.x + (block.textOffset || 28), cursor[key], line, t);
@@ -1989,6 +2314,159 @@ window.TBResume = (() => {
             return;
         }
 
+        /* Star: five points, sampled off two radii rather than written out,
+           so the inner radius is one number and the shape stays a star at
+           every size. 0.382 is the ratio a regular pentagram gives; anything
+           larger reads as a flower and anything smaller as a caltrop. */
+        if (kind === "star") {
+            const pts = [];
+            const RO = 1.02 * u;
+            const RI = 0.390 * u;
+            for (let i = 0; i < 10; i += 1) {
+                const a = -Math.PI / 2 + i * Math.PI / 5;
+                const r2 = (i % 2 === 0) ? RO : RI;
+                pts.push([cx + Math.cos(a) * r2, cy + Math.sin(a) * r2]);
+            }
+            P.push({ op: "poly", page: page, fill: glyph, points: pts });
+            return;
+        }
+
+        /* Mortarboard: a rhombus for the board and a short stem with a tassel
+           below it. The board is drawn as a DIAMOND rather than a trapezoid
+           because a mortarboard is seen from slightly above, and a trapezoid
+           reads as a plain hat. */
+        if (kind === "cap") {
+            P.push({ op: "poly", page: page, fill: glyph, points: [
+                [cx, cy - 0.86 * u],
+                [cx + 1.08 * u, cy - 0.30 * u],
+                [cx, cy + 0.26 * u],
+                [cx - 1.08 * u, cy - 0.30 * u]
+            ]});
+            /* The head band, tucked under the board so the two read as one
+               object rather than a diamond floating over a bar. */
+            P.push({ op: "poly", page: page, fill: glyph, points: [
+                [cx - 0.56 * u, cy - 0.02 * u],
+                [cx + 0.56 * u, cy - 0.02 * u],
+                [cx + 0.56 * u, cy + 0.62 * u],
+                [cx - 0.56 * u, cy + 0.62 * u]
+            ]});
+            P.push({ op: "poly", page: page, fill: hole, points: [
+                [cx - 0.56 * u, cy + 0.06 * u],
+                [cx + 0.56 * u, cy + 0.06 * u],
+                [cx, cy + 0.34 * u]
+            ]});
+            return;
+        }
+
+        /* Briefcase: a body with a handle over it. The handle is a knocked-out
+           notch in a small bar rather than a stroked arc -- at 11pt a stroked
+           handle is one pixel and disappears. */
+        if (kind === "briefcase") {
+            P.push({ op: "rect", page: page, fill: glyph,
+                     x: cx - 0.42 * u, y: cy - 0.92 * u, w: 0.84 * u, h: 0.34 * u });
+            P.push({ op: "rect", page: page, fill: hole,
+                     x: cx - 0.24 * u, y: cy - 0.74 * u, w: 0.48 * u, h: 0.22 * u });
+            P.push({ op: "rect", page: page, fill: glyph,
+                     x: cx - 1.02 * u, y: cy - 0.58 * u, w: 2.04 * u, h: 1.44 * u });
+            /* The clasp, which is what stops it reading as a plain box. */
+            P.push({ op: "rect", page: page, fill: hole,
+                     x: cx - 0.18 * u, y: cy - 0.02 * u, w: 0.36 * u, h: 0.26 * u });
+            return;
+        }
+
+        /* Globe: a disc with one meridian and one parallel knocked out of it.
+           Two lines, not a grid -- more than two and at this size the disc
+           fills in and reads as a striped circle. */
+        if (kind === "globe") {
+            P.push({ op: "circle", page: page, cx: cx, cy: cy, r: 1.0 * u, fill: glyph });
+            P.push({ op: "rect", page: page, fill: hole,
+                     x: cx - 1.0 * u, y: cy - 0.09 * u, w: 2.0 * u, h: 0.18 * u });
+            P.push({ op: "circle", page: page, cx: cx, cy: cy, r: 0.40 * u, fill: hole });
+            P.push({ op: "circle", page: page, cx: cx, cy: cy, r: 0.26 * u, fill: glyph });
+            return;
+        }
+
+        /* A LINK, deliberately, where the reference draws a brand mark.
+           Reproducing a company's logo inside a template we publish is a
+           trademark question rather than a drawing problem, and the field it
+           labels is a URL like any other -- so this is two interlocking bars,
+           which reads as "a link" and belongs to nobody. */
+        if (kind === "link") {
+            const bar = (dx, dy) => {
+                P.push({ op: "poly", page: page, fill: glyph, points: [
+                    [cx + dx - 0.30 * u, cy + dy + 0.52 * u],
+                    [cx + dx + 0.36 * u, cy + dy - 0.50 * u],
+                    [cx + dx + 0.70 * u, cy + dy - 0.28 * u],
+                    [cx + dx + 0.04 * u, cy + dy + 0.74 * u]
+                ]});
+            };
+            bar(-0.42 * u, -0.16 * u);
+            bar(0.06 * u, 0.14 * u);
+            P.push({ op: "rect", page: page, fill: glyph,
+                     x: cx - 0.34 * u, y: cy - 0.10 * u, w: 0.68 * u, h: 0.20 * u });
+            return;
+        }
+
+        /* Bust: a head over shoulders. The shoulders are the upper half of an
+           ELLIPSE rather than a circle or a trapezoid -- a circle gives a
+           bubble and straight sides give a road sign, and at 12pt the only
+           thing that reads as a person is the flattened curve of a shoulder
+           line. Sampled for the same reason the handset is: the shape is a
+           curve, and vertices written by hand only match it at one size. */
+        if (kind === "person") {
+            P.push({ op: "circle", page: page,
+                     cx: cx, cy: cy - 0.48 * u, r: 0.42 * u, fill: glyph });
+            const RX = 0.82 * u;
+            const RY = 0.66 * u;
+            const OY = cy + 0.92 * u;
+            const pts = [];
+            const N = 18;
+            for (let i = 0; i <= N; i += 1) {
+                const a = Math.PI + Math.PI * (i / N);
+                pts.push([cx + Math.cos(a) * RX, OY + Math.sin(a) * RY]);
+            }
+            P.push({ op: "poly", page: page, fill: glyph, points: pts });
+            return;
+        }
+
+        /* Calendar: a block with a header band and two hanging tabs. The band
+           is what distinguishes it from a plain framed square -- without it
+           the glyph reads as a picture frame, and with it the eye supplies
+           the grid it is too small to draw.
+
+           The page is knocked out rather than the body being drawn as four
+           strokes, so the shape is two primitives instead of five and the
+           knockout colour is the one key a template has to get right. */
+        if (kind === "calendar") {
+            P.push({ op: "rect", page: page, fill: glyph,
+                     x: cx - 0.46 * u, y: cy - 1.00 * u, w: 0.16 * u, h: 0.30 * u });
+            P.push({ op: "rect", page: page, fill: glyph,
+                     x: cx + 0.30 * u, y: cy - 1.00 * u, w: 0.16 * u, h: 0.30 * u });
+            P.push({ op: "rect", page: page, fill: glyph,
+                     x: cx - 0.86 * u, y: cy - 0.78 * u, w: 1.72 * u, h: 1.66 * u });
+            P.push({ op: "rect", page: page, fill: hole,
+                     x: cx - 0.68 * u, y: cy - 0.22 * u, w: 1.36 * u, h: 0.92 * u });
+            return;
+        }
+
+        /* Flag: a pole and a pennant. A rectangular banner with a wavy edge is
+           what the reference draws, and it was rejected -- the wave costs a
+           sampled curve and at 12pt it reads as a smudge on the fly edge. A
+           triangular pennant is unambiguous at any size this is ever drawn.
+
+           The pennant hangs from the TOP of the pole. Centring it on the pole
+           reads as a bow tie. */
+        if (kind === "flag") {
+            P.push({ op: "rect", page: page, fill: glyph,
+                     x: cx - 0.66 * u, y: cy - 0.98 * u, w: 0.20 * u, h: 1.96 * u });
+            P.push({ op: "poly", page: page, fill: glyph, points: [
+                [cx - 0.46 * u, cy - 0.92 * u],
+                [cx + 0.88 * u, cy - 0.50 * u],
+                [cx - 0.46 * u, cy - 0.08 * u]
+            ]});
+            return;
+        }
+
         /* Envelope: a solid body with the flap cut back out of it as a
            chevron that runs corner to corner. A knocked-out triangle was the
            obvious alternative and is what this drew before; it removes the
@@ -2157,9 +2635,20 @@ window.TBResume = (() => {
             n.setAttribute("x", o.x); n.setAttribute("y", o.y);
             n.setAttribute("font-family", FAMILY[o.family].css);
             n.setAttribute("font-size", o.size);
-            n.setAttribute("font-weight", o.weight === "bold" ? "700" : "400");
+            n.setAttribute("font-weight",
+                (o.weight === "bold" || o.weight === "bolditalic") ? "700" : "400");
             n.setAttribute("fill", o.color);
             if (o.tracking) n.setAttribute("letter-spacing", o.tracking);
+            /* jsPDF takes the STYLE in the same argument as the weight, so a
+               role may say "italic" or "bolditalic" and the PDF obeys. SVG
+               splits them, and until this was added the preview drew an
+               italic role upright while the export slanted it -- a
+               preview/PDF divergence of exactly the kind the xml:space bug
+               was, and as invisible, because the text is identical either
+               way. */
+            if (o.weight === "italic" || o.weight === "bolditalic") {
+                n.setAttribute("font-style", "italic");
+            }
             /* The same x the PDF anchors: jsPDF's align option and SVG's
                text-anchor place a centred or right-aligned string identically
                about the coordinate, so no second measurement is needed here

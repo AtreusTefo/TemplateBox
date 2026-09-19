@@ -6015,6 +6015,248 @@ legend {
     margin-bottom: 0;
 }
 
+
+/* The Serif Timeline CV miniature. Grey sheet, a header of photograph and
+   name over a full-width rule, then two columns with an education spine. The
+   dots are drawn with a repeating gradient rather than one element per entry:
+   the miniature is decorative and a per-entry element would be four more
+   nodes in a card that already has twenty. */
+.mock-doc.timeline {
+    background-color: #EAEAEA;
+    padding: 0.25rem 0.25rem 0.3125rem;
+    overflow: hidden;
+    font-family: Georgia, "Times New Roman", serif;
+}
+
+.mock-doc.timeline .mk-head {
+    display: grid;
+    grid-template-columns: 30% 1fr;
+    gap: 0.25rem;
+    align-items: start;
+}
+
+.mock-doc.timeline .mk-photo {
+    aspect-ratio: 4 / 5;
+    background-color: #C7C7C7;
+}
+
+.mock-doc.timeline .mk-headtext {
+    display: flex;
+    flex-direction: column;
+    gap: 0.0625rem;
+}
+
+.mock-doc.timeline .mk-name {
+    font-size: 0.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    color: #1A1A1A;
+    text-transform: uppercase;
+}
+
+.mock-doc.timeline .mk-rule {
+    display: block;
+    height: 1px;
+    background-color: #1A1A1A;
+    margin: 0.0625rem 0;
+}
+
+/* The rule that closes the header and levels the columns beneath it. */
+.mock-doc.timeline .mk-span {
+    height: 1px;
+    background-color: #1A1A1A;
+    margin: 0.1875rem 0 0.125rem;
+}
+
+.mock-doc.timeline .mk-cols {
+    display: grid;
+    grid-template-columns: 34% 66%;
+    gap: 0.1875rem;
+}
+
+.mock-doc.timeline .mk-main {
+    border-left: 1px solid #1A1A1A;
+    padding-left: 0.1875rem;
+}
+
+.mock-doc.timeline .mk-h {
+    font-size: 0.25rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #1A1A1A;
+    text-transform: uppercase;
+    border-bottom: 1px solid #1A1A1A;
+    padding-bottom: 0.0625rem;
+    margin: 0.1875rem 0 0.125rem;
+}
+
+.mock-doc.timeline .mk-time {
+    border-left: 1px solid #1A1A1A;
+    padding-left: 0.1875rem;
+    margin-left: 0.0625rem;
+}
+
+
+/* The Blue Banner CV miniature. Each heading is a solid tab bleeding off the
+   left edge over a pale full-width band, which is the whole identity of the
+   sheet. Two nodes per heading: the <p> is the band and carries the bleed, the
+   <span> is the parallelogram and carries the label. One node cannot do both,
+   because a clip-path clips the element's text along with its fill. */
+.mock-doc.banner {
+    background-color: #FFFFFF;
+    padding: 0.25rem 0.25rem 0.3125rem;
+    overflow: hidden;
+}
+
+.mock-doc.banner .mk-head {
+    display: grid;
+    grid-template-columns: 26% 1fr;
+    gap: 0.25rem;
+    align-items: start;
+    margin-bottom: 0.1875rem;
+}
+
+.mock-doc.banner .mk-photo {
+    aspect-ratio: 4 / 5;
+    background-color: #C8D6E8;
+}
+
+.mock-doc.banner .mk-headtext {
+    display: flex;
+    flex-direction: column;
+    gap: 0.0625rem;
+}
+
+.mock-doc.banner .mk-name {
+    font-size: 0.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #1F4E79;
+    text-transform: uppercase;
+}
+
+.mock-doc.banner .mk-sub {
+    font-size: 0.25rem;
+    font-style: italic;
+    color: #1F4E79;
+}
+
+.mock-doc.banner .mk-tab {
+    margin: 0.1875rem -0.25rem 0.125rem;
+    background-color: #EAF1FB;
+    line-height: 1;
+}
+
+.mock-doc.banner .mk-tab > span {
+    display: inline-block;
+    padding: 0.0625rem 0.3125rem 0.0625rem 0.25rem;
+    background-color: #1F4E79;
+    clip-path: polygon(0 0, 100% 0, 94% 100%, 0 100%);
+    font-size: 0.25rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #FFFFFF;
+    text-transform: uppercase;
+}
+
+/* Inside the band the tab starts at the column edge rather than off the page,
+   so the bleed is dropped for the two halves. */
+.mock-doc.banner .mk-cols .mk-tab {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.mock-doc.banner .mk-cols {
+    display: grid;
+    grid-template-columns: 48% 52%;
+    gap: 0.1875rem;
+}
+
+.mock-doc.banner .mk-main {
+    border-left: 1px solid #9FB8D4;
+    padding-left: 0.1875rem;
+}
+
+
+/* The Badge Column CV miniature: a centred masthead, a blue disc beside every
+   heading, and a ruled divider between the columns. */
+.mock-doc.badge {
+    background-color: #FFFFFF;
+    padding: 0.3125rem 0.25rem;
+    overflow: hidden;
+}
+
+.mock-doc.badge .mk-kick {
+    font-size: 0.1875rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-align: center;
+    text-transform: uppercase;
+    color: #2F333C;
+    margin-bottom: 0.0625rem;
+}
+
+.mock-doc.badge .mk-name {
+    font-size: 0.5625rem;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+    text-align: center;
+    text-transform: uppercase;
+    color: #2F333C;
+}
+
+.mock-doc.badge .mk-title {
+    font-size: 0.1875rem;
+    letter-spacing: 0.26em;
+    text-align: center;
+    text-transform: uppercase;
+    color: #2F333C;
+    margin-bottom: 0.25rem;
+    padding-bottom: 0.125rem;
+    border-bottom: 1px solid #1F4E79;
+    width: 34%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.mock-doc.badge .mk-cols {
+    display: grid;
+    grid-template-columns: 30% 70%;
+    gap: 0.25rem;
+}
+
+.mock-doc.badge .mk-main {
+    border-left: 1px solid #A3AFCB;
+    padding-left: 0.25rem;
+}
+
+.mock-doc.badge .mk-h {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    font-size: 0.25rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #2F333C;
+    margin: 0.1875rem 0 0.0625rem;
+}
+
+.mock-doc.badge .mk-dot {
+    flex: 0 0 auto;
+    width: 0.3125rem;
+    height: 0.3125rem;
+    border-radius: 50%;
+    background-color: #1F4E79;
+}
+
+.mock-doc.badge .mk-foot {
+    margin-top: 0.25rem;
+    border-top: 1px solid #1F4E79;
+}
+
 /* --------------------------------------------------------------------------
    Click-to-edit on the preview.
 
