@@ -1853,5 +1853,148 @@ window.TB_PHOTO_MOCKUPS = [
             { x: 609, y: 961 },
             { x: 252, y: 961 }
         ]
+    },
+    {
+        id: "hoodie-buckethat-clay",
+        title: "White Hoodie and Bucket Hat on Clay",
+        thumb: "assets/thumbnails/product-mockups/apparel/sets/hoodie-buckethat-clay/hoodie-buckethat-clay-thumb.jpg",
+        /* 1122x1402, 0.8003 -- 4:5 to within 0.03%, straight thumbnail
+           downscale with no padding. The second two-garment set, and the
+           prompt for it was written against what the first one and the two
+           single-garment templates it reuses actually cost. */
+        base: "assets/mockups/apparel/sets/hoodie-buckethat-clay/hoodie-buckethat-clay-base.png",
+        overlay: null,
+        displace: "assets/mockups/apparel/sets/hoodie-buckethat-clay/hoodie-buckethat-clay-displace.png",
+        shade: "assets/mockups/apparel/sets/hoodie-buckethat-clay/hoodie-buckethat-clay-shade.png",
+        light: "assets/mockups/apparel/sets/hoodie-buckethat-clay/hoodie-buckethat-clay-light.png",
+        /* 0.3, the apparel default. This base has the catalog's most
+           structured light map and the largest cost to pay for it: a #12305C
+           navy fill lifts by a mean of 12.2 levels in the hoodie zone at this
+           gain, against the held bag's 11.8 and the tee-and-cap set's 7.17.
+           Nothing loses its blue identity (0.00%, p95 luma 83.8 against a
+           source of 44); at gain 1.0 it would, at 1.05% and p95 176.4.
+
+           The map earns its place on structure rather than on headroom, which
+           is 13.0. Light means run 29.5 at the hoodie zone's edge band against
+           52.4 in its interior, and 24.2 against 12.6 on the hat -- a 78% and
+           a 92% difference, where the linen frame's map agreed with itself to
+           one part in three hundred and was dropped as noise. */
+        lightGain: 0.3,
+        garment: "assets/mockups/apparel/sets/hoodie-buckethat-clay/hoodie-buckethat-clay-garment.png",
+        tone: "assets/mockups/apparel/sets/hoodie-buckethat-clay/hoodie-buckethat-clay-tone.png",
+        /* 4.50 luma levels -- the highest weave in the catalog, past the
+           hanger hoodie's 4.28, which held the record and was itself explained
+           by directional daylight across brushed fleece. Same lighting, same
+           explanation, and the same bill: see the blown-pixel note below. */
+        grain: "assets/mockups/apparel/sets/hoodie-buckethat-clay/hoodie-buckethat-clay-grain.png",
+        /* Both garments dye together. Regions of 579,160px of hoodie and
+           60,631px of hat, where the third largest classified region is 45px
+           of speckle. The shortest path between them is 29px against a 6px
+           dilation, so they close to 17px apart and stay two regions -- nearly
+           double the tee-and-cap set's 16px, which was that template's one
+           thin margin. The two seeds keep 639,832 of 640,031, dropping
+           0.031%. */
+        garmentColors: {
+            original: { name: "As photographed", hex: "#E9E9EC", original: true },
+            black: { name: "Black", hex: "#1A1A1A" },
+            navy: { name: "Navy", hex: "#1F2A44" },
+            red: { name: "Red", hex: "#B5352E" },
+            forest: { name: "Forest Green", hex: "#2E4B3C" },
+            sand: { name: "Sand", hex: "#D8C7A9" },
+            heatherGrey: { name: "Heather Grey", hex: "#6E6E69", heather: 0.55 },
+            heatherNavy: { name: "Heather Navy", hex: "#1F2A44", heather: 0.20 }
+        },
+        /* 12, and the reference is almost an identity: `hoodie-hanger-white`
+           ships 12 on a base of the same 1122 width whose global gradient p99
+           is 24.92 against this one's 24.72. Scaled by the bucket hat's
+           formula that gives 11.90. The bucket hat itself, at strength 6 and
+           gradient p99 14.23, would argue 10.42 -- but this frame is 90%
+           hoodie by classified area, so the hoodie reference decides.
+
+           THE GRID DOES NOT BOUND THIS ONE, which is worth saying because on
+           the card and the bucket hat it did. Ruled-line wobble inside the
+           chest zone runs 0, 0.28, 0.38, 0.38, 0.42, 0.55 mean sd at strengths
+           0, 6, 9, 12, 16 and 22: monotonic, sub-pixel throughout, and melting
+           nowhere. It permits 12 rather than selecting it. The hat zone cannot
+           be read this way at all -- at 132x70 it gives the line matcher only
+           about 26 rows, and it reported 1.947 at strength ZERO, where the
+           true value is 0. */
+        displaceStrength: 12,
+        mode: "surface",
+        backing: null,
+        /* NO `background`: opaque scene, every corner alpha 255, zero clear
+           pixels, so the Background panel stays hidden. The wall is what holds
+           the backdrop out of the garment mask -- saturation p1 118 to 121
+           across three patches against a gate of 14, with luma p50 95 to 107
+           against a floor of 110, so it fails BOTH gates rather than relying
+           on one. The woodwork fails too (rail p1 16, shelf 29).
+
+           The hanger is the one thing that does not: its patch reads
+           saturation p1 2 with luma reaching 176, because of the steel hook.
+           It does not matter, because the hook is a 45px island the
+           connected-region restriction drops -- but it is why that
+           restriction, not the classifier, is what keeps this scene clean. */
+        /* THE FACTORY THRESHOLDS ARE CORRECT HERE, which is worth stating
+           because `bucket-hat-white` is the one template that had to raise
+           them. That hat carried a colour cast measuring saturation 12 to 16,
+           so a gate of 14 bisected its crown and left the zone 87.9% pure.
+           This hat's zone measures saturation 2 / 5 / 7, and both zones come
+           out 100.0000% at 14/110 and at 20/165 alike. The photograph was
+           asked for a neutral white for exactly this reason. */
+        zoneLabels: ["Hoodie", "Bucket Hat"],
+        /* Two axis-aligned rectangles; both keep `zoneIsRect` and the full
+           shading pass.
+
+           HOODIE, 298x298: a 10x10in chest print at roughly 29.8 px/in, the
+           same size `hoodie-hanger-white` settled on and for the same reason.
+           It is bounded above by the hood's V, which ends at y=362, and below
+           by the kangaroo pocket's top seam at y=763 -- both found as
+           vertical-roughness ridges (20.15 and 9.87 against a body reading
+           1.5 to 3.0), the method that template introduced. That leaves 401px
+           of clear chest, so the print sits centred with 52px above and 51px
+           below. A 12x12in print would need 358px and leave 21px, which is not
+           breathing room. Centred on x=426, which the body's own run midpoints
+           hold to within 2px below the sleeves.
+
+           The scale carries an 11% band, as it did there: the waistband rib
+           (79px, 2.5in) says 31.6 px/in and pocket-seam-to-hem (339px,
+           12.14in) says 27.9. 29.8 is the midpoint.
+
+           BUCKET HAT, 144x82: about 12.0 x 6.9cm at this hat's scale, which is
+           what a real bucket-hat embroidery measures. It is NOT the doubled
+           17 x 9.5cm `bucket-hat-white` carries -- that hat filled its frame,
+           this one shares the frame with a hoodie and its crown is only 232px
+           wide. Bounded above by the front edge of the crown's top disc at
+           y=1045 and below by the crown-to-brim seam at y=1176, leaving 12px
+           and 13px of clearance. Centred on x=942, the crown's own midpoint.
+
+           The camera sits about 7.7 degrees above the hat's horizontal: the
+           top disc projects a 28px minor axis on a 210px diameter. That
+           foreshortens the crown front by cos(7.7) = 0.991, under 1%, which is
+           why a rectangle is still honest here. Width is bounded by curvature
+           rather than purity, as it is on the bucket hat: gradient inside this
+           zone peaks at 4.9 against the silhouette edge's 29.4. */
+        warpZones: [
+            [
+                { x: 277, y: 414 },
+                { x: 575, y: 414 },
+                { x: 575, y: 712 },
+                { x: 277, y: 712 }
+            ],
+            [
+                { x: 870, y: 1062 },
+                { x: 1014, y: 1062 },
+                { x: 1014, y: 1144 },
+                { x: 870, y: 1144 }
+            ]
+        ],
+        /* warpZones[0], not an independent value: every path that predates
+           multi-zone reads this one and the validator requires it. */
+        warpZone: [
+            { x: 277, y: 414 },
+            { x: 575, y: 414 },
+            { x: 575, y: 712 },
+            { x: 277, y: 712 }
+        ]
     }
 ];
